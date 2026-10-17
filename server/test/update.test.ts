@@ -9,7 +9,9 @@ import { join } from "node:path";
 const home = mkdtempSync(join(tmpdir(), "aemcp-update-"));
 const installed = join(home, ".aemcp", "server", "ae-mcp.mjs");
 // a stand-in "release": reports its version, and pretends `setup` updated the AE extension
-const fake = (v: string) => `if (process.argv.includes("--version")) console.log("${v}"); else console.log(JSON.stringify({ extensionInstalled: true }));\n`;
+// (an ES module, like the real bundle: Node refuses those under unknown file extensions)
+const fake = (v: string) =>
+  `import { argv } from "node:process";\nif (argv.includes("--version")) console.log("${v}"); else console.log(JSON.stringify({ extensionInstalled: true }));\n`;
 let release: any;
 let files: Record<string, string> = {};
 let server: Server;
@@ -59,7 +61,7 @@ describe("ae-mcp update", () => {
     expect(r).toMatchObject({ ok: false, updated: false });
     expect(r.message).toMatch(/checksum mismatch.*Nothing was changed/);
     expect(readFileSync(installed, "utf8")).toBe(before);
-    expect(existsSync(`${installed}.download`)).toBe(false);
+    expect(existsSync(installed.replace(/\.mjs$/, ".download.mjs"))).toBe(false);
   });
 
   it("refuses a download that doesn't report the release's version", async () => {

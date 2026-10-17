@@ -67,7 +67,8 @@ export async function runUpdate(): Promise<UpdateResult> {
   if (!rel.assets.some((a) => a.name === SERVER_ASSET))
     return { ...base, ok: false, to: latest, url: rel.html_url, message: `v${latest} can't be installed automatically. Download it from ${rel.html_url}` };
 
-  const tmp = `${INSTALLED_SERVER}.download`;
+  // keeps the .mjs ending: Node only runs ES modules with a known file extension
+  const tmp = INSTALLED_SERVER.replace(/\.mjs$/, ".download.mjs");
   try {
     const asset = rel.assets.find((a) => a.name === SERVER_ASSET)!;
     const [body, want] = await Promise.all([get(asset.browser_download_url).then((r) => r.arrayBuffer()), expectedDigest(rel)]);

@@ -9,11 +9,13 @@
 // Needs key-based SSH to the PC (OpenSSH server on Windows). SSH cannot open windows on the
 // PC's desktop, so After Effects has to be opened there by hand.
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const host = process.env.AEMCP_WIN_HOST || "ron-pc";
 const allowNoAe = process.argv.includes("--allow-no-ae");
 const bundle = fileURLToPath(new URL("../dist/ae-mcp.mjs", import.meta.url));
+const buildVersion = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
 const SSH = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10"];
 
 /** Runs a cmd.exe command line on the PC. */
@@ -68,11 +70,14 @@ if (!instances.length) {
     process.exit(1);
   }
 } else {
-  for (const [port, version] of instances) {
-    console.log(`\n== After Effects ${version} (bridge port ${port})`);
+  for (const [port, aeVersion] of instances) {
+    console.log(`\n== After Effects ${aeVersion} (bridge port ${port})`);
     const r = remote(run(`.aemcp\\server\\ae-mcp.mjs selftest --full`).replace("&& ", `&& set AEMCP_BRIDGE_PORT=${port}&& `), { quiet: true });
     const out = plain(r.out);
     console.log(out.split(/\r?\n/).filter((l) => /✖|signature|Bridge running|steps passed|step\(s\) failed|All checks|problem/i.test(l)).join("\n"));
+    const bridge = /bridge v(\S+?)\)/.exec(out)?.[1];
+    if (bridge && bridge !== buildVersion)
+      console.log(`  ! this After Effects still runs the v${bridge} extension: restart it on the PC to test v${buildVersion}'s extension too`);
     if (r.status !== 0) failed++;
   }
 }
