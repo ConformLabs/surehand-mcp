@@ -14,6 +14,10 @@ export interface AemcpConfig {
   updateCheck?: boolean;
   /** set to false to turn off the change report after edits */
   changeReport?: boolean;
+  /** "full" | "ask" | "read-only", and whether scripts may run shell commands */
+  permissions?: { mode?: string; allowShell?: boolean };
+  /** preferred After Effects instance when several run: "2026", "26.5" or a bridge port */
+  instance?: string;
 }
 
 export function configPath(): string {
@@ -35,5 +39,7 @@ export function loadConfig(): AemcpConfig {
     toolProfile: file.toolProfile,
     updateCheck: file.updateCheck,
     changeReport: file.changeReport,
+    permissions: file.permissions,
+    instance: file.instance,
   };
 }

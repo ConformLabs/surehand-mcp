@@ -47,9 +47,13 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 var define_AEMCP_CEP_FILES_default;
 var init_define_AEMCP_CEP_FILES = __esm({
   "<define:__AEMCP_CEP_FILES__>"() {
-    define_AEMCP_CEP_FILES_default = { "CSXS/manifest.xml": '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n<ExtensionManifest xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n    ExtensionBundleId="com.aemcp"\n    ExtensionBundleVersion="1.0.0"\n    ExtensionBundleName="AE MCP"\n    Version="9.0">\n  <ExtensionList>\n    <Extension Id="com.aemcp.bridge" Version="1.0.0" />\n    <Extension Id="com.aemcp.panel" Version="1.0.0" />\n  </ExtensionList>\n  <ExecutionEnvironment>\n    <HostList>\n      <Host Name="AEFT" Version="[16.0,99.9]" />\n    </HostList>\n    <LocaleList>\n      <Locale Code="All" />\n    </LocaleList>\n    <RequiredRuntimeList>\n      <RequiredRuntime Name="CSXS" Version="9.0" />\n    </RequiredRuntimeList>\n  </ExecutionEnvironment>\n  <DispatchInfoList>\n    <!-- Invisible background extension: starts with After Effects and runs the local bridge server. -->\n    <Extension Id="com.aemcp.bridge">\n      <DispatchInfo>\n        <Resources>\n          <MainPath>./bridge.html</MainPath>\n          <CEFCommandLine>\n            <Parameter>--enable-nodejs</Parameter>\n            <Parameter>--mixed-context</Parameter>\n          </CEFCommandLine>\n        </Resources>\n        <Lifecycle>\n          <AutoVisible>false</AutoVisible>\n          <StartOn>\n            <Event>com.adobe.csxs.events.ApplicationInitialized</Event>\n            <Event>applicationActivate</Event>\n          </StartOn>\n        </Lifecycle>\n        <UI>\n          <Type>Custom</Type>\n          <Geometry>\n            <Size><Height>1</Height><Width>1</Width></Size>\n          </Geometry>\n        </UI>\n      </DispatchInfo>\n    </Extension>\n    <!-- Status panel: Window > Extensions > AE MCP -->\n    <Extension Id="com.aemcp.panel">\n      <DispatchInfo>\n        <Resources>\n          <MainPath>./index.html</MainPath>\n          <CEFCommandLine>\n            <Parameter>--enable-nodejs</Parameter>\n            <Parameter>--mixed-context</Parameter>\n          </CEFCommandLine>\n        </Resources>\n        <Lifecycle>\n          <AutoVisible>true</AutoVisible>\n        </Lifecycle>\n        <UI>\n          <Type>Panel</Type>\n          <Menu>AE MCP</Menu>\n          <Geometry>\n            <Size><Height>420</Height><Width>320</Width></Size>\n            <MinSize><Height>200</Height><Width>240</Width></MinSize>\n          </Geometry>\n        </UI>\n      </DispatchInfo>\n    </Extension>\n  </DispatchInfoList>\n</ExtensionManifest>\n', "bridge.html": '<!DOCTYPE html>\n<html>\n<head><meta charset="utf-8"><title>AE MCP Bridge</title></head>\n<body>\n<script src="js/bridge-core.js"></script>\n<script>AEMCPBridge.start();</script>\n</body>\n</html>\n', "css/panel.css": ':root { --bg: #232323; --fg: #d6d6d6; --muted: #8a8a8a; --ok: #3fb950; --bad: #f85149; --warn: #d29922; --line: #3a3a3a; }\n* { box-sizing: border-box; }\nbody { margin: 0; padding: 10px; background: var(--bg); color: var(--fg); font: 12px -apple-system, "Segoe UI", sans-serif; }\nheader { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }\n#title { font-weight: 600; font-size: 13px; }\n.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--warn); flex: none; }\n.dot.ok { background: var(--ok); } .dot.bad { background: var(--bad); }\n.muted { color: var(--muted); }\n.row { display: flex; gap: 6px; margin-bottom: 10px; }\nbutton { background: #3a3a3a; color: var(--fg); border: 1px solid #4a4a4a; border-radius: 4px; padding: 4px 10px; cursor: pointer; font: inherit; }\nbutton:hover { background: #454545; }\n.label { text-transform: uppercase; font-size: 10px; letter-spacing: .05em; color: var(--muted); margin-bottom: 4px; }\nul { list-style: none; padding: 0; margin: 0; }\nli { border-top: 1px solid var(--line); padding: 4px 0; word-break: break-all; }\nli .t { color: var(--muted); margin-right: 6px; }\nli.err .s { color: var(--bad); } li.ok .s { color: var(--ok); }\nfooter { margin-top: 10px; font-size: 10px; }\n.banner { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #2d2a12; border: 1px solid #5c531c; border-radius: 4px; padding: 6px 8px; margin-bottom: 10px; }\n.banner[hidden], [hidden] { display: none; }\n.setting { align-items: center; }\n.setting label { color: var(--muted); }\nselect { background: #3a3a3a; color: var(--fg); border: 1px solid #4a4a4a; border-radius: 4px; padding: 3px 6px; font: inherit; flex: 1; }\n.small { font-size: 10px; margin: -6px 0 10px; }\n', "index.html": '<!DOCTYPE html>\n<html>\n<head>\n  <meta charset="utf-8">\n  <title>AE MCP</title>\n  <link rel="stylesheet" href="css/panel.css">\n</head>\n<body>\n  <header>\n    <span id="dot" class="dot"></span>\n    <div>\n      <div id="title">AE MCP</div>\n      <div id="sub" class="muted">checking\u2026</div>\n    </div>\n  </header>\n  <div id="update" class="banner" hidden>\n    <span id="updateText"></span>\n    <button id="updateBtn">Download</button>\n  </div>\n  <section class="row">\n    <button id="test">Test</button>\n    <button id="refresh">Refresh</button>\n    <button id="diag" title="Copies a report to paste into a bug report or a chat">Copy diagnostics</button>\n  </section>\n  <section class="row setting">\n    <label for="profile">AI tools</label>\n    <select id="profile">\n      <option value="core">Core (faster, recommended)</option>\n      <option value="full">Full (all tools)</option>\n    </select>\n  </section>\n  <div id="profileNote" class="muted small" hidden>Saved. Restart your AI app to apply.</div>\n  <section>\n    <div class="label">Recent calls</div>\n    <ul id="log"><li class="muted">No calls yet</li></ul>\n  </section>\n  <footer class="muted" id="foot"></footer>\n  <script src="js/bridge-core.js"></script>\n  <script src="js/panel.js"></script>\n</body>\n</html>\n', "js/bridge-core.js": `/* AE MCP bridge: a tiny HTTP server inside After Effects (CEP + Node) that evaluates
+    define_AEMCP_CEP_FILES_default = { "CSXS/manifest.xml": '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n<ExtensionManifest xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n    ExtensionBundleId="com.aemcp"\n    ExtensionBundleVersion="1.0.0"\n    ExtensionBundleName="AE MCP"\n    Version="9.0">\n  <ExtensionList>\n    <Extension Id="com.aemcp.bridge" Version="1.0.0" />\n    <Extension Id="com.aemcp.panel" Version="1.0.0" />\n  </ExtensionList>\n  <ExecutionEnvironment>\n    <HostList>\n      <Host Name="AEFT" Version="[16.0,99.9]" />\n    </HostList>\n    <LocaleList>\n      <Locale Code="All" />\n    </LocaleList>\n    <RequiredRuntimeList>\n      <RequiredRuntime Name="CSXS" Version="9.0" />\n    </RequiredRuntimeList>\n  </ExecutionEnvironment>\n  <DispatchInfoList>\n    <!-- Invisible background extension: starts with After Effects and runs the local bridge server. -->\n    <Extension Id="com.aemcp.bridge">\n      <DispatchInfo>\n        <Resources>\n          <MainPath>./bridge.html</MainPath>\n          <CEFCommandLine>\n            <Parameter>--enable-nodejs</Parameter>\n            <Parameter>--mixed-context</Parameter>\n          </CEFCommandLine>\n        </Resources>\n        <Lifecycle>\n          <AutoVisible>false</AutoVisible>\n          <StartOn>\n            <Event>com.adobe.csxs.events.ApplicationInitialized</Event>\n            <Event>applicationActivate</Event>\n          </StartOn>\n        </Lifecycle>\n        <UI>\n          <Type>Custom</Type>\n          <Geometry>\n            <Size><Height>1</Height><Width>1</Width></Size>\n          </Geometry>\n        </UI>\n      </DispatchInfo>\n    </Extension>\n    <!-- Status panel: Window > Extensions > AE MCP -->\n    <Extension Id="com.aemcp.panel">\n      <DispatchInfo>\n        <Resources>\n          <MainPath>./index.html</MainPath>\n          <CEFCommandLine>\n            <Parameter>--enable-nodejs</Parameter>\n            <Parameter>--mixed-context</Parameter>\n          </CEFCommandLine>\n        </Resources>\n        <Lifecycle>\n          <AutoVisible>true</AutoVisible>\n        </Lifecycle>\n        <UI>\n          <Type>Panel</Type>\n          <Menu>AE MCP</Menu>\n          <Geometry>\n            <Size><Height>420</Height><Width>320</Width></Size>\n            <MinSize><Height>200</Height><Width>240</Width></MinSize>\n          </Geometry>\n        </UI>\n      </DispatchInfo>\n    </Extension>\n  </DispatchInfoList>\n</ExtensionManifest>\n', "bridge.html": '<!DOCTYPE html>\n<html>\n<head><meta charset="utf-8"><title>AE MCP Bridge</title></head>\n<body>\n<script src="js/bridge-core.js"></script>\n<script>AEMCPBridge.start();</script>\n</body>\n</html>\n', "css/panel.css": ':root { --bg: #232323; --fg: #d6d6d6; --muted: #8a8a8a; --ok: #3fb950; --bad: #f85149; --warn: #d29922; --line: #3a3a3a; }\n* { box-sizing: border-box; }\nbody { margin: 0; padding: 10px; background: var(--bg); color: var(--fg); font: 12px -apple-system, "Segoe UI", sans-serif; }\nheader { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }\n#title { font-weight: 600; font-size: 13px; }\n.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--warn); flex: none; }\n.dot.ok { background: var(--ok); } .dot.bad { background: var(--bad); }\n.muted { color: var(--muted); }\n.row { display: flex; gap: 6px; margin-bottom: 10px; }\nbutton { background: #3a3a3a; color: var(--fg); border: 1px solid #4a4a4a; border-radius: 4px; padding: 4px 10px; cursor: pointer; font: inherit; }\nbutton:hover { background: #454545; }\n.label { text-transform: uppercase; font-size: 10px; letter-spacing: .05em; color: var(--muted); margin-bottom: 4px; }\nul { list-style: none; padding: 0; margin: 0; }\nli { border-top: 1px solid var(--line); padding: 4px 0; word-break: break-all; }\nli .t { color: var(--muted); margin-right: 6px; }\nli.err .s { color: var(--bad); } li.ok .s { color: var(--ok); }\nfooter { margin-top: 10px; font-size: 10px; }\n.banner { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #2d2a12; border: 1px solid #5c531c; border-radius: 4px; padding: 6px 8px; margin-bottom: 10px; }\n.banner[hidden], [hidden] { display: none; }\n.setting { align-items: center; }\n.setting label { color: var(--muted); }\nselect { background: #3a3a3a; color: var(--fg); border: 1px solid #4a4a4a; border-radius: 4px; padding: 3px 6px; font: inherit; flex: 1; }\n.small { font-size: 10px; margin: -6px 0 10px; }\n.grid { display: grid; grid-template-columns: auto 1fr; gap: 6px 8px; align-items: center; margin-bottom: 8px; }\n.grid label { color: var(--muted); }\n#approvals { border: 1px solid #5c531c; background: #2d2a12; border-radius: 4px; padding: 6px 8px; margin-bottom: 10px; }\n.approval { border-top: 1px solid #4a4520; padding: 6px 0; }\n.approval:first-child { border-top: 0; }\n.approval .what { font-weight: 600; margin-bottom: 4px; }\n.approval pre, li pre { max-height: 160px; overflow: auto; background: #181818; padding: 6px; border-radius: 3px; margin: 4px 0; white-space: pre-wrap; word-break: break-word; font: 11px Menlo, Consolas, monospace; }\n.approval .row { margin: 4px 0 0; }\nbutton.allow { background: #1f4d2b; border-color: #2e6b3d; }\nbutton.deny { background: #5a1f1f; border-color: #7a2c2c; }\nli { cursor: pointer; }\nli .c { color: var(--muted); }\n', "index.html": '<!DOCTYPE html>\n<html>\n<head>\n  <meta charset="utf-8">\n  <title>AE MCP</title>\n  <link rel="stylesheet" href="css/panel.css">\n</head>\n<body>\n  <header>\n    <span id="dot" class="dot"></span>\n    <div>\n      <div id="title">AE MCP</div>\n      <div id="sub" class="muted">checking\u2026</div>\n    </div>\n  </header>\n  <div id="update" class="banner" hidden>\n    <span id="updateText"></span>\n    <button id="updateBtn">Download</button>\n  </div>\n\n  <section id="approvals" hidden>\n    <div class="label">Waiting for your approval</div>\n    <div id="approvalList"></div>\n  </section>\n\n  <section class="row">\n    <button id="test">Test</button>\n    <button id="diag" title="Copies a report to paste into a bug report or a chat">Copy diagnostics</button>\n    <button id="openLog" title="Show the full activity log file">Open log</button>\n  </section>\n\n  <section class="grid">\n    <label for="perm">Permissions</label>\n    <select id="perm">\n      <option value="full">Full access</option>\n      <option value="ask">Ask before every change</option>\n      <option value="read-only">Read-only</option>\n    </select>\n    <label for="shell">Shell commands</label>\n    <select id="shell">\n      <option value="on">Allowed</option>\n      <option value="off">Blocked</option>\n    </select>\n    <label for="profile">AI tools</label>\n    <select id="profile">\n      <option value="core">Core (faster, recommended)</option>\n      <option value="full">Full (all tools)</option>\n    </select>\n  </section>\n  <div id="note" class="muted small" hidden></div>\n\n  <section>\n    <div class="label">Activity <span class="muted" id="activityHint">(click an entry for details)</span></div>\n    <ul id="log"><li class="muted">No calls yet</li></ul>\n  </section>\n  <footer class="muted" id="foot"></footer>\n  <script src="js/bridge-core.js"></script>\n  <script src="js/panel.js"></script>\n</body>\n</html>\n', "js/bridge-core.js": `/* AE MCP bridge: a tiny HTTP server inside After Effects (CEP + Node) that evaluates
  * ExtendScript sent by the ae-mcp server. Binds to 127.0.0.1 only and requires the
- * shared token from ~/.aemcp/config.json. */
+ * shared token from ~/.aemcp/config.json.
+ *
+ * Several After Effects instances (e.g. 2025 and 2026) can run at once: each bridge takes the
+ * first free port from bridgePort upwards and registers itself in ~/.aemcp/instances/, so the
+ * server can list them and pick one. */
 (function (global) {
   "use strict";
   var nodeRequire = typeof require !== "undefined" ? require : global.cep_node && global.cep_node.require;
@@ -63,6 +67,9 @@ var init_define_AEMCP_CEP_FILES = __esm({
   var CONFIG_DIR = path.join(os.homedir(), ".aemcp");
   var CONFIG_FILE = path.join(CONFIG_DIR, "config.json");
   var STATUS_FILE = path.join(CONFIG_DIR, "bridge-status.json");
+  var INSTANCES_DIR = path.join(CONFIG_DIR, "instances");
+  var PANEL_ID = "com.aemcp.panel";
+  var PORT_RANGE = 10;
 
   function loadConfig() {
     var cfg = {};
@@ -77,6 +84,11 @@ var init_define_AEMCP_CEP_FILES = __esm({
     return cfg;
   }
 
+  function permissionMode() {
+    var p = loadConfig().permissions;
+    return (p && p.mode) || "full";
+  }
+
   function hostInfo() {
     try {
       var env = JSON.parse(global.__adobe_cep__.getHostEnvironment());
@@ -88,17 +100,33 @@ var init_define_AEMCP_CEP_FILES = __esm({
     global.__adobe_cep__.evalScript(script, function (r) { cb(r); });
   }
 
-  var state = { started: false, listening: false, error: null, port: null, busy: false, queue: [], log: [], startedAt: null };
+  var state = {
+    started: false, listening: false, error: null, port: null, busy: false, queue: [], log: [], startedAt: null,
+    current: null, // { startedAt, label } of the script being evaluated
+    pending: [], // edits waiting for approval in "ask" mode
+    lastActivated: null,
+  };
 
   function addLog(entry) {
     state.log.unshift(entry);
     if (state.log.length > 50) state.log.length = 50;
   }
 
+  function instanceFile() { return path.join(INSTANCES_DIR, String(state.port) + ".json"); }
+
   function writeStatus() {
-    try {
-      fs.writeFileSync(STATUS_FILE, JSON.stringify({ listening: state.listening, port: state.port, error: state.error, pid: process.pid, host: hostInfo(), version: VERSION, at: new Date().toISOString() }, null, 2));
-    } catch (e) {}
+    var info = {
+      listening: state.listening, port: state.port, error: state.error, pid: process.pid, host: hostInfo(), version: VERSION,
+      startedAt: state.startedAt, lastActivated: state.lastActivated, at: new Date().toISOString(),
+    };
+    try { fs.writeFileSync(STATUS_FILE, JSON.stringify(info, null, 2)); } catch (e) {}
+    if (state.listening) {
+      try { fs.mkdirSync(INSTANCES_DIR, { recursive: true }); fs.writeFileSync(instanceFile(), JSON.stringify(info, null, 2)); } catch (e) {}
+    }
+  }
+
+  function unregister() {
+    try { if (state.listening) fs.unlinkSync(instanceFile()); } catch (e) {}
   }
 
   // ExtendScript is single threaded: run one script at a time.
@@ -108,17 +136,20 @@ var init_define_AEMCP_CEP_FILES = __esm({
     if (job.cancelled) return pump();
     state.busy = true;
     var t0 = Date.now();
+    state.current = { startedAt: t0, label: job.label };
     evalScript(job.script, function (result) {
       state.busy = false;
+      state.current = null;
       var ms = Date.now() - t0;
       var ok = result !== "EvalScript error." && result.indexOf('{"ok":false') !== 0;
-      addLog({ at: new Date().toISOString(), ms: ms, ok: ok, size: job.script.length, preview: String(result).slice(0, 160) });
+      addLog({ at: new Date().toISOString(), ms: ms, ok: ok, size: job.script.length, label: job.label, preview: String(result).slice(0, 160) });
       job.done(result);
       pump();
     });
   }
 
   function send(res, status, obj) {
+    if (res.headersSent) return;
     res.writeHead(status, { "content-type": "application/json" });
     res.end(JSON.stringify(obj));
   }
@@ -129,84 +160,175 @@ var init_define_AEMCP_CEP_FILES = __esm({
     try { return crypto.timingSafeEqual(Buffer.from(h), Buffer.from(token)); } catch (e) { return false; }
   }
 
+  function readBody(req, cb) {
+    var chunks = [];
+    req.on("data", function (c) { chunks.push(c); });
+    req.on("end", function () {
+      try { cb(null, JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}")); } catch (e) { cb(e); }
+    });
+  }
+
+  function openPanel() {
+    try { global.__adobe_cep__.requestOpenExtension(PANEL_ID, ""); } catch (e) {}
+  }
+
+  function health(req, token) {
+    var cur = state.current;
+    return {
+      ok: true, name: "aemcp-bridge", version: VERSION, host: hostInfo(), port: state.port, pid: process.pid,
+      busy: state.busy, busyForMs: cur ? Date.now() - cur.startedAt : 0, busyWith: cur ? cur.label || null : null,
+      queue: state.queue.length, pendingApprovals: state.pending.length, permissionMode: permissionMode(),
+      startedAt: state.startedAt, lastActivated: state.lastActivated, authorized: authorized(req, token),
+    };
+  }
+
+  function handleEval(req, res, body) {
+    if (!body || typeof body.script !== "string") return send(res, 400, { ok: false, error: "missing script" });
+    var finished = false;
+    var job = {
+      script: body.script,
+      label: body.label || null,
+      done: function (result) {
+        if (finished) return;
+        finished = true;
+        clearTimeout(timer);
+        send(res, 200, { ok: true, result: result });
+      },
+    };
+    var timeoutMs = Math.max(1000, Math.min(Number(body.timeoutMs) || 120000, 24 * 3600 * 1000));
+    var timer = null;
+    var startTimer = function () {
+      timer = setTimeout(function () {
+        if (finished) return;
+        finished = true;
+        job.cancelled = true; // drop it if it has not started yet
+        send(res, 504, { ok: false, error: "Timed out after " + Math.round(timeoutMs / 1000) + "s waiting for After Effects (it may be busy, rendering, or showing a dialog)." });
+      }, timeoutMs);
+    };
+    // client went away (or the AI app cancelled the request) before we answered: don't run it if still queued
+    res.on("close", function () { if (!finished) { finished = true; job.cancelled = true; clearTimeout(timer); dropPending(job); } });
+
+    if (body.approval && permissionMode() === "ask") {
+      // hold the edit until the user allows or denies it in the AE MCP panel
+      var p = {
+        id: crypto.randomBytes(6).toString("hex"), at: new Date().toISOString(), tool: body.approval.tool || "edit",
+        summary: String(body.approval.summary || "").slice(0, 4000), job: job,
+      };
+      p.resolve = function (allow) {
+        state.pending = state.pending.filter(function (x) { return x !== p; });
+        if (finished) return;
+        if (!allow) {
+          finished = true;
+          addLog({ at: new Date().toISOString(), ms: 0, ok: false, label: p.tool, preview: "denied in the AE MCP panel" });
+          return send(res, 200, { ok: false, denied: true, error: "The user denied this change in After Effects (AE MCP panel)." });
+        }
+        startTimer();
+        state.queue.push(job);
+        pump();
+      };
+      state.pending.push(p);
+      openPanel();
+      // waiting for a person: allow up to 10 minutes before giving up
+      setTimeout(function () { if (!finished && state.pending.indexOf(p) >= 0) { state.pending = state.pending.filter(function (x) { return x !== p; }); finished = true; send(res, 200, { ok: false, denied: true, error: "No one approved this change in the AE MCP panel within 10 minutes." }); } }, 10 * 60 * 1000);
+      return;
+    }
+    startTimer();
+    state.queue.push(job);
+    pump();
+  }
+
+  function dropPending(job) {
+    state.pending = state.pending.filter(function (x) { return x.job !== job; });
+  }
+
   function start() {
     if (state.started) return state;
     state.started = true;
     var cfg = loadConfig();
-    state.port = cfg.bridgePort;
-
+    var base = cfg.bridgePort;
     var server = http.createServer(function (req, res) {
       // Reject browser-originated requests (DNS-rebinding / CSRF protection)
       if (req.headers.origin) return send(res, 403, { ok: false, error: "forbidden" });
       var token = loadConfig().token;
-      if (req.method === "GET" && req.url === "/health") {
-        return send(res, 200, { ok: true, name: "aemcp-bridge", version: VERSION, host: hostInfo(), busy: state.busy, queue: state.queue.length, authorized: authorized(req, token) });
-      }
+      if (req.method === "GET" && req.url === "/health") return send(res, 200, health(req, token));
       if (!authorized(req, token)) return send(res, 401, { ok: false, error: "unauthorized" });
       if (req.method === "GET" && req.url === "/log") return send(res, 200, { ok: true, log: state.log });
-      if (req.method === "POST" && req.url === "/eval") {
-        var chunks = [];
-        req.on("data", function (c) { chunks.push(c); });
-        req.on("end", function () {
-          var body;
-          try { body = JSON.parse(Buffer.concat(chunks).toString("utf8")); } catch (e) { return send(res, 400, { ok: false, error: "invalid JSON" }); }
-          if (!body || typeof body.script !== "string") return send(res, 400, { ok: false, error: "missing script" });
-          var finished = false;
-          var job = {
-            script: body.script,
-            done: function (result) {
-              if (finished) return;
-              finished = true;
-              clearTimeout(timer);
-              send(res, 200, { ok: true, result: result });
-            },
-          };
-          var timeoutMs = Math.max(1000, Math.min(Number(body.timeoutMs) || 120000, 24 * 3600 * 1000));
-          var timer = setTimeout(function () {
-            if (finished) return;
-            finished = true;
-            job.cancelled = true; // drop it if it has not started yet
-            send(res, 504, { ok: false, error: "Timed out after " + timeoutMs + "ms waiting for After Effects (it may be busy, rendering, or showing a dialog)." });
-          }, timeoutMs);
-          // client went away before we answered: don't run it if it is still queued
-          res.on("close", function () { if (!finished) { job.cancelled = true; } });
-          state.queue.push(job);
-          pump();
+      if (req.method === "GET" && req.url === "/pending") {
+        return send(res, 200, { ok: true, pending: state.pending.map(function (p) { return { id: p.id, at: p.at, tool: p.tool, summary: p.summary }; }) });
+      }
+      if (req.method === "POST" && req.url === "/approve") {
+        return readBody(req, function (err, b) {
+          if (err) return send(res, 400, { ok: false, error: "invalid JSON" });
+          var p = state.pending.filter(function (x) { return x.id === b.id; })[0];
+          if (!p) return send(res, 404, { ok: false, error: "no such request (already answered or cancelled)" });
+          p.resolve(!!b.allow);
+          send(res, 200, { ok: true });
         });
-        return;
+      }
+      if (req.method === "POST" && req.url === "/eval") {
+        return readBody(req, function (err, b) {
+          if (err) return send(res, 400, { ok: false, error: "invalid JSON" });
+          handleEval(req, res, b);
+        });
       }
       send(res, 404, { ok: false, error: "not found" });
     });
 
+    var attempt = 0;
     server.on("error", function (e) {
+      if (e.code === "EADDRINUSE" && attempt < PORT_RANGE - 1) {
+        attempt++;
+        state.port = base + attempt;
+        return server.listen(state.port, "127.0.0.1");
+      }
       state.listening = false;
-      state.error = e.code === "EADDRINUSE"
-        ? "Port " + state.port + " is already in use (another After Effects instance running the bridge?)"
-        : String(e.message || e);
+      state.error = e.code === "EADDRINUSE" ? "Ports " + base + "-" + (base + PORT_RANGE - 1) + " are all in use" : String(e.message || e);
       writeStatus();
     });
-    server.listen(state.port, "127.0.0.1", function () {
+    server.on("listening", function () {
       state.listening = true;
       state.error = null;
       state.startedAt = new Date().toISOString();
+      state.lastActivated = state.startedAt;
       writeStatus();
     });
+    state.port = base;
+    server.listen(state.port, "127.0.0.1");
     state.server = server;
+
+    // remember when this After Effects window was last brought to the front: with several
+    // instances open, the server uses the one you used most recently
+    try {
+      global.__adobe_cep__.addEventListener("com.adobe.csxs.events.ApplicationActivate", function () {
+        state.lastActivated = new Date().toISOString();
+        writeStatus();
+      });
+    } catch (e) {}
+    setInterval(writeStatus, 60 * 1000); // heartbeat
+    try { global.addEventListener("unload", unregister); } catch (e) {}
+    try { process.on("exit", unregister); } catch (e) {}
     return state;
   }
 
-  global.AEMCPBridge = { start: start, state: state, loadConfig: loadConfig, hostInfo: hostInfo, VERSION: VERSION, CONFIG_FILE: CONFIG_FILE };
+  global.AEMCPBridge = {
+    start: start, state: state, loadConfig: loadConfig, hostInfo: hostInfo, permissionMode: permissionMode,
+    VERSION: VERSION, CONFIG_FILE: CONFIG_FILE, CONFIG_DIR: CONFIG_DIR,
+  };
 })(window);
-`, "js/panel.js": `/* Status panel. If the background bridge extension isn't running (some hosts don't honour
- * StartOn for invisible extensions), the panel starts the bridge itself. */
+`, "js/panel.js": `/* Status panel: connection, approvals ("ask" mode), permissions, activity log, diagnostics.
+ * If the background bridge extension isn't running (some hosts don't honour StartOn for
+ * invisible extensions), the panel starts the bridge itself. */
 (function () {
   "use strict";
   var http = require("http");
   var fs = require("fs");
   var os = require("os");
   var path = require("path");
+  var childProcess = require("child_process");
   var $ = function (id) { return document.getElementById(id); };
   var AEMCP_DIR = path.join(os.homedir(), ".aemcp");
+  var ACTIVITY_FILE = path.join(AEMCP_DIR, "activity.jsonl");
+  var myPort = null; // the bridge of THIS After Effects instance
 
   function readJson(file) {
     try { return JSON.parse(fs.readFileSync(file, "utf8")); } catch (e) { return null; }
@@ -215,7 +337,8 @@ var init_define_AEMCP_CEP_FILES = __esm({
   function call(method, p, body, cb) {
     var cfg = AEMCPBridge.loadConfig();
     var data = body ? JSON.stringify(body) : null;
-    var req = http.request({ host: "127.0.0.1", port: cfg.bridgePort, path: p, method: method,
+    var port = myPort || AEMCPBridge.state.port || cfg.bridgePort;
+    var req = http.request({ host: "127.0.0.1", port: port, path: p, method: method,
       headers: { authorization: "Bearer " + cfg.token, "content-type": "application/json" } }, function (res) {
       var chunks = [];
       res.on("data", function (c) { chunks.push(c); });
@@ -227,27 +350,124 @@ var init_define_AEMCP_CEP_FILES = __esm({
     req.end();
   }
 
+  // The bridge of this instance: the bridge extension writes bridge-status.json with its pid and port;
+  // with several AE instances, match on this AE's version.
+  function findMyPort(cb) {
+    var host = AEMCPBridge.hostInfo();
+    var dir = path.join(AEMCP_DIR, "instances"), best = null;
+    try {
+      fs.readdirSync(dir).forEach(function (f) {
+        var info = readJson(path.join(dir, f));
+        if (info && info.host && info.host.appVersion === host.appVersion) best = info.port;
+      });
+    } catch (e) {}
+    myPort = best || AEMCPBridge.state.port || AEMCPBridge.loadConfig().bridgePort;
+    cb();
+  }
+
   function setStatus(kind, text) {
     $("dot").className = "dot " + kind;
     $("sub").textContent = text;
   }
 
-  function renderLog(log) {
-    var ul = $("log");
-    ul.innerHTML = "";
-    if (!log || !log.length) { ul.innerHTML = '<li class="muted">No calls yet</li>'; return; }
-    log.slice(0, 20).forEach(function (e) {
-      var li = document.createElement("li");
-      li.className = e.ok ? "ok" : "err";
-      li.innerHTML = '<span class="t"></span><span class="s"></span> <span class="p"></span>';
-      li.querySelector(".t").textContent = new Date(e.at).toLocaleTimeString() + " \xB7 " + e.ms + "ms";
-      li.querySelector(".s").textContent = e.ok ? "ok" : "error";
-      li.querySelector(".p").textContent = e.preview;
-      ul.appendChild(li);
-    });
+  function note(text) {
+    $("note").textContent = text;
+    $("note").hidden = false;
   }
 
-  // --- update banner (the MCP server checks GitHub at most daily and caches the result) ---
+  // ---------- config (permissions, tool profile) ----------
+  function readConfig() { return readJson(AEMCPBridge.CONFIG_FILE) || AEMCPBridge.loadConfig(); }
+  function writeConfig(cfg) {
+    try { fs.writeFileSync(AEMCPBridge.CONFIG_FILE, JSON.stringify(cfg, null, 2) + "\\n"); return true; }
+    catch (e) { alert("Could not save settings: " + e.message); return false; }
+  }
+  function loadSettings() {
+    var cfg = readConfig(), p = cfg.permissions || {};
+    $("perm").value = p.mode === "ask" || p.mode === "read-only" ? p.mode : "full";
+    $("shell").value = p.allowShell === false ? "off" : "on";
+    $("profile").value = cfg.toolProfile === "full" ? "full" : "core";
+  }
+  $("perm").onchange = $("shell").onchange = function () {
+    var cfg = readConfig();
+    cfg.permissions = { mode: $("perm").value, allowShell: $("shell").value === "on" };
+    if (writeConfig(cfg)) note("Permissions saved. They apply to the next request (no restart needed).");
+  };
+  $("profile").onchange = function () {
+    var cfg = readConfig();
+    cfg.toolProfile = $("profile").value;
+    if (writeConfig(cfg)) note("Saved. Restart your AI app to apply the tool set.");
+  };
+
+  // ---------- approvals ----------
+  var shownPending = "";
+  function renderPending(list) {
+    var key = list.map(function (p) { return p.id; }).join(",");
+    if (key === shownPending) return;
+    shownPending = key;
+    var box = $("approvalList");
+    box.innerHTML = "";
+    $("approvals").hidden = !list.length;
+    list.forEach(function (p) {
+      var d = document.createElement("div");
+      d.className = "approval";
+      d.innerHTML = '<div class="what"></div><pre></pre><div class="row"><button class="allow">Allow</button><button class="deny">Deny</button></div>';
+      d.querySelector(".what").textContent = p.tool + " \xB7 " + new Date(p.at).toLocaleTimeString();
+      d.querySelector("pre").textContent = p.summary;
+      d.querySelector(".allow").onclick = function () { answer(p.id, true); };
+      d.querySelector(".deny").onclick = function () { answer(p.id, false); };
+      box.appendChild(d);
+    });
+  }
+  function answer(id, allow) {
+    call("POST", "/approve", { id: id, allow: allow }, function () { shownPending = ""; pollPending(); });
+  }
+  function pollPending() {
+    call("GET", "/pending", null, function (err, r) { if (!err && r && r.pending) renderPending(r.pending); });
+  }
+
+  // ---------- activity ----------
+  function readActivity(limit) {
+    try {
+      var lines = fs.readFileSync(ACTIVITY_FILE, "utf8").trim().split("\\n");
+      return lines.slice(-limit).map(function (l) { try { return JSON.parse(l); } catch (e) { return null; } }).filter(Boolean).reverse();
+    } catch (e) { return []; }
+  }
+  var shownActivity = "", openEntry = null;
+  function renderActivity() {
+    var list = readActivity(30);
+    var key = list.length ? list[0].at + list.length : "";
+    if (key === shownActivity) return;
+    shownActivity = key;
+    var ul = $("log");
+    ul.innerHTML = "";
+    if (!list.length) { ul.innerHTML = '<li class="muted">No calls yet</li>'; return; }
+    list.forEach(function (e) {
+      var li = document.createElement("li");
+      li.className = e.ok ? "ok" : "err";
+      li.innerHTML = '<span class="t"></span><span class="s"></span> <span class="p"></span> <span class="c"></span>';
+      li.querySelector(".t").textContent = new Date(e.at).toLocaleTimeString() + " \xB7 " + e.ms + "ms";
+      li.querySelector(".s").textContent = e.tool;
+      li.querySelector(".p").textContent = (e.summary || "").slice(0, 120);
+      li.querySelector(".c").textContent = (e.client ? " \xB7 " + e.client : "") + (e.changes ? " \xB7 " + e.changes + " changes" : "");
+      li.onclick = function () {
+        var pre = li.querySelector("pre");
+        if (pre) { li.removeChild(pre); openEntry = null; return; }
+        pre = document.createElement("pre");
+        pre.textContent = e.args && typeof e.args.code === "string" ? e.args.code : JSON.stringify(e.args, null, 2);
+        li.appendChild(pre);
+        openEntry = e.at;
+      };
+      ul.appendChild(li);
+      if (openEntry === e.at) li.onclick();
+    });
+  }
+  $("openLog").onclick = function () {
+    var cmd = process.platform === "win32" ? 'explorer /select,"' + ACTIVITY_FILE + '"' : 'open -R "' + ACTIVITY_FILE + '"';
+    if (!fs.existsSync(ACTIVITY_FILE)) return alert("No activity yet.");
+    childProcess.exec(cmd);
+  };
+
+  // ---------- update banner (the MCP server checks GitHub at most daily and caches the result) ----------
   function cmpVersions(a, b) {
     var pa = String(a).replace(/^v/, "").split("."), pb = String(b).replace(/^v/, "").split(".");
     for (var i = 0; i < 3; i++) { var x = parseInt(pa[i], 10) || 0, y = parseInt(pb[i], 10) || 0; if (x !== y) return x > y ? 1 : -1; }
@@ -257,28 +477,12 @@ var init_define_AEMCP_CEP_FILES = __esm({
     var u = readJson(path.join(AEMCP_DIR, "update-check.json"));
     if (u && u.latest && cmpVersions(u.latest, AEMCPBridge.VERSION) > 0) {
       $("updateText").textContent = "Update available: v" + u.latest;
-      $("updateBtn").onclick = function () {
-        try { window.cep.util.openURLInDefaultBrowser(u.url); } catch (e) { alert(u.url); }
-      };
+      $("updateBtn").onclick = function () { try { window.cep.util.openURLInDefaultBrowser(u.url); } catch (e) { alert(u.url); } };
       $("update").hidden = false;
     } else $("update").hidden = true;
   }
 
-  // --- tool profile (read by the MCP server when the AI app starts it) ---
-  function loadProfile() {
-    var cfg = readJson(AEMCPBridge.CONFIG_FILE) || {};
-    $("profile").value = cfg.toolProfile === "full" ? "full" : "core";
-  }
-  $("profile").onchange = function () {
-    var cfg = readJson(AEMCPBridge.CONFIG_FILE) || AEMCPBridge.loadConfig();
-    cfg.toolProfile = $("profile").value;
-    try {
-      fs.writeFileSync(AEMCPBridge.CONFIG_FILE, JSON.stringify(cfg, null, 2) + "\\n");
-      $("profileNote").hidden = false;
-    } catch (e) { alert("Could not save: " + e.message); }
-  };
-
-  // --- diagnostics ---
+  // ---------- diagnostics ----------
   function copyText(text) {
     var ta = document.createElement("textarea");
     ta.value = text;
@@ -292,28 +496,28 @@ var init_define_AEMCP_CEP_FILES = __esm({
   $("diag").onclick = function () {
     var lines = ["### AE MCP diagnostics", "time: " + new Date().toISOString()];
     var host = AEMCPBridge.hostInfo();
-    lines.push("host: " + host.appName + " " + host.appVersion + " \xB7 bridge v" + AEMCPBridge.VERSION);
+    lines.push("host: " + host.appName + " " + host.appVersion + " \xB7 bridge v" + AEMCPBridge.VERSION + " \xB7 port " + myPort);
     lines.push("os: " + process.platform + " " + os.release() + " " + os.arch() + " \xB7 CEP node " + process.versions.node);
     try { lines.push("extension: " + decodeURI(window.__adobe_cep__.getSystemPath("extension")).replace(/^file:\\/\\//, "")); } catch (e) {}
     var cfg = readJson(AEMCPBridge.CONFIG_FILE);
     if (cfg) { if (cfg.token) cfg.token = "<set, " + cfg.token.length + " chars>"; lines.push("config: " + JSON.stringify(cfg)); }
     else lines.push("config: MISSING (" + AEMCPBridge.CONFIG_FILE + ")");
     lines.push("bridge status: " + JSON.stringify(readJson(path.join(AEMCP_DIR, "bridge-status.json"))));
+    try { lines.push("instances: " + fs.readdirSync(path.join(AEMCP_DIR, "instances")).join(", ")); } catch (e) {}
     lines.push("update check: " + JSON.stringify(readJson(path.join(AEMCP_DIR, "update-check.json"))));
     lines.push("server installed: " + fs.existsSync(path.join(AEMCP_DIR, "server", "ae-mcp.mjs")));
     var script = "(function(){var w=null;try{w=app.preferences.getPrefAsLong('Main Pref Section','Pref_SCRIPTING_FILE_NETWORK_SECURITY')===1;}catch(e){}" +
       "return 'ae: '+app.version+' \xB7 '+$.os+' \xB7 items '+app.project.numItems+' \xB7 scriptsCanWriteFiles '+w+' \xB7 helpers '+(typeof aemcp==='undefined'?'not loaded':aemcp.version);})()";
-    call("POST", "/eval", { script: script, timeoutMs: 10000 }, function (err, r) {
+    call("POST", "/eval", { script: script, timeoutMs: 10000, label: "diagnostics" }, function (err, r) {
       lines.push(err ? "bridge eval: ERROR " + err.message : String(r.result));
-      call("GET", "/log", null, function (e2, lg) {
-        lines.push("recent calls:");
-        if (!e2 && lg.log) lg.log.slice(0, 15).forEach(function (e) { lines.push("  " + e.at + " " + (e.ok ? "ok " : "ERR") + " " + e.ms + "ms " + e.preview); });
-        var text = lines.join("\\n");
-        alert(copyText(text) ? "Diagnostics copied to the clipboard." : text);
-      });
+      lines.push("recent activity:");
+      readActivity(15).forEach(function (e) { lines.push("  " + e.at + " " + (e.ok ? "ok " : "ERR") + " " + e.ms + "ms " + e.tool + " " + (e.summary || "").slice(0, 120)); });
+      var text = lines.join("\\n");
+      alert(copyText(text) ? "Diagnostics copied to the clipboard." : text);
     });
   };
 
+  // ---------- status ----------
   var triedStart = false;
   function refresh() {
     call("GET", "/health", null, function (err, h) {
@@ -321,31 +525,34 @@ var init_define_AEMCP_CEP_FILES = __esm({
         if (!triedStart) {
           triedStart = true;
           AEMCPBridge.start();
-          setTimeout(refresh, 500);
+          setTimeout(function () { findMyPort(refresh); }, 500);
           return;
         }
         setStatus("bad", AEMCPBridge.state.error || "Bridge not running: " + err.message);
         return;
       }
       if (!h.authorized) { setStatus("bad", "Token mismatch: re-run the installer"); return; }
-      var cfg = AEMCPBridge.loadConfig();
-      setStatus("ok", "Listening on 127.0.0.1:" + cfg.bridgePort + (h.busy ? " \xB7 busy" : "") + (h.queue ? " \xB7 queue " + h.queue : ""));
-      call("GET", "/log", null, function (e2, r) { if (!e2) renderLog(r.log); });
+      var extra = [];
+      if (h.busy) extra.push("busy " + Math.round(h.busyForMs / 1000) + "s" + (h.busyWith ? " (" + h.busyWith + ")" : ""));
+      if (h.queue) extra.push("queue " + h.queue);
+      if (h.permissionMode && h.permissionMode !== "full") extra.push(h.permissionMode === "ask" ? "asks before changes" : "read-only");
+      setStatus(h.busy && h.busyForMs > 15000 ? "warn" : "ok", "Connected \xB7 port " + h.port + (extra.length ? " \xB7 " + extra.join(" \xB7 ") : ""));
+      if (h.pendingApprovals || shownPending) pollPending();
     });
+    renderActivity();
     showUpdate();
   }
 
-  $("refresh").onclick = refresh;
   $("test").onclick = function () {
-    call("POST", "/eval", { script: "'After Effects ' + app.version", timeoutMs: 10000 }, function (err, r) {
+    call("POST", "/eval", { script: "'After Effects ' + app.version", timeoutMs: 10000, label: "panel test" }, function (err, r) {
       alert(err ? "Error: " + err.message : r.ok ? "Bridge OK\\n" + r.result : "Error: " + r.error);
       refresh();
     });
   };
-  $("foot").textContent = "v" + AEMCPBridge.VERSION + " \xB7 config: " + AEMCPBridge.CONFIG_FILE;
-  loadProfile();
-  refresh();
-  setInterval(refresh, 3000);
+  $("foot").textContent = "v" + AEMCPBridge.VERSION + " \xB7 " + AEMCP_DIR;
+  loadSettings();
+  findMyPort(refresh);
+  setInterval(refresh, 1500);
 })();
 ` };
   }
@@ -7691,1149 +7898,6 @@ var require_content_type = __commonJS({
   }
 });
 
-// src/config.ts
-import { readFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
-function configPath() {
-  return process.env.AEMCP_CONFIG || join(homedir(), ".aemcp", "config.json");
-}
-function loadConfig() {
-  let file2 = {};
-  try {
-    file2 = JSON.parse(readFileSync(configPath(), "utf8"));
-  } catch {
-  }
-  return {
-    bridgePort: Number(process.env.AEMCP_BRIDGE_PORT || file2.bridgePort || 8765),
-    token: process.env.AEMCP_TOKEN || file2.token || "",
-    httpPort: Number(process.env.AEMCP_HTTP_PORT || file2.httpPort || 8766),
-    toolProfile: file2.toolProfile,
-    updateCheck: file2.updateCheck,
-    changeReport: file2.changeReport
-  };
-}
-var VERSION;
-var init_config = __esm({
-  "src/config.ts"() {
-    "use strict";
-    init_define_AEMCP_CEP_FILES();
-    VERSION = "1.1.0";
-  }
-});
-
-// src/cli/util.ts
-import { execFileSync, spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync as readFileSync2, writeFileSync } from "node:fs";
-import { homedir as homedir2, platform } from "node:os";
-import { dirname, join as join2 } from "node:path";
-import { createInterface } from "node:readline";
-function chatgptDesktopInstalled() {
-  if (which("codex")) return true;
-  if (isMac)
-    return ["/Applications/ChatGPT.app", "/Applications/Codex.app", join2(HOME, "Applications", "ChatGPT.app")].some((p) => existsSync(p));
-  if (isWin) {
-    if ([join2(LOCALAPPDATA, "Programs", "ChatGPT"), join2(LOCALAPPDATA, "Microsoft", "WindowsApps", "ChatGPT.exe")].some((p) => existsSync(p))) return true;
-    try {
-      return readdirSync(join2(LOCALAPPDATA, "Packages")).some((n) => /^OpenAI\.(ChatGPT|Codex)/i.test(n));
-    } catch {
-      return false;
-    }
-  }
-  return false;
-}
-function readJson(file2, fallback) {
-  try {
-    return JSON.parse(readFileSync2(file2, "utf8"));
-  } catch {
-    return fallback;
-  }
-}
-function writeJsonWithBackup(file2, data) {
-  mkdirSync(dirname(file2), { recursive: true });
-  if (existsSync(file2) && !existsSync(file2 + ".aemcp.bak")) copyFileSync(file2, file2 + ".aemcp.bak");
-  writeFileSync(file2, JSON.stringify(data, null, 2) + "\n");
-}
-function which(cmd) {
-  const r = spawnSync(isWin ? "where" : "which", [cmd], { encoding: "utf8" });
-  if (r.status === 0) return r.stdout.split(/\r?\n/).find(Boolean)?.trim() || null;
-  return null;
-}
-function run(cmd, args) {
-  return execFileSync(cmd, args, { stdio: "pipe", encoding: "utf8", shell: isWin && /\.(cmd|bat)$/i.test(cmd) });
-}
-function stableNodePath() {
-  if (process.execPath.startsWith(join2(AEMCP_DIR, "node"))) return process.execPath;
-  const onPath = which("node");
-  return onPath && existsSync(onPath) ? onPath : process.execPath;
-}
-function findClaudeCli() {
-  const found = which("claude");
-  if (found) return found;
-  const candidates = isWin ? [join2(APPDATA, "npm", "claude.cmd"), join2(HOME, ".local", "bin", "claude.exe")] : [join2(HOME, ".local", "bin", "claude"), join2(HOME, ".claude", "local", "claude"), "/opt/homebrew/bin/claude", "/usr/local/bin/claude"];
-  return candidates.find((c) => existsSync(c)) || null;
-}
-async function ask(question, def = true) {
-  if (!process.stdin.isTTY) return false;
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
-  const a = await new Promise((r) => rl.question(`  ${question} ${def ? "[Y/n]" : "[y/N]"} `, r));
-  rl.close();
-  return a.trim() === "" ? def : /^y/i.test(a.trim());
-}
-function removeCodexBlock(text) {
-  return text.replace(new RegExp(`\\n?${CODEX_START}[\\s\\S]*?${CODEX_END}\\n?`, "g"), "\n");
-}
-function codexBlock(nodePath, serverFile) {
-  const q = (s) => JSON.stringify(s);
-  return `${CODEX_START}
-[mcp_servers.${SERVER_NAME}]
-command = ${q(nodePath)}
-args = [${q(serverFile)}]
-startup_timeout_sec = 20
-tool_timeout_sec = 600
-${CODEX_END}
-`;
-}
-var isMac, isWin, HOME, AEMCP_DIR, CONFIG_FILE, INSTALLED_SERVER, SERVER_NAME, EXTENSION_ID, CSXS_VERSIONS, APPDATA, LOCALAPPDATA, cepExtensionsDir, extensionDir, claudeDesktopDir, claudeDesktopConfig, claudeCodeConfig, cursorConfig, codexConfig, claudeDesktopExe, useColor, color, green, yellow, red, bold, dim, ok, warn, fail, step, sleep, CODEX_START, CODEX_END;
-var init_util = __esm({
-  "src/cli/util.ts"() {
-    "use strict";
-    init_define_AEMCP_CEP_FILES();
-    isMac = platform() === "darwin";
-    isWin = platform() === "win32";
-    HOME = homedir2();
-    AEMCP_DIR = join2(HOME, ".aemcp");
-    CONFIG_FILE = join2(AEMCP_DIR, "config.json");
-    INSTALLED_SERVER = join2(AEMCP_DIR, "server", "ae-mcp.mjs");
-    SERVER_NAME = "after-effects";
-    EXTENSION_ID = "com.aemcp";
-    CSXS_VERSIONS = [9, 10, 11, 12, 13, 14];
-    APPDATA = process.env.APPDATA || join2(HOME, "AppData", "Roaming");
-    LOCALAPPDATA = process.env.LOCALAPPDATA || join2(HOME, "AppData", "Local");
-    cepExtensionsDir = () => isWin ? join2(APPDATA, "Adobe", "CEP", "extensions") : join2(HOME, "Library", "Application Support", "Adobe", "CEP", "extensions");
-    extensionDir = () => join2(cepExtensionsDir(), EXTENSION_ID);
-    claudeDesktopDir = () => isWin ? join2(APPDATA, "Claude") : join2(HOME, "Library", "Application Support", "Claude");
-    claudeDesktopConfig = () => join2(claudeDesktopDir(), "claude_desktop_config.json");
-    claudeCodeConfig = () => join2(HOME, ".claude.json");
-    cursorConfig = () => join2(HOME, ".cursor", "mcp.json");
-    codexConfig = () => join2(process.env.CODEX_HOME || join2(HOME, ".codex"), "config.toml");
-    claudeDesktopExe = () => join2(LOCALAPPDATA, "AnthropicClaude", "claude.exe");
-    useColor = process.stdout.isTTY || isWin;
-    color = (c) => (s) => useColor ? `\x1B[${c}m${s}\x1B[0m` : s;
-    green = color(32);
-    yellow = color(33);
-    red = color(31);
-    bold = color(1);
-    dim = color(2);
-    ok = (m) => console.log(`  ${green("\u2714")} ${m}`);
-    warn = (m) => console.log(`  ${yellow("!")} ${m}`);
-    fail = (m) => console.log(`  ${red("\u2716")} ${m}`);
-    step = (m) => console.log(`
-${bold(m)}`);
-    sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-    CODEX_START = "# >>> ae-mcp >>>";
-    CODEX_END = "# <<< ae-mcp <<<";
-  }
-});
-
-// src/cli/setup.ts
-import { spawnSync as spawnSync2 } from "node:child_process";
-import { randomBytes } from "node:crypto";
-import { existsSync as existsSync2, mkdirSync as mkdirSync2, readFileSync as readFileSync3, rmSync, writeFileSync as writeFileSync2 } from "node:fs";
-import { dirname as dirname2, join as join3 } from "node:path";
-function ensureConfig() {
-  const cfg = readJson(CONFIG_FILE, {});
-  if (cfg.token && cfg.bridgePort && cfg.httpPort) return false;
-  cfg.token ||= randomBytes(24).toString("hex");
-  cfg.bridgePort ||= 8765;
-  cfg.httpPort ||= 8766;
-  mkdirSync2(AEMCP_DIR, { recursive: true });
-  writeFileSync2(CONFIG_FILE, JSON.stringify(cfg, null, 2) + "\n", { mode: 384 });
-  return true;
-}
-function installedExtensionHash() {
-  try {
-    return readFileSync3(join3(extensionDir(), HASH_FILE), "utf8").trim();
-  } catch {
-    return null;
-  }
-}
-function ensureExtension(force = false) {
-  const dir = extensionDir();
-  const current2 = installedExtensionHash();
-  if (!force && current2 === "a18b01e6708c" && existsSync2(join3(dir, "CSXS", "manifest.xml"))) return { installed: false, updated: false };
-  const updated = existsSync2(dir);
-  rmSync(dir, { recursive: true, force: true });
-  for (const [rel, content] of Object.entries(define_AEMCP_CEP_FILES_default)) {
-    const p = join3(dir, ...rel.split("/"));
-    mkdirSync2(dirname2(p), { recursive: true });
-    writeFileSync2(p, content);
-  }
-  writeFileSync2(join3(dir, HASH_FILE), "a18b01e6708c");
-  return { installed: true, updated };
-}
-function debugModeOn(v) {
-  if (isMac) {
-    const r = spawnSync2("defaults", ["read", `com.adobe.CSXS.${v}`, "PlayerDebugMode"], { encoding: "utf8" });
-    return r.status === 0 && r.stdout.trim() === "1";
-  }
-  if (isWin) {
-    const r = spawnSync2("reg", ["query", `HKCU\\Software\\Adobe\\CSXS.${v}`, "/v", "PlayerDebugMode"], { encoding: "utf8" });
-    return r.status === 0 && /PlayerDebugMode\s+REG_SZ\s+1/.test(r.stdout);
-  }
-  return true;
-}
-function ensureDebugMode() {
-  let changed = false;
-  for (const v of CSXS_VERSIONS) {
-    if (debugModeOn(v)) continue;
-    const r = isWin ? spawnSync2("reg", ["add", `HKCU\\Software\\Adobe\\CSXS.${v}`, "/v", "PlayerDebugMode", "/t", "REG_SZ", "/d", "1", "/f"]) : spawnSync2("defaults", ["write", `com.adobe.CSXS.${v}`, "PlayerDebugMode", "1"]);
-    if (r.status !== 0) throw new Error(`could not enable PlayerDebugMode for CSXS.${v}`);
-    changed = true;
-  }
-  return changed;
-}
-function ensureAeSetup(opts = {}) {
-  const res = { extensionInstalled: false, extensionUpdated: false, debugModeChanged: false, configCreated: false, errors: [] };
-  try {
-    res.configCreated = ensureConfig();
-  } catch (e) {
-    res.errors.push(`config: ${e.message}`);
-  }
-  try {
-    const r = ensureExtension(opts.forceExtension);
-    res.extensionInstalled = r.installed;
-    res.extensionUpdated = r.updated;
-  } catch (e) {
-    res.errors.push(`extension: ${e.message}`);
-  }
-  try {
-    res.debugModeChanged = ensureDebugMode();
-  } catch (e) {
-    res.errors.push(`PlayerDebugMode: ${e.message}`);
-  }
-  lastSetup = res;
-  return res;
-}
-function setupHint() {
-  if (lastSetup && (lastSetup.extensionInstalled || lastSetup.debugModeChanged))
-    return " The After Effects extension was just installed/updated: please restart After Effects once to load it.";
-  return "";
-}
-var HASH_FILE, lastSetup;
-var init_setup = __esm({
-  "src/cli/setup.ts"() {
-    "use strict";
-    init_define_AEMCP_CEP_FILES();
-    init_util();
-    HASH_FILE = ".aemcp-hash";
-    lastSetup = null;
-  }
-});
-
-// src/bridge.ts
-async function request(path, init = {}) {
-  const cfg = loadConfig();
-  const ctrl = new AbortController();
-  const timeoutMs = init.timeoutMs ?? 3e4;
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-  let res;
-  try {
-    res = await fetch(`http://127.0.0.1:${cfg.bridgePort}${path}`, {
-      ...init,
-      signal: ctrl.signal,
-      headers: { "content-type": "application/json", authorization: `Bearer ${cfg.token}`, ...init.headers || {} }
-    });
-  } catch (e) {
-    if (e?.name === "AbortError")
-      throw new BridgeError(
-        `After Effects did not respond within ${Math.round(timeoutMs / 1e3)}s. The script may still be running (ExtendScript cannot be interrupted), or AE is blocked by a modal dialog. Check After Effects.`,
-        "TIMEOUT"
-      );
-    throw new BridgeError(NOT_RUNNING_HELP + setupHint(), "NOT_RUNNING");
-  } finally {
-    clearTimeout(timer);
-  }
-  const body = await res.json().catch(() => ({}));
-  if (res.status === 401) throw new BridgeError("Bridge rejected the token. Re-run the installer so server and AE share ~/.aemcp/config.json, then restart AE.", "AUTH");
-  if (!res.ok || body.ok === false) throw new BridgeError(body.error || `Bridge error HTTP ${res.status}`, "BRIDGE");
-  return body;
-}
-async function health() {
-  return request("/health", { method: "GET", timeoutMs: 3e3 });
-}
-async function evalRaw(script, timeoutMs = 12e4) {
-  const body = await request("/eval", { method: "POST", body: JSON.stringify({ script, timeoutMs }), timeoutMs: timeoutMs + 5e3 });
-  return String(body.result ?? "");
-}
-var BridgeError, NOT_RUNNING_HELP;
-var init_bridge = __esm({
-  "src/bridge.ts"() {
-    "use strict";
-    init_define_AEMCP_CEP_FILES();
-    init_config();
-    init_setup();
-    BridgeError = class extends Error {
-      constructor(message, code) {
-        super(message);
-        this.code = code;
-      }
-      code;
-    };
-    NOT_RUNNING_HELP = "Cannot reach After Effects. Make sure After Effects is running and the AE MCP bridge is loaded (it starts automatically with AE after install; you can also open Window > Extensions > AE MCP to check its status). If you just installed, restart After Effects.";
-  }
-});
-
-// src/aemcp.jsxinc
-var aemcp_default;
-var init_aemcp = __esm({
-  "src/aemcp.jsxinc"() {
-    aemcp_default = `// aemcp helper library \u2014 loaded once into the After Effects ExtendScript engine
-// by the MCP server (sent over the bridge whenever the version check fails).
-// ES3 only: no let/const, arrow functions, Array.prototype.map, JSON, etc.
-// ---------- ES5+ runtime polyfills ----------
-// AE's ExtendScript engine is ES3. Modern syntax in user scripts is transpiled by the server;
-// these add the built-ins that transpiled (and hand-written) code expects. Each is only added
-// if missing. Note: ES3 can't make them non-enumerable, so use index loops (or for...of, which
-// is transpiled to one) rather than for...in over arrays.
-(function () {
-  var AP = Array.prototype, SP = String.prototype, OP = Object;
-  function def(o, name, fn) { if (typeof o[name] !== "function") o[name] = fn; }
-  function toInt(n) { n = Number(n); return isNaN(n) ? 0 : (n < 0 ? Math.ceil(n) : Math.floor(n)); }
-  def(AP, "forEach", function (f, t) { for (var i = 0, n = this.length; i < n; i++) if (i in this) f.call(t, this[i], i, this); });
-  def(AP, "map", function (f, t) { var r = new Array(this.length); for (var i = 0, n = this.length; i < n; i++) if (i in this) r[i] = f.call(t, this[i], i, this); return r; });
-  def(AP, "filter", function (f, t) { var r = []; for (var i = 0, n = this.length; i < n; i++) if (i in this && f.call(t, this[i], i, this)) r.push(this[i]); return r; });
-  def(AP, "some", function (f, t) { for (var i = 0, n = this.length; i < n; i++) if (i in this && f.call(t, this[i], i, this)) return true; return false; });
-  def(AP, "every", function (f, t) { for (var i = 0, n = this.length; i < n; i++) if (i in this && !f.call(t, this[i], i, this)) return false; return true; });
-  def(AP, "reduce", function (f, acc) {
-    var i = 0, n = this.length;
-    if (arguments.length < 2) { while (i < n && !(i in this)) i++; if (i >= n) throw new TypeError("Reduce of empty array with no initial value"); acc = this[i++]; }
-    for (; i < n; i++) if (i in this) acc = f(acc, this[i], i, this);
-    return acc;
-  });
-  def(AP, "reduceRight", function (f, acc) {
-    var i = this.length - 1;
-    if (arguments.length < 2) { while (i >= 0 && !(i in this)) i--; if (i < 0) throw new TypeError("Reduce of empty array with no initial value"); acc = this[i--]; }
-    for (; i >= 0; i--) if (i in this) acc = f(acc, this[i], i, this);
-    return acc;
-  });
-  def(AP, "indexOf", function (x, from) { var n = this.length, i = toInt(from || 0); if (i < 0) i = Math.max(0, n + i); for (; i < n; i++) if (this[i] === x) return i; return -1; });
-  def(AP, "lastIndexOf", function (x, from) { var n = this.length, i = arguments.length > 1 ? toInt(from) : n - 1; if (i < 0) i = n + i; for (i = Math.min(i, n - 1); i >= 0; i--) if (this[i] === x) return i; return -1; });
-  def(AP, "find", function (f, t) { for (var i = 0, n = this.length; i < n; i++) if (f.call(t, this[i], i, this)) return this[i]; return undefined; });
-  def(AP, "findIndex", function (f, t) { for (var i = 0, n = this.length; i < n; i++) if (f.call(t, this[i], i, this)) return i; return -1; });
-  def(AP, "findLast", function (f, t) { for (var i = this.length - 1; i >= 0; i--) if (f.call(t, this[i], i, this)) return this[i]; return undefined; });
-  def(AP, "includes", function (x) { for (var i = 0, n = this.length; i < n; i++) if (this[i] === x || (x !== x && this[i] !== this[i])) return true; return false; });
-  def(AP, "fill", function (v, s, e) { var n = this.length, i = toInt(s || 0), end = e === undefined ? n : toInt(e); if (i < 0) i += n; if (end < 0) end += n; for (; i < end; i++) this[i] = v; return this; });
-  def(AP, "flat", function (d) { d = d === undefined ? 1 : toInt(d); var r = []; (function walk(a, k) { for (var i = 0; i < a.length; i++) { if (a[i] instanceof Array && k > 0) walk(a[i], k - 1); else r.push(a[i]); } })(this, d); return r; });
-  def(Array, "isArray", function (a) { return a instanceof Array; });
-  def(Array, "from", function (src, f, t) { var r = []; if (src == null) return r; var n = src.length >>> 0; for (var i = 0; i < n; i++) { var v = typeof src === "string" ? src.charAt(i) : src[i]; r.push(f ? f.call(t, v, i) : v); } return r; });
-  def(Array, "of", function () { return AP.slice.call(arguments); });
-  def(OP, "keys", function (o) { var r = []; for (var k in o) if (OP.prototype.hasOwnProperty.call(o, k)) r.push(k); return r; });
-  def(OP, "values", function (o) { var r = []; for (var k in o) if (OP.prototype.hasOwnProperty.call(o, k)) r.push(o[k]); return r; });
-  def(OP, "entries", function (o) { var r = []; for (var k in o) if (OP.prototype.hasOwnProperty.call(o, k)) r.push([k, o[k]]); return r; });
-  def(OP, "fromEntries", function (es) { var o = {}; for (var i = 0; i < es.length; i++) o[es[i][0]] = es[i][1]; return o; });
-  def(OP, "assign", function (t) { for (var i = 1; i < arguments.length; i++) { var s = arguments[i]; if (s != null) for (var k in s) if (OP.prototype.hasOwnProperty.call(s, k)) t[k] = s[k]; } return t; });
-  def(OP, "create", function (proto, props) { function F() {} F.prototype = proto; var o = new F(); if (props) OP.defineProperties(o, props); return o; });
-  // ES3 has no real property descriptors: keep the value (accessors are not supported)
-  def(OP, "defineProperty", function (o, k, d) { if (d && "value" in d) o[k] = d.value; else if (d && d.get) { try { o[k] = d.get.call(o); } catch (e) {} } return o; });
-  def(OP, "defineProperties", function (o, ds) { for (var k in ds) if (OP.prototype.hasOwnProperty.call(ds, k)) OP.defineProperty(o, k, ds[k]); return o; });
-  def(OP, "getPrototypeOf", function (o) { return o.__proto__; });
-  def(OP, "setPrototypeOf", function (o, p) { o.__proto__ = p; return o; });
-  def(OP, "freeze", function (o) { return o; });
-  def(OP, "is", function (a, b) { return a === b ? a !== 0 || 1 / a === 1 / b : a !== a && b !== b; });
-  def(SP, "trim", function () { return String(this).replace(/^\\s+|\\s+$/g, ""); });
-  def(SP, "trimStart", function () { return String(this).replace(/^\\s+/, ""); });
-  def(SP, "trimEnd", function () { return String(this).replace(/\\s+$/, ""); });
-  def(SP, "startsWith", function (s, p) { p = p || 0; return String(this).substr(p, String(s).length) === String(s); });
-  def(SP, "endsWith", function (s, e) { var t = String(this); e = e === undefined ? t.length : e; s = String(s); return t.substring(e - s.length, e) === s; });
-  def(SP, "includes", function (s, p) { return String(this).indexOf(s, p || 0) !== -1; });
-  def(SP, "repeat", function (n) { var r = "", t = String(this); for (var i = 0; i < n; i++) r += t; return r; });
-  def(SP, "padStart", function (n, f) { var t = String(this); f = f === undefined ? " " : String(f); while (t.length < n) t = f + t; return t.length > n ? t.substr(t.length - n) : t; });
-  def(SP, "padEnd", function (n, f) { var t = String(this); f = f === undefined ? " " : String(f); while (t.length < n) t += f; return t.substr(0, n); });
-  def(SP, "replaceAll", function (a, b) { return String(this).split(a).join(b); });
-  def(SP, "at", function (i) { var t = String(this); i = toInt(i); return t.charAt(i < 0 ? t.length + i : i); });
-  def(AP, "at", function (i) { i = toInt(i); return this[i < 0 ? this.length + i : i]; });
-  def(Number, "isFinite", function (n) { return typeof n === "number" && isFinite(n); });
-  def(Number, "isNaN", function (n) { return typeof n === "number" && n !== n; });
-  def(Number, "isInteger", function (n) { return typeof n === "number" && isFinite(n) && Math.floor(n) === n; });
-  def(Number, "parseFloat", parseFloat);
-  def(Number, "parseInt", parseInt);
-  def(Math, "sign", function (x) { x = Number(x); return x > 0 ? 1 : (x < 0 ? -1 : x); });
-  def(Math, "trunc", function (x) { return x < 0 ? Math.ceil(x) : Math.floor(x); });
-  def(Math, "hypot", function () { var s = 0; for (var i = 0; i < arguments.length; i++) s += arguments[i] * arguments[i]; return Math.sqrt(s); });
-  def(Math, "log10", function (x) { return Math.log(x) / Math.LN10; });
-  def(Math, "log2", function (x) { return Math.log(x) / Math.LN2; });
-  def(Date, "now", function () { return new Date().getTime(); });
-  def(Function.prototype, "bind", function (t) {
-    var f = this, pre = AP.slice.call(arguments, 1);
-    return function () { return f.apply(t, pre.concat(AP.slice.call(arguments))); };
-  });
-})();
-
-aemcp = (function () {
-  var A = {};
-  A.version = "__AEMCP_VERSION__";
-
-  // ---------- JSON ----------
-  function quote(s) {
-    return '"' + String(s).replace(/[\\\\"\\u0000-\\u001f\\u2028\\u2029]/g, function (c) {
-      switch (c) {
-        case '"': return '\\\\"';
-        case "\\\\": return "\\\\\\\\";
-        case "\\n": return "\\\\n";
-        case "\\r": return "\\\\r";
-        case "\\t": return "\\\\t";
-        case "\\b": return "\\\\b";
-        case "\\f": return "\\\\f";
-      }
-      var h = c.charCodeAt(0).toString(16);
-      return "\\\\u" + "0000".substr(h.length) + h;
-    }) + '"';
-  }
-  A.stringify = function (v) {
-    if (v === null || v === undefined) return "null";
-    var t = typeof v;
-    if (t === "number") return isFinite(v) ? String(v) : "null";
-    if (t === "boolean") return v ? "true" : "false";
-    if (t === "string") return quote(v);
-    if (v instanceof Array) {
-      var parts = [];
-      for (var i = 0; i < v.length; i++) parts.push(A.stringify(v[i]));
-      return "[" + parts.join(",") + "]";
-    }
-    if (t === "object") {
-      var out = [];
-      for (var k in v) {
-        if (!v.hasOwnProperty(k)) continue;
-        var val = v[k];
-        if (typeof val === "function" || val === undefined) continue;
-        out.push(quote(k) + ":" + A.stringify(val));
-      }
-      return "{" + out.join(",") + "}";
-    }
-    return "null";
-  };
-
-  // ---------- small utils ----------
-  A.round = function (n) { return typeof n === "number" ? Math.round(n * 10000) / 10000 : n; };
-  function isAE(name) { try { return typeof $.global[name] !== "undefined"; } catch (e) { return false; } }
-  function inst(v, ctor) { try { return isAE(ctor) && v instanceof $.global[ctor]; } catch (e) { return false; } }
-  A.fail = function (msg) { var e = new Error(msg); e.aemcpUser = true; throw e; };
-
-  // ---------- finders ----------
-  // ref: number (item id) | string (name) | "active" | undefined (=active)
-  A.findItem = function (ref) {
-    var p = app.project;
-    if (ref === undefined || ref === null || ref === "active") {
-      if (!p.activeItem) A.fail("No active item. Open/select a composition or pass an id/name.");
-      return p.activeItem;
-    }
-    if (typeof ref === "number") {
-      var it = p.itemByID(ref);
-      if (!it) A.fail("No project item with id " + ref);
-      return it;
-    }
-    for (var i = 1; i <= p.numItems; i++) if (p.item(i).name === ref) return p.item(i);
-    A.fail("No project item named '" + ref + "'");
-  };
-  A.findComp = function (ref) {
-    if (ref === undefined || ref === null || ref === "active") {
-      var a = app.project.activeItem;
-      if (a && a instanceof CompItem) return a;
-      // fall back to the comp open in the viewer
-      try { if (app.activeViewer && app.activeViewer.type === ViewerType.VIEWER_COMPOSITION) { app.activeViewer.setActive(); a = app.project.activeItem; if (a instanceof CompItem) return a; } } catch (e) {}
-      A.fail("No active composition. Open a comp or pass compId / compName.");
-    }
-    var it = A.findItem(ref);
-    if (!(it instanceof CompItem)) A.fail("Item '" + it.name + "' is not a composition");
-    return it;
-  };
-  // ref: number (1-based index) | string (name) | {id:n}
-  A.findLayer = function (comp, ref) {
-    if (ref === undefined || ref === null) {
-      if (comp.selectedLayers.length) return comp.selectedLayers[0];
-      A.fail("No layer specified and none selected");
-    }
-    if (typeof ref === "number") {
-      if (ref < 1 || ref > comp.numLayers) A.fail("Layer index " + ref + " out of range 1-" + comp.numLayers);
-      return comp.layer(ref);
-    }
-    if (typeof ref === "object" && ref.id !== undefined) {
-      for (var i = 1; i <= comp.numLayers; i++) if (comp.layer(i).id === ref.id) return comp.layer(i);
-      A.fail("No layer with id " + ref.id);
-    }
-    var l = comp.layer(String(ref));
-    if (!l) A.fail("No layer named '" + ref + "' in comp '" + comp.name + "'");
-    return l;
-  };
-  // path: "Transform/Position" | ["ADBE Transform Group","ADBE Position"] | "Effects/Gaussian Blur/Blurriness"
-  // Each segment may be a display name, match name, or 1-based index.
-  A.resolveProp = function (layer, path) {
-    var segs = path instanceof Array ? path : String(path).split("/");
-    var cur = layer;
-    for (var i = 0; i < segs.length; i++) {
-      var s = segs[i];
-      if (s === "" || s === undefined) continue;
-      var next = null;
-      if (typeof s === "number" || /^\\d+$/.test(s)) next = cur.property(Number(s));
-      else {
-        try { next = cur.property(s); } catch (e) { next = null; }
-        if (!next && String(s).toLowerCase() === "effects") next = cur.property("ADBE Effect Parade");
-        if (!next && cur.numProperties) {
-          var low = String(s).toLowerCase();
-          for (var j = 1; j <= cur.numProperties; j++) {
-            var c = cur.property(j);
-            if (c.name.toLowerCase() === low || c.matchName.toLowerCase() === low) { next = c; break; }
-          }
-        }
-      }
-      if (!next) A.fail("Property '" + s + "' not found under '" + (cur.name || "layer") + "' (path " + segs.join("/") + ")");
-      cur = next;
-    }
-    return cur;
-  };
-
-  // ---------- serializers ----------
-  A.itemType = function (it) {
-    if (it instanceof CompItem) return "comp";
-    if (it instanceof FolderItem) return "folder";
-    if (it instanceof FootageItem) {
-      try {
-        if (it.mainSource instanceof SolidSource) return "solid";
-        if (it.mainSource instanceof PlaceholderSource) return "placeholder";
-      } catch (e) {}
-      return "footage";
-    }
-    return "item";
-  };
-  A.itemInfo = function (it) {
-    var o = { id: it.id, name: it.name, type: A.itemType(it), parentFolder: it.parentFolder ? it.parentFolder.name : null, comment: it.comment, label: it.label };
-    if (it instanceof CompItem || it instanceof FootageItem) {
-      o.width = it.width; o.height = it.height; o.duration = A.round(it.duration); o.pixelAspect = it.pixelAspect;
-      o.hasVideo = it.hasVideo; o.hasAudio = it.hasAudio;
-      try { o.frameRate = A.round(it.frameRate); } catch (e) {}
-    }
-    if (it instanceof CompItem) { o.numLayers = it.numLayers; o.bgColor = it.bgColor; o.workAreaStart = A.round(it.workAreaStart); o.workAreaDuration = A.round(it.workAreaDuration); o.displayStartTime = A.round(it.displayStartTime); }
-    if (it instanceof FootageItem) {
-      try { o.file = it.file ? it.file.fsName : null; } catch (e) {}
-      try { o.isStill = it.mainSource.isStill; } catch (e) {}
-      try { if (it.mainSource instanceof SolidSource) o.color = it.mainSource.color; } catch (e) {}
-      o.footageMissing = it.footageMissing;
-    }
-    if (it instanceof FolderItem) o.numItems = it.numItems;
-    return o;
-  };
-  A.layerType = function (l) {
-    if (inst(l, "TextLayer")) return "text";
-    if (inst(l, "ShapeLayer")) return "shape";
-    if (inst(l, "CameraLayer")) return "camera";
-    if (inst(l, "LightLayer")) return "light";
-    if (inst(l, "AVLayer")) {
-      if (l.nullLayer) return "null";
-      if (l.adjustmentLayer) return "adjustment";
-      try { if (l.source instanceof CompItem) return "precomp"; } catch (e) {}
-      try { if (l.source.mainSource instanceof SolidSource) return "solid"; } catch (e) {}
-      return "footage";
-    }
-    return "layer";
-  };
-  A.layerInfo = function (l, detail) {
-    var o = { index: l.index, id: l.id, name: l.name, type: A.layerType(l), enabled: l.enabled, solo: l.solo, locked: l.locked, shy: l.shy,
-      inPoint: A.round(l.inPoint), outPoint: A.round(l.outPoint), startTime: A.round(l.startTime), stretch: l.stretch, label: l.label,
-      parent: l.parent ? l.parent.index : null, selected: l.selected, comment: l.comment };
-    if (inst(l, "AVLayer")) {
-      o.threeD = l.threeDLayer; o.blendingMode = A.enumName(BlendingMode, l.blendingMode);
-      o.trackMatteType = A.enumName(TrackMatteType, l.trackMatteType); o.audioEnabled = l.audioEnabled;
-      o.adjustmentLayer = l.adjustmentLayer; o.motionBlur = l.motionBlur; o.collapseTransformation = l.collapseTransformation;
-      try { if (l.source) o.source = { id: l.source.id, name: l.source.name, type: A.itemType(l.source) }; } catch (e) {}
-    }
-    if (detail) {
-      var tr = l.property("ADBE Transform Group");
-      o.transform = {};
-      for (var i = 1; i <= tr.numProperties; i++) {
-        var p = tr.property(i);
-        try { if (p.propertyValueType !== PropertyValueType.NO_VALUE) o.transform[p.name] = A.valueOf(p.value); } catch (e) {}
-      }
-      o.effects = [];
-      var fx = l.property("ADBE Effect Parade");
-      if (fx) for (var j = 1; j <= fx.numProperties; j++) o.effects.push({ index: j, name: fx.property(j).name, matchName: fx.property(j).matchName, enabled: fx.property(j).enabled });
-      var masks = l.property("ADBE Mask Parade");
-      o.numMasks = masks ? masks.numProperties : 0;
-      o.markers = A.markers(l.property("ADBE Marker"));
-      if (inst(l, "TextLayer")) o.text = A.textInfo(l.property("ADBE Text Properties").property("ADBE Text Document").value);
-      o.animated = A.animatedProps(l);
-    }
-    return o;
-  };
-  A.compInfo = function (c, withLayers) {
-    var o = A.itemInfo(c);
-    o.time = A.round(c.time); o.frameDuration = A.round(c.frameDuration); o.motionBlur = c.motionBlur; o.renderer = c.renderer;
-    try { o.activeCamera = c.activeCamera ? c.activeCamera.name : null; } catch (e) {}
-    if (withLayers) { o.layers = []; for (var i = 1; i <= c.numLayers; i++) o.layers.push(A.layerInfo(c.layer(i), false)); }
-    return o;
-  };
-  A.textInfo = function (td) {
-    var o = { text: td.text };
-    var keys = ["font", "fontSize", "fillColor", "strokeColor", "strokeWidth", "applyFill", "applyStroke", "tracking", "leading", "fauxBold", "fauxItalic", "allCaps", "boxText", "pointText"];
-    for (var i = 0; i < keys.length; i++) { try { var v = td[keys[i]]; if (v !== undefined) o[keys[i]] = A.valueOf(v); } catch (e) {} }
-    try { o.justification = A.enumName(ParagraphJustification, td.justification); } catch (e) {}
-    try { if (td.boxText) o.boxTextSize = td.boxTextSize; } catch (e) {}
-    return o;
-  };
-  A.enumName = function (en, val) {
-    for (var k in en) { try { if (en[k] === val) return k; } catch (e) {} }
-    return val;
-  };
-  A.markers = function (mp) {
-    var out = [];
-    if (!mp) return out;
-    for (var i = 1; i <= mp.numKeys; i++) {
-      var m = mp.keyValue(i);
-      out.push({ time: A.round(mp.keyTime(i)), comment: m.comment, duration: A.round(m.duration), chapter: m.chapter, url: m.url });
-    }
-    return out;
-  };
-  A.valueOf = function (v) {
-    if (v === null || v === undefined) return null;
-    if (typeof v === "number") return A.round(v);
-    if (v instanceof Array) { var a = []; for (var i = 0; i < v.length; i++) a.push(A.valueOf(v[i])); return a; }
-    if (inst(v, "TextDocument")) return A.textInfo(v);
-    if (inst(v, "Shape")) return { vertices: v.vertices, inTangents: v.inTangents, outTangents: v.outTangents, closed: v.closed };
-    if (inst(v, "MarkerValue")) return { comment: v.comment, duration: v.duration };
-    return v;
-  };
-  A.animatedProps = function (layer) {
-    var out = [];
-    function walk(g, path) {
-      for (var i = 1; i <= g.numProperties; i++) {
-        var p = g.property(i), pp = path + "/" + p.name;
-        if (p.propertyType === PropertyType.PROPERTY) {
-          var e = false; try { e = p.canSetExpression && p.expressionEnabled; } catch (x) {}
-          if (p.numKeys > 0 || e) out.push({ path: pp.substr(1), numKeys: p.numKeys, expression: e ? p.expression : undefined });
-        } else walk(p, pp);
-      }
-    }
-    try { walk(layer, ""); } catch (e) {}
-    return out;
-  };
-  A.propInfo = function (p, opts) {
-    opts = opts || {};
-    var o = { name: p.name, matchName: p.matchName, propertyIndex: p.propertyIndex };
-    if (p.propertyType === PropertyType.PROPERTY) {
-      o.kind = "property";
-      o.valueType = A.enumName(PropertyValueType, p.propertyValueType);
-      try { if (p.propertyValueType !== PropertyValueType.NO_VALUE) o.value = A.valueOf(p.value); } catch (e) {}
-      o.numKeys = p.numKeys;
-      try { o.canSetExpression = p.canSetExpression; if (p.expression) { o.expression = p.expression; o.expressionEnabled = p.expressionEnabled; o.expressionError = p.expressionError; } } catch (e) {}
-      try { if (p.hasMin) o.min = p.minValue; if (p.hasMax) o.max = p.maxValue; } catch (e) {}
-      try { o.unitsText = p.unitsText; } catch (e) {}
-      if (opts.keyframes && p.numKeys) o.keyframes = A.keyframes(p);
-    } else {
-      o.kind = p.propertyType === PropertyType.INDEXED_GROUP ? "indexedGroup" : "group";
-      o.numProperties = p.numProperties;
-      try { if (p.canSetEnabled) o.enabled = p.enabled; } catch (e) {}
-      var depth = opts.depth === undefined ? 1 : opts.depth;
-      if (depth > 0) {
-        o.children = [];
-        for (var i = 1; i <= p.numProperties; i++) {
-          var c = p.property(i);
-          if (!opts.includeHidden) { try { if (c.propertyType === PropertyType.PROPERTY && c.propertyValueType === PropertyValueType.NO_VALUE) continue; } catch (e) {} }
-          o.children.push(A.propInfo(c, { depth: depth - 1, keyframes: opts.keyframes, includeHidden: opts.includeHidden }));
-        }
-      }
-    }
-    return o;
-  };
-  A.keyframes = function (p) {
-    var ks = [];
-    for (var k = 1; k <= p.numKeys; k++) {
-      var kf = { index: k, time: A.round(p.keyTime(k)), value: A.valueOf(p.keyValue(k)) };
-      try { kf.inInterpolation = A.enumName(KeyframeInterpolationType, p.keyInInterpolationType(k)); kf.outInterpolation = A.enumName(KeyframeInterpolationType, p.keyOutInterpolationType(k)); } catch (e) {}
-      try {
-        var ie = p.keyInTemporalEase(k), oe = p.keyOutTemporalEase(k);
-        kf.easeIn = []; kf.easeOut = [];
-        for (var d = 0; d < ie.length; d++) { kf.easeIn.push({ speed: A.round(ie[d].speed), influence: A.round(ie[d].influence) }); kf.easeOut.push({ speed: A.round(oe[d].speed), influence: A.round(oe[d].influence) }); }
-      } catch (e) {}
-      ks.push(kf);
-    }
-    return ks;
-  };
-
-  // Generic serializer for arbitrary return values of user scripts.
-  // \`depth\` limits how far AE objects (comps, layers, properties) are expanded;
-  // plain arrays/objects are copied as-is up to a nesting guard.
-  A.serialize = function (v, depth, nest) {
-    if (depth === undefined) depth = 4;
-    nest = nest || 0;
-    if (v === null || v === undefined) return null;
-    var t = typeof v;
-    if (t === "number" || t === "string" || t === "boolean") return v;
-    if (t === "function") return "[function]";
-    if (nest > 30) return "[too deep]";
-    try {
-      if (v instanceof CompItem) return A.compInfo(v, depth > 1);
-      if (inst(v, "Item")) return A.itemInfo(v);
-      if (inst(v, "Layer")) return A.layerInfo(v, depth > 2);
-      if (inst(v, "PropertyBase")) return A.propInfo(v, { depth: depth > 2 ? 1 : 0 });
-      if (inst(v, "Project")) return A.projectInfo();
-      if (inst(v, "File") || inst(v, "Folder")) return v.fsName;
-      if (inst(v, "TextDocument") || inst(v, "Shape") || inst(v, "MarkerValue")) return A.valueOf(v);
-      if (inst(v, "KeyframeEase")) return { speed: A.round(v.speed), influence: A.round(v.influence) };
-      if (inst(v, "RenderQueueItem")) return { comp: v.comp.name, status: A.enumName(RQItemStatus, v.status) };
-      if (inst(v, "Collection") || inst(v, "ItemCollection") || inst(v, "LayerCollection")) {
-        if (depth <= 0) return "[collection of " + v.length + "]";
-        var c = []; for (var ci = 1; ci <= v.length; ci++) c.push(A.serialize(v[ci], depth - 1, nest + 1)); return c;
-      }
-    } catch (e) {}
-    if (v instanceof Array) {
-      var a = [], n = Math.min(v.length, 2000);
-      for (var i = 0; i < n; i++) a.push(A.serialize(v[i], depth, nest + 1));
-      if (v.length > n) a.push("... " + (v.length - n) + " more");
-      return a;
-    }
-    var isPlain = false;
-    try { isPlain = v.constructor === Object; } catch (e) {}
-    if (!isPlain && depth <= 0) return "[" + (v.reflect ? v.reflect.name : "object") + "]";
-    var o = {};
-    for (var k in v) { try { if (typeof v[k] !== "function") o[k] = A.serialize(v[k], isPlain ? depth : depth - 1, nest + 1); } catch (e) {} }
-    return o;
-  };
-
-  A.projectInfo = function () {
-    var p = app.project, counts = { comp: 0, footage: 0, folder: 0, solid: 0, placeholder: 0 };
-    for (var i = 1; i <= p.numItems; i++) { var t = A.itemType(p.item(i)); counts[t] = (counts[t] || 0) + 1; }
-    var o = { file: p.file ? p.file.fsName : null, name: p.file ? p.file.name : "Untitled", dirty: p.dirty, numItems: p.numItems, counts: counts,
-      bitsPerChannel: p.bitsPerChannel, renderQueueItems: p.renderQueue.numItems };
-    try { o.frameRate = A.round(p.frameRate); } catch (e) {}
-    try { o.workingSpace = p.workingSpace; } catch (e) {}
-    try { o.expressionEngine = p.expressionEngine; } catch (e) {}
-    var a = p.activeItem;
-    o.activeItem = a ? { id: a.id, name: a.name, type: A.itemType(a) } : null;
-    return o;
-  };
-
-  // ---------- value helpers used by tools ----------
-  A.toAEValue = function (prop, v) {
-    if (prop.propertyValueType === PropertyValueType.TEXT_DOCUMENT) {
-      var td = prop.value;
-      if (typeof v === "string") { td.text = v; return td; }
-      A.applyText(td, v); return td;
-    }
-    if (prop.propertyValueType === PropertyValueType.SHAPE && v && v.vertices) {
-      var s = new Shape(); s.vertices = v.vertices; if (v.inTangents) s.inTangents = v.inTangents; if (v.outTangents) s.outTangents = v.outTangents; s.closed = v.closed !== false; return s;
-    }
-    if (prop.propertyValueType === PropertyValueType.COLOR) return A.color(v);
-    return v;
-  };
-  // Accepts [r,g,b], [r,g,b,a] (0-1 or 0-255) or "#rrggbb".
-  A.color = function (v) {
-    if (typeof v === "string") {
-      var h = v.replace("#", "");
-      if (h.length === 3) h = h.charAt(0) + h.charAt(0) + h.charAt(1) + h.charAt(1) + h.charAt(2) + h.charAt(2);
-      return [parseInt(h.substr(0, 2), 16) / 255, parseInt(h.substr(2, 2), 16) / 255, parseInt(h.substr(4, 2), 16) / 255, 1];
-    }
-    if (v instanceof Array) {
-      var big = false; for (var i = 0; i < v.length; i++) if (v[i] > 1) big = true;
-      var c = []; for (var j = 0; j < v.length; j++) c.push(big ? v[j] / 255 : v[j]);
-      if (c.length === 3) c.push(1);
-      return c;
-    }
-    return v;
-  };
-  A.color3 = function (v) { var c = A.color(v); return [c[0], c[1], c[2]]; };
-  A.applyText = function (td, o) {
-    if (o.text !== undefined) td.text = o.text;
-    if (o.font !== undefined) td.font = o.font;
-    if (o.fontSize !== undefined) td.fontSize = o.fontSize;
-    if (o.fillColor !== undefined) { td.applyFill = true; td.fillColor = A.color3(o.fillColor); }
-    if (o.strokeColor !== undefined) { td.applyStroke = true; td.strokeColor = A.color3(o.strokeColor); }
-    if (o.strokeWidth !== undefined) td.strokeWidth = o.strokeWidth;
-    if (o.tracking !== undefined) td.tracking = o.tracking;
-    if (o.leading !== undefined) { try { td.autoLeading = false; } catch (e) {} td.leading = o.leading; }
-    if (o.fauxBold !== undefined) td.fauxBold = o.fauxBold;
-    if (o.fauxItalic !== undefined) td.fauxItalic = o.fauxItalic;
-    if (o.allCaps !== undefined) td.allCaps = o.allCaps;
-    if (o.justification !== undefined) td.justification = ParagraphJustification[String(o.justification).toUpperCase()] || td.justification;
-    return td;
-  };
-  A.interp = function (name) {
-    if (!name) return null;
-    var m = { linear: KeyframeInterpolationType.LINEAR, bezier: KeyframeInterpolationType.BEZIER, hold: KeyframeInterpolationType.HOLD };
-    return m[String(name).toLowerCase()] || null;
-  };
-  // ease: {speed, influence} or number (influence %, speed 0) applied to every dimension
-  A.easeArr = function (prop, e) {
-    var dims = 1;
-    if (prop.propertyValueType === PropertyValueType.TwoD) dims = 2;
-    else if (prop.propertyValueType === PropertyValueType.ThreeD) dims = 3;
-    var sp = typeof e === "number" ? 0 : (e.speed || 0), inf = typeof e === "number" ? e : (e.influence || 33.333);
-    var a = []; for (var i = 0; i < dims; i++) a.push(new KeyframeEase(sp, Math.max(0.1, Math.min(100, inf))));
-    return a;
-  };
-
-  // ---------- change report ----------
-  // Snapshots before/after a tool call and a diff of them. Items are always compared; layers and
-  // property values only for the comps in scope (the active comp and comps named in the call),
-  // with a budget on property reads so very large comps stay fast.
-  var PROP_BUDGET = 25000;
-  function brief(v) {
-    if (v === null || v === undefined) return "none";
-    if (typeof v === "number") return String(Math.round(v * 100) / 100);
-    if (typeof v === "string") return v.length > 40 ? '"' + v.substr(0, 37) + '..."' : '"' + v + '"';
-    if (typeof v === "boolean") return v ? "on" : "off";
-    if (v instanceof Array) {
-      if (v.length > 4) return "[" + v.length + " values]";
-      var a = []; for (var i = 0; i < v.length; i++) a.push(brief(v[i])); return "[" + a.join(",") + "]";
-    }
-    if (v.text !== undefined) return brief(v.text);
-    if (v.vertices) return "path(" + v.vertices.length + " points)";
-    return "{...}";
-  }
-  function keySig(p) {
-    var n = p.numKeys; if (!n) return "";
-    var s = n + ":";
-    var lim = Math.min(n, 40);
-    for (var k = 1; k <= lim; k++) { var kv; try { kv = p.keyValue(k); } catch (e) { kv = "?"; } s += A.round(p.keyTime(k)) + "=" + A.stringify(A.valueOf(kv)) + ";"; }
-    return s;
-  }
-  function layerSig(L) {
-    var o = [L.name, A.round(L.inPoint), A.round(L.outPoint), A.round(L.startTime), L.stretch, L.parent ? (L.parent.id || L.parent.index) : 0, L.enabled, L.solo, L.locked, L.shy, L.label];
-    try { o.push(L.threeDLayer, L.blendingMode, L.trackMatteType, L.adjustmentLayer, L.motionBlur, L.guideLayer, L.audioEnabled); } catch (e) {}
-    return o;
-  }
-  var LAYER_FIELDS = ["name", "in", "out", "start", "stretch", "parent", "enabled", "solo", "locked", "shy", "label", "3D", "blend mode", "track matte", "adjustment", "motion blur", "guide", "audio"];
-  function layerKey(L) { return L.id !== undefined ? "L" + L.id : "i" + L.index + ":" + L.name; }
-  function snapProps(L, out, groups, budget) {
-    function walk(g, path, depth) {
-      for (var i = 1; i <= g.numProperties; i++) {
-        if (budget.n <= 0) { budget.over = true; return; }
-        var p = g.property(i), pp = path ? path + "/" + p.name : p.name;
-        budget.n--;
-        if (p.propertyType === PropertyType.PROPERTY) {
-          if (p.propertyValueType === PropertyValueType.NO_VALUE) continue;
-          var raw; try { raw = p.value; } catch (e) { continue; }
-          // cheap fingerprints for the common cases (numbers, arrays); full JSON only for the rest
-          var v = raw, vs;
-          if (typeof raw === "number" || typeof raw === "boolean") vs = String(raw);
-          else if (raw instanceof Array) vs = raw.join(",");
-          else { v = A.valueOf(raw); vs = A.stringify(v); }
-          var ex = ""; try { if (p.canSetExpression && p.expression) ex = (p.expressionEnabled ? "" : "(off)") + p.expression; } catch (e) {}
-          var nk = p.numKeys;
-          out[pp] = { s: vs + "|" + (nk ? keySig(p) : "") + "|" + ex, v: v, k: nk, e: ex };
-        } else {
-          if (p.propertyType === PropertyType.INDEXED_GROUP || depth < 3) {
-            var en = ""; try { if (p.canSetEnabled) en = p.enabled ? "on" : "off"; } catch (e) {}
-            if (path) groups[pp] = en;
-          }
-          walk(p, pp, depth + 1);
-        }
-      }
-    }
-    walk(L, "", 0);
-  }
-  function snapComp(c, deep, budget) {
-    var o = { id: c.id, name: c.name, layers: {}, order: [], deep: deep };
-    for (var i = 1; i <= c.numLayers; i++) {
-      var L = c.layer(i), k = layerKey(L);
-      var e = { name: L.name, index: i, sig: layerSig(L) };
-      if (deep) { e.props = {}; e.groups = {}; snapProps(L, e.props, e.groups, budget); }
-      o.layers[k] = e; o.order.push(k);
-    }
-    if (budget.over) o.partial = true;
-    return o;
-  }
-  function itemSig(it) {
-    var s = [it.name, it.parentFolder ? it.parentFolder.id : 0, it.label, it.comment];
-    try { if (it instanceof CompItem) s.push(it.width, it.height, A.round(it.duration), A.round(it.frameRate), it.pixelAspect, A.stringify(it.bgColor), A.round(it.workAreaStart), A.round(it.workAreaDuration), it.numLayers); } catch (e) {}
-    try { if (it instanceof FootageItem) { s.push(it.file ? it.file.fsName : "", it.width, it.height); if (it.mainSource instanceof SolidSource) s.push(A.stringify(it.mainSource.color)); } } catch (e) {}
-    return s;
-  }
-  var ITEM_FIELDS = ["name", "folder", "label", "comment", "width", "height", "duration", "frame rate", "pixel aspect", "background", "work area start", "work area duration", "layers"];
-  A.snapshot = function (scopeRefs) {
-    var p = app.project, snap = { items: {}, comps: {} }, budget = { n: PROP_BUDGET, over: false };
-    for (var i = 1; i <= p.numItems; i++) { var it = p.item(i); snap.items[it.id] = { name: it.name, type: A.itemType(it), sig: itemSig(it), layers: it instanceof CompItem ? it.numLayers : undefined }; }
-    var ids = {};
-    try { if (p.activeItem instanceof CompItem) ids[p.activeItem.id] = true; } catch (e) {}
-    for (var r = 0; r < scopeRefs.length; r++) { try { ids[A.findComp(scopeRefs[r]).id] = true; } catch (e) {} }
-    for (var id in ids) { var c = p.itemByID(Number(id)); if (c) snap.comps[id] = snapComp(c, true, budget); }
-    return snap;
-  };
-  A.diff = function (a, b) {
-    var ch = { items: [], layers: [], props: [], scope: [], partial: false }, MAX = 80, n = 0;
-    function add(list, v) { if (n++ < MAX) list.push(v); else ch.truncated = true; }
-    for (var id in b.items) {
-      var x = b.items[id], y = a.items[id];
-      if (!y) { add(ch.items, ["+", x.type, x.name, x.layers]); continue; }
-      var d = [];
-      for (var f = 0; f < x.sig.length; f++) if (A.stringify(x.sig[f]) !== A.stringify(y.sig[f])) d.push(ITEM_FIELDS[f] + " " + brief(y.sig[f]) + " -> " + brief(x.sig[f]));
-      if (d.length) add(ch.items, ["~", x.type, x.name, d.join("; ")]);
-    }
-    for (var id2 in a.items) if (!b.items[id2]) add(ch.items, ["-", a.items[id2].type, a.items[id2].name]);
-    for (var cid in b.comps) {
-      var cb = b.comps[cid], ca = a.comps[cid];
-      if (!ca) continue; // comp entered the scope during the call (e.g. newly opened): reported as an item
-      ch.scope.push(cb.name);
-      if (ca.partial || cb.partial) ch.partial = true;
-      for (var k in cb.layers) {
-        var lb = cb.layers[k], la = ca.layers[k];
-        if (!la) { add(ch.layers, ["+", cb.name, lb.name]); continue; }
-        var ld = [];
-        for (var g = 0; g < lb.sig.length; g++) if (A.stringify(lb.sig[g]) !== A.stringify(la.sig[g])) ld.push(LAYER_FIELDS[g] + " " + brief(la.sig[g]) + " -> " + brief(lb.sig[g]));
-        if (la.index !== lb.index) ld.push("order " + la.index + " -> " + lb.index);
-        if (ld.length) add(ch.layers, ["~", cb.name, lb.name, ld.join("; ")]);
-        if (la.props && lb.props) {
-          // added/removed groups (effects, masks, shape groups...): report only the outermost one
-          var addedG = [], removedG = [];
-          for (var gp in lb.groups) {
-            if (la.groups[gp] === undefined) addedG.push(gp);
-            else if (la.groups[gp] !== lb.groups[gp]) add(ch.props, ["~", lb.name, gp, "enabled " + la.groups[gp] + " -> " + lb.groups[gp]]);
-          }
-          for (var gq in la.groups) if (lb.groups[gq] === undefined) removedG.push(gq);
-          var outermost = function (list) {
-            list.sort();
-            var keep = [];
-            for (var q = 0; q < list.length; q++) {
-              var inner = false;
-              for (var z = 0; z < keep.length; z++) if (list[q].indexOf(keep[z] + "/") === 0) { inner = true; break; }
-              if (!inner) keep.push(list[q]);
-            }
-            return keep;
-          };
-          addedG = outermost(addedG); removedG = outermost(removedG);
-          for (var ga = 0; ga < addedG.length; ga++) add(ch.props, ["+", lb.name, addedG[ga]]);
-          for (var gr = 0; gr < removedG.length; gr++) add(ch.props, ["-", lb.name, removedG[gr]]);
-          for (var pp in lb.props) {
-            var pb = lb.props[pp], pa = la.props[pp];
-            if (!pa || pa.s === pb.s) continue;
-            var parts = [];
-            if (A.stringify(pa.v) !== A.stringify(pb.v)) parts.push(brief(pa.v) + " -> " + brief(pb.v));
-            if (pa.k !== pb.k) parts.push("keyframes " + pa.k + " -> " + pb.k); else if (pb.k && pa.s.split("|")[1] !== pb.s.split("|")[1]) parts.push("keyframes changed");
-            if (pa.e !== pb.e) parts.push(!pa.e ? "expression added" : (!pb.e ? "expression removed" : "expression changed"));
-            if (!parts.length) parts.push("changed");
-            add(ch.props, ["~", lb.name, pp, parts.join(", ")]);
-          }
-        }
-      }
-      for (var k2 in ca.layers) if (!cb.layers[k2]) add(ch.layers, ["-", cb.name, ca.layers[k2].name]);
-    }
-    return ch;
-  };
-
-  // ---------- runner ----------
-  A.run = function (fn, args, opts) {
-    opts = opts || {};
-    var logs = [];
-    function log() {
-      var parts = [];
-      for (var i = 0; i < arguments.length; i++) { var a = arguments[i]; parts.push(typeof a === "string" ? a : A.stringify(A.serialize(a, 2))); }
-      logs.push(parts.join(" "));
-    }
-    var undo = opts.undoGroup !== false && opts.undoGroup !== "";
-    var res;
-    try {
-      if (opts.suppressDialogs !== false) { try { app.beginSuppressDialogs(); } catch (e) {} }
-      if (undo) app.beginUndoGroup(opts.undoGroup || "AE MCP");
-      var before = null;
-      if (opts.report) { try { before = A.snapshot(opts.report); } catch (e) { before = null; } }
-      var r = fn(args || {}, log);
-      res = { ok: true, result: opts.raw ? r : A.serialize(r, opts.depth || 4), logs: logs };
-      if (before) { try { res.changes = A.diff(before, A.snapshot(opts.report)); } catch (e) { res.changes = { error: e.message }; } }
-    } catch (e) {
-      res = { ok: false, error: { message: e.message || String(e), name: e.name, line: e.line, user: !!e.aemcpUser }, logs: logs };
-      // a failed script may have changed things before it stopped: report those too
-      if (before) { try { res.changes = A.diff(before, A.snapshot(opts.report)); } catch (e2) {} }
-    } finally {
-      if (undo) { try { app.endUndoGroup(); } catch (e) {} }
-      if (opts.suppressDialogs !== false) { try { app.endSuppressDialogs(false); } catch (e) {} }
-    }
-    return A.stringify(res);
-  };
-
-  return A;
-})();
-// JSON for scripts (AE's ExtendScript has no JSON object)
-if (typeof JSON === "undefined" || !JSON.stringify) {
-  JSON = {
-    stringify: function (v) { return aemcp.stringify(v); },
-    parse: function (s) {
-      s = String(s);
-      // only data: reject anything that could run code
-      if (/[^,:{}\\[\\]0-9.\\-+Eaeflnr-u \\n\\r\\t]/.test(s.replace(/"(\\\\.|[^"\\\\])*"/g, ""))) throw new SyntaxError("JSON.parse: invalid JSON");
-      return eval("(" + s + ")");
-    }
-  };
-}
-"aemcp loaded " + aemcp.version;
-`;
-  }
-});
-
-// src/jsx.ts
-import { createHash } from "node:crypto";
-function toJsLiteral(v) {
-  return (JSON.stringify(v ?? null) ?? "null").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
-}
-function wrapBody(body, args, opts = {}) {
-  const runOpts = { undoGroup: opts.undoGroup === void 0 ? "AE MCP" : opts.undoGroup, depth: opts.depth, report: opts.report };
-  return `(function(){
-if (typeof aemcp === 'undefined' || aemcp.version !== ${toJsLiteral(HELPER_VERSION)}) return ${toJsLiteral(NEED_HELPERS)};
-return aemcp.run(function(args, log){
-` + body + `
-}, ${toJsLiteral(args ?? {})}, ${toJsLiteral(runOpts)});
-})()`;
-}
-function evalBody(fnSource) {
-  return `var __fn = eval(${toJsLiteral(fnSource)});
-return __fn(args, log);`;
-}
-function errorHint(message) {
-  const m = message || "";
-  if (/Object is invalid/i.test(m)) return "The After Effects object no longer exists (e.g. a layer/comp was removed or the project changed). Look it up again.";
-  if (/out of range|index.*range/i.test(m)) return "AE collections are 1-based: app.project.item(1..numItems), comp.layer(1..numLayers), prop.property(1..numProperties).";
-  if (/Function .+ is undefined/i.test(m)) return "That method doesn't exist on this object in ExtendScript. Check the object type (ae_get_scripting_guide) or use aemcp helpers.";
-  if (/undefined is not an object|null is not an object/i.test(m)) return "Something is undefined: a lookup returned nothing (names are case-sensitive; activeItem may not be a comp).";
-  if (/does not have a value/i.test(m)) return "Syntax error (ExtendScript reports these as '... does not have a value').";
-  if (/Can not .* to a (layer|property)|cannot set|not settable|read.?only/i.test(m)) return "That attribute is read-only or can't be set in this state (e.g. the layer is locked, or the property has expressions/keyframes).";
-  return null;
-}
-function codeExcerpt(code, line, context = 2) {
-  const lines = code.split(/\r?\n/);
-  if (!line || line < 1 || line > lines.length) return "";
-  const from = Math.max(1, line - context), to = Math.min(lines.length, line + context);
-  const width = String(to).length;
-  const out = [];
-  for (let i = from; i <= to; i++) out.push(`${i === line ? ">" : " "} ${String(i).padStart(width)} | ${lines[i - 1]}`);
-  return out.join("\n");
-}
-function parseResult(raw) {
-  if (raw === "EvalScript error.")
-    return { ok: false, logs: [], error: { message: "ExtendScript could not evaluate the script (EvalScript error). This usually means a syntax error outside the user code wrapper." } };
-  try {
-    const r = JSON.parse(raw);
-    if (r && typeof r === "object" && "ok" in r) return { logs: [], ...r };
-    return { ok: true, result: r, logs: [] };
-  } catch {
-    return { ok: true, result: raw, logs: [] };
-  }
-}
-async function ensureHelpers() {
-  const r = await evalRaw(helperLoader, 3e4);
-  if (!r.startsWith("aemcp loaded")) throw new Error("Failed to load the aemcp helper library into After Effects: " + r);
-}
-async function runJsx(body, args = {}, opts = {}) {
-  const script = wrapBody(body, args, opts);
-  let raw = await evalRaw(script, opts.timeoutMs);
-  if (raw === NEED_HELPERS) {
-    await ensureHelpers();
-    raw = await evalRaw(script, opts.timeoutMs);
-  }
-  return parseResult(raw);
-}
-function formatChanges(ch) {
-  if (!ch) return null;
-  if (ch.error) return `Changes: (could not be determined: ${ch.error})`;
-  const lines = [];
-  for (const [op, type, name, extra] of ch.items) {
-    if (op === "+") lines.push(`+ ${type} "${name}"${type === "comp" && extra !== void 0 ? ` (${extra} layers)` : ""}`);
-    else if (op === "-") lines.push(`- ${type} "${name}"`);
-    else lines.push(`~ ${type} "${name}": ${extra}`);
-  }
-  for (const [op, comp, layer, extra] of ch.layers) {
-    if (op === "+") lines.push(`+ layer "${layer}" in "${comp}"`);
-    else if (op === "-") lines.push(`- layer "${layer}" in "${comp}"`);
-    else lines.push(`~ layer "${layer}" in "${comp}": ${extra}`);
-  }
-  for (const [op, layer, path, extra] of ch.props) {
-    if (op === "+") lines.push(`+ ${layer} > ${path}`);
-    else if (op === "-") lines.push(`- ${layer} > ${path}`);
-    else lines.push(`~ ${layer} > ${path}: ${extra}`);
-  }
-  if (!lines.length) return "Changes: none";
-  const notes = [];
-  if (ch.scope.length) notes.push(`layers/properties compared in: ${ch.scope.join(", ")}`);
-  if (ch.partial) notes.push("very large comp: some properties not compared");
-  if (ch.truncated) notes.push("more changes not listed");
-  return `Changes${notes.length ? ` (${notes.join("; ")})` : ""}:
-${lines.join("\n")}`;
-}
-var NEED_HELPERS, HELPER_VERSION, helperSource, helperLoader;
-var init_jsx = __esm({
-  "src/jsx.ts"() {
-    "use strict";
-    init_define_AEMCP_CEP_FILES();
-    init_aemcp();
-    init_config();
-    init_bridge();
-    NEED_HELPERS = "__AEMCP_NEED_HELPERS__";
-    HELPER_VERSION = `${VERSION}-${createHash("sha1").update(aemcp_default).digest("hex").slice(0, 10)}`;
-    helperSource = aemcp_default.replace("__AEMCP_VERSION__", HELPER_VERSION);
-    helperLoader = "(function(){try{eval(" + toJsLiteral(helperSource) + ");return 'aemcp loaded ' + aemcp.version;}catch(e){return 'aemcp load error: ' + e.message + ' (line ' + e.line + ')';}})()";
-  }
-});
-
-// src/update.ts
-import { mkdirSync as mkdirSync3, readFileSync as readFileSync4, writeFileSync as writeFileSync3 } from "node:fs";
-import { homedir as homedir3 } from "node:os";
-import { dirname as dirname3, join as join4 } from "node:path";
-function compareVersions(a, b) {
-  const pa = a.replace(/^v/, "").split(/[.-]/).map((x) => parseInt(x, 10) || 0);
-  const pb = b.replace(/^v/, "").split(/[.-]/).map((x) => parseInt(x, 10) || 0);
-  for (let i = 0; i < 3; i++) if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) > (pb[i] ?? 0) ? 1 : -1;
-  return 0;
-}
-function updateCheckEnabled() {
-  return !process.env.AEMCP_NO_UPDATE_CHECK && loadConfig().updateCheck !== false;
-}
-function readCache() {
-  try {
-    return JSON.parse(readFileSync4(CACHE, "utf8"));
-  } catch {
-    return null;
-  }
-}
-function knownUpdate() {
-  const c = current ?? readCache();
-  if (!c?.latest) return null;
-  return { ...c, current: VERSION, updateAvailable: compareVersions(c.latest, VERSION) > 0 };
-}
-async function checkForUpdate(force = false) {
-  if (!updateCheckEnabled()) return null;
-  const cached2 = readCache();
-  if (!force && cached2 && Date.now() - Date.parse(cached2.checkedAt) < DAY) return current = knownUpdate();
-  try {
-    const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
-      headers: { "user-agent": `ae-mcp/${VERSION}`, accept: "application/vnd.github+json" },
-      signal: AbortSignal.timeout(4e3)
-    });
-    if (!res.ok) return knownUpdate();
-    const rel = await res.json();
-    if (!rel.tag_name) return knownUpdate();
-    const latest = rel.tag_name.replace(/^v/, "");
-    current = { checkedAt: (/* @__PURE__ */ new Date()).toISOString(), current: VERSION, latest, url: rel.html_url || RELEASES_URL, updateAvailable: compareVersions(latest, VERSION) > 0 };
-    mkdirSync3(dirname3(CACHE), { recursive: true });
-    writeFileSync3(CACHE, JSON.stringify(current, null, 2));
-    return current;
-  } catch {
-    return knownUpdate();
-  }
-}
-function updateMessage(u) {
-  return u?.updateAvailable ? `A newer version of AE MCP is available: v${u.latest} (you have v${u.current}). Download: ${u.url}` : null;
-}
-var REPO, RELEASES_URL, CACHE, DAY, current;
-var init_update = __esm({
-  "src/update.ts"() {
-    "use strict";
-    init_define_AEMCP_CEP_FILES();
-    init_config();
-    REPO = "ronyitzhaki/after-effects-mcp";
-    RELEASES_URL = `https://github.com/${REPO}/releases/latest`;
-    CACHE = join4(homedir3(), ".aemcp", "update-check.json");
-    DAY = 24 * 3600 * 1e3;
-    current = null;
-  }
-});
-
 // node_modules/@babel/standalone/babel.min.js
 var require_babel_min = __commonJS({
   "node_modules/@babel/standalone/babel.min.js"(exports, module) {
@@ -9192,7 +8256,7 @@ var require_babel_min = __commonJS({
           i10 || console.warn(n10 + "`" + e10 + "` has been deprecated, please migrate to `" + a10 + "`\n" + o10);
         }
       }
-      function C(e10, a10) {
+      function C2(e10, a10) {
         return E("ArrayExpression", e10, a10);
       }
       function P(e10, a10) {
@@ -13038,7 +12102,7 @@ var require_babel_min = __commonJS({
         return !!e10 && ("ClassAccessorProperty" === e10.type && (null == a10 || S(e10, a10)));
       }, isAnyTypeAnnotation: Le, isArgumentPlaceholder: function(e10, a10) {
         return E("ArgumentPlaceholder", e10, a10);
-      }, isArrayExpression: C, isArrayPattern: se, isArrayTypeAnnotation: Ue, isArrowFunctionExpression: de, isAssignmentExpression: P, isAssignmentPattern: oe, isAwaitExpression: _e, isBigIntLiteral: ke, isBigIntLiteralTypeAnnotation: function(e10, a10) {
+      }, isArrayExpression: C2, isArrayPattern: se, isArrayTypeAnnotation: Ue, isArrowFunctionExpression: de, isAssignmentExpression: P, isAssignmentPattern: oe, isAwaitExpression: _e, isBigIntLiteral: ke, isBigIntLiteralTypeAnnotation: function(e10, a10) {
         return E("BigIntLiteralTypeAnnotation", e10, a10);
       }, isBinary: Aa, isBinaryExpression: function(e10, a10) {
         return E("BinaryExpression", e10, a10);
@@ -20541,7 +19605,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
         return iE;
       }, get scope() {
         return oE;
-      } }), pE = jr, gE = vf, fE = Gh, hE = ai, mE = C, RE = Aa, yE = _, vE = Wa, bE = ue, xE = le, SE = pe, EE = ge, TE = fe, wE = j, CE = F, PE = Re, AE = Ma, _E2 = G, DE = La, kE = Ga, IE = W, BE = z2, NE = Ua, jE = Oa, OE = H, FE = we, ME = Ce, LE = Pe, UE = ae, qE = ne, WE = re, VE = Xr, HE = en, GE = Ah, KE = Pi, JE = Ai, zE = Y, XE = pa, YE = xe, $E = Fe, QE = Ha, ZE = yi;
+      } }), pE = jr, gE = vf, fE = Gh, hE = ai, mE = C2, RE = Aa, yE = _, vE = Wa, bE = ue, xE = le, SE = pe, EE = ge, TE = fe, wE = j, CE = F, PE = Re, AE = Ma, _E2 = G, DE = La, kE = Ga, IE = W, BE = z2, NE = Ua, jE = Oa, OE = H, FE = we, ME = Ce, LE = Pe, UE = ae, qE = ne, WE = re, VE = Xr, HE = en, GE = Ah, KE = Pi, JE = Ai, zE = Y, XE = pa, YE = xe, $E = Fe, QE = Ha, ZE = yi;
       function eT(e10, a10) {
         switch (null == e10 ? void 0 : e10.type) {
           default:
@@ -29932,7 +28996,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
         return CV(this.file.addHelper("superPropGet"), [this.isDerivedConstructor ? DV([IV(), a10]) : a10, this.prop(e10), IV()].concat(y(this.isStatic || this.isPrivateMethod ? [] : [ii(1)])));
       }, _call: function(e10, a10, n10) {
         var t10, r10 = PV(this.getObjectRef());
-        t10 = 1 === a10.length && Te(a10[0]) && (F(a10[0].argument) || C(a10[0].argument)) ? a10[0].argument : Nr(a10);
+        t10 = 1 === a10.length && Te(a10[0]) && (F(a10[0].argument) || C2(a10[0].argument)) ? a10[0].argument : Nr(a10);
         var i10 = Wr(this.file.addHelper("superPropGet"), [this.isDerivedConstructor ? DV([IV(), r10]) : r10, this.prop(e10), IV(), ii(2 | (this.isStatic || this.isPrivateMethod ? 0 : 1))]);
         return n10 ? so(i10, [t10], true) : CV(i10, [t10]);
       }, set: function(e10, a10) {
@@ -31248,7 +30312,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
             var i10 = t10.getBinding(e11.name);
             if (null != i10 && i10.constant && i10.path.isGenericType("Array")) return e11;
           }
-          if (C(e11)) return e11;
+          if (C2(e11)) return e11;
           if (F(e11, { name: "arguments" })) return gx.expression.ast(DG || (DG = R(["\n          Array.prototype.slice.call(", ")\n        "])), e11);
           var o10 = [e11];
           return "number" == typeof a11 ? (o10.push(ii(a11)), n10 = "slicedToArray") : n10 = "toArray", r10 && (o10.unshift(t10.path.hub.addHelper(n10)), n10 = "maybeArrayLike"), Wr(t10.path.hub.addHelper(n10), o10);
@@ -31296,7 +30360,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
             }
           } else this.nodes.push(Xr(Wr(this.addHelper("objectDestructuringEmpty"), BG(a11) ? [] : [a11])));
         }, a10.canUnpackArrayPattern = function(e11, a11) {
-          if (!C(a11)) return false;
+          if (!C2(a11)) return false;
           if (e11.elements.length > a11.elements.length) return false;
           if (e11.elements.length < a11.elements.length && !jG(e11)) return false;
           for (var n10, t10 = o(e11.elements); !(n10 = t10()).done; ) {
@@ -31337,7 +30401,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
             }
           } else this.nodes.push(Xr(Wr(this.addHelper("objectDestructuringEmpty"), [])));
         }, a10.init = function(e11, a11) {
-          if (!C(a11) && !G(a11)) {
+          if (!C2(a11) && !G(a11)) {
             var n10 = this.scope.maybeGenerateMemoised(a11, true);
             n10 && (this.nodes.push(this.buildVariableDeclaration(n10, vf(a11))), a11 = n10);
           }
@@ -31409,7 +30473,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
         }, AssignmentExpression: function(e11, a11) {
           qa(e11.node.left) && (function(e12, a12, n11, t11, r11, i11) {
             var o11, s11 = e12.node, d11 = e12.scope, u11 = e12.parentPath, c11 = [], l11 = new MG({ operator: s11.operator, scope: d11, nodes: c11, arrayLikeIsIterable: n11, iterableIsArray: t11, objectRestNoSymbols: r11, useBuiltIns: i11, addHelper: a12 });
-            (!u11.isExpressionStatement() && !u11.isSequenceExpression() || e12.isCompletionRecord()) && (o11 = d11.generateUidIdentifierBasedOnNode(s11.right, "ref"), c11.push(Pi("var", [Ai(o11, s11.right)])), C(s11.right) && l11.arrayRefSet.add(o11.name)), l11.init(s11.left, o11 || s11.right), o11 && (u11.isArrowFunctionExpression() ? (e12.replaceWith(Ur([])), c11.push(Ri(vf(o11)))) : c11.push(Xr(vf(o11)))), e12.replaceWithMultiple(c11), d11.crawl();
+            (!u11.isExpressionStatement() && !u11.isSequenceExpression() || e12.isCompletionRecord()) && (o11 = d11.generateUidIdentifierBasedOnNode(s11.right, "ref"), c11.push(Pi("var", [Ai(o11, s11.right)])), C2(s11.right) && l11.arrayRefSet.add(o11.name)), l11.init(s11.left, o11 || s11.right), o11 && (u11.isArrowFunctionExpression() ? (e12.replaceWith(Ur([])), c11.push(Ri(vf(o11)))) : c11.push(Xr(vf(o11)))), e12.replaceWithMultiple(c11), d11.crawl();
           })(e11, function(e12) {
             return a11.addHelper(e12);
           }, l10, c10, p10, u10);
@@ -33520,7 +32584,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
         return e10.addRange(12289, 12291).addRange(12296, 12305).addRange(12307, 12319).addRange(12336, 12341).addRange(12348, 12349).addRange(12353, 12438).addRange(12441, 12448).addRange(12539, 12540).addRange(65093, 65094).addRange(65377, 65381).addRange(65438, 65439).addRange(110593, 110879).addRange(110928, 110930), S2.characters = e10, S2;
       }
       var T2, w2 = {};
-      function C2() {
+      function C22() {
         if (T2) return w2;
         T2 = 1;
         var e10 = VK()();
@@ -35616,7 +34680,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
         return nde ? ade : (nde = 1, ade = "18.0.0");
       }
       function sde() {
-        return tde || (tde = { "/node_modules/regenerate-unicode-properties/Binary_Property/Alphabetic.js": HK, "/node_modules/regenerate-unicode-properties/Binary_Property/Any.js": JK, "/node_modules/regenerate-unicode-properties/Binary_Property/ASCII_Hex_Digit.js": YK, "/node_modules/regenerate-unicode-properties/Binary_Property/ASCII.js": ZK, "/node_modules/regenerate-unicode-properties/Binary_Property/Assigned.js": nJ, "/node_modules/regenerate-unicode-properties/Binary_Property/Bidi_Control.js": iJ, "/node_modules/regenerate-unicode-properties/Binary_Property/Bidi_Mirrored.js": dJ, "/node_modules/regenerate-unicode-properties/Binary_Property/Case_Ignorable.js": lJ, "/node_modules/regenerate-unicode-properties/Binary_Property/Cased.js": fJ, "/node_modules/regenerate-unicode-properties/Binary_Property/Changes_When_Casefolded.js": RJ, "/node_modules/regenerate-unicode-properties/Binary_Property/Changes_When_Casemapped.js": bJ, "/node_modules/regenerate-unicode-properties/Binary_Property/Changes_When_Lowercased.js": EJ, "/node_modules/regenerate-unicode-properties/Binary_Property/Changes_When_NFKC_Casefolded.js": CJ, "/node_modules/regenerate-unicode-properties/Binary_Property/Changes_When_Titlecased.js": _J, "/node_modules/regenerate-unicode-properties/Binary_Property/Changes_When_Uppercased.js": IJ, "/node_modules/regenerate-unicode-properties/Binary_Property/Dash.js": jJ, "/node_modules/regenerate-unicode-properties/Binary_Property/Default_Ignorable_Code_Point.js": MJ, "/node_modules/regenerate-unicode-properties/Binary_Property/Deprecated.js": qJ, "/node_modules/regenerate-unicode-properties/Binary_Property/Diacritic.js": HJ, "/node_modules/regenerate-unicode-properties/Binary_Property/Emoji_Component.js": JJ, "/node_modules/regenerate-unicode-properties/Binary_Property/Emoji_Modifier_Base.js": YJ, "/node_modules/regenerate-unicode-properties/Binary_Property/Emoji_Modifier.js": ZJ, "/node_modules/regenerate-unicode-properties/Binary_Property/Emoji_Presentation.js": nz, "/node_modules/regenerate-unicode-properties/Binary_Property/Emoji.js": iz, "/node_modules/regenerate-unicode-properties/Binary_Property/Extended_Pictographic.js": dz, "/node_modules/regenerate-unicode-properties/Binary_Property/Extender.js": lz, "/node_modules/regenerate-unicode-properties/Binary_Property/Grapheme_Base.js": fz, "/node_modules/regenerate-unicode-properties/Binary_Property/Grapheme_Extend.js": Rz, "/node_modules/regenerate-unicode-properties/Binary_Property/Hex_Digit.js": bz, "/node_modules/regenerate-unicode-properties/Binary_Property/ID_Continue.js": Ez, "/node_modules/regenerate-unicode-properties/Binary_Property/ID_Start.js": Cz, "/node_modules/regenerate-unicode-properties/Binary_Property/Ideographic.js": _z, "/node_modules/regenerate-unicode-properties/Binary_Property/IDS_Binary_Operator.js": Iz, "/node_modules/regenerate-unicode-properties/Binary_Property/IDS_Trinary_Operator.js": jz, "/node_modules/regenerate-unicode-properties/Binary_Property/Join_Control.js": Mz, "/node_modules/regenerate-unicode-properties/Binary_Property/Logical_Order_Exception.js": qz, "/node_modules/regenerate-unicode-properties/Binary_Property/Lowercase.js": Hz, "/node_modules/regenerate-unicode-properties/Binary_Property/Math.js": Jz, "/node_modules/regenerate-unicode-properties/Binary_Property/Noncharacter_Code_Point.js": Yz, "/node_modules/regenerate-unicode-properties/Binary_Property/Pattern_Syntax.js": Zz, "/node_modules/regenerate-unicode-properties/Binary_Property/Pattern_White_Space.js": nX, "/node_modules/regenerate-unicode-properties/Binary_Property/Quotation_Mark.js": iX, "/node_modules/regenerate-unicode-properties/Binary_Property/Radical.js": dX, "/node_modules/regenerate-unicode-properties/Binary_Property/Regional_Indicator.js": lX, "/node_modules/regenerate-unicode-properties/Binary_Property/Sentence_Terminal.js": fX, "/node_modules/regenerate-unicode-properties/Binary_Property/Soft_Dotted.js": RX, "/node_modules/regenerate-unicode-properties/Binary_Property/Terminal_Punctuation.js": bX, "/node_modules/regenerate-unicode-properties/Binary_Property/Unified_Ideograph.js": EX, "/node_modules/regenerate-unicode-properties/Binary_Property/Uppercase.js": CX, "/node_modules/regenerate-unicode-properties/Binary_Property/Variation_Selector.js": _X, "/node_modules/regenerate-unicode-properties/Binary_Property/White_Space.js": IX, "/node_modules/regenerate-unicode-properties/Binary_Property/XID_Continue.js": jX, "/node_modules/regenerate-unicode-properties/Binary_Property/XID_Start.js": MX, "/node_modules/regenerate-unicode-properties/General_Category/Cased_Letter.js": qX, "/node_modules/regenerate-unicode-properties/General_Category/Close_Punctuation.js": HX, "/node_modules/regenerate-unicode-properties/General_Category/Connector_Punctuation.js": JX, "/node_modules/regenerate-unicode-properties/General_Category/Control.js": YX, "/node_modules/regenerate-unicode-properties/General_Category/Currency_Symbol.js": ZX, "/node_modules/regenerate-unicode-properties/General_Category/Dash_Punctuation.js": nY, "/node_modules/regenerate-unicode-properties/General_Category/Decimal_Number.js": iY, "/node_modules/regenerate-unicode-properties/General_Category/Enclosing_Mark.js": dY, "/node_modules/regenerate-unicode-properties/General_Category/Final_Punctuation.js": lY, "/node_modules/regenerate-unicode-properties/General_Category/Format.js": fY, "/node_modules/regenerate-unicode-properties/General_Category/Initial_Punctuation.js": RY, "/node_modules/regenerate-unicode-properties/General_Category/Letter_Number.js": bY, "/node_modules/regenerate-unicode-properties/General_Category/Letter.js": EY, "/node_modules/regenerate-unicode-properties/General_Category/Line_Separator.js": CY, "/node_modules/regenerate-unicode-properties/General_Category/Lowercase_Letter.js": _Y, "/node_modules/regenerate-unicode-properties/General_Category/Mark.js": IY, "/node_modules/regenerate-unicode-properties/General_Category/Math_Symbol.js": jY, "/node_modules/regenerate-unicode-properties/General_Category/Modifier_Letter.js": MY, "/node_modules/regenerate-unicode-properties/General_Category/Modifier_Symbol.js": qY, "/node_modules/regenerate-unicode-properties/General_Category/Nonspacing_Mark.js": HY, "/node_modules/regenerate-unicode-properties/General_Category/Number.js": JY, "/node_modules/regenerate-unicode-properties/General_Category/Open_Punctuation.js": YY, "/node_modules/regenerate-unicode-properties/General_Category/Other_Letter.js": ZY, "/node_modules/regenerate-unicode-properties/General_Category/Other_Number.js": n$, "/node_modules/regenerate-unicode-properties/General_Category/Other_Punctuation.js": i$, "/node_modules/regenerate-unicode-properties/General_Category/Other_Symbol.js": d$, "/node_modules/regenerate-unicode-properties/General_Category/Other.js": l$, "/node_modules/regenerate-unicode-properties/General_Category/Paragraph_Separator.js": f$, "/node_modules/regenerate-unicode-properties/General_Category/Private_Use.js": R$, "/node_modules/regenerate-unicode-properties/General_Category/Punctuation.js": b$, "/node_modules/regenerate-unicode-properties/General_Category/Separator.js": E$, "/node_modules/regenerate-unicode-properties/General_Category/Space_Separator.js": C$, "/node_modules/regenerate-unicode-properties/General_Category/Spacing_Mark.js": _$, "/node_modules/regenerate-unicode-properties/General_Category/Surrogate.js": I$, "/node_modules/regenerate-unicode-properties/General_Category/Symbol.js": j$, "/node_modules/regenerate-unicode-properties/General_Category/Titlecase_Letter.js": M$, "/node_modules/regenerate-unicode-properties/General_Category/Unassigned.js": q$, "/node_modules/regenerate-unicode-properties/General_Category/Uppercase_Letter.js": K$, "/node_modules/regenerate-unicode-properties/index.js": J$, "/node_modules/regenerate-unicode-properties/Property_of_Strings/Basic_Emoji.js": Y$, "/node_modules/regenerate-unicode-properties/Property_of_Strings/Emoji_Keycap_Sequence.js": Z$, "/node_modules/regenerate-unicode-properties/Property_of_Strings/RGI_Emoji_Flag_Sequence.js": nQ, "/node_modules/regenerate-unicode-properties/Property_of_Strings/RGI_Emoji_Modifier_Sequence.js": iQ, "/node_modules/regenerate-unicode-properties/Property_of_Strings/RGI_Emoji_Tag_Sequence.js": dQ, "/node_modules/regenerate-unicode-properties/Property_of_Strings/RGI_Emoji_ZWJ_Sequence.js": lQ, "/node_modules/regenerate-unicode-properties/Property_of_Strings/RGI_Emoji.js": fQ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Adlam.js": RQ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Ahom.js": bQ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Anatolian_Hieroglyphs.js": EQ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Arabic.js": CQ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Armenian.js": _Q, "/node_modules/regenerate-unicode-properties/Script_Extensions/Avestan.js": IQ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Balinese.js": jQ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Bamum.js": MQ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Bassa_Vah.js": qQ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Batak.js": HQ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Bengali.js": JQ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Beria_Erfe.js": YQ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Bhaiksuki.js": ZQ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Bopomofo.js": nZ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Brahmi.js": iZ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Braille.js": dZ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Buginese.js": lZ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Buhid.js": fZ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Canadian_Aboriginal.js": RZ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Carian.js": bZ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Caucasian_Albanian.js": EZ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Chakma.js": CZ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Cham.js": _Z, "/node_modules/regenerate-unicode-properties/Script_Extensions/Cherokee.js": IZ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Chorasmian.js": jZ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Common.js": MZ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Coptic.js": qZ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Cuneiform.js": HZ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Cypriot.js": JZ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Cypro_Minoan.js": YZ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Cyrillic.js": ZZ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Deseret.js": n1, "/node_modules/regenerate-unicode-properties/Script_Extensions/Devanagari.js": i1, "/node_modules/regenerate-unicode-properties/Script_Extensions/Dives_Akuru.js": d1, "/node_modules/regenerate-unicode-properties/Script_Extensions/Dogra.js": l1, "/node_modules/regenerate-unicode-properties/Script_Extensions/Duployan.js": f1, "/node_modules/regenerate-unicode-properties/Script_Extensions/Egyptian_Hieroglyphs.js": R1, "/node_modules/regenerate-unicode-properties/Script_Extensions/Elbasan.js": b1, "/node_modules/regenerate-unicode-properties/Script_Extensions/Elymaic.js": E1, "/node_modules/regenerate-unicode-properties/Script_Extensions/Ethiopic.js": C1, "/node_modules/regenerate-unicode-properties/Script_Extensions/Garay.js": _1, "/node_modules/regenerate-unicode-properties/Script_Extensions/Georgian.js": I1, "/node_modules/regenerate-unicode-properties/Script_Extensions/Glagolitic.js": j1, "/node_modules/regenerate-unicode-properties/Script_Extensions/Gothic.js": M1, "/node_modules/regenerate-unicode-properties/Script_Extensions/Grantha.js": q1, "/node_modules/regenerate-unicode-properties/Script_Extensions/Greek.js": H1, "/node_modules/regenerate-unicode-properties/Script_Extensions/Gujarati.js": J1, "/node_modules/regenerate-unicode-properties/Script_Extensions/Gunjala_Gondi.js": Y1, "/node_modules/regenerate-unicode-properties/Script_Extensions/Gurmukhi.js": Z1, "/node_modules/regenerate-unicode-properties/Script_Extensions/Gurung_Khema.js": n2, "/node_modules/regenerate-unicode-properties/Script_Extensions/Han.js": i2, "/node_modules/regenerate-unicode-properties/Script_Extensions/Hangul.js": d2, "/node_modules/regenerate-unicode-properties/Script_Extensions/Hanifi_Rohingya.js": l2, "/node_modules/regenerate-unicode-properties/Script_Extensions/Hanunoo.js": f2, "/node_modules/regenerate-unicode-properties/Script_Extensions/Hatran.js": R2, "/node_modules/regenerate-unicode-properties/Script_Extensions/Hebrew.js": b2, "/node_modules/regenerate-unicode-properties/Script_Extensions/Hiragana.js": E2, "/node_modules/regenerate-unicode-properties/Script_Extensions/Imperial_Aramaic.js": C2, "/node_modules/regenerate-unicode-properties/Script_Extensions/Inherited.js": _2, "/node_modules/regenerate-unicode-properties/Script_Extensions/Inscriptional_Pahlavi.js": I2, "/node_modules/regenerate-unicode-properties/Script_Extensions/Inscriptional_Parthian.js": j2, "/node_modules/regenerate-unicode-properties/Script_Extensions/Javanese.js": M2, "/node_modules/regenerate-unicode-properties/Script_Extensions/Jurchen.js": q2, "/node_modules/regenerate-unicode-properties/Script_Extensions/Kaithi.js": H2, "/node_modules/regenerate-unicode-properties/Script_Extensions/Kannada.js": J2, "/node_modules/regenerate-unicode-properties/Script_Extensions/Katakana.js": Y2, "/node_modules/regenerate-unicode-properties/Script_Extensions/Kawi.js": Z2, "/node_modules/regenerate-unicode-properties/Script_Extensions/Kayah_Li.js": n0, "/node_modules/regenerate-unicode-properties/Script_Extensions/Kharoshthi.js": i0, "/node_modules/regenerate-unicode-properties/Script_Extensions/Khitan_Small_Script.js": d0, "/node_modules/regenerate-unicode-properties/Script_Extensions/Khmer.js": l0, "/node_modules/regenerate-unicode-properties/Script_Extensions/Khojki.js": f0, "/node_modules/regenerate-unicode-properties/Script_Extensions/Khudawadi.js": R0, "/node_modules/regenerate-unicode-properties/Script_Extensions/Kirat_Rai.js": b0, "/node_modules/regenerate-unicode-properties/Script_Extensions/Lao.js": E0, "/node_modules/regenerate-unicode-properties/Script_Extensions/Latin.js": C0, "/node_modules/regenerate-unicode-properties/Script_Extensions/Lepcha.js": _0, "/node_modules/regenerate-unicode-properties/Script_Extensions/Limbu.js": I0, "/node_modules/regenerate-unicode-properties/Script_Extensions/Linear_A.js": j0, "/node_modules/regenerate-unicode-properties/Script_Extensions/Linear_B.js": M0, "/node_modules/regenerate-unicode-properties/Script_Extensions/Lisu.js": q0, "/node_modules/regenerate-unicode-properties/Script_Extensions/Lycian.js": H0, "/node_modules/regenerate-unicode-properties/Script_Extensions/Lydian.js": J0, "/node_modules/regenerate-unicode-properties/Script_Extensions/Mahajani.js": Y0, "/node_modules/regenerate-unicode-properties/Script_Extensions/Makasar.js": Z0, "/node_modules/regenerate-unicode-properties/Script_Extensions/Malayalam.js": n6, "/node_modules/regenerate-unicode-properties/Script_Extensions/Mandaic.js": i6, "/node_modules/regenerate-unicode-properties/Script_Extensions/Manichaean.js": d6, "/node_modules/regenerate-unicode-properties/Script_Extensions/Marchen.js": l6, "/node_modules/regenerate-unicode-properties/Script_Extensions/Masaram_Gondi.js": f6, "/node_modules/regenerate-unicode-properties/Script_Extensions/Medefaidrin.js": R6, "/node_modules/regenerate-unicode-properties/Script_Extensions/Meetei_Mayek.js": b6, "/node_modules/regenerate-unicode-properties/Script_Extensions/Mende_Kikakui.js": E6, "/node_modules/regenerate-unicode-properties/Script_Extensions/Meroitic_Cursive.js": C6, "/node_modules/regenerate-unicode-properties/Script_Extensions/Meroitic_Hieroglyphs.js": _6, "/node_modules/regenerate-unicode-properties/Script_Extensions/Miao.js": I6, "/node_modules/regenerate-unicode-properties/Script_Extensions/Modi.js": j6, "/node_modules/regenerate-unicode-properties/Script_Extensions/Mongolian.js": M6, "/node_modules/regenerate-unicode-properties/Script_Extensions/Mro.js": q6, "/node_modules/regenerate-unicode-properties/Script_Extensions/Multani.js": H6, "/node_modules/regenerate-unicode-properties/Script_Extensions/Myanmar.js": J6, "/node_modules/regenerate-unicode-properties/Script_Extensions/Nabataean.js": Y6, "/node_modules/regenerate-unicode-properties/Script_Extensions/Nag_Mundari.js": Z6, "/node_modules/regenerate-unicode-properties/Script_Extensions/Nandinagari.js": n4, "/node_modules/regenerate-unicode-properties/Script_Extensions/New_Tai_Lue.js": i4, "/node_modules/regenerate-unicode-properties/Script_Extensions/Newa.js": d4, "/node_modules/regenerate-unicode-properties/Script_Extensions/Nko.js": l4, "/node_modules/regenerate-unicode-properties/Script_Extensions/Nushu.js": f4, "/node_modules/regenerate-unicode-properties/Script_Extensions/Nyiakeng_Puachue_Hmong.js": R4, "/node_modules/regenerate-unicode-properties/Script_Extensions/Ogham.js": b4, "/node_modules/regenerate-unicode-properties/Script_Extensions/Ol_Chiki.js": E4, "/node_modules/regenerate-unicode-properties/Script_Extensions/Ol_Onal.js": C4, "/node_modules/regenerate-unicode-properties/Script_Extensions/Old_Hungarian.js": _4, "/node_modules/regenerate-unicode-properties/Script_Extensions/Old_Italic.js": I4, "/node_modules/regenerate-unicode-properties/Script_Extensions/Old_North_Arabian.js": j4, "/node_modules/regenerate-unicode-properties/Script_Extensions/Old_Permic.js": M4, "/node_modules/regenerate-unicode-properties/Script_Extensions/Old_Persian.js": q4, "/node_modules/regenerate-unicode-properties/Script_Extensions/Old_Sogdian.js": H4, "/node_modules/regenerate-unicode-properties/Script_Extensions/Old_South_Arabian.js": J4, "/node_modules/regenerate-unicode-properties/Script_Extensions/Old_Turkic.js": Y4, "/node_modules/regenerate-unicode-properties/Script_Extensions/Old_Uyghur.js": Z4, "/node_modules/regenerate-unicode-properties/Script_Extensions/Oriya.js": n7, "/node_modules/regenerate-unicode-properties/Script_Extensions/Osage.js": i7, "/node_modules/regenerate-unicode-properties/Script_Extensions/Osmanya.js": d7, "/node_modules/regenerate-unicode-properties/Script_Extensions/Pahawh_Hmong.js": l7, "/node_modules/regenerate-unicode-properties/Script_Extensions/Palmyrene.js": f7, "/node_modules/regenerate-unicode-properties/Script_Extensions/Pau_Cin_Hau.js": R7, "/node_modules/regenerate-unicode-properties/Script_Extensions/Phags_Pa.js": b7, "/node_modules/regenerate-unicode-properties/Script_Extensions/Phoenician.js": E7, "/node_modules/regenerate-unicode-properties/Script_Extensions/Proto_Cuneiform.js": C7, "/node_modules/regenerate-unicode-properties/Script_Extensions/Psalter_Pahlavi.js": _7, "/node_modules/regenerate-unicode-properties/Script_Extensions/Rejang.js": I7, "/node_modules/regenerate-unicode-properties/Script_Extensions/Runic.js": j7, "/node_modules/regenerate-unicode-properties/Script_Extensions/Samaritan.js": M7, "/node_modules/regenerate-unicode-properties/Script_Extensions/Saurashtra.js": q7, "/node_modules/regenerate-unicode-properties/Script_Extensions/Seal.js": H7, "/node_modules/regenerate-unicode-properties/Script_Extensions/Sharada.js": J7, "/node_modules/regenerate-unicode-properties/Script_Extensions/Shavian.js": Y7, "/node_modules/regenerate-unicode-properties/Script_Extensions/Siddham.js": Z7, "/node_modules/regenerate-unicode-properties/Script_Extensions/Sidetic.js": n3, "/node_modules/regenerate-unicode-properties/Script_Extensions/SignWriting.js": i3, "/node_modules/regenerate-unicode-properties/Script_Extensions/Sinhala.js": d3, "/node_modules/regenerate-unicode-properties/Script_Extensions/Sogdian.js": l3, "/node_modules/regenerate-unicode-properties/Script_Extensions/Sora_Sompeng.js": f3, "/node_modules/regenerate-unicode-properties/Script_Extensions/Soyombo.js": R3, "/node_modules/regenerate-unicode-properties/Script_Extensions/Sundanese.js": b3, "/node_modules/regenerate-unicode-properties/Script_Extensions/Sunuwar.js": E3, "/node_modules/regenerate-unicode-properties/Script_Extensions/Syloti_Nagri.js": C3, "/node_modules/regenerate-unicode-properties/Script_Extensions/Syriac.js": _3, "/node_modules/regenerate-unicode-properties/Script_Extensions/Tagalog.js": I3, "/node_modules/regenerate-unicode-properties/Script_Extensions/Tagbanwa.js": j3, "/node_modules/regenerate-unicode-properties/Script_Extensions/Tai_Le.js": M3, "/node_modules/regenerate-unicode-properties/Script_Extensions/Tai_Tham.js": q3, "/node_modules/regenerate-unicode-properties/Script_Extensions/Tai_Viet.js": H3, "/node_modules/regenerate-unicode-properties/Script_Extensions/Tai_Yo.js": J3, "/node_modules/regenerate-unicode-properties/Script_Extensions/Takri.js": Y3, "/node_modules/regenerate-unicode-properties/Script_Extensions/Tamil.js": Z3, "/node_modules/regenerate-unicode-properties/Script_Extensions/Tangsa.js": n8, "/node_modules/regenerate-unicode-properties/Script_Extensions/Tangut.js": i8, "/node_modules/regenerate-unicode-properties/Script_Extensions/Telugu.js": d8, "/node_modules/regenerate-unicode-properties/Script_Extensions/Thaana.js": l8, "/node_modules/regenerate-unicode-properties/Script_Extensions/Thai.js": f8, "/node_modules/regenerate-unicode-properties/Script_Extensions/Tibetan.js": R8, "/node_modules/regenerate-unicode-properties/Script_Extensions/Tifinagh.js": b8, "/node_modules/regenerate-unicode-properties/Script_Extensions/Tirhuta.js": E8, "/node_modules/regenerate-unicode-properties/Script_Extensions/Todhri.js": C8, "/node_modules/regenerate-unicode-properties/Script_Extensions/Tolong_Siki.js": _8, "/node_modules/regenerate-unicode-properties/Script_Extensions/Toto.js": I8, "/node_modules/regenerate-unicode-properties/Script_Extensions/Tulu_Tigalari.js": j8, "/node_modules/regenerate-unicode-properties/Script_Extensions/Ugaritic.js": M8, "/node_modules/regenerate-unicode-properties/Script_Extensions/Unknown.js": q8, "/node_modules/regenerate-unicode-properties/Script_Extensions/Vai.js": H8, "/node_modules/regenerate-unicode-properties/Script_Extensions/Vithkuqi.js": J8, "/node_modules/regenerate-unicode-properties/Script_Extensions/Wancho.js": Y8, "/node_modules/regenerate-unicode-properties/Script_Extensions/Warang_Citi.js": Z8, "/node_modules/regenerate-unicode-properties/Script_Extensions/Yezidi.js": n9, "/node_modules/regenerate-unicode-properties/Script_Extensions/Yi.js": i9, "/node_modules/regenerate-unicode-properties/Script_Extensions/Zanabazar_Square.js": d9, "/node_modules/regenerate-unicode-properties/Script/Adlam.js": l9, "/node_modules/regenerate-unicode-properties/Script/Ahom.js": f9, "/node_modules/regenerate-unicode-properties/Script/Anatolian_Hieroglyphs.js": R9, "/node_modules/regenerate-unicode-properties/Script/Arabic.js": b9, "/node_modules/regenerate-unicode-properties/Script/Armenian.js": E9, "/node_modules/regenerate-unicode-properties/Script/Avestan.js": C9, "/node_modules/regenerate-unicode-properties/Script/Balinese.js": _9, "/node_modules/regenerate-unicode-properties/Script/Bamum.js": I9, "/node_modules/regenerate-unicode-properties/Script/Bassa_Vah.js": j9, "/node_modules/regenerate-unicode-properties/Script/Batak.js": M9, "/node_modules/regenerate-unicode-properties/Script/Bengali.js": q9, "/node_modules/regenerate-unicode-properties/Script/Beria_Erfe.js": H9, "/node_modules/regenerate-unicode-properties/Script/Bhaiksuki.js": J9, "/node_modules/regenerate-unicode-properties/Script/Bopomofo.js": Y9, "/node_modules/regenerate-unicode-properties/Script/Brahmi.js": Z9, "/node_modules/regenerate-unicode-properties/Script/Braille.js": n5, "/node_modules/regenerate-unicode-properties/Script/Buginese.js": i5, "/node_modules/regenerate-unicode-properties/Script/Buhid.js": d5, "/node_modules/regenerate-unicode-properties/Script/Canadian_Aboriginal.js": l5, "/node_modules/regenerate-unicode-properties/Script/Carian.js": f5, "/node_modules/regenerate-unicode-properties/Script/Caucasian_Albanian.js": R5, "/node_modules/regenerate-unicode-properties/Script/Chakma.js": b5, "/node_modules/regenerate-unicode-properties/Script/Cham.js": E5, "/node_modules/regenerate-unicode-properties/Script/Cherokee.js": C5, "/node_modules/regenerate-unicode-properties/Script/Chorasmian.js": _5, "/node_modules/regenerate-unicode-properties/Script/Common.js": I5, "/node_modules/regenerate-unicode-properties/Script/Coptic.js": j5, "/node_modules/regenerate-unicode-properties/Script/Cuneiform.js": M5, "/node_modules/regenerate-unicode-properties/Script/Cypriot.js": q5, "/node_modules/regenerate-unicode-properties/Script/Cypro_Minoan.js": H5, "/node_modules/regenerate-unicode-properties/Script/Cyrillic.js": J5, "/node_modules/regenerate-unicode-properties/Script/Deseret.js": Y5, "/node_modules/regenerate-unicode-properties/Script/Devanagari.js": Z5, "/node_modules/regenerate-unicode-properties/Script/Dives_Akuru.js": nee, "/node_modules/regenerate-unicode-properties/Script/Dogra.js": iee, "/node_modules/regenerate-unicode-properties/Script/Duployan.js": dee, "/node_modules/regenerate-unicode-properties/Script/Egyptian_Hieroglyphs.js": lee, "/node_modules/regenerate-unicode-properties/Script/Elbasan.js": fee, "/node_modules/regenerate-unicode-properties/Script/Elymaic.js": Ree, "/node_modules/regenerate-unicode-properties/Script/Ethiopic.js": bee, "/node_modules/regenerate-unicode-properties/Script/Garay.js": Eee, "/node_modules/regenerate-unicode-properties/Script/Georgian.js": Cee, "/node_modules/regenerate-unicode-properties/Script/Glagolitic.js": _ee, "/node_modules/regenerate-unicode-properties/Script/Gothic.js": Iee, "/node_modules/regenerate-unicode-properties/Script/Grantha.js": jee, "/node_modules/regenerate-unicode-properties/Script/Greek.js": Mee, "/node_modules/regenerate-unicode-properties/Script/Gujarati.js": qee, "/node_modules/regenerate-unicode-properties/Script/Gunjala_Gondi.js": Hee, "/node_modules/regenerate-unicode-properties/Script/Gurmukhi.js": Jee, "/node_modules/regenerate-unicode-properties/Script/Gurung_Khema.js": Yee, "/node_modules/regenerate-unicode-properties/Script/Han.js": Zee, "/node_modules/regenerate-unicode-properties/Script/Hangul.js": nae, "/node_modules/regenerate-unicode-properties/Script/Hanifi_Rohingya.js": iae, "/node_modules/regenerate-unicode-properties/Script/Hanunoo.js": dae, "/node_modules/regenerate-unicode-properties/Script/Hatran.js": lae, "/node_modules/regenerate-unicode-properties/Script/Hebrew.js": fae, "/node_modules/regenerate-unicode-properties/Script/Hiragana.js": Rae, "/node_modules/regenerate-unicode-properties/Script/Imperial_Aramaic.js": bae, "/node_modules/regenerate-unicode-properties/Script/Inherited.js": Eae, "/node_modules/regenerate-unicode-properties/Script/Inscriptional_Pahlavi.js": Cae, "/node_modules/regenerate-unicode-properties/Script/Inscriptional_Parthian.js": _ae, "/node_modules/regenerate-unicode-properties/Script/Javanese.js": Iae, "/node_modules/regenerate-unicode-properties/Script/Jurchen.js": jae, "/node_modules/regenerate-unicode-properties/Script/Kaithi.js": Mae, "/node_modules/regenerate-unicode-properties/Script/Kannada.js": qae, "/node_modules/regenerate-unicode-properties/Script/Katakana.js": Hae, "/node_modules/regenerate-unicode-properties/Script/Kawi.js": Jae, "/node_modules/regenerate-unicode-properties/Script/Kayah_Li.js": Yae, "/node_modules/regenerate-unicode-properties/Script/Kharoshthi.js": Zae, "/node_modules/regenerate-unicode-properties/Script/Khitan_Small_Script.js": nne, "/node_modules/regenerate-unicode-properties/Script/Khmer.js": ine, "/node_modules/regenerate-unicode-properties/Script/Khojki.js": dne, "/node_modules/regenerate-unicode-properties/Script/Khudawadi.js": lne, "/node_modules/regenerate-unicode-properties/Script/Kirat_Rai.js": fne, "/node_modules/regenerate-unicode-properties/Script/Lao.js": Rne, "/node_modules/regenerate-unicode-properties/Script/Latin.js": bne, "/node_modules/regenerate-unicode-properties/Script/Lepcha.js": Ene, "/node_modules/regenerate-unicode-properties/Script/Limbu.js": Cne, "/node_modules/regenerate-unicode-properties/Script/Linear_A.js": _ne, "/node_modules/regenerate-unicode-properties/Script/Linear_B.js": Ine, "/node_modules/regenerate-unicode-properties/Script/Lisu.js": jne, "/node_modules/regenerate-unicode-properties/Script/Lycian.js": Mne, "/node_modules/regenerate-unicode-properties/Script/Lydian.js": qne, "/node_modules/regenerate-unicode-properties/Script/Mahajani.js": Hne, "/node_modules/regenerate-unicode-properties/Script/Makasar.js": Jne, "/node_modules/regenerate-unicode-properties/Script/Malayalam.js": Yne, "/node_modules/regenerate-unicode-properties/Script/Mandaic.js": Zne, "/node_modules/regenerate-unicode-properties/Script/Manichaean.js": nte, "/node_modules/regenerate-unicode-properties/Script/Marchen.js": ite, "/node_modules/regenerate-unicode-properties/Script/Masaram_Gondi.js": dte, "/node_modules/regenerate-unicode-properties/Script/Medefaidrin.js": lte, "/node_modules/regenerate-unicode-properties/Script/Meetei_Mayek.js": fte, "/node_modules/regenerate-unicode-properties/Script/Mende_Kikakui.js": Rte, "/node_modules/regenerate-unicode-properties/Script/Meroitic_Cursive.js": bte, "/node_modules/regenerate-unicode-properties/Script/Meroitic_Hieroglyphs.js": Ete, "/node_modules/regenerate-unicode-properties/Script/Miao.js": Cte, "/node_modules/regenerate-unicode-properties/Script/Modi.js": _te, "/node_modules/regenerate-unicode-properties/Script/Mongolian.js": Ite, "/node_modules/regenerate-unicode-properties/Script/Mro.js": jte, "/node_modules/regenerate-unicode-properties/Script/Multani.js": Mte, "/node_modules/regenerate-unicode-properties/Script/Myanmar.js": qte, "/node_modules/regenerate-unicode-properties/Script/Nabataean.js": Hte, "/node_modules/regenerate-unicode-properties/Script/Nag_Mundari.js": Jte, "/node_modules/regenerate-unicode-properties/Script/Nandinagari.js": Yte, "/node_modules/regenerate-unicode-properties/Script/New_Tai_Lue.js": Zte, "/node_modules/regenerate-unicode-properties/Script/Newa.js": nre, "/node_modules/regenerate-unicode-properties/Script/Nko.js": ire, "/node_modules/regenerate-unicode-properties/Script/Nushu.js": dre, "/node_modules/regenerate-unicode-properties/Script/Nyiakeng_Puachue_Hmong.js": lre, "/node_modules/regenerate-unicode-properties/Script/Ogham.js": fre, "/node_modules/regenerate-unicode-properties/Script/Ol_Chiki.js": Rre, "/node_modules/regenerate-unicode-properties/Script/Ol_Onal.js": bre, "/node_modules/regenerate-unicode-properties/Script/Old_Hungarian.js": Ere, "/node_modules/regenerate-unicode-properties/Script/Old_Italic.js": Cre, "/node_modules/regenerate-unicode-properties/Script/Old_North_Arabian.js": _re, "/node_modules/regenerate-unicode-properties/Script/Old_Permic.js": Ire, "/node_modules/regenerate-unicode-properties/Script/Old_Persian.js": jre, "/node_modules/regenerate-unicode-properties/Script/Old_Sogdian.js": Mre, "/node_modules/regenerate-unicode-properties/Script/Old_South_Arabian.js": qre, "/node_modules/regenerate-unicode-properties/Script/Old_Turkic.js": Hre, "/node_modules/regenerate-unicode-properties/Script/Old_Uyghur.js": Jre, "/node_modules/regenerate-unicode-properties/Script/Oriya.js": Yre, "/node_modules/regenerate-unicode-properties/Script/Osage.js": Zre, "/node_modules/regenerate-unicode-properties/Script/Osmanya.js": nie, "/node_modules/regenerate-unicode-properties/Script/Pahawh_Hmong.js": iie, "/node_modules/regenerate-unicode-properties/Script/Palmyrene.js": die, "/node_modules/regenerate-unicode-properties/Script/Pau_Cin_Hau.js": lie, "/node_modules/regenerate-unicode-properties/Script/Phags_Pa.js": fie, "/node_modules/regenerate-unicode-properties/Script/Phoenician.js": Rie, "/node_modules/regenerate-unicode-properties/Script/Proto_Cuneiform.js": bie, "/node_modules/regenerate-unicode-properties/Script/Psalter_Pahlavi.js": Eie, "/node_modules/regenerate-unicode-properties/Script/Rejang.js": Cie, "/node_modules/regenerate-unicode-properties/Script/Runic.js": _ie, "/node_modules/regenerate-unicode-properties/Script/Samaritan.js": Iie, "/node_modules/regenerate-unicode-properties/Script/Saurashtra.js": jie, "/node_modules/regenerate-unicode-properties/Script/Seal.js": Mie, "/node_modules/regenerate-unicode-properties/Script/Sharada.js": qie, "/node_modules/regenerate-unicode-properties/Script/Shavian.js": Hie, "/node_modules/regenerate-unicode-properties/Script/Siddham.js": Jie, "/node_modules/regenerate-unicode-properties/Script/Sidetic.js": Yie, "/node_modules/regenerate-unicode-properties/Script/SignWriting.js": Zie, "/node_modules/regenerate-unicode-properties/Script/Sinhala.js": noe, "/node_modules/regenerate-unicode-properties/Script/Sogdian.js": ioe, "/node_modules/regenerate-unicode-properties/Script/Sora_Sompeng.js": doe, "/node_modules/regenerate-unicode-properties/Script/Soyombo.js": loe, "/node_modules/regenerate-unicode-properties/Script/Sundanese.js": foe, "/node_modules/regenerate-unicode-properties/Script/Sunuwar.js": Roe, "/node_modules/regenerate-unicode-properties/Script/Syloti_Nagri.js": boe, "/node_modules/regenerate-unicode-properties/Script/Syriac.js": Eoe, "/node_modules/regenerate-unicode-properties/Script/Tagalog.js": Coe, "/node_modules/regenerate-unicode-properties/Script/Tagbanwa.js": _oe, "/node_modules/regenerate-unicode-properties/Script/Tai_Le.js": Ioe, "/node_modules/regenerate-unicode-properties/Script/Tai_Tham.js": joe, "/node_modules/regenerate-unicode-properties/Script/Tai_Viet.js": Moe, "/node_modules/regenerate-unicode-properties/Script/Tai_Yo.js": qoe, "/node_modules/regenerate-unicode-properties/Script/Takri.js": Hoe, "/node_modules/regenerate-unicode-properties/Script/Tamil.js": Joe, "/node_modules/regenerate-unicode-properties/Script/Tangsa.js": Yoe, "/node_modules/regenerate-unicode-properties/Script/Tangut.js": Zoe, "/node_modules/regenerate-unicode-properties/Script/Telugu.js": nse, "/node_modules/regenerate-unicode-properties/Script/Thaana.js": ise, "/node_modules/regenerate-unicode-properties/Script/Thai.js": dse, "/node_modules/regenerate-unicode-properties/Script/Tibetan.js": lse, "/node_modules/regenerate-unicode-properties/Script/Tifinagh.js": fse, "/node_modules/regenerate-unicode-properties/Script/Tirhuta.js": Rse, "/node_modules/regenerate-unicode-properties/Script/Todhri.js": bse, "/node_modules/regenerate-unicode-properties/Script/Tolong_Siki.js": Ese, "/node_modules/regenerate-unicode-properties/Script/Toto.js": Cse, "/node_modules/regenerate-unicode-properties/Script/Tulu_Tigalari.js": _se, "/node_modules/regenerate-unicode-properties/Script/Ugaritic.js": Ise, "/node_modules/regenerate-unicode-properties/Script/Unknown.js": jse, "/node_modules/regenerate-unicode-properties/Script/Vai.js": Mse, "/node_modules/regenerate-unicode-properties/Script/Vithkuqi.js": qse, "/node_modules/regenerate-unicode-properties/Script/Wancho.js": Hse, "/node_modules/regenerate-unicode-properties/Script/Warang_Citi.js": Jse, "/node_modules/regenerate-unicode-properties/Script/Yezidi.js": Yse, "/node_modules/regenerate-unicode-properties/Script/Yi.js": Zse, "/node_modules/regenerate-unicode-properties/Script/Zanabazar_Square.js": ide, "/node_modules/regenerate-unicode-properties/unicode-version.js": ode });
+        return tde || (tde = { "/node_modules/regenerate-unicode-properties/Binary_Property/Alphabetic.js": HK, "/node_modules/regenerate-unicode-properties/Binary_Property/Any.js": JK, "/node_modules/regenerate-unicode-properties/Binary_Property/ASCII_Hex_Digit.js": YK, "/node_modules/regenerate-unicode-properties/Binary_Property/ASCII.js": ZK, "/node_modules/regenerate-unicode-properties/Binary_Property/Assigned.js": nJ, "/node_modules/regenerate-unicode-properties/Binary_Property/Bidi_Control.js": iJ, "/node_modules/regenerate-unicode-properties/Binary_Property/Bidi_Mirrored.js": dJ, "/node_modules/regenerate-unicode-properties/Binary_Property/Case_Ignorable.js": lJ, "/node_modules/regenerate-unicode-properties/Binary_Property/Cased.js": fJ, "/node_modules/regenerate-unicode-properties/Binary_Property/Changes_When_Casefolded.js": RJ, "/node_modules/regenerate-unicode-properties/Binary_Property/Changes_When_Casemapped.js": bJ, "/node_modules/regenerate-unicode-properties/Binary_Property/Changes_When_Lowercased.js": EJ, "/node_modules/regenerate-unicode-properties/Binary_Property/Changes_When_NFKC_Casefolded.js": CJ, "/node_modules/regenerate-unicode-properties/Binary_Property/Changes_When_Titlecased.js": _J, "/node_modules/regenerate-unicode-properties/Binary_Property/Changes_When_Uppercased.js": IJ, "/node_modules/regenerate-unicode-properties/Binary_Property/Dash.js": jJ, "/node_modules/regenerate-unicode-properties/Binary_Property/Default_Ignorable_Code_Point.js": MJ, "/node_modules/regenerate-unicode-properties/Binary_Property/Deprecated.js": qJ, "/node_modules/regenerate-unicode-properties/Binary_Property/Diacritic.js": HJ, "/node_modules/regenerate-unicode-properties/Binary_Property/Emoji_Component.js": JJ, "/node_modules/regenerate-unicode-properties/Binary_Property/Emoji_Modifier_Base.js": YJ, "/node_modules/regenerate-unicode-properties/Binary_Property/Emoji_Modifier.js": ZJ, "/node_modules/regenerate-unicode-properties/Binary_Property/Emoji_Presentation.js": nz, "/node_modules/regenerate-unicode-properties/Binary_Property/Emoji.js": iz, "/node_modules/regenerate-unicode-properties/Binary_Property/Extended_Pictographic.js": dz, "/node_modules/regenerate-unicode-properties/Binary_Property/Extender.js": lz, "/node_modules/regenerate-unicode-properties/Binary_Property/Grapheme_Base.js": fz, "/node_modules/regenerate-unicode-properties/Binary_Property/Grapheme_Extend.js": Rz, "/node_modules/regenerate-unicode-properties/Binary_Property/Hex_Digit.js": bz, "/node_modules/regenerate-unicode-properties/Binary_Property/ID_Continue.js": Ez, "/node_modules/regenerate-unicode-properties/Binary_Property/ID_Start.js": Cz, "/node_modules/regenerate-unicode-properties/Binary_Property/Ideographic.js": _z, "/node_modules/regenerate-unicode-properties/Binary_Property/IDS_Binary_Operator.js": Iz, "/node_modules/regenerate-unicode-properties/Binary_Property/IDS_Trinary_Operator.js": jz, "/node_modules/regenerate-unicode-properties/Binary_Property/Join_Control.js": Mz, "/node_modules/regenerate-unicode-properties/Binary_Property/Logical_Order_Exception.js": qz, "/node_modules/regenerate-unicode-properties/Binary_Property/Lowercase.js": Hz, "/node_modules/regenerate-unicode-properties/Binary_Property/Math.js": Jz, "/node_modules/regenerate-unicode-properties/Binary_Property/Noncharacter_Code_Point.js": Yz, "/node_modules/regenerate-unicode-properties/Binary_Property/Pattern_Syntax.js": Zz, "/node_modules/regenerate-unicode-properties/Binary_Property/Pattern_White_Space.js": nX, "/node_modules/regenerate-unicode-properties/Binary_Property/Quotation_Mark.js": iX, "/node_modules/regenerate-unicode-properties/Binary_Property/Radical.js": dX, "/node_modules/regenerate-unicode-properties/Binary_Property/Regional_Indicator.js": lX, "/node_modules/regenerate-unicode-properties/Binary_Property/Sentence_Terminal.js": fX, "/node_modules/regenerate-unicode-properties/Binary_Property/Soft_Dotted.js": RX, "/node_modules/regenerate-unicode-properties/Binary_Property/Terminal_Punctuation.js": bX, "/node_modules/regenerate-unicode-properties/Binary_Property/Unified_Ideograph.js": EX, "/node_modules/regenerate-unicode-properties/Binary_Property/Uppercase.js": CX, "/node_modules/regenerate-unicode-properties/Binary_Property/Variation_Selector.js": _X, "/node_modules/regenerate-unicode-properties/Binary_Property/White_Space.js": IX, "/node_modules/regenerate-unicode-properties/Binary_Property/XID_Continue.js": jX, "/node_modules/regenerate-unicode-properties/Binary_Property/XID_Start.js": MX, "/node_modules/regenerate-unicode-properties/General_Category/Cased_Letter.js": qX, "/node_modules/regenerate-unicode-properties/General_Category/Close_Punctuation.js": HX, "/node_modules/regenerate-unicode-properties/General_Category/Connector_Punctuation.js": JX, "/node_modules/regenerate-unicode-properties/General_Category/Control.js": YX, "/node_modules/regenerate-unicode-properties/General_Category/Currency_Symbol.js": ZX, "/node_modules/regenerate-unicode-properties/General_Category/Dash_Punctuation.js": nY, "/node_modules/regenerate-unicode-properties/General_Category/Decimal_Number.js": iY, "/node_modules/regenerate-unicode-properties/General_Category/Enclosing_Mark.js": dY, "/node_modules/regenerate-unicode-properties/General_Category/Final_Punctuation.js": lY, "/node_modules/regenerate-unicode-properties/General_Category/Format.js": fY, "/node_modules/regenerate-unicode-properties/General_Category/Initial_Punctuation.js": RY, "/node_modules/regenerate-unicode-properties/General_Category/Letter_Number.js": bY, "/node_modules/regenerate-unicode-properties/General_Category/Letter.js": EY, "/node_modules/regenerate-unicode-properties/General_Category/Line_Separator.js": CY, "/node_modules/regenerate-unicode-properties/General_Category/Lowercase_Letter.js": _Y, "/node_modules/regenerate-unicode-properties/General_Category/Mark.js": IY, "/node_modules/regenerate-unicode-properties/General_Category/Math_Symbol.js": jY, "/node_modules/regenerate-unicode-properties/General_Category/Modifier_Letter.js": MY, "/node_modules/regenerate-unicode-properties/General_Category/Modifier_Symbol.js": qY, "/node_modules/regenerate-unicode-properties/General_Category/Nonspacing_Mark.js": HY, "/node_modules/regenerate-unicode-properties/General_Category/Number.js": JY, "/node_modules/regenerate-unicode-properties/General_Category/Open_Punctuation.js": YY, "/node_modules/regenerate-unicode-properties/General_Category/Other_Letter.js": ZY, "/node_modules/regenerate-unicode-properties/General_Category/Other_Number.js": n$, "/node_modules/regenerate-unicode-properties/General_Category/Other_Punctuation.js": i$, "/node_modules/regenerate-unicode-properties/General_Category/Other_Symbol.js": d$, "/node_modules/regenerate-unicode-properties/General_Category/Other.js": l$, "/node_modules/regenerate-unicode-properties/General_Category/Paragraph_Separator.js": f$, "/node_modules/regenerate-unicode-properties/General_Category/Private_Use.js": R$, "/node_modules/regenerate-unicode-properties/General_Category/Punctuation.js": b$, "/node_modules/regenerate-unicode-properties/General_Category/Separator.js": E$, "/node_modules/regenerate-unicode-properties/General_Category/Space_Separator.js": C$, "/node_modules/regenerate-unicode-properties/General_Category/Spacing_Mark.js": _$, "/node_modules/regenerate-unicode-properties/General_Category/Surrogate.js": I$, "/node_modules/regenerate-unicode-properties/General_Category/Symbol.js": j$, "/node_modules/regenerate-unicode-properties/General_Category/Titlecase_Letter.js": M$, "/node_modules/regenerate-unicode-properties/General_Category/Unassigned.js": q$, "/node_modules/regenerate-unicode-properties/General_Category/Uppercase_Letter.js": K$, "/node_modules/regenerate-unicode-properties/index.js": J$, "/node_modules/regenerate-unicode-properties/Property_of_Strings/Basic_Emoji.js": Y$, "/node_modules/regenerate-unicode-properties/Property_of_Strings/Emoji_Keycap_Sequence.js": Z$, "/node_modules/regenerate-unicode-properties/Property_of_Strings/RGI_Emoji_Flag_Sequence.js": nQ, "/node_modules/regenerate-unicode-properties/Property_of_Strings/RGI_Emoji_Modifier_Sequence.js": iQ, "/node_modules/regenerate-unicode-properties/Property_of_Strings/RGI_Emoji_Tag_Sequence.js": dQ, "/node_modules/regenerate-unicode-properties/Property_of_Strings/RGI_Emoji_ZWJ_Sequence.js": lQ, "/node_modules/regenerate-unicode-properties/Property_of_Strings/RGI_Emoji.js": fQ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Adlam.js": RQ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Ahom.js": bQ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Anatolian_Hieroglyphs.js": EQ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Arabic.js": CQ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Armenian.js": _Q, "/node_modules/regenerate-unicode-properties/Script_Extensions/Avestan.js": IQ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Balinese.js": jQ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Bamum.js": MQ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Bassa_Vah.js": qQ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Batak.js": HQ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Bengali.js": JQ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Beria_Erfe.js": YQ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Bhaiksuki.js": ZQ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Bopomofo.js": nZ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Brahmi.js": iZ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Braille.js": dZ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Buginese.js": lZ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Buhid.js": fZ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Canadian_Aboriginal.js": RZ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Carian.js": bZ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Caucasian_Albanian.js": EZ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Chakma.js": CZ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Cham.js": _Z, "/node_modules/regenerate-unicode-properties/Script_Extensions/Cherokee.js": IZ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Chorasmian.js": jZ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Common.js": MZ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Coptic.js": qZ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Cuneiform.js": HZ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Cypriot.js": JZ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Cypro_Minoan.js": YZ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Cyrillic.js": ZZ, "/node_modules/regenerate-unicode-properties/Script_Extensions/Deseret.js": n1, "/node_modules/regenerate-unicode-properties/Script_Extensions/Devanagari.js": i1, "/node_modules/regenerate-unicode-properties/Script_Extensions/Dives_Akuru.js": d1, "/node_modules/regenerate-unicode-properties/Script_Extensions/Dogra.js": l1, "/node_modules/regenerate-unicode-properties/Script_Extensions/Duployan.js": f1, "/node_modules/regenerate-unicode-properties/Script_Extensions/Egyptian_Hieroglyphs.js": R1, "/node_modules/regenerate-unicode-properties/Script_Extensions/Elbasan.js": b1, "/node_modules/regenerate-unicode-properties/Script_Extensions/Elymaic.js": E1, "/node_modules/regenerate-unicode-properties/Script_Extensions/Ethiopic.js": C1, "/node_modules/regenerate-unicode-properties/Script_Extensions/Garay.js": _1, "/node_modules/regenerate-unicode-properties/Script_Extensions/Georgian.js": I1, "/node_modules/regenerate-unicode-properties/Script_Extensions/Glagolitic.js": j1, "/node_modules/regenerate-unicode-properties/Script_Extensions/Gothic.js": M1, "/node_modules/regenerate-unicode-properties/Script_Extensions/Grantha.js": q1, "/node_modules/regenerate-unicode-properties/Script_Extensions/Greek.js": H1, "/node_modules/regenerate-unicode-properties/Script_Extensions/Gujarati.js": J1, "/node_modules/regenerate-unicode-properties/Script_Extensions/Gunjala_Gondi.js": Y1, "/node_modules/regenerate-unicode-properties/Script_Extensions/Gurmukhi.js": Z1, "/node_modules/regenerate-unicode-properties/Script_Extensions/Gurung_Khema.js": n2, "/node_modules/regenerate-unicode-properties/Script_Extensions/Han.js": i2, "/node_modules/regenerate-unicode-properties/Script_Extensions/Hangul.js": d2, "/node_modules/regenerate-unicode-properties/Script_Extensions/Hanifi_Rohingya.js": l2, "/node_modules/regenerate-unicode-properties/Script_Extensions/Hanunoo.js": f2, "/node_modules/regenerate-unicode-properties/Script_Extensions/Hatran.js": R2, "/node_modules/regenerate-unicode-properties/Script_Extensions/Hebrew.js": b2, "/node_modules/regenerate-unicode-properties/Script_Extensions/Hiragana.js": E2, "/node_modules/regenerate-unicode-properties/Script_Extensions/Imperial_Aramaic.js": C22, "/node_modules/regenerate-unicode-properties/Script_Extensions/Inherited.js": _2, "/node_modules/regenerate-unicode-properties/Script_Extensions/Inscriptional_Pahlavi.js": I2, "/node_modules/regenerate-unicode-properties/Script_Extensions/Inscriptional_Parthian.js": j2, "/node_modules/regenerate-unicode-properties/Script_Extensions/Javanese.js": M2, "/node_modules/regenerate-unicode-properties/Script_Extensions/Jurchen.js": q2, "/node_modules/regenerate-unicode-properties/Script_Extensions/Kaithi.js": H2, "/node_modules/regenerate-unicode-properties/Script_Extensions/Kannada.js": J2, "/node_modules/regenerate-unicode-properties/Script_Extensions/Katakana.js": Y2, "/node_modules/regenerate-unicode-properties/Script_Extensions/Kawi.js": Z2, "/node_modules/regenerate-unicode-properties/Script_Extensions/Kayah_Li.js": n0, "/node_modules/regenerate-unicode-properties/Script_Extensions/Kharoshthi.js": i0, "/node_modules/regenerate-unicode-properties/Script_Extensions/Khitan_Small_Script.js": d0, "/node_modules/regenerate-unicode-properties/Script_Extensions/Khmer.js": l0, "/node_modules/regenerate-unicode-properties/Script_Extensions/Khojki.js": f0, "/node_modules/regenerate-unicode-properties/Script_Extensions/Khudawadi.js": R0, "/node_modules/regenerate-unicode-properties/Script_Extensions/Kirat_Rai.js": b0, "/node_modules/regenerate-unicode-properties/Script_Extensions/Lao.js": E0, "/node_modules/regenerate-unicode-properties/Script_Extensions/Latin.js": C0, "/node_modules/regenerate-unicode-properties/Script_Extensions/Lepcha.js": _0, "/node_modules/regenerate-unicode-properties/Script_Extensions/Limbu.js": I0, "/node_modules/regenerate-unicode-properties/Script_Extensions/Linear_A.js": j0, "/node_modules/regenerate-unicode-properties/Script_Extensions/Linear_B.js": M0, "/node_modules/regenerate-unicode-properties/Script_Extensions/Lisu.js": q0, "/node_modules/regenerate-unicode-properties/Script_Extensions/Lycian.js": H0, "/node_modules/regenerate-unicode-properties/Script_Extensions/Lydian.js": J0, "/node_modules/regenerate-unicode-properties/Script_Extensions/Mahajani.js": Y0, "/node_modules/regenerate-unicode-properties/Script_Extensions/Makasar.js": Z0, "/node_modules/regenerate-unicode-properties/Script_Extensions/Malayalam.js": n6, "/node_modules/regenerate-unicode-properties/Script_Extensions/Mandaic.js": i6, "/node_modules/regenerate-unicode-properties/Script_Extensions/Manichaean.js": d6, "/node_modules/regenerate-unicode-properties/Script_Extensions/Marchen.js": l6, "/node_modules/regenerate-unicode-properties/Script_Extensions/Masaram_Gondi.js": f6, "/node_modules/regenerate-unicode-properties/Script_Extensions/Medefaidrin.js": R6, "/node_modules/regenerate-unicode-properties/Script_Extensions/Meetei_Mayek.js": b6, "/node_modules/regenerate-unicode-properties/Script_Extensions/Mende_Kikakui.js": E6, "/node_modules/regenerate-unicode-properties/Script_Extensions/Meroitic_Cursive.js": C6, "/node_modules/regenerate-unicode-properties/Script_Extensions/Meroitic_Hieroglyphs.js": _6, "/node_modules/regenerate-unicode-properties/Script_Extensions/Miao.js": I6, "/node_modules/regenerate-unicode-properties/Script_Extensions/Modi.js": j6, "/node_modules/regenerate-unicode-properties/Script_Extensions/Mongolian.js": M6, "/node_modules/regenerate-unicode-properties/Script_Extensions/Mro.js": q6, "/node_modules/regenerate-unicode-properties/Script_Extensions/Multani.js": H6, "/node_modules/regenerate-unicode-properties/Script_Extensions/Myanmar.js": J6, "/node_modules/regenerate-unicode-properties/Script_Extensions/Nabataean.js": Y6, "/node_modules/regenerate-unicode-properties/Script_Extensions/Nag_Mundari.js": Z6, "/node_modules/regenerate-unicode-properties/Script_Extensions/Nandinagari.js": n4, "/node_modules/regenerate-unicode-properties/Script_Extensions/New_Tai_Lue.js": i4, "/node_modules/regenerate-unicode-properties/Script_Extensions/Newa.js": d4, "/node_modules/regenerate-unicode-properties/Script_Extensions/Nko.js": l4, "/node_modules/regenerate-unicode-properties/Script_Extensions/Nushu.js": f4, "/node_modules/regenerate-unicode-properties/Script_Extensions/Nyiakeng_Puachue_Hmong.js": R4, "/node_modules/regenerate-unicode-properties/Script_Extensions/Ogham.js": b4, "/node_modules/regenerate-unicode-properties/Script_Extensions/Ol_Chiki.js": E4, "/node_modules/regenerate-unicode-properties/Script_Extensions/Ol_Onal.js": C4, "/node_modules/regenerate-unicode-properties/Script_Extensions/Old_Hungarian.js": _4, "/node_modules/regenerate-unicode-properties/Script_Extensions/Old_Italic.js": I4, "/node_modules/regenerate-unicode-properties/Script_Extensions/Old_North_Arabian.js": j4, "/node_modules/regenerate-unicode-properties/Script_Extensions/Old_Permic.js": M4, "/node_modules/regenerate-unicode-properties/Script_Extensions/Old_Persian.js": q4, "/node_modules/regenerate-unicode-properties/Script_Extensions/Old_Sogdian.js": H4, "/node_modules/regenerate-unicode-properties/Script_Extensions/Old_South_Arabian.js": J4, "/node_modules/regenerate-unicode-properties/Script_Extensions/Old_Turkic.js": Y4, "/node_modules/regenerate-unicode-properties/Script_Extensions/Old_Uyghur.js": Z4, "/node_modules/regenerate-unicode-properties/Script_Extensions/Oriya.js": n7, "/node_modules/regenerate-unicode-properties/Script_Extensions/Osage.js": i7, "/node_modules/regenerate-unicode-properties/Script_Extensions/Osmanya.js": d7, "/node_modules/regenerate-unicode-properties/Script_Extensions/Pahawh_Hmong.js": l7, "/node_modules/regenerate-unicode-properties/Script_Extensions/Palmyrene.js": f7, "/node_modules/regenerate-unicode-properties/Script_Extensions/Pau_Cin_Hau.js": R7, "/node_modules/regenerate-unicode-properties/Script_Extensions/Phags_Pa.js": b7, "/node_modules/regenerate-unicode-properties/Script_Extensions/Phoenician.js": E7, "/node_modules/regenerate-unicode-properties/Script_Extensions/Proto_Cuneiform.js": C7, "/node_modules/regenerate-unicode-properties/Script_Extensions/Psalter_Pahlavi.js": _7, "/node_modules/regenerate-unicode-properties/Script_Extensions/Rejang.js": I7, "/node_modules/regenerate-unicode-properties/Script_Extensions/Runic.js": j7, "/node_modules/regenerate-unicode-properties/Script_Extensions/Samaritan.js": M7, "/node_modules/regenerate-unicode-properties/Script_Extensions/Saurashtra.js": q7, "/node_modules/regenerate-unicode-properties/Script_Extensions/Seal.js": H7, "/node_modules/regenerate-unicode-properties/Script_Extensions/Sharada.js": J7, "/node_modules/regenerate-unicode-properties/Script_Extensions/Shavian.js": Y7, "/node_modules/regenerate-unicode-properties/Script_Extensions/Siddham.js": Z7, "/node_modules/regenerate-unicode-properties/Script_Extensions/Sidetic.js": n3, "/node_modules/regenerate-unicode-properties/Script_Extensions/SignWriting.js": i3, "/node_modules/regenerate-unicode-properties/Script_Extensions/Sinhala.js": d3, "/node_modules/regenerate-unicode-properties/Script_Extensions/Sogdian.js": l3, "/node_modules/regenerate-unicode-properties/Script_Extensions/Sora_Sompeng.js": f3, "/node_modules/regenerate-unicode-properties/Script_Extensions/Soyombo.js": R3, "/node_modules/regenerate-unicode-properties/Script_Extensions/Sundanese.js": b3, "/node_modules/regenerate-unicode-properties/Script_Extensions/Sunuwar.js": E3, "/node_modules/regenerate-unicode-properties/Script_Extensions/Syloti_Nagri.js": C3, "/node_modules/regenerate-unicode-properties/Script_Extensions/Syriac.js": _3, "/node_modules/regenerate-unicode-properties/Script_Extensions/Tagalog.js": I3, "/node_modules/regenerate-unicode-properties/Script_Extensions/Tagbanwa.js": j3, "/node_modules/regenerate-unicode-properties/Script_Extensions/Tai_Le.js": M3, "/node_modules/regenerate-unicode-properties/Script_Extensions/Tai_Tham.js": q3, "/node_modules/regenerate-unicode-properties/Script_Extensions/Tai_Viet.js": H3, "/node_modules/regenerate-unicode-properties/Script_Extensions/Tai_Yo.js": J3, "/node_modules/regenerate-unicode-properties/Script_Extensions/Takri.js": Y3, "/node_modules/regenerate-unicode-properties/Script_Extensions/Tamil.js": Z3, "/node_modules/regenerate-unicode-properties/Script_Extensions/Tangsa.js": n8, "/node_modules/regenerate-unicode-properties/Script_Extensions/Tangut.js": i8, "/node_modules/regenerate-unicode-properties/Script_Extensions/Telugu.js": d8, "/node_modules/regenerate-unicode-properties/Script_Extensions/Thaana.js": l8, "/node_modules/regenerate-unicode-properties/Script_Extensions/Thai.js": f8, "/node_modules/regenerate-unicode-properties/Script_Extensions/Tibetan.js": R8, "/node_modules/regenerate-unicode-properties/Script_Extensions/Tifinagh.js": b8, "/node_modules/regenerate-unicode-properties/Script_Extensions/Tirhuta.js": E8, "/node_modules/regenerate-unicode-properties/Script_Extensions/Todhri.js": C8, "/node_modules/regenerate-unicode-properties/Script_Extensions/Tolong_Siki.js": _8, "/node_modules/regenerate-unicode-properties/Script_Extensions/Toto.js": I8, "/node_modules/regenerate-unicode-properties/Script_Extensions/Tulu_Tigalari.js": j8, "/node_modules/regenerate-unicode-properties/Script_Extensions/Ugaritic.js": M8, "/node_modules/regenerate-unicode-properties/Script_Extensions/Unknown.js": q8, "/node_modules/regenerate-unicode-properties/Script_Extensions/Vai.js": H8, "/node_modules/regenerate-unicode-properties/Script_Extensions/Vithkuqi.js": J8, "/node_modules/regenerate-unicode-properties/Script_Extensions/Wancho.js": Y8, "/node_modules/regenerate-unicode-properties/Script_Extensions/Warang_Citi.js": Z8, "/node_modules/regenerate-unicode-properties/Script_Extensions/Yezidi.js": n9, "/node_modules/regenerate-unicode-properties/Script_Extensions/Yi.js": i9, "/node_modules/regenerate-unicode-properties/Script_Extensions/Zanabazar_Square.js": d9, "/node_modules/regenerate-unicode-properties/Script/Adlam.js": l9, "/node_modules/regenerate-unicode-properties/Script/Ahom.js": f9, "/node_modules/regenerate-unicode-properties/Script/Anatolian_Hieroglyphs.js": R9, "/node_modules/regenerate-unicode-properties/Script/Arabic.js": b9, "/node_modules/regenerate-unicode-properties/Script/Armenian.js": E9, "/node_modules/regenerate-unicode-properties/Script/Avestan.js": C9, "/node_modules/regenerate-unicode-properties/Script/Balinese.js": _9, "/node_modules/regenerate-unicode-properties/Script/Bamum.js": I9, "/node_modules/regenerate-unicode-properties/Script/Bassa_Vah.js": j9, "/node_modules/regenerate-unicode-properties/Script/Batak.js": M9, "/node_modules/regenerate-unicode-properties/Script/Bengali.js": q9, "/node_modules/regenerate-unicode-properties/Script/Beria_Erfe.js": H9, "/node_modules/regenerate-unicode-properties/Script/Bhaiksuki.js": J9, "/node_modules/regenerate-unicode-properties/Script/Bopomofo.js": Y9, "/node_modules/regenerate-unicode-properties/Script/Brahmi.js": Z9, "/node_modules/regenerate-unicode-properties/Script/Braille.js": n5, "/node_modules/regenerate-unicode-properties/Script/Buginese.js": i5, "/node_modules/regenerate-unicode-properties/Script/Buhid.js": d5, "/node_modules/regenerate-unicode-properties/Script/Canadian_Aboriginal.js": l5, "/node_modules/regenerate-unicode-properties/Script/Carian.js": f5, "/node_modules/regenerate-unicode-properties/Script/Caucasian_Albanian.js": R5, "/node_modules/regenerate-unicode-properties/Script/Chakma.js": b5, "/node_modules/regenerate-unicode-properties/Script/Cham.js": E5, "/node_modules/regenerate-unicode-properties/Script/Cherokee.js": C5, "/node_modules/regenerate-unicode-properties/Script/Chorasmian.js": _5, "/node_modules/regenerate-unicode-properties/Script/Common.js": I5, "/node_modules/regenerate-unicode-properties/Script/Coptic.js": j5, "/node_modules/regenerate-unicode-properties/Script/Cuneiform.js": M5, "/node_modules/regenerate-unicode-properties/Script/Cypriot.js": q5, "/node_modules/regenerate-unicode-properties/Script/Cypro_Minoan.js": H5, "/node_modules/regenerate-unicode-properties/Script/Cyrillic.js": J5, "/node_modules/regenerate-unicode-properties/Script/Deseret.js": Y5, "/node_modules/regenerate-unicode-properties/Script/Devanagari.js": Z5, "/node_modules/regenerate-unicode-properties/Script/Dives_Akuru.js": nee, "/node_modules/regenerate-unicode-properties/Script/Dogra.js": iee, "/node_modules/regenerate-unicode-properties/Script/Duployan.js": dee, "/node_modules/regenerate-unicode-properties/Script/Egyptian_Hieroglyphs.js": lee, "/node_modules/regenerate-unicode-properties/Script/Elbasan.js": fee, "/node_modules/regenerate-unicode-properties/Script/Elymaic.js": Ree, "/node_modules/regenerate-unicode-properties/Script/Ethiopic.js": bee, "/node_modules/regenerate-unicode-properties/Script/Garay.js": Eee, "/node_modules/regenerate-unicode-properties/Script/Georgian.js": Cee, "/node_modules/regenerate-unicode-properties/Script/Glagolitic.js": _ee, "/node_modules/regenerate-unicode-properties/Script/Gothic.js": Iee, "/node_modules/regenerate-unicode-properties/Script/Grantha.js": jee, "/node_modules/regenerate-unicode-properties/Script/Greek.js": Mee, "/node_modules/regenerate-unicode-properties/Script/Gujarati.js": qee, "/node_modules/regenerate-unicode-properties/Script/Gunjala_Gondi.js": Hee, "/node_modules/regenerate-unicode-properties/Script/Gurmukhi.js": Jee, "/node_modules/regenerate-unicode-properties/Script/Gurung_Khema.js": Yee, "/node_modules/regenerate-unicode-properties/Script/Han.js": Zee, "/node_modules/regenerate-unicode-properties/Script/Hangul.js": nae, "/node_modules/regenerate-unicode-properties/Script/Hanifi_Rohingya.js": iae, "/node_modules/regenerate-unicode-properties/Script/Hanunoo.js": dae, "/node_modules/regenerate-unicode-properties/Script/Hatran.js": lae, "/node_modules/regenerate-unicode-properties/Script/Hebrew.js": fae, "/node_modules/regenerate-unicode-properties/Script/Hiragana.js": Rae, "/node_modules/regenerate-unicode-properties/Script/Imperial_Aramaic.js": bae, "/node_modules/regenerate-unicode-properties/Script/Inherited.js": Eae, "/node_modules/regenerate-unicode-properties/Script/Inscriptional_Pahlavi.js": Cae, "/node_modules/regenerate-unicode-properties/Script/Inscriptional_Parthian.js": _ae, "/node_modules/regenerate-unicode-properties/Script/Javanese.js": Iae, "/node_modules/regenerate-unicode-properties/Script/Jurchen.js": jae, "/node_modules/regenerate-unicode-properties/Script/Kaithi.js": Mae, "/node_modules/regenerate-unicode-properties/Script/Kannada.js": qae, "/node_modules/regenerate-unicode-properties/Script/Katakana.js": Hae, "/node_modules/regenerate-unicode-properties/Script/Kawi.js": Jae, "/node_modules/regenerate-unicode-properties/Script/Kayah_Li.js": Yae, "/node_modules/regenerate-unicode-properties/Script/Kharoshthi.js": Zae, "/node_modules/regenerate-unicode-properties/Script/Khitan_Small_Script.js": nne, "/node_modules/regenerate-unicode-properties/Script/Khmer.js": ine, "/node_modules/regenerate-unicode-properties/Script/Khojki.js": dne, "/node_modules/regenerate-unicode-properties/Script/Khudawadi.js": lne, "/node_modules/regenerate-unicode-properties/Script/Kirat_Rai.js": fne, "/node_modules/regenerate-unicode-properties/Script/Lao.js": Rne, "/node_modules/regenerate-unicode-properties/Script/Latin.js": bne, "/node_modules/regenerate-unicode-properties/Script/Lepcha.js": Ene, "/node_modules/regenerate-unicode-properties/Script/Limbu.js": Cne, "/node_modules/regenerate-unicode-properties/Script/Linear_A.js": _ne, "/node_modules/regenerate-unicode-properties/Script/Linear_B.js": Ine, "/node_modules/regenerate-unicode-properties/Script/Lisu.js": jne, "/node_modules/regenerate-unicode-properties/Script/Lycian.js": Mne, "/node_modules/regenerate-unicode-properties/Script/Lydian.js": qne, "/node_modules/regenerate-unicode-properties/Script/Mahajani.js": Hne, "/node_modules/regenerate-unicode-properties/Script/Makasar.js": Jne, "/node_modules/regenerate-unicode-properties/Script/Malayalam.js": Yne, "/node_modules/regenerate-unicode-properties/Script/Mandaic.js": Zne, "/node_modules/regenerate-unicode-properties/Script/Manichaean.js": nte, "/node_modules/regenerate-unicode-properties/Script/Marchen.js": ite, "/node_modules/regenerate-unicode-properties/Script/Masaram_Gondi.js": dte, "/node_modules/regenerate-unicode-properties/Script/Medefaidrin.js": lte, "/node_modules/regenerate-unicode-properties/Script/Meetei_Mayek.js": fte, "/node_modules/regenerate-unicode-properties/Script/Mende_Kikakui.js": Rte, "/node_modules/regenerate-unicode-properties/Script/Meroitic_Cursive.js": bte, "/node_modules/regenerate-unicode-properties/Script/Meroitic_Hieroglyphs.js": Ete, "/node_modules/regenerate-unicode-properties/Script/Miao.js": Cte, "/node_modules/regenerate-unicode-properties/Script/Modi.js": _te, "/node_modules/regenerate-unicode-properties/Script/Mongolian.js": Ite, "/node_modules/regenerate-unicode-properties/Script/Mro.js": jte, "/node_modules/regenerate-unicode-properties/Script/Multani.js": Mte, "/node_modules/regenerate-unicode-properties/Script/Myanmar.js": qte, "/node_modules/regenerate-unicode-properties/Script/Nabataean.js": Hte, "/node_modules/regenerate-unicode-properties/Script/Nag_Mundari.js": Jte, "/node_modules/regenerate-unicode-properties/Script/Nandinagari.js": Yte, "/node_modules/regenerate-unicode-properties/Script/New_Tai_Lue.js": Zte, "/node_modules/regenerate-unicode-properties/Script/Newa.js": nre, "/node_modules/regenerate-unicode-properties/Script/Nko.js": ire, "/node_modules/regenerate-unicode-properties/Script/Nushu.js": dre, "/node_modules/regenerate-unicode-properties/Script/Nyiakeng_Puachue_Hmong.js": lre, "/node_modules/regenerate-unicode-properties/Script/Ogham.js": fre, "/node_modules/regenerate-unicode-properties/Script/Ol_Chiki.js": Rre, "/node_modules/regenerate-unicode-properties/Script/Ol_Onal.js": bre, "/node_modules/regenerate-unicode-properties/Script/Old_Hungarian.js": Ere, "/node_modules/regenerate-unicode-properties/Script/Old_Italic.js": Cre, "/node_modules/regenerate-unicode-properties/Script/Old_North_Arabian.js": _re, "/node_modules/regenerate-unicode-properties/Script/Old_Permic.js": Ire, "/node_modules/regenerate-unicode-properties/Script/Old_Persian.js": jre, "/node_modules/regenerate-unicode-properties/Script/Old_Sogdian.js": Mre, "/node_modules/regenerate-unicode-properties/Script/Old_South_Arabian.js": qre, "/node_modules/regenerate-unicode-properties/Script/Old_Turkic.js": Hre, "/node_modules/regenerate-unicode-properties/Script/Old_Uyghur.js": Jre, "/node_modules/regenerate-unicode-properties/Script/Oriya.js": Yre, "/node_modules/regenerate-unicode-properties/Script/Osage.js": Zre, "/node_modules/regenerate-unicode-properties/Script/Osmanya.js": nie, "/node_modules/regenerate-unicode-properties/Script/Pahawh_Hmong.js": iie, "/node_modules/regenerate-unicode-properties/Script/Palmyrene.js": die, "/node_modules/regenerate-unicode-properties/Script/Pau_Cin_Hau.js": lie, "/node_modules/regenerate-unicode-properties/Script/Phags_Pa.js": fie, "/node_modules/regenerate-unicode-properties/Script/Phoenician.js": Rie, "/node_modules/regenerate-unicode-properties/Script/Proto_Cuneiform.js": bie, "/node_modules/regenerate-unicode-properties/Script/Psalter_Pahlavi.js": Eie, "/node_modules/regenerate-unicode-properties/Script/Rejang.js": Cie, "/node_modules/regenerate-unicode-properties/Script/Runic.js": _ie, "/node_modules/regenerate-unicode-properties/Script/Samaritan.js": Iie, "/node_modules/regenerate-unicode-properties/Script/Saurashtra.js": jie, "/node_modules/regenerate-unicode-properties/Script/Seal.js": Mie, "/node_modules/regenerate-unicode-properties/Script/Sharada.js": qie, "/node_modules/regenerate-unicode-properties/Script/Shavian.js": Hie, "/node_modules/regenerate-unicode-properties/Script/Siddham.js": Jie, "/node_modules/regenerate-unicode-properties/Script/Sidetic.js": Yie, "/node_modules/regenerate-unicode-properties/Script/SignWriting.js": Zie, "/node_modules/regenerate-unicode-properties/Script/Sinhala.js": noe, "/node_modules/regenerate-unicode-properties/Script/Sogdian.js": ioe, "/node_modules/regenerate-unicode-properties/Script/Sora_Sompeng.js": doe, "/node_modules/regenerate-unicode-properties/Script/Soyombo.js": loe, "/node_modules/regenerate-unicode-properties/Script/Sundanese.js": foe, "/node_modules/regenerate-unicode-properties/Script/Sunuwar.js": Roe, "/node_modules/regenerate-unicode-properties/Script/Syloti_Nagri.js": boe, "/node_modules/regenerate-unicode-properties/Script/Syriac.js": Eoe, "/node_modules/regenerate-unicode-properties/Script/Tagalog.js": Coe, "/node_modules/regenerate-unicode-properties/Script/Tagbanwa.js": _oe, "/node_modules/regenerate-unicode-properties/Script/Tai_Le.js": Ioe, "/node_modules/regenerate-unicode-properties/Script/Tai_Tham.js": joe, "/node_modules/regenerate-unicode-properties/Script/Tai_Viet.js": Moe, "/node_modules/regenerate-unicode-properties/Script/Tai_Yo.js": qoe, "/node_modules/regenerate-unicode-properties/Script/Takri.js": Hoe, "/node_modules/regenerate-unicode-properties/Script/Tamil.js": Joe, "/node_modules/regenerate-unicode-properties/Script/Tangsa.js": Yoe, "/node_modules/regenerate-unicode-properties/Script/Tangut.js": Zoe, "/node_modules/regenerate-unicode-properties/Script/Telugu.js": nse, "/node_modules/regenerate-unicode-properties/Script/Thaana.js": ise, "/node_modules/regenerate-unicode-properties/Script/Thai.js": dse, "/node_modules/regenerate-unicode-properties/Script/Tibetan.js": lse, "/node_modules/regenerate-unicode-properties/Script/Tifinagh.js": fse, "/node_modules/regenerate-unicode-properties/Script/Tirhuta.js": Rse, "/node_modules/regenerate-unicode-properties/Script/Todhri.js": bse, "/node_modules/regenerate-unicode-properties/Script/Tolong_Siki.js": Ese, "/node_modules/regenerate-unicode-properties/Script/Toto.js": Cse, "/node_modules/regenerate-unicode-properties/Script/Tulu_Tigalari.js": _se, "/node_modules/regenerate-unicode-properties/Script/Ugaritic.js": Ise, "/node_modules/regenerate-unicode-properties/Script/Unknown.js": jse, "/node_modules/regenerate-unicode-properties/Script/Vai.js": Mse, "/node_modules/regenerate-unicode-properties/Script/Vithkuqi.js": qse, "/node_modules/regenerate-unicode-properties/Script/Wancho.js": Hse, "/node_modules/regenerate-unicode-properties/Script/Warang_Citi.js": Jse, "/node_modules/regenerate-unicode-properties/Script/Yezidi.js": Yse, "/node_modules/regenerate-unicode-properties/Script/Yi.js": Zse, "/node_modules/regenerate-unicode-properties/Script/Zanabazar_Square.js": ide, "/node_modules/regenerate-unicode-properties/unicode-version.js": ode });
       }
       function dde(e10, a10) {
         var n10, t10 = (function(e11) {
@@ -40973,7 +40037,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
             var t11 = a11.getBinding(n11.name);
             if (null != t11 && t11.constant && t11.path.isGenericType("Array")) return n11;
           }
-          if (C(n11)) return n11;
+          if (C2(n11)) return n11;
           if (F(n11, { name: "arguments" })) return gx.expression.ast(the || (the = R(["\n          Array.prototype.slice.call(", ")\n        "])), n11);
           var o10 = [n11], s11 = "toConsumableArray";
           return i10 && (o10.unshift(a11.path.hub.addHelper(s11)), s11 = "maybeArrayLike"), Wr(a11.path.hub.addHelper(s11), o10);
@@ -40994,7 +40058,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
             if (Te(l11)) {
               i11 = c10(i11, r11);
               var p10 = s10(l11, a11);
-              C(p10) && d10(p10) && (p10 = Wr(n11.addHelper("arrayLikeToArray"), [p10])), r11.push(p10);
+              C2(p10) && d10(p10) && (p10 = Wr(n11.addHelper("arrayLikeToArray"), [p10])), r11.push(p10);
             } else i11.push(l11);
           }
           return c10(i11, r11), r11;
@@ -41003,7 +40067,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
           var a11 = e11.node, n11 = e11.scope, t11 = a11.elements;
           if (u10(t11)) {
             var r11 = l10(t11, n11, this.file), i11 = r11[0];
-            1 !== r11.length || i11 === t11[0].argument ? (C(i11) ? r11.shift() : i11 = Nr([]), e11.replaceWith(Wr(ci(i11, ai("concat")), r11))) : e11.replaceWith(i11);
+            1 !== r11.length || i11 === t11[0].argument ? (C2(i11) ? r11.shift() : i11 = Nr([]), e11.replaceWith(Wr(ci(i11, ai("concat")), r11))) : e11.replaceWith(i11);
           }
         }, CallExpression: function(e11) {
           var a11 = e11.node, n11 = e11.scope, t11 = a11.arguments;
@@ -41966,7 +41030,7 @@ This problem is likely caused by another plugin injecting
         } } };
       };
       function mme(e10) {
-        return !(Ma(e10) && !Pe(e10)) && (_(e10) || Ne(e10) || K(e10) ? mme(e10.callee) || e10.arguments.some(mme) : Pe(e10) ? e10.expressions.some(mme) : Ce(e10) ? mme(e10.tag) || mme(e10.quasi) : C(e10) ? e10.elements.some(mme) : z2(e10) ? e10.properties.some(function(e11) {
+        return !(Ma(e10) && !Pe(e10)) && (_(e10) || Ne(e10) || K(e10) ? mme(e10.callee) || e10.arguments.some(mme) : Pe(e10) ? e10.expressions.some(mme) : Ce(e10) ? mme(e10.tag) || mme(e10.quasi) : C2(e10) ? e10.elements.some(mme) : z2(e10) ? e10.properties.some(function(e11) {
           return Y(e11) ? mme(e11.value) || e11.computed && mme(e11.key) : (X(e11), false);
         }) : G(e10) || Be(e10) ? mme(e10.object) || e10.computed && mme(e10.property) : !(O(e10) || de(e10) || ce(e10)) && (!ae(e10) && (!Z(e10) || e10.expressions.some(mme))));
       }
@@ -42615,572 +41679,6 @@ This problem is likely caused by another plugin injecting
   }
 });
 
-// src/tools/profile.ts
-function resolveProfile(argv = process.argv) {
-  const i = argv.indexOf("--tools");
-  const env = process.env.AEMCP_TOOLS && process.env.AEMCP_TOOLS.toLowerCase() !== "false" ? process.env.AEMCP_TOOLS : void 0;
-  const raw = (i >= 0 ? argv[i + 1] : void 0) ?? env ?? loadConfig().toolProfile ?? "core";
-  const v = String(raw).trim().toLowerCase();
-  if (v === "full" || v === "all" || v === "true") return { name: "full", allows: () => true };
-  if (v === "core" || v === "false" || v === "") return { name: "core", allows: (t) => CORE_TOOLS.has(t) };
-  const extra = new Set(v.split(",").map((s) => s.trim()).filter((s) => s && s !== "core"));
-  return { name: "custom", allows: (t) => CORE_TOOLS.has(t) || extra.has(t) };
-}
-function applyProfile(server, profile) {
-  const original = server.registerTool.bind(server);
-  server.registerTool = (name, ...rest) => profile.allows(name) ? original(name, ...rest) : void 0;
-}
-var CORE_TOOLS;
-var init_profile = __esm({
-  "src/tools/profile.ts"() {
-    "use strict";
-    init_define_AEMCP_CEP_FILES();
-    init_config();
-    CORE_TOOLS = /* @__PURE__ */ new Set([
-      // connection, scripting, seeing
-      "ae_status",
-      "ae_run_script",
-      "ae_get_scripting_guide",
-      "ae_render_frame",
-      "ae_render_contact_sheet",
-      // understanding the project
-      "ae_get_project_info",
-      "ae_get_comp_info",
-      "ae_get_layer_info",
-      "ae_get_selection",
-      "ae_get_properties",
-      "ae_find_properties",
-      "ae_get_layer_bounds",
-      "ae_get_comp_map",
-      // common edits
-      "ae_create_comp",
-      "ae_add_layer",
-      "ae_add_shape",
-      "ae_set_property",
-      "ae_set_keyframes",
-      "ae_set_expression",
-      "ae_apply_effect",
-      "ae_get_effect_params",
-      "ae_undo"
-    ]);
-  }
-});
-
-// src/cli/install.ts
-var install_exports = {};
-__export(install_exports, {
-  install: () => install
-});
-import { spawn, spawnSync as spawnSync3 } from "node:child_process";
-import { chmodSync, copyFileSync as copyFileSync2, existsSync as existsSync4, mkdirSync as mkdirSync5, readdirSync as readdirSync2, readFileSync as readFileSync6, writeFileSync as writeFileSync4 } from "node:fs";
-import { dirname as dirname4, join as join6 } from "node:path";
-import { fileURLToPath } from "node:url";
-function mcpbInstalled() {
-  try {
-    return readdirSync2(join6(claudeDesktopDir(), "Claude Extensions")).some((n) => /after-effects/i.test(n) && !n.endsWith(".json"));
-  } catch {
-    return false;
-  }
-}
-function claudeDesktopRunning() {
-  if (isMac)
-    return (spawnSync3("ps", ["-axo", "comm="], { encoding: "utf8" }).stdout || "").split("\n").some((l) => l.trim().endsWith(".app/Contents/MacOS/Claude"));
-  if (isWin) return (spawnSync3("tasklist", ["/FI", "IMAGENAME eq claude.exe", "/NH"], { encoding: "utf8" }).stdout || "").toLowerCase().includes("claude.exe");
-  return false;
-}
-async function quitClaudeDesktop() {
-  if (isMac) spawnSync3("osascript", ["-e", 'tell application "Claude" to quit']);
-  else if (isWin) spawnSync3("taskkill", ["/IM", "claude.exe", "/T"]);
-  for (let i = 0; i < 40; i++) {
-    if (!claudeDesktopRunning()) return true;
-    await sleep(500);
-  }
-  if (isWin) {
-    spawnSync3("taskkill", ["/IM", "claude.exe", "/T", "/F"]);
-    await sleep(1e3);
-  }
-  return !claudeDesktopRunning();
-}
-function startClaudeDesktop() {
-  if (isMac) spawnSync3("open", ["-a", "Claude"]);
-  else if (isWin && existsSync4(claudeDesktopExe())) spawn(claudeDesktopExe(), [], { detached: true, stdio: "ignore" }).unref();
-}
-async function install(argv) {
-  const flags = new Set(argv);
-  const want = (name) => !flags.has("--skip-clients") && !flags.has(`--no-${name}`);
-  console.log(bold(`
-After Effects MCP installer v${VERSION}`));
-  console.log(dim(`${process.platform} \xB7 node ${process.version}`));
-  if (!isMac && !isWin) warn("After Effects only runs on macOS and Windows; continuing anyway.");
-  step("1/4  Installing the MCP server");
-  const self2 = fileURLToPath(import.meta.url);
-  mkdirSync5(dirname4(INSTALLED_SERVER), { recursive: true });
-  if (self2 !== INSTALLED_SERVER) copyFileSync2(self2, INSTALLED_SERVER);
-  if (!isWin) chmodSync(INSTALLED_SERVER, 493);
-  ok(`Server: ${INSTALLED_SERVER}`);
-  ensureConfig();
-  ok(`Config: ${CONFIG_FILE}`);
-  step("2/4  Installing the After Effects extension");
-  try {
-    ensureExtension(true);
-    ok(`Extension: ${extensionDir()}`);
-  } catch (e) {
-    fail(`Could not install the extension: ${e.message}`);
-    process.exit(1);
-  }
-  try {
-    ensureDebugMode();
-    ok(`Unsigned extensions enabled (PlayerDebugMode, CSXS ${CSXS_VERSIONS[0]}-${CSXS_VERSIONS.at(-1)})`);
-  } catch (e) {
-    warn(`${e.message}. The extension will not load until PlayerDebugMode is enabled (see README > Troubleshooting).`);
-  }
-  step("3/4  Connecting AI apps");
-  const nodePath = stableNodePath();
-  const entry = { command: nodePath, args: [INSTALLED_SERVER] };
-  const registered = [];
-  const addJson = (label, file2, value2 = entry) => {
-    try {
-      const data = readJson(file2, {});
-      data.mcpServers ||= {};
-      data.mcpServers[SERVER_NAME] = value2;
-      writeJsonWithBackup(file2, data);
-      ok(`${label}`);
-      registered.push(label);
-    } catch (e) {
-      warn(`${label}: could not update ${file2}: ${e.message}`);
-    }
-  };
-  let restartClaude = false;
-  if (want("claude-desktop")) {
-    if (mcpbInstalled()) {
-      ok("Claude Desktop: already connected through the AE MCP extension (.mcpb)");
-      registered.push("Claude Desktop");
-    } else if (existsSync4(claudeDesktopDir())) {
-      const cfg = readJson(claudeDesktopConfig(), {});
-      const cur = cfg.mcpServers?.[SERVER_NAME];
-      const already = !!cur && cur.args?.[0] === INSTALLED_SERVER && typeof cur.command === "string" && existsSync4(cur.command);
-      if (!already && claudeDesktopRunning()) {
-        console.log("  Claude Desktop is open. It must be closed while it is connected, then it reopens.");
-        if (await ask("Restart Claude Desktop now?", true)) {
-          if (await quitClaudeDesktop()) restartClaude = true;
-          else warn("Could not close Claude Desktop. Quit it manually and run the installer again.");
-        } else warn("Quit Claude Desktop (Cmd+Q / tray > Quit) and run this installer again, or the setting may be lost.");
-      }
-      if (already) {
-        ok("Claude Desktop (already connected)");
-        registered.push("Claude Desktop");
-      } else addJson("Claude Desktop", claudeDesktopConfig());
-    } else console.log(dim("  - Claude Desktop not installed (skipped)"));
-  }
-  if (want("claude-code")) {
-    const claude = findClaudeCli();
-    if (claude) {
-      try {
-        try {
-          run(claude, ["mcp", "remove", SERVER_NAME, "--scope", "user"]);
-        } catch {
-        }
-        run(claude, ["mcp", "add", "--scope", "user", SERVER_NAME, "--", nodePath, INSTALLED_SERVER]);
-        ok("Claude Code");
-        registered.push("Claude Code");
-      } catch (e) {
-        warn(`Claude Code: ${String(e.stderr || e.message).split("\n")[0]}`);
-      }
-    } else if (existsSync4(claudeCodeConfig())) addJson("Claude Code", claudeCodeConfig(), { type: "stdio", ...entry, env: {} });
-    else console.log(dim("  - Claude Code not installed (skipped)"));
-  }
-  if (want("cursor") && existsSync4(dirname4(cursorConfig()))) addJson("Cursor", cursorConfig());
-  if (want("codex") && (existsSync4(dirname4(codexConfig())) || chatgptDesktopInstalled())) {
-    try {
-      const file2 = codexConfig();
-      mkdirSync5(dirname4(file2), { recursive: true });
-      const text = existsSync4(file2) ? readFileSync6(file2, "utf8") : "";
-      if (existsSync4(file2) && !existsSync4(file2 + ".aemcp.bak")) copyFileSync2(file2, file2 + ".aemcp.bak");
-      const rest = removeCodexBlock(text).trim();
-      writeFileSync4(file2, (rest ? rest + "\n\n" : "") + codexBlock(nodePath, INSTALLED_SERVER));
-      ok("ChatGPT desktop / Codex");
-      registered.push("ChatGPT desktop");
-    } catch (e) {
-      warn(`Codex: ${e.message}`);
-    }
-  }
-  if (restartClaude) {
-    startClaudeDesktop();
-    ok("Claude Desktop restarted");
-  }
-  step("4/4  Done!");
-  console.log(`
-  ${bold("Restart After Effects")} if it is open. The connection starts automatically with it.
-  ${registered.length ? `Connected: ${registered.join(", ")}. Restart ${registered.filter((r) => r !== "Claude Desktop" || !restartClaude).join(", ") || "nothing else"} if open.` : "No AI apps were found to connect."}
-
-  Try asking Claude: ${bold('"Check After Effects is connected, then make a 1080p comp with an animated title."')}
-  Check the installation any time with ${bold("2. Test Installation")} (in the ${isWin ? "Windows" : "Mac"} folder).
-${registered.includes("ChatGPT desktop") ? "  ChatGPT desktop app: restart it; after-effects appears under Settings > Plugins > Servers.\n" : ""}  ChatGPT on the web: run ${bold("3. Connect ChatGPT")} from the same folder.
-
-  Other MCP apps can use:  command ${nodePath}
-                           args    ["${INSTALLED_SERVER}"]
-`);
-}
-var init_install = __esm({
-  "src/cli/install.ts"() {
-    "use strict";
-    init_define_AEMCP_CEP_FILES();
-    init_config();
-    init_setup();
-    init_util();
-  }
-});
-
-// src/cli/uninstall.ts
-var uninstall_exports = {};
-__export(uninstall_exports, {
-  uninstall: () => uninstall
-});
-import { existsSync as existsSync5, readdirSync as readdirSync3, readFileSync as readFileSync7, rmSync as rmSync2, writeFileSync as writeFileSync5 } from "node:fs";
-import { join as join7 } from "node:path";
-function uninstall(argv) {
-  console.log(bold("\nAfter Effects MCP uninstaller\n"));
-  const keepConfig = argv.includes("--keep-config");
-  if (existsSync5(extensionDir())) {
-    rmSync2(extensionDir(), { recursive: true, force: true });
-    ok(`Removed the After Effects extension`);
-  }
-  if (existsSync5(AEMCP_DIR)) {
-    for (const name of readdirSync3(AEMCP_DIR))
-      if (name !== "node" && !(keepConfig && name === "config.json")) rmSync2(join7(AEMCP_DIR, name), { recursive: true, force: true });
-  }
-  ok(keepConfig ? "Removed the server (kept ~/.aemcp/config.json)" : `Removed ${AEMCP_DIR}`);
-  for (const [label, file2] of [["Claude Desktop", claudeDesktopConfig()], ["Cursor", cursorConfig()], ["Claude Code", claudeCodeConfig()]]) {
-    const data = readJson(file2, null);
-    if (data?.mcpServers?.[SERVER_NAME]) {
-      delete data.mcpServers[SERVER_NAME];
-      writeJsonWithBackup(file2, data);
-      ok(`Removed from ${label}`);
-    }
-  }
-  const claude = findClaudeCli();
-  if (claude) {
-    try {
-      run(claude, ["mcp", "remove", SERVER_NAME, "--scope", "user"]);
-      ok("Removed from Claude Code");
-    } catch {
-    }
-  }
-  if (existsSync5(codexConfig())) {
-    const t = readFileSync7(codexConfig(), "utf8");
-    const n = removeCodexBlock(t);
-    if (n !== t) {
-      writeFileSync5(codexConfig(), n.trimEnd() + "\n");
-      ok("Removed from Codex");
-    }
-  }
-  console.log("\nDone. Restart After Effects and your AI apps.");
-  console.log("If you installed the Claude Desktop extension (.mcpb), remove it in Claude Desktop > Settings > Extensions.");
-  warn("PlayerDebugMode was left enabled (harmless; other extensions may rely on it).");
-}
-var init_uninstall = __esm({
-  "src/cli/uninstall.ts"() {
-    "use strict";
-    init_define_AEMCP_CEP_FILES();
-    init_util();
-  }
-});
-
-// src/cli/diagnostics.ts
-var diagnostics_exports = {};
-__export(diagnostics_exports, {
-  diagnostics: () => diagnostics
-});
-import { spawnSync as spawnSync4 } from "node:child_process";
-import { arch, release } from "node:os";
-import { join as join8 } from "node:path";
-import { existsSync as existsSync6, readFileSync as readFileSync8 } from "node:fs";
-function debugMode() {
-  return CSXS_VERSIONS.map((v) => {
-    const r = isWin ? spawnSync4("reg", ["query", `HKCU\\Software\\Adobe\\CSXS.${v}`, "/v", "PlayerDebugMode"], { encoding: "utf8" }) : isMac ? spawnSync4("defaults", ["read", `com.adobe.CSXS.${v}`, "PlayerDebugMode"], { encoding: "utf8" }) : null;
-    return `${v}:${r && r.status === 0 && /(^|\s)1\s*$/m.test(r.stdout) ? "on" : "off"}`;
-  }).join(" ");
-}
-function clientEntry(file2) {
-  const data = readJson(file2, null);
-  const e = data?.mcpServers?.[SERVER_NAME];
-  if (!e) return data ? "no entry" : "not found";
-  return `${e.command} ${(e.args || []).join(" ")}${e.command && !existsSync6(e.command) ? "  (COMMAND MISSING)" : ""}`;
-}
-async function diagnostics() {
-  const L = ["### AE MCP diagnostics", `time: ${(/* @__PURE__ */ new Date()).toISOString()}`];
-  L.push(`server: v${VERSION} (helpers ${HELPER_VERSION}) \xB7 tools profile: ${resolveProfile().name}`);
-  L.push(`os: ${process.platform} ${release()} ${arch()} \xB7 node ${process.version} at ${process.execPath}`);
-  const cfg = readJson(CONFIG_FILE, null);
-  if (cfg) L.push(`config: ${JSON.stringify({ ...cfg, token: cfg.token ? `<set, ${cfg.token.length} chars>` : "MISSING" })}`);
-  else L.push(`config: MISSING (${CONFIG_FILE})`);
-  L.push(`installed server: ${existsSync6(INSTALLED_SERVER) ? INSTALLED_SERVER : "not installed (fine when using the .mcpb)"}`);
-  L.push(`extension: ${extensionDir()} \xB7 ${existsSync6(join8(extensionDir(), "CSXS", "manifest.xml")) ? `hash ${installedExtensionHash()} (bundled ${"a18b01e6708c"})` : "MISSING"}`);
-  L.push(`PlayerDebugMode: ${debugMode()}`);
-  L.push(`Claude Desktop: ${clientEntry(claudeDesktopConfig())}`);
-  L.push(`Claude Code: ${clientEntry(claudeCodeConfig())}`);
-  L.push(`Cursor: ${clientEntry(cursorConfig())}`);
-  let codex = "not found";
-  try {
-    codex = readFileSync8(codexConfig(), "utf8").includes(`[mcp_servers.${SERVER_NAME}]`) ? "entry present" : "no entry";
-  } catch {
-  }
-  L.push(`ChatGPT desktop / Codex (${codexConfig()}): ${codex}`);
-  L.push(`bridge status file: ${JSON.stringify(readJson(join8(AEMCP_DIR, "bridge-status.json"), null))}`);
-  const u = knownUpdate();
-  L.push(`update: ${u ? `latest v${u.latest}${u.updateAvailable ? " (UPDATE AVAILABLE)" : ""}` : "unknown"}`);
-  try {
-    const h = await health();
-    L.push(`bridge: reachable \xB7 ${h.host?.appName} ${h.host?.appVersion} \xB7 bridge v${h.version} \xB7 authorized ${h.authorized}`);
-    const r = await evalRaw(
-      "(function(){var w=null;try{w=app.preferences.getPrefAsLong('Main Pref Section','Pref_SCRIPTING_FILE_NETWORK_SECURITY')===1;}catch(e){}return 'ae: '+app.version+' \xB7 '+$.os+' \xB7 items '+app.project.numItems+' \xB7 scriptsCanWriteFiles '+w+' \xB7 helpers '+(typeof aemcp==='undefined'?'not loaded':aemcp.version);})()",
-      1e4
-    );
-    L.push(r);
-  } catch (e) {
-    L.push(`bridge: NOT reachable (${e.message.split(".")[0]})`);
-  }
-  return L.join("\n");
-}
-var init_diagnostics = __esm({
-  "src/cli/diagnostics.ts"() {
-    "use strict";
-    init_define_AEMCP_CEP_FILES();
-    init_bridge();
-    init_config();
-    init_jsx();
-    init_profile();
-    init_update();
-    init_setup();
-    init_util();
-  }
-});
-
-// src/cli/selftest.ts
-var selftest_exports = {};
-__export(selftest_exports, {
-  selftest: () => selftest
-});
-import { existsSync as existsSync7, mkdirSync as mkdirSync6, readFileSync as readFileSync9, statSync as statSync2, unlinkSync as unlinkSync2 } from "node:fs";
-import { join as join9 } from "node:path";
-import { spawnSync as spawnSync5 } from "node:child_process";
-async function selftest() {
-  let failures = 0;
-  const bad = (m) => {
-    failures++;
-    fail(m);
-  };
-  console.log(bold(`
-After Effects MCP self-test v${VERSION}`));
-  console.log(`  ${process.platform} \xB7 node ${process.version}
-`);
-  if (updateCheckEnabled()) {
-    const u = await checkForUpdate(true);
-    const msg = updateMessage(u);
-    if (msg) warn(msg);
-    else if (u?.latest) ok(`Up to date (latest release v${u.latest})`);
-  }
-  if (existsSync7(CONFIG_FILE) && loadConfig().token) ok(`Config ${CONFIG_FILE}`);
-  else bad(`No config at ${CONFIG_FILE}. Run the installer.`);
-  const hash2 = installedExtensionHash();
-  if (!existsSync7(join9(extensionDir(), "CSXS", "manifest.xml"))) bad(`After Effects extension missing at ${extensionDir()}. Run the installer.`);
-  else if (hash2 !== "a18b01e6708c") warn(`Extension at ${extensionDir()} is a different version (${hash2 ?? "unknown"} vs ${"a18b01e6708c"}). Re-run the installer.`);
-  else ok("After Effects extension installed");
-  const offVersions = CSXS_VERSIONS.filter((v) => {
-    const r = isWin ? spawnSync5("reg", ["query", `HKCU\\Software\\Adobe\\CSXS.${v}`, "/v", "PlayerDebugMode"], { encoding: "utf8" }) : isMac ? spawnSync5("defaults", ["read", `com.adobe.CSXS.${v}`, "PlayerDebugMode"], { encoding: "utf8" }) : null;
-    return r && !(r.status === 0 && /(^|\s)1\s*$/m.test(r.stdout));
-  });
-  if (offVersions.length) bad(`PlayerDebugMode not enabled for CSXS ${offVersions.join(", ")}. Run the installer.`);
-  else ok("Unsigned extensions allowed (PlayerDebugMode)");
-  const desktop = readJson(claudeDesktopConfig(), null);
-  if (desktop?.mcpServers?.[SERVER_NAME]) {
-    const cmd = desktop.mcpServers[SERVER_NAME].command;
-    if (cmd && !existsSync7(cmd)) bad(`Claude Desktop points to a Node that no longer exists: ${cmd}. Re-run the installer.`);
-    else ok("Claude Desktop configured");
-  } else console.log("  - Claude Desktop config has no after-effects entry (fine if you use the .mcpb extension or another app)");
-  console.log("");
-  let h;
-  try {
-    h = await health();
-  } catch (e) {
-    bad(`Bridge not reachable on 127.0.0.1:${loadConfig().bridgePort}. Is After Effects running? (restart it after installing)`);
-    const statusFile = join9(AEMCP_DIR, "bridge-status.json");
-    if (existsSync7(statusFile)) {
-      const st = readJson(statusFile, {});
-      console.log(`    last bridge status: ${st.listening ? "listening" : "not listening"}${st.error ? " - " + st.error : ""} (${st.at})`);
-    }
-    return summary(failures);
-  }
-  ok(`Bridge running inside ${h.host?.appName ?? "AE"} ${h.host?.appVersion ?? ""} (bridge v${h.version})`);
-  if (h.authorized === false) {
-    bad("Bridge rejected our token: config mismatch. Re-run the installer and restart After Effects.");
-    return summary(failures);
-  }
-  const info = await runJsx(
-    "var w = null; try { w = app.preferences.getPrefAsLong('Main Pref Section', 'Pref_SCRIPTING_FILE_NETWORK_SECURITY') === 1; } catch (e) {} return { version: app.version, os: $.os, canWrite: w };",
-    {},
-    { undoGroup: false, timeoutMs: 15e3 }
-  ).catch((e) => ({ ok: false, error: { message: e.message } }));
-  if (!info.ok) return bad(`ExtendScript failed: ${info.error?.message}`), summary(failures);
-  ok(`ExtendScript works: After Effects ${info.result.version} on ${info.result.os}`);
-  if (info.result.canWrite === false)
-    warn("'Allow Scripts to Write Files and Access Network' is OFF: enable it in AE Settings > Scripting & Expressions (needed for frame previews).");
-  const tmpDir = join9(AEMCP_DIR, "tmp");
-  mkdirSync6(tmpDir, { recursive: true });
-  const png = join9(tmpDir, `selftest_${Date.now()}.png`);
-  const job = await runJsx(
-    `var c = app.project.items.addComp("__aemcp_selftest", 640, 360, 1, 2, 30);
-var t = c.layers.addText("AE MCP OK");
-var p = t.property("ADBE Transform Group").property("ADBE Position");
-p.setValuesAtTimes([0, 1], [[100, 180], [540, 180]]);
-var fx = t.property("ADBE Effect Parade").addProperty("ADBE Drop Shadow");
-t.property("ADBE Transform Group").property("ADBE Opacity").expression = "50 + 50 * Math.sin(time)";
-var f = new File(args.png);
-var wrote = false;
-if (args.canWrite !== false) { c.saveFrameToPng(1, f); var w = 0; while (!f.exists && w < 10000) { $.sleep(50); w += 50; } wrote = f.exists; $.sleep(100); }
-var r = { keys: p.numKeys, effect: fx.matchName, exprError: t.property("ADBE Transform Group").property("ADBE Opacity").expressionError, wrote: wrote };
-c.remove();
-return r;`,
-    { png, canWrite: info.result.canWrite },
-    { undoGroup: "AE MCP self-test", timeoutMs: 6e4 }
-  );
-  if (!job.ok) bad(`Test job failed: ${job.error?.message}`);
-  else {
-    const r = job.result;
-    if (r.keys === 2 && r.effect === "ADBE Drop Shadow" && !r.exprError) ok("Created a comp, text layer, keyframes, effect and expression (then removed it)");
-    else bad(`Unexpected test result: ${JSON.stringify(r)}`);
-    if (info.result.canWrite !== false) {
-      for (let i = 0; i < 50 && !(existsSync7(png) && statSync2(png).size > 0); i++) await sleep(100);
-      if (existsSync7(png) && statSync2(png).size > 0) {
-        const sig = readFileSync9(png).subarray(1, 4).toString();
-        sig === "PNG" ? ok("Rendered a frame preview") : bad("Frame preview is not a valid PNG");
-        try {
-          unlinkSync2(png);
-        } catch {
-        }
-      } else bad(`Frame preview was not written to ${png}`);
-    }
-  }
-  return summary(failures);
-}
-async function summary(failures) {
-  if (!failures) {
-    console.log(`
-${green(bold("All checks passed. After Effects MCP is ready."))}
-`);
-    return 0;
-  }
-  console.log(`
-${red(bold(`${failures} problem(s) found.`))} See README > Troubleshooting.`);
-  console.log("If you report it, include everything below (it contains no secrets):\n");
-  const { diagnostics: diagnostics2 } = await Promise.resolve().then(() => (init_diagnostics(), diagnostics_exports));
-  console.log(await diagnostics2());
-  return 1;
-}
-var init_selftest = __esm({
-  "src/cli/selftest.ts"() {
-    "use strict";
-    init_define_AEMCP_CEP_FILES();
-    init_bridge();
-    init_config();
-    init_jsx();
-    init_update();
-    init_setup();
-    init_util();
-  }
-});
-
-// src/cli/chatgpt.ts
-var chatgpt_exports = {};
-__export(chatgpt_exports, {
-  chatgpt: () => chatgpt
-});
-import { spawn as spawn2 } from "node:child_process";
-import { existsSync as existsSync8 } from "node:fs";
-import { fileURLToPath as fileURLToPath2 } from "node:url";
-function chatgpt(argv) {
-  ensureConfig();
-  const cfg = loadConfig();
-  const port = String(cfg.httpPort);
-  const children = [];
-  const cleanup = () => children.forEach((c) => {
-    try {
-      c.kill();
-    } catch {
-    }
-  });
-  process.on("SIGINT", () => {
-    cleanup();
-    process.exit(0);
-  });
-  process.on("exit", cleanup);
-  const srv = spawn2(process.execPath, [fileURLToPath2(import.meta.url), "--http", "--port", port], { stdio: ["ignore", "inherit", "inherit"] });
-  children.push(srv);
-  srv.on("exit", (code) => {
-    fail(`MCP server exited (${code})`);
-    process.exit(1);
-  });
-  const announce = (base) => console.log(`
-${bold("ChatGPT connector URL")} (keep it secret, it contains your access token):
-
-  ${yellow(`${base}/mcp/${cfg.token}`)}
-
-In ChatGPT: Settings > Apps & Connectors > Advanced settings > turn on Developer mode,
-then Create a connector > paste the URL above > Authentication: "No authentication" > Create.
-Keep this window open while you use it. Press Ctrl+C to stop.
-`);
-  console.log(dim("Tip: the ChatGPT desktop app does not need this; 1. Install connects it directly (Settings > Plugins).\n"));
-  if (argv.includes("--local")) return announce(`http://127.0.0.1:${port}`);
-  const cloudflared = which("cloudflared") || (isWin ? null : ["/opt/homebrew/bin/cloudflared", "/usr/local/bin/cloudflared"].find((p) => existsSync8(p)) ?? null);
-  const ngrok = which("ngrok");
-  let shown = false;
-  if (cloudflared) {
-    const t = spawn2(cloudflared, ["tunnel", "--no-autoupdate", "--url", `http://127.0.0.1:${port}`], { stdio: ["ignore", "pipe", "pipe"] });
-    children.push(t);
-    const onData = (d) => {
-      const m = String(d).match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/);
-      if (m && !shown) {
-        shown = true;
-        announce(m[0]);
-      }
-    };
-    t.stdout.on("data", onData);
-    t.stderr.on("data", onData);
-    console.log(dim("Starting Cloudflare tunnel..."));
-  } else if (ngrok) {
-    const t = spawn2(ngrok, ["http", port, "--log", "stdout", "--log-format", "json"], { stdio: ["ignore", "pipe", "inherit"] });
-    children.push(t);
-    t.stdout.on("data", (d) => {
-      for (const line of String(d).split("\n")) {
-        try {
-          const j = JSON.parse(line);
-          if (j.url?.startsWith("https") && !shown) {
-            shown = true;
-            announce(j.url);
-          }
-        } catch {
-        }
-      }
-    });
-    console.log(dim("Starting ngrok tunnel..."));
-  } else {
-    warn("ChatGPT needs a public HTTPS address, which needs a free tunnel tool. Install one, then run this again:");
-    console.log(`  - cloudflared (no account): ${isWin ? "winget install --id Cloudflare.cloudflared" : "brew install cloudflared"}`);
-    console.log("  - or ngrok: https://ngrok.com/download");
-    console.log(`
-The server is running locally at http://127.0.0.1:${port}/mcp (token in ~/.aemcp/config.json).`);
-  }
-}
-var init_chatgpt = __esm({
-  "src/cli/chatgpt.ts"() {
-    "use strict";
-    init_define_AEMCP_CEP_FILES();
-    init_config();
-    init_setup();
-    init_util();
-  }
-});
-
 // src/index.ts
 init_define_AEMCP_CEP_FILES();
 
@@ -43649,9 +42147,9 @@ var ParseStatus = class _ParseStatus {
   }
   static async mergeObjectAsync(status, pairs) {
     const syncPairs = [];
-    for (const pair of pairs) {
-      const key = await pair.key;
-      const value2 = await pair.value;
+    for (const pair2 of pairs) {
+      const key = await pair2.key;
+      const value2 = await pair2.value;
       syncPairs.push({
         key,
         value: value2
@@ -43661,8 +42159,8 @@ var ParseStatus = class _ParseStatus {
   }
   static mergeObjectSync(status, pairs) {
     const finalObject = {};
-    for (const pair of pairs) {
-      const { key, value: value2 } = pair;
+    for (const pair2 of pairs) {
+      const { key, value: value2 } = pair2;
       if (key.status === "aborted")
         return INVALID;
       if (value2.status === "aborted")
@@ -43671,7 +42169,7 @@ var ParseStatus = class _ParseStatus {
         status.dirty();
       if (value2.status === "dirty")
         status.dirty();
-      if (key.value !== "__proto__" && (typeof value2.value !== "undefined" || pair.alwaysSet)) {
+      if (key.value !== "__proto__" && (typeof value2.value !== "undefined" || pair2.alwaysSet)) {
         finalObject[key.value] = value2.value;
       }
     }
@@ -45558,13 +44056,13 @@ var ZodObject = class _ZodObject extends ZodType {
     if (ctx.common.async) {
       return Promise.resolve().then(async () => {
         const syncPairs = [];
-        for (const pair of pairs) {
-          const key = await pair.key;
-          const value2 = await pair.value;
+        for (const pair2 of pairs) {
+          const key = await pair2.key;
+          const value2 = await pair2.value;
           syncPairs.push({
             key,
             value: value2,
-            alwaysSet: pair.alwaysSet
+            alwaysSet: pair2.alwaysSet
           });
         }
         return syncPairs;
@@ -46253,9 +44751,9 @@ var ZodMap = class extends ZodType {
     if (ctx.common.async) {
       const finalMap = /* @__PURE__ */ new Map();
       return Promise.resolve().then(async () => {
-        for (const pair of pairs) {
-          const key = await pair.key;
-          const value2 = await pair.value;
+        for (const pair2 of pairs) {
+          const key = await pair2.key;
+          const value2 = await pair2.value;
           if (key.status === "aborted" || value2.status === "aborted") {
             return INVALID;
           }
@@ -46268,9 +44766,9 @@ var ZodMap = class extends ZodType {
       });
     } else {
       const finalMap = /* @__PURE__ */ new Map();
-      for (const pair of pairs) {
-        const key = pair.key;
-        const value2 = pair.value;
+      for (const pair2 of pairs) {
+        const key = pair2.key;
+        const value2 = pair2.value;
         if (key.status === "aborted" || value2.status === "aborted") {
           return INVALID;
         }
@@ -63988,21 +62486,21 @@ function visit(schema, fnOrHandlers) {
     const h = fnOrHandlers[node2._zod.def.type];
     return h ? h(node2, rewritten) : node2;
   };
-  const cache = /* @__PURE__ */ new Map();
+  const cache2 = /* @__PURE__ */ new Map();
   function run2(s) {
-    const cached2 = cache.get(s);
+    const cached2 = cache2.get(s);
     if (cached2 === RESOLVING) {
       return new $ZodLazy({
         type: "lazy",
-        getter: () => cache.get(s)
+        getter: () => cache2.get(s)
       });
     }
     if (cached2 !== void 0)
       return cached2;
-    cache.set(s, RESOLVING);
+    cache2.set(s, RESOLVING);
     const inner = mapInner(s);
     const mapped = fn(inner, inner !== s);
-    cache.set(s, mapped);
+    cache2.set(s, mapped);
     return mapped;
   }
   function mapInner(s) {
@@ -73441,8 +71939,8 @@ var Response$1 = class Response$12 {
   #body;
   #init;
   [getResponseCache]() {
-    const cache = this[cacheKey];
-    const liveHeaders = cache && cache[2] instanceof Headers ? cache[2] : void 0;
+    const cache2 = this[cacheKey];
+    const liveHeaders = cache2 && cache2[2] instanceof Headers ? cache2[2] : void 0;
     delete this[cacheKey];
     return this[responseCache] ||= new GlobalResponse(this.#body, liveHeaders ? {
       status: this.#init?.status,
@@ -73470,10 +71968,10 @@ var Response$1 = class Response$12 {
     ];
   }
   get headers() {
-    const cache = this[cacheKey];
-    if (cache) {
-      if (!(cache[2] instanceof Headers)) cache[2] = new Headers(cache[2] || (cache[1] === null ? void 0 : { "content-type": defaultContentType }));
-      return cache[2];
+    const cache2 = this[cacheKey];
+    if (cache2) {
+      if (!(cache2[2] instanceof Headers)) cache2[2] = new Headers(cache2[2] || (cache2[1] === null ? void 0 : { "content-type": defaultContentType }));
+      return cache2[2];
     }
     return this[getResponseCache]().headers;
   }
@@ -74929,9 +73427,35 @@ var StreamableHTTPServerTransport = class {
 };
 
 // src/index.ts
-init_config();
 import { createServer as createServer2 } from "node:http";
 import { timingSafeEqual } from "node:crypto";
+
+// src/config.ts
+init_define_AEMCP_CEP_FILES();
+import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+var VERSION = "1.1.0";
+function configPath() {
+  return process.env.AEMCP_CONFIG || join(homedir(), ".aemcp", "config.json");
+}
+function loadConfig() {
+  let file2 = {};
+  try {
+    file2 = JSON.parse(readFileSync(configPath(), "utf8"));
+  } catch {
+  }
+  return {
+    bridgePort: Number(process.env.AEMCP_BRIDGE_PORT || file2.bridgePort || 8765),
+    token: process.env.AEMCP_TOKEN || file2.token || "",
+    httpPort: Number(process.env.AEMCP_HTTP_PORT || file2.httpPort || 8766),
+    toolProfile: file2.toolProfile,
+    updateCheck: file2.updateCheck,
+    changeReport: file2.changeReport,
+    permissions: file2.permissions,
+    instance: file2.instance
+  };
+}
 
 // src/docs.ts
 init_define_AEMCP_CEP_FILES();
@@ -74959,6 +73483,9 @@ var EXTENDSCRIPT_DOC = `# After Effects ExtendScript cheat sheet (for ae_run_scr
 - Only with transpile:false or ae_run_script_file (raw ExtendScript): use var/function only, put parentheses around
   nested ?: (ExtendScript evaluates a ? b : c ? d : e left-to-right), and don't use reserved words such as short, int,
   char, float, class as names.
+- Don't use plain objects as dictionaries keyed by arbitrary names: ExtendScript objects already have members such as
+  "+", "-", "*", "reflect", "watch" and "toSource" (operator overloading), so a comp named "-" collides. Prefix keys
+  (map["k:" + name]).
 - Edits report what changed (items, layers, properties, keyframes, expressions, effects) after every call.
 
 ## Helpers (global \`aemcp\`)
@@ -75055,6 +73582,47 @@ comp.saveFrameToPng(time, new File("/tmp/frame.png"));
 
 // src/tools/app.ts
 init_define_AEMCP_CEP_FILES();
+
+// src/capabilities.ts
+init_define_AEMCP_CEP_FILES();
+var CAPABILITIES_JSX = `
+var c = app.project.items.addComp("__aemcp_caps", 64, 64, 1, 1, 30), f = {};
+try {
+  var t = c.layers.addText("ab"), td = t.property("ADBE Text Properties").property("ADBE Text Document").value;
+  var op = t.property("ADBE Transform Group").property("ADBE Opacity");
+  var has = function (o, k) { try { return typeof o[k] !== "undefined"; } catch (e) { return false; } };
+  var rq = app.project.renderQueue.items.add(c);
+  f.perCharacterText = has(td, "characterRange");
+  f.paragraphRanges = has(td, "paragraphRange");
+  f.renderSettingsApi = has(rq, "getSettings") && has(rq.outputModule(1), "getSettings");
+  f.mediaEncoderQueue = has(app.project.renderQueue, "queueInAME");
+  rq.remove();
+  f.essentialGraphics = has(op, "addToMotionGraphicsTemplateAs");
+  f.mogrtExport = has(c, "exportAsMotionGraphicsTemplate");
+  f.fontsApi = !!app.fonts;
+  f.missingFontsApi = !!app.fonts && has(app.fonts, "missingOrSubstitutedFonts");
+  f.keyframeLabels = has(op, "setLabelAtKey");
+  f.layerIds = has(t, "id");
+  f.anyLayerTrackMatte = has(t, "setTrackMatte");
+  f.expressionEngine = app.project.expressionEngine;
+  f.scriptsCanWriteFiles = (function () { try { return app.preferences.getPrefAsLong("Main Pref Section", "Pref_SCRIPTING_FILE_NETWORK_SECURITY") === 1; } catch (e) { return null; } })();
+} finally { c.remove(); }
+return { appVersion: app.version, os: $.os, features: f };`;
+var FEATURE_NOTES = {
+  perCharacterText: "ae_style_text_range (AE 24.0+)",
+  paragraphRanges: "per-paragraph settings in ae_set_paragraph (AE 24.0+)",
+  renderSettingsApi: "ae_get/set_render_settings",
+  mediaEncoderQueue: "ae_queue_in_media_encoder",
+  essentialGraphics: "ae_essential_graphics",
+  mogrtExport: "ae_export_mogrt",
+  fontsApi: "ae_get_fonts (AE 24.0+)",
+  missingFontsApi: "missing-font check in ae_project_health (AE 24.0+)",
+  keyframeLabels: "keyframe color labels in ae_edit_keyframes (AE 22.6+)",
+  layerIds: "stable layer ids for the change report (AE 22.0+; older versions match layers by index+name)",
+  anyLayerTrackMatte: "track matte to any layer in ae_set_layer_attributes (AE 23.0+)"
+};
+
+// src/tools/app.ts
 var appTools = [
   {
     name: "ae_execute_menu_command",
@@ -75111,11 +73679,14 @@ return out;`
   {
     name: "ae_system_info",
     title: "System & app info",
-    description: "After Effects version, OS, memory, preferences folder, scripting permissions, project expression engine.",
+    description: "After Effects version, OS, memory, folders, scripting permissions, expression engine, and which newer scripting features this AE version supports (per-character text, render settings API, Essential Graphics, keyframe labels...).",
     input: {},
     readOnly: true,
+    tempItems: true,
     jsx: `
-var o = { appVersion: app.version, buildName: app.buildName, os: $.os, locale: $.locale, screens: $.screens, memoryInUse: app.memoryInUse, tempFolder: Folder.temp.fsName,
+var caps = (function () {${CAPABILITIES_JSX}
+})();
+var o = { features: caps.features, appVersion: app.version, buildName: app.buildName, os: $.os, locale: $.locale, screens: $.screens, memoryInUse: app.memoryInUse, tempFolder: Folder.temp.fsName,
   userDataFolder: Folder.userData.fsName, appFolder: Folder.appPackage ? Folder.appPackage.fsName : null };
 try { o.canWriteFiles = app.preferences.getPrefAsLong("Main Pref Section", "Pref_SCRIPTING_FILE_NETWORK_SECURITY") === 1; } catch (e) {}
 try { o.expressionEngine = app.project.expressionEngine; } catch (e) {}
@@ -75128,9 +73699,1230 @@ init_define_AEMCP_CEP_FILES();
 
 // src/tools/registry.ts
 init_define_AEMCP_CEP_FILES();
-init_bridge();
-init_config();
-init_jsx();
+
+// src/bridge.ts
+init_define_AEMCP_CEP_FILES();
+import { readdirSync as readdirSync2, readFileSync as readFileSync4 } from "node:fs";
+import { dirname as dirname3, join as join4 } from "node:path";
+
+// src/cli/setup.ts
+init_define_AEMCP_CEP_FILES();
+import { spawnSync as spawnSync2 } from "node:child_process";
+import { randomBytes } from "node:crypto";
+import { existsSync as existsSync2, mkdirSync as mkdirSync2, readFileSync as readFileSync3, rmSync, writeFileSync as writeFileSync2 } from "node:fs";
+import { dirname as dirname2, join as join3 } from "node:path";
+
+// src/cli/util.ts
+init_define_AEMCP_CEP_FILES();
+import { execFileSync, spawnSync } from "node:child_process";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync as readFileSync2, writeFileSync } from "node:fs";
+import { homedir as homedir2, platform } from "node:os";
+import { dirname, join as join2 } from "node:path";
+import { createInterface } from "node:readline";
+var isMac = platform() === "darwin";
+var isWin = platform() === "win32";
+var HOME = homedir2();
+var AEMCP_DIR = join2(HOME, ".aemcp");
+var CONFIG_FILE = join2(AEMCP_DIR, "config.json");
+var INSTALLED_SERVER = join2(AEMCP_DIR, "server", "ae-mcp.mjs");
+var SERVER_NAME = "after-effects";
+var EXTENSION_ID = "com.aemcp";
+var CSXS_VERSIONS = [9, 10, 11, 12, 13, 14];
+var APPDATA = process.env.APPDATA || join2(HOME, "AppData", "Roaming");
+var LOCALAPPDATA = process.env.LOCALAPPDATA || join2(HOME, "AppData", "Local");
+var cepExtensionsDir = () => isWin ? join2(APPDATA, "Adobe", "CEP", "extensions") : join2(HOME, "Library", "Application Support", "Adobe", "CEP", "extensions");
+var extensionDir = () => join2(cepExtensionsDir(), EXTENSION_ID);
+var claudeDesktopDir = () => isWin ? join2(APPDATA, "Claude") : join2(HOME, "Library", "Application Support", "Claude");
+var claudeDesktopConfig = () => join2(claudeDesktopDir(), "claude_desktop_config.json");
+var claudeCodeConfig = () => join2(HOME, ".claude.json");
+var cursorConfig = () => join2(HOME, ".cursor", "mcp.json");
+var codexConfig = () => join2(process.env.CODEX_HOME || join2(HOME, ".codex"), "config.toml");
+function chatgptDesktopInstalled() {
+  if (which("codex")) return true;
+  if (isMac)
+    return ["/Applications/ChatGPT.app", "/Applications/Codex.app", join2(HOME, "Applications", "ChatGPT.app")].some((p) => existsSync(p));
+  if (isWin) {
+    if ([join2(LOCALAPPDATA, "Programs", "ChatGPT"), join2(LOCALAPPDATA, "Microsoft", "WindowsApps", "ChatGPT.exe")].some((p) => existsSync(p))) return true;
+    try {
+      return readdirSync(join2(LOCALAPPDATA, "Packages")).some((n) => /^OpenAI\.(ChatGPT|Codex)/i.test(n));
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+var claudeDesktopExe = () => join2(LOCALAPPDATA, "AnthropicClaude", "claude.exe");
+var useColor = process.stdout.isTTY || isWin;
+var color = (c) => (s) => useColor ? `\x1B[${c}m${s}\x1B[0m` : s;
+var green = color(32);
+var yellow = color(33);
+var red = color(31);
+var bold = color(1);
+var dim = color(2);
+var ok = (m) => console.log(`  ${green("\u2714")} ${m}`);
+var warn = (m) => console.log(`  ${yellow("!")} ${m}`);
+var fail = (m) => console.log(`  ${red("\u2716")} ${m}`);
+var step = (m) => console.log(`
+${bold(m)}`);
+function readJson(file2, fallback) {
+  try {
+    return JSON.parse(readFileSync2(file2, "utf8"));
+  } catch {
+    return fallback;
+  }
+}
+function writeJsonWithBackup(file2, data) {
+  mkdirSync(dirname(file2), { recursive: true });
+  if (existsSync(file2) && !existsSync(file2 + ".aemcp.bak")) copyFileSync(file2, file2 + ".aemcp.bak");
+  writeFileSync(file2, JSON.stringify(data, null, 2) + "\n");
+}
+function which(cmd) {
+  const r = spawnSync(isWin ? "where" : "which", [cmd], { encoding: "utf8" });
+  if (r.status === 0) return r.stdout.split(/\r?\n/).find(Boolean)?.trim() || null;
+  return null;
+}
+function run(cmd, args) {
+  return execFileSync(cmd, args, { stdio: "pipe", encoding: "utf8", shell: isWin && /\.(cmd|bat)$/i.test(cmd) });
+}
+function stableNodePath() {
+  if (process.execPath.startsWith(join2(AEMCP_DIR, "node"))) return process.execPath;
+  const onPath = which("node");
+  return onPath && existsSync(onPath) ? onPath : process.execPath;
+}
+function findClaudeCli() {
+  const found = which("claude");
+  if (found) return found;
+  const candidates = isWin ? [join2(APPDATA, "npm", "claude.cmd"), join2(HOME, ".local", "bin", "claude.exe")] : [join2(HOME, ".local", "bin", "claude"), join2(HOME, ".claude", "local", "claude"), "/opt/homebrew/bin/claude", "/usr/local/bin/claude"];
+  return candidates.find((c) => existsSync(c)) || null;
+}
+async function ask(question, def = true) {
+  if (!process.stdin.isTTY) return false;
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  const a = await new Promise((r) => rl.question(`  ${question} ${def ? "[Y/n]" : "[y/N]"} `, r));
+  rl.close();
+  return a.trim() === "" ? def : /^y/i.test(a.trim());
+}
+var sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+var CODEX_START = "# >>> ae-mcp >>>";
+var CODEX_END = "# <<< ae-mcp <<<";
+function removeCodexBlock(text) {
+  return text.replace(new RegExp(`\\n?${CODEX_START}[\\s\\S]*?${CODEX_END}\\n?`, "g"), "\n");
+}
+function codexBlock(nodePath, serverFile) {
+  const q = (s) => JSON.stringify(s);
+  return `${CODEX_START}
+[mcp_servers.${SERVER_NAME}]
+command = ${q(nodePath)}
+args = [${q(serverFile)}]
+startup_timeout_sec = 20
+tool_timeout_sec = 600
+${CODEX_END}
+`;
+}
+
+// src/cli/setup.ts
+var HASH_FILE = ".aemcp-hash";
+var lastSetup = null;
+function ensureConfig() {
+  const cfg = readJson(CONFIG_FILE, {});
+  if (cfg.token && cfg.bridgePort && cfg.httpPort) return false;
+  cfg.token ||= randomBytes(24).toString("hex");
+  cfg.bridgePort ||= 8765;
+  cfg.httpPort ||= 8766;
+  mkdirSync2(AEMCP_DIR, { recursive: true });
+  writeFileSync2(CONFIG_FILE, JSON.stringify(cfg, null, 2) + "\n", { mode: 384 });
+  return true;
+}
+function installedExtensionHash() {
+  try {
+    return readFileSync3(join3(extensionDir(), HASH_FILE), "utf8").trim();
+  } catch {
+    return null;
+  }
+}
+function ensureExtension(force = false) {
+  const dir = extensionDir();
+  const current2 = installedExtensionHash();
+  if (!force && current2 === "42052ad26295" && existsSync2(join3(dir, "CSXS", "manifest.xml"))) return { installed: false, updated: false };
+  const updated = existsSync2(dir);
+  rmSync(dir, { recursive: true, force: true });
+  for (const [rel, content] of Object.entries(define_AEMCP_CEP_FILES_default)) {
+    const p = join3(dir, ...rel.split("/"));
+    mkdirSync2(dirname2(p), { recursive: true });
+    writeFileSync2(p, content);
+  }
+  writeFileSync2(join3(dir, HASH_FILE), "42052ad26295");
+  return { installed: true, updated };
+}
+function debugModeOn(v) {
+  if (isMac) {
+    const r = spawnSync2("defaults", ["read", `com.adobe.CSXS.${v}`, "PlayerDebugMode"], { encoding: "utf8" });
+    return r.status === 0 && r.stdout.trim() === "1";
+  }
+  if (isWin) {
+    const r = spawnSync2("reg", ["query", `HKCU\\Software\\Adobe\\CSXS.${v}`, "/v", "PlayerDebugMode"], { encoding: "utf8" });
+    return r.status === 0 && /PlayerDebugMode\s+REG_SZ\s+1/.test(r.stdout);
+  }
+  return true;
+}
+function ensureDebugMode() {
+  let changed = false;
+  for (const v of CSXS_VERSIONS) {
+    if (debugModeOn(v)) continue;
+    const r = isWin ? spawnSync2("reg", ["add", `HKCU\\Software\\Adobe\\CSXS.${v}`, "/v", "PlayerDebugMode", "/t", "REG_SZ", "/d", "1", "/f"]) : spawnSync2("defaults", ["write", `com.adobe.CSXS.${v}`, "PlayerDebugMode", "1"]);
+    if (r.status !== 0) throw new Error(`could not enable PlayerDebugMode for CSXS.${v}`);
+    changed = true;
+  }
+  return changed;
+}
+function ensureAeSetup(opts = {}) {
+  const res = { extensionInstalled: false, extensionUpdated: false, debugModeChanged: false, configCreated: false, errors: [] };
+  try {
+    res.configCreated = ensureConfig();
+  } catch (e) {
+    res.errors.push(`config: ${e.message}`);
+  }
+  try {
+    const r = ensureExtension(opts.forceExtension);
+    res.extensionInstalled = r.installed;
+    res.extensionUpdated = r.updated;
+  } catch (e) {
+    res.errors.push(`extension: ${e.message}`);
+  }
+  try {
+    res.debugModeChanged = ensureDebugMode();
+  } catch (e) {
+    res.errors.push(`PlayerDebugMode: ${e.message}`);
+  }
+  lastSetup = res;
+  return res;
+}
+function setupHint() {
+  if (lastSetup && (lastSetup.extensionInstalled || lastSetup.debugModeChanged))
+    return " The After Effects extension was just installed/updated: please restart After Effects once to load it.";
+  return "";
+}
+
+// src/bridge.ts
+var BridgeError = class extends Error {
+  constructor(message, code) {
+    super(message);
+    this.code = code;
+  }
+  code;
+};
+var NOT_RUNNING_HELP = "Cannot reach After Effects. Make sure After Effects is running and the AE MCP bridge is loaded (it starts automatically with AE after install; you can also open Window > Extensions > AE MCP to check its status). If you just installed, restart After Effects.";
+var INSTANCES_DIR = () => join4(dirname3(configPath()), "instances");
+var selectedPort = null;
+var cache = null;
+function aeLabel(appVersion = "") {
+  const major = parseInt(appVersion, 10);
+  return major >= 17 ? `After Effects ${2e3 + major}` : `After Effects ${appVersion}`;
+}
+async function probe(port, timeoutMs = 800) {
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/health`, {
+      headers: { authorization: `Bearer ${loadConfig().token}` },
+      signal: AbortSignal.timeout(timeoutMs)
+    });
+    const h = await res.json();
+    return h?.name === "aemcp-bridge" ? h : null;
+  } catch {
+    return null;
+  }
+}
+async function listInstances(force = false) {
+  if (!force && cache && Date.now() - cache.at < 5e3) return cache.list;
+  const ports = /* @__PURE__ */ new Set([loadConfig().bridgePort]);
+  try {
+    for (const f of readdirSync2(INSTANCES_DIR())) {
+      const port = parseInt(f, 10);
+      if (port) ports.add(port);
+    }
+  } catch {
+  }
+  const found = await Promise.all(
+    [...ports].map(async (port) => {
+      const h = await probe(port);
+      if (!h) return null;
+      let file2 = {};
+      try {
+        file2 = JSON.parse(readFileSync4(join4(INSTANCES_DIR(), `${port}.json`), "utf8"));
+      } catch {
+      }
+      const appVersion = h.host?.appVersion || file2.host?.appVersion || "";
+      return {
+        port,
+        appVersion,
+        label: aeLabel(appVersion),
+        bridgeVersion: h.version,
+        lastActivated: h.lastActivated || file2.lastActivated,
+        startedAt: h.startedAt || file2.startedAt,
+        busy: h.busy
+      };
+    })
+  );
+  const list = found.filter((x) => !!x).sort((a, b) => a.port - b.port);
+  cache = { at: Date.now(), list };
+  return list;
+}
+function matchInstance(list, pref) {
+  const p = String(pref).trim();
+  if (/^\d{4,5}$/.test(p) && Number(p) >= 1024 && list.some((i) => i.port === Number(p))) return list.find((i) => i.port === Number(p));
+  const year = /^20\d\d$/.test(p) ? String(Number(p) - 2e3) : p;
+  return list.find((i) => i.appVersion === year || i.appVersion.startsWith(year + ".") || i.appVersion.split(".")[0] === year);
+}
+function selectInstance(port) {
+  selectedPort = port;
+}
+async function resolvePort() {
+  if (process.env.AEMCP_BRIDGE_PORT) return Number(process.env.AEMCP_BRIDGE_PORT);
+  const list = await listInstances();
+  if (selectedPort && list.some((i) => i.port === selectedPort)) return selectedPort;
+  if (!list.length) return loadConfig().bridgePort;
+  const pref = process.env.AEMCP_INSTANCE || loadConfig().instance;
+  const m = pref ? matchInstance(list, pref) : void 0;
+  if (m) return m.port;
+  if (list.length === 1) return list[0].port;
+  return [...list].sort((a, b) => Date.parse(b.lastActivated || b.startedAt || "0") - Date.parse(a.lastActivated || a.startedAt || "0"))[0].port;
+}
+async function request(path, init = {}) {
+  const cfg = loadConfig();
+  const port = init.port ?? await resolvePort();
+  const ctrl = new AbortController();
+  const timeoutMs = init.timeoutMs ?? 3e4;
+  let reason = null;
+  const timer = setTimeout(() => {
+    reason = "timeout";
+    ctrl.abort();
+  }, timeoutMs);
+  const onCancel = () => {
+    reason = "cancel";
+    ctrl.abort();
+  };
+  init.cancel?.addEventListener("abort", onCancel);
+  let res;
+  try {
+    res = await fetch(`http://127.0.0.1:${port}${path}`, {
+      ...init,
+      signal: ctrl.signal,
+      headers: { "content-type": "application/json", authorization: `Bearer ${cfg.token}`, ...init.headers || {} }
+    });
+  } catch (e) {
+    if (reason === "cancel")
+      throw new BridgeError("Cancelled. If After Effects had already started the script it finishes anyway (scripts can't be interrupted).", "CANCELLED");
+    if (reason === "timeout") throw new BridgeError(await explainTimeout(port, timeoutMs), "TIMEOUT");
+    cache = null;
+    throw new BridgeError(NOT_RUNNING_HELP + setupHint(), "NOT_RUNNING");
+  } finally {
+    clearTimeout(timer);
+    init.cancel?.removeEventListener("abort", onCancel);
+  }
+  const body = await res.json().catch(() => ({}));
+  if (res.status === 401) throw new BridgeError("Bridge rejected the token. Re-run the installer so server and AE share ~/.aemcp/config.json, then restart AE.", "AUTH");
+  if (body.denied) throw new BridgeError(body.error || "The change was denied in After Effects.", "DENIED");
+  if (!res.ok || body.ok === false) throw new BridgeError(body.error || `Bridge error HTTP ${res.status}`, "BRIDGE");
+  return body;
+}
+async function explainTimeout(port, timeoutMs) {
+  const secs = Math.round(timeoutMs / 1e3);
+  const h = await probe(port, 1500);
+  if (!h) return `After Effects did not respond within ${secs}s, and its bridge is not answering either. AE may be frozen or quitting.`;
+  if (h.pendingApprovals) return `Still waiting for approval in After Effects (AE MCP panel) after ${secs}s.`;
+  if (h.busy) {
+    const busy = Math.round((h.busyForMs || 0) / 1e3);
+    return `After Effects has been busy for ${busy}s${h.busyWith ? ` (running ${h.busyWith})` : ""}. Either a long script or render is still running (it can't be interrupted and will finish on its own), or AE is blocked by an open dialog or settings window: check After Effects and close any dialog. For long jobs pass a larger timeoutSeconds.`;
+  }
+  return `After Effects did not finish within ${secs}s.`;
+}
+async function health(port) {
+  return request("/health", { method: "GET", timeoutMs: 3e3, port });
+}
+async function evalRaw(script, timeoutMs = 12e4, opts = {}) {
+  const extra = opts.approval ? 10 * 60 * 1e3 : 0;
+  const body = await request("/eval", {
+    method: "POST",
+    body: JSON.stringify({ script, timeoutMs, label: opts.label, approval: opts.approval }),
+    timeoutMs: timeoutMs + 5e3 + extra,
+    cancel: opts.cancel
+  });
+  return String(body.result ?? "");
+}
+
+// src/jsx.ts
+init_define_AEMCP_CEP_FILES();
+import { createHash } from "node:crypto";
+
+// src/aemcp.jsxinc
+var aemcp_default = `// aemcp helper library \u2014 loaded once into the After Effects ExtendScript engine
+// by the MCP server (sent over the bridge whenever the version check fails).
+// ES3 only: no let/const, arrow functions, Array.prototype.map, JSON, etc.
+// ---------- ES5+ runtime polyfills ----------
+// AE's ExtendScript engine is ES3. Modern syntax in user scripts is transpiled by the server;
+// these add the built-ins that transpiled (and hand-written) code expects. Each is only added
+// if missing. Note: ES3 can't make them non-enumerable, so use index loops (or for...of, which
+// is transpiled to one) rather than for...in over arrays.
+(function () {
+  var AP = Array.prototype, SP = String.prototype, OP = Object;
+  function def(o, name, fn) { if (typeof o[name] !== "function") o[name] = fn; }
+  function toInt(n) { n = Number(n); return isNaN(n) ? 0 : (n < 0 ? Math.ceil(n) : Math.floor(n)); }
+  def(AP, "forEach", function (f, t) { for (var i = 0, n = this.length; i < n; i++) if (i in this) f.call(t, this[i], i, this); });
+  def(AP, "map", function (f, t) { var r = new Array(this.length); for (var i = 0, n = this.length; i < n; i++) if (i in this) r[i] = f.call(t, this[i], i, this); return r; });
+  def(AP, "filter", function (f, t) { var r = []; for (var i = 0, n = this.length; i < n; i++) if (i in this && f.call(t, this[i], i, this)) r.push(this[i]); return r; });
+  def(AP, "some", function (f, t) { for (var i = 0, n = this.length; i < n; i++) if (i in this && f.call(t, this[i], i, this)) return true; return false; });
+  def(AP, "every", function (f, t) { for (var i = 0, n = this.length; i < n; i++) if (i in this && !f.call(t, this[i], i, this)) return false; return true; });
+  def(AP, "reduce", function (f, acc) {
+    var i = 0, n = this.length;
+    if (arguments.length < 2) { while (i < n && !(i in this)) i++; if (i >= n) throw new TypeError("Reduce of empty array with no initial value"); acc = this[i++]; }
+    for (; i < n; i++) if (i in this) acc = f(acc, this[i], i, this);
+    return acc;
+  });
+  def(AP, "reduceRight", function (f, acc) {
+    var i = this.length - 1;
+    if (arguments.length < 2) { while (i >= 0 && !(i in this)) i--; if (i < 0) throw new TypeError("Reduce of empty array with no initial value"); acc = this[i--]; }
+    for (; i >= 0; i--) if (i in this) acc = f(acc, this[i], i, this);
+    return acc;
+  });
+  def(AP, "indexOf", function (x, from) { var n = this.length, i = toInt(from || 0); if (i < 0) i = Math.max(0, n + i); for (; i < n; i++) if (this[i] === x) return i; return -1; });
+  def(AP, "lastIndexOf", function (x, from) { var n = this.length, i = arguments.length > 1 ? toInt(from) : n - 1; if (i < 0) i = n + i; for (i = Math.min(i, n - 1); i >= 0; i--) if (this[i] === x) return i; return -1; });
+  def(AP, "find", function (f, t) { for (var i = 0, n = this.length; i < n; i++) if (f.call(t, this[i], i, this)) return this[i]; return undefined; });
+  def(AP, "findIndex", function (f, t) { for (var i = 0, n = this.length; i < n; i++) if (f.call(t, this[i], i, this)) return i; return -1; });
+  def(AP, "findLast", function (f, t) { for (var i = this.length - 1; i >= 0; i--) if (f.call(t, this[i], i, this)) return this[i]; return undefined; });
+  def(AP, "includes", function (x) { for (var i = 0, n = this.length; i < n; i++) if (this[i] === x || (x !== x && this[i] !== this[i])) return true; return false; });
+  def(AP, "fill", function (v, s, e) { var n = this.length, i = toInt(s || 0), end = e === undefined ? n : toInt(e); if (i < 0) i += n; if (end < 0) end += n; for (; i < end; i++) this[i] = v; return this; });
+  function flatInto(a, k, r) { for (var i = 0; i < a.length; i++) { if (a[i] instanceof Array && k > 0) flatInto(a[i], k - 1, r); else r.push(a[i]); } return r; }
+  def(AP, "flat", function (d) { return flatInto(this, d === undefined ? 1 : toInt(d), []); });
+  def(Array, "isArray", function (a) { return a instanceof Array; });
+  def(Array, "from", function (src, f, t) { var r = []; if (src == null) return r; var n = src.length >>> 0; for (var i = 0; i < n; i++) { var v = typeof src === "string" ? src.charAt(i) : src[i]; r.push(f ? f.call(t, v, i) : v); } return r; });
+  def(Array, "of", function () { return AP.slice.call(arguments); });
+  def(OP, "keys", function (o) { var r = []; for (var k in o) if (OP.prototype.hasOwnProperty.call(o, k)) r.push(k); return r; });
+  def(OP, "values", function (o) { var r = []; for (var k in o) if (OP.prototype.hasOwnProperty.call(o, k)) r.push(o[k]); return r; });
+  def(OP, "entries", function (o) { var r = []; for (var k in o) if (OP.prototype.hasOwnProperty.call(o, k)) r.push([k, o[k]]); return r; });
+  def(OP, "fromEntries", function (es) { var o = {}; for (var i = 0; i < es.length; i++) o[es[i][0]] = es[i][1]; return o; });
+  def(OP, "assign", function (t) { for (var i = 1; i < arguments.length; i++) { var s = arguments[i]; if (s != null) for (var k in s) if (OP.prototype.hasOwnProperty.call(s, k)) t[k] = s[k]; } return t; });
+  def(OP, "create", function (proto, props) { function F() {} F.prototype = proto; var o = new F(); if (props) OP.defineProperties(o, props); return o; });
+  // ES3 has no real property descriptors: keep the value (accessors are not supported)
+  def(OP, "defineProperty", function (o, k, d) { if (d && "value" in d) o[k] = d.value; else if (d && d.get) { try { o[k] = d.get.call(o); } catch (e) {} } return o; });
+  def(OP, "defineProperties", function (o, ds) { for (var k in ds) if (OP.prototype.hasOwnProperty.call(ds, k)) OP.defineProperty(o, k, ds[k]); return o; });
+  def(OP, "getPrototypeOf", function (o) { return o.__proto__; });
+  def(OP, "setPrototypeOf", function (o, p) { o.__proto__ = p; return o; });
+  def(OP, "freeze", function (o) { return o; });
+  def(OP, "is", function (a, b) { return a === b ? a !== 0 || 1 / a === 1 / b : a !== a && b !== b; });
+  def(SP, "trim", function () { return String(this).replace(/^\\s+|\\s+$/g, ""); });
+  def(SP, "trimStart", function () { return String(this).replace(/^\\s+/, ""); });
+  def(SP, "trimEnd", function () { return String(this).replace(/\\s+$/, ""); });
+  def(SP, "startsWith", function (s, p) { p = p || 0; return String(this).substr(p, String(s).length) === String(s); });
+  def(SP, "endsWith", function (s, e) { var t = String(this); e = e === undefined ? t.length : e; s = String(s); return t.substring(e - s.length, e) === s; });
+  def(SP, "includes", function (s, p) { return String(this).indexOf(s, p || 0) !== -1; });
+  def(SP, "repeat", function (n) { var r = "", t = String(this); for (var i = 0; i < n; i++) r += t; return r; });
+  def(SP, "padStart", function (n, f) { var t = String(this); f = f === undefined ? " " : String(f); while (t.length < n) t = f + t; return t.length > n ? t.substr(t.length - n) : t; });
+  def(SP, "padEnd", function (n, f) { var t = String(this); f = f === undefined ? " " : String(f); while (t.length < n) t += f; return t.substr(0, n); });
+  def(SP, "replaceAll", function (a, b) { return String(this).split(a).join(b); });
+  def(SP, "at", function (i) { var t = String(this); i = toInt(i); return t.charAt(i < 0 ? t.length + i : i); });
+  def(AP, "at", function (i) { i = toInt(i); return this[i < 0 ? this.length + i : i]; });
+  def(Number, "isFinite", function (n) { return typeof n === "number" && isFinite(n); });
+  def(Number, "isNaN", function (n) { return typeof n === "number" && n !== n; });
+  def(Number, "isInteger", function (n) { return typeof n === "number" && isFinite(n) && Math.floor(n) === n; });
+  def(Number, "parseFloat", parseFloat);
+  def(Number, "parseInt", parseInt);
+  def(Math, "sign", function (x) { x = Number(x); return x > 0 ? 1 : (x < 0 ? -1 : x); });
+  def(Math, "trunc", function (x) { return x < 0 ? Math.ceil(x) : Math.floor(x); });
+  def(Math, "hypot", function () { var s = 0; for (var i = 0; i < arguments.length; i++) s += arguments[i] * arguments[i]; return Math.sqrt(s); });
+  def(Math, "log10", function (x) { return Math.log(x) / Math.LN10; });
+  def(Math, "log2", function (x) { return Math.log(x) / Math.LN2; });
+  def(Date, "now", function () { return new Date().getTime(); });
+  def(Function.prototype, "bind", function (t) {
+    var f = this, pre = AP.slice.call(arguments, 1);
+    return function () { return f.apply(t, pre.concat(AP.slice.call(arguments))); };
+  });
+})();
+
+aemcp = (function () {
+  var A = {};
+  A.version = "__AEMCP_VERSION__";
+
+  // ---------- JSON ----------
+  function quote(s) {
+    return '"' + String(s).replace(/[\\\\"\\u0000-\\u001f\\u2028\\u2029]/g, function (c) {
+      switch (c) {
+        case '"': return '\\\\"';
+        case "\\\\": return "\\\\\\\\";
+        case "\\n": return "\\\\n";
+        case "\\r": return "\\\\r";
+        case "\\t": return "\\\\t";
+        case "\\b": return "\\\\b";
+        case "\\f": return "\\\\f";
+      }
+      var h = c.charCodeAt(0).toString(16);
+      return "\\\\u" + "0000".substr(h.length) + h;
+    }) + '"';
+  }
+  A.stringify = function (v) {
+    if (v === null || v === undefined) return "null";
+    var t = typeof v;
+    if (t === "number") return isFinite(v) ? String(v) : "null";
+    if (t === "boolean") return v ? "true" : "false";
+    if (t === "string") return quote(v);
+    if (v instanceof Array) {
+      var parts = [];
+      for (var i = 0; i < v.length; i++) parts.push(A.stringify(v[i]));
+      return "[" + parts.join(",") + "]";
+    }
+    if (t === "object") {
+      var out = [];
+      for (var k in v) {
+        if (!v.hasOwnProperty(k)) continue;
+        var val = v[k];
+        if (typeof val === "function" || val === undefined) continue;
+        out.push(quote(k) + ":" + A.stringify(val));
+      }
+      return "{" + out.join(",") + "}";
+    }
+    return "null";
+  };
+
+  // ---------- small utils ----------
+  A.round = function (n) { return typeof n === "number" ? Math.round(n * 10000) / 10000 : n; };
+  function isAE(name) { try { return typeof $.global[name] !== "undefined"; } catch (e) { return false; } }
+  function inst(v, ctor) { try { return isAE(ctor) && v instanceof $.global[ctor]; } catch (e) { return false; } }
+  A.fail = function (msg) { var e = new Error(msg); e.aemcpUser = true; throw e; };
+
+  // ---------- finders ----------
+  // ref: number (item id) | string (name) | "active" | undefined (=active)
+  A.findItem = function (ref) {
+    var p = app.project;
+    if (ref === undefined || ref === null || ref === "active") {
+      if (!p.activeItem) A.fail("No active item. Open/select a composition or pass an id/name.");
+      return p.activeItem;
+    }
+    if (typeof ref === "number") {
+      var it = p.itemByID(ref);
+      if (!it) A.fail("No project item with id " + ref);
+      return it;
+    }
+    for (var i = 1; i <= p.numItems; i++) if (p.item(i).name === ref) return p.item(i);
+    A.fail("No project item named '" + ref + "'");
+  };
+  A.findComp = function (ref) {
+    if (ref === undefined || ref === null || ref === "active") {
+      var a = app.project.activeItem;
+      if (a && a instanceof CompItem) return a;
+      // fall back to the comp open in the viewer
+      try { if (app.activeViewer && app.activeViewer.type === ViewerType.VIEWER_COMPOSITION) { app.activeViewer.setActive(); a = app.project.activeItem; if (a instanceof CompItem) return a; } } catch (e) {}
+      A.fail("No active composition. Open a comp or pass compId / compName.");
+    }
+    var it = A.findItem(ref);
+    if (!(it instanceof CompItem)) A.fail("Item '" + it.name + "' is not a composition");
+    return it;
+  };
+  // ref: number (1-based index) | string (name) | {id:n}
+  A.findLayer = function (comp, ref) {
+    if (ref === undefined || ref === null) {
+      if (comp.selectedLayers.length) return comp.selectedLayers[0];
+      A.fail("No layer specified and none selected");
+    }
+    if (typeof ref === "number") {
+      if (ref < 1 || ref > comp.numLayers) A.fail("Layer index " + ref + " out of range 1-" + comp.numLayers);
+      return comp.layer(ref);
+    }
+    if (typeof ref === "object" && ref.id !== undefined) {
+      for (var i = 1; i <= comp.numLayers; i++) if (comp.layer(i).id === ref.id) return comp.layer(i);
+      A.fail("No layer with id " + ref.id);
+    }
+    var l = comp.layer(String(ref));
+    if (!l) A.fail("No layer named '" + ref + "' in comp '" + comp.name + "'");
+    return l;
+  };
+  // path: "Transform/Position" | ["ADBE Transform Group","ADBE Position"] | "Effects/Gaussian Blur/Blurriness"
+  // Each segment may be a display name, match name, or 1-based index.
+  A.resolveProp = function (layer, path) {
+    var segs = path instanceof Array ? path : String(path).split("/");
+    var cur = layer;
+    for (var i = 0; i < segs.length; i++) {
+      var s = segs[i];
+      if (s === "" || s === undefined) continue;
+      var next = null;
+      if (typeof s === "number" || /^\\d+$/.test(s)) next = cur.property(Number(s));
+      else {
+        try { next = cur.property(s); } catch (e) { next = null; }
+        if (!next && String(s).toLowerCase() === "effects") next = cur.property("ADBE Effect Parade");
+        if (!next && cur.numProperties) {
+          var low = String(s).toLowerCase();
+          for (var j = 1; j <= cur.numProperties; j++) {
+            var c = cur.property(j);
+            if (c.name.toLowerCase() === low || c.matchName.toLowerCase() === low) { next = c; break; }
+          }
+        }
+      }
+      if (!next) A.fail("Property '" + s + "' not found under '" + (cur.name || "layer") + "' (path " + segs.join("/") + ")");
+      cur = next;
+    }
+    return cur;
+  };
+
+  // ---------- serializers ----------
+  A.itemType = function (it) {
+    if (it instanceof CompItem) return "comp";
+    if (it instanceof FolderItem) return "folder";
+    if (it instanceof FootageItem) {
+      try {
+        if (it.mainSource instanceof SolidSource) return "solid";
+        if (it.mainSource instanceof PlaceholderSource) return "placeholder";
+      } catch (e) {}
+      return "footage";
+    }
+    return "item";
+  };
+  A.itemInfo = function (it) {
+    var o = { id: it.id, name: it.name, type: A.itemType(it), parentFolder: it.parentFolder ? it.parentFolder.name : null, comment: it.comment, label: it.label };
+    if (it instanceof CompItem || it instanceof FootageItem) {
+      o.width = it.width; o.height = it.height; o.duration = A.round(it.duration); o.pixelAspect = it.pixelAspect;
+      o.hasVideo = it.hasVideo; o.hasAudio = it.hasAudio;
+      try { o.frameRate = A.round(it.frameRate); } catch (e) {}
+    }
+    if (it instanceof CompItem) { o.numLayers = it.numLayers; o.bgColor = it.bgColor; o.workAreaStart = A.round(it.workAreaStart); o.workAreaDuration = A.round(it.workAreaDuration); o.displayStartTime = A.round(it.displayStartTime); }
+    if (it instanceof FootageItem) {
+      try { o.file = it.file ? it.file.fsName : null; } catch (e) {}
+      try { o.isStill = it.mainSource.isStill; } catch (e) {}
+      try { if (it.mainSource instanceof SolidSource) o.color = it.mainSource.color; } catch (e) {}
+      o.footageMissing = it.footageMissing;
+    }
+    if (it instanceof FolderItem) o.numItems = it.numItems;
+    return o;
+  };
+  A.layerType = function (l) {
+    if (inst(l, "TextLayer")) return "text";
+    if (inst(l, "ShapeLayer")) return "shape";
+    if (inst(l, "CameraLayer")) return "camera";
+    if (inst(l, "LightLayer")) return "light";
+    if (inst(l, "AVLayer")) {
+      if (l.nullLayer) return "null";
+      if (l.adjustmentLayer) return "adjustment";
+      try { if (l.source instanceof CompItem) return "precomp"; } catch (e) {}
+      try { if (l.source.mainSource instanceof SolidSource) return "solid"; } catch (e) {}
+      return "footage";
+    }
+    return "layer";
+  };
+  A.layerInfo = function (l, detail) {
+    var o = { index: l.index, id: l.id, name: l.name, type: A.layerType(l), enabled: l.enabled, solo: l.solo, locked: l.locked, shy: l.shy,
+      inPoint: A.round(l.inPoint), outPoint: A.round(l.outPoint), startTime: A.round(l.startTime), stretch: l.stretch, label: l.label,
+      parent: l.parent ? l.parent.index : null, selected: l.selected, comment: l.comment };
+    if (inst(l, "AVLayer")) {
+      o.threeD = l.threeDLayer; o.blendingMode = A.enumName(BlendingMode, l.blendingMode);
+      o.trackMatteType = A.enumName(TrackMatteType, l.trackMatteType); o.audioEnabled = l.audioEnabled;
+      o.adjustmentLayer = l.adjustmentLayer; o.motionBlur = l.motionBlur; o.collapseTransformation = l.collapseTransformation;
+      try { if (l.source) o.source = { id: l.source.id, name: l.source.name, type: A.itemType(l.source) }; } catch (e) {}
+    }
+    if (detail) {
+      var tr = l.property("ADBE Transform Group");
+      o.transform = {};
+      for (var i = 1; i <= tr.numProperties; i++) {
+        var p = tr.property(i);
+        try { if (p.propertyValueType !== PropertyValueType.NO_VALUE) o.transform[p.name] = A.valueOf(p.value); } catch (e) {}
+      }
+      o.effects = [];
+      var fx = l.property("ADBE Effect Parade");
+      if (fx) for (var j = 1; j <= fx.numProperties; j++) o.effects.push({ index: j, name: fx.property(j).name, matchName: fx.property(j).matchName, enabled: fx.property(j).enabled });
+      var masks = l.property("ADBE Mask Parade");
+      o.numMasks = masks ? masks.numProperties : 0;
+      o.markers = A.markers(l.property("ADBE Marker"));
+      if (inst(l, "TextLayer")) o.text = A.textInfo(l.property("ADBE Text Properties").property("ADBE Text Document").value);
+      o.animated = A.animatedProps(l);
+    }
+    return o;
+  };
+  A.compInfo = function (c, withLayers) {
+    var o = A.itemInfo(c);
+    o.time = A.round(c.time); o.frameDuration = A.round(c.frameDuration); o.motionBlur = c.motionBlur; o.renderer = c.renderer;
+    try { o.activeCamera = c.activeCamera ? c.activeCamera.name : null; } catch (e) {}
+    if (withLayers) { o.layers = []; for (var i = 1; i <= c.numLayers; i++) o.layers.push(A.layerInfo(c.layer(i), false)); }
+    return o;
+  };
+  A.textInfo = function (td) {
+    var o = { text: td.text };
+    var keys = ["font", "fontSize", "fillColor", "strokeColor", "strokeWidth", "applyFill", "applyStroke", "tracking", "leading", "fauxBold", "fauxItalic", "allCaps", "boxText", "pointText"];
+    for (var i = 0; i < keys.length; i++) { try { var v = td[keys[i]]; if (v !== undefined) o[keys[i]] = A.valueOf(v); } catch (e) {} }
+    try { o.justification = A.enumName(ParagraphJustification, td.justification); } catch (e) {}
+    try { if (td.boxText) o.boxTextSize = td.boxTextSize; } catch (e) {}
+    return o;
+  };
+  A.enumName = function (en, val) {
+    for (var k in en) { try { if (en[k] === val) return k; } catch (e) {} }
+    return val;
+  };
+  A.markers = function (mp) {
+    var out = [];
+    if (!mp) return out;
+    for (var i = 1; i <= mp.numKeys; i++) {
+      var m = mp.keyValue(i);
+      out.push({ time: A.round(mp.keyTime(i)), comment: m.comment, duration: A.round(m.duration), chapter: m.chapter, url: m.url });
+    }
+    return out;
+  };
+  A.valueOf = function (v) {
+    if (v === null || v === undefined) return null;
+    if (typeof v === "number") return A.round(v);
+    if (v instanceof Array) { var a = []; for (var i = 0; i < v.length; i++) a.push(A.valueOf(v[i])); return a; }
+    if (inst(v, "TextDocument")) return A.textInfo(v);
+    if (inst(v, "Shape")) return { vertices: v.vertices, inTangents: v.inTangents, outTangents: v.outTangents, closed: v.closed };
+    if (inst(v, "MarkerValue")) return { comment: v.comment, duration: v.duration };
+    return v;
+  };
+  A.animatedProps = function (layer) {
+    var out = [];
+    function walk(g, path) {
+      for (var i = 1; i <= g.numProperties; i++) {
+        var p = g.property(i), pp = path + "/" + p.name;
+        if (p.propertyType === PropertyType.PROPERTY) {
+          var e = false; try { e = p.canSetExpression && p.expressionEnabled; } catch (x) {}
+          if (p.numKeys > 0 || e) out.push({ path: pp.substr(1), numKeys: p.numKeys, expression: e ? p.expression : undefined });
+        } else walk(p, pp);
+      }
+    }
+    try { walk(layer, ""); } catch (e) {}
+    return out;
+  };
+  A.propInfo = function (p, opts) {
+    opts = opts || {};
+    var o = { name: p.name, matchName: p.matchName, propertyIndex: p.propertyIndex };
+    if (p.propertyType === PropertyType.PROPERTY) {
+      o.kind = "property";
+      o.valueType = A.enumName(PropertyValueType, p.propertyValueType);
+      try { if (p.propertyValueType !== PropertyValueType.NO_VALUE) o.value = A.valueOf(p.value); } catch (e) {}
+      o.numKeys = p.numKeys;
+      try { o.canSetExpression = p.canSetExpression; if (p.expression) { o.expression = p.expression; o.expressionEnabled = p.expressionEnabled; o.expressionError = p.expressionError; } } catch (e) {}
+      try { if (p.hasMin) o.min = p.minValue; if (p.hasMax) o.max = p.maxValue; } catch (e) {}
+      try { o.unitsText = p.unitsText; } catch (e) {}
+      if (opts.keyframes && p.numKeys) o.keyframes = A.keyframes(p);
+    } else {
+      o.kind = p.propertyType === PropertyType.INDEXED_GROUP ? "indexedGroup" : "group";
+      o.numProperties = p.numProperties;
+      try { if (p.canSetEnabled) o.enabled = p.enabled; } catch (e) {}
+      var depth = opts.depth === undefined ? 1 : opts.depth;
+      if (depth > 0) {
+        o.children = [];
+        for (var i = 1; i <= p.numProperties; i++) {
+          var c = p.property(i);
+          if (!opts.includeHidden) { try { if (c.propertyType === PropertyType.PROPERTY && c.propertyValueType === PropertyValueType.NO_VALUE) continue; } catch (e) {} }
+          o.children.push(A.propInfo(c, { depth: depth - 1, keyframes: opts.keyframes, includeHidden: opts.includeHidden }));
+        }
+      }
+    }
+    return o;
+  };
+  // Every attribute of a keyframe, so it can be inspected, edited, moved and copied without loss.
+  A.captureKey = function (p, k) {
+    var d = { time: p.keyTime(k), value: p.keyValue(k) };
+    try { d.inInterp = p.keyInInterpolationType(k); d.outInterp = p.keyOutInterpolationType(k); } catch (e) {}
+    try { d.inEase = p.keyInTemporalEase(k); d.outEase = p.keyOutTemporalEase(k); } catch (e) {}
+    try { d.tc = p.keyTemporalContinuous(k); d.tab = p.keyTemporalAutoBezier(k); } catch (e) {}
+    if (p.isSpatial) {
+      try { d.sc = p.keySpatialContinuous(k); d.sab = p.keySpatialAutoBezier(k); d.inTan = p.keyInSpatialTangent(k); d.outTan = p.keyOutSpatialTangent(k); d.roving = p.keyRoving(k); } catch (e) {}
+    }
+    try { d.label = p.keyLabel(k); } catch (e) {}
+    try { d.selected = p.keySelected(k); } catch (e) {}
+    return d;
+  };
+  A.restoreKey = function (p, d, time) {
+    var k = p.addKey(time === undefined ? d.time : time);
+    p.setValueAtKey(k, d.value);
+    A.applyKeyAttrs(p, k, d);
+    return k;
+  };
+  A.applyKeyAttrs = function (p, k, d) {
+    if (d.inInterp !== undefined) { try { p.setInterpolationTypeAtKey(k, d.inInterp, d.outInterp); } catch (e) {} }
+    if (d.inEase) { try { p.setTemporalEaseAtKey(k, d.inEase, d.outEase); } catch (e) {} }
+    if (d.tc !== undefined) { try { p.setTemporalContinuousAtKey(k, d.tc); p.setTemporalAutoBezierAtKey(k, d.tab); } catch (e) {} }
+    if (p.isSpatial && d.inTan) { try { p.setSpatialTangentsAtKey(k, d.inTan, d.outTan); } catch (e) {} }
+    if (p.isSpatial && d.sc !== undefined) { try { p.setSpatialContinuousAtKey(k, d.sc); p.setSpatialAutoBezierAtKey(k, d.sab); } catch (e) {} }
+    if (d.label !== undefined) { try { p.setLabelAtKey(k, d.label); } catch (e) {} }
+    if (d.roving) { try { p.setRovingAtKey(k, true); } catch (e) {} }
+    if (d.selected !== undefined) { try { p.setSelectedAtKey(k, d.selected); } catch (e) {} }
+  };
+  A.keyframes = function (p) {
+    var ks = [];
+    for (var k = 1; k <= p.numKeys; k++) {
+      var d = A.captureKey(p, k);
+      var kf = { index: k, time: A.round(d.time), value: A.valueOf(d.value) };
+      if (d.inInterp !== undefined) { kf.inInterpolation = A.enumName(KeyframeInterpolationType, d.inInterp); kf.outInterpolation = A.enumName(KeyframeInterpolationType, d.outInterp); }
+      if (d.inEase) {
+        kf.easeIn = []; kf.easeOut = [];
+        for (var e = 0; e < d.inEase.length; e++) { kf.easeIn.push({ speed: A.round(d.inEase[e].speed), influence: A.round(d.inEase[e].influence) }); kf.easeOut.push({ speed: A.round(d.outEase[e].speed), influence: A.round(d.outEase[e].influence) }); }
+      }
+      if (d.tc) kf.temporalContinuous = true;
+      if (d.tab) kf.temporalAutoBezier = true;
+      if (d.inTan) { kf.inSpatialTangent = A.valueOf(d.inTan); kf.outSpatialTangent = A.valueOf(d.outTan); }
+      if (d.sc) kf.spatialContinuous = true;
+      if (d.sab) kf.spatialAutoBezier = true;
+      if (d.roving) kf.roving = true;
+      if (d.label) kf.label = d.label;
+      ks.push(kf);
+    }
+    return ks;
+  };
+
+  // Generic serializer for arbitrary return values of user scripts.
+  // \`depth\` limits how far AE objects (comps, layers, properties) are expanded;
+  // plain arrays/objects are copied as-is up to a nesting guard.
+  A.serialize = function (v, depth, nest) {
+    if (depth === undefined) depth = 4;
+    nest = nest || 0;
+    if (v === null || v === undefined) return null;
+    var t = typeof v;
+    if (t === "number" || t === "string" || t === "boolean") return v;
+    if (t === "function") return "[function]";
+    if (nest > 30) return "[too deep]";
+    try {
+      if (v instanceof CompItem) return A.compInfo(v, depth > 1);
+      if (inst(v, "Item")) return A.itemInfo(v);
+      if (inst(v, "Layer")) return A.layerInfo(v, depth > 2);
+      if (inst(v, "PropertyBase")) return A.propInfo(v, { depth: depth > 2 ? 1 : 0 });
+      if (inst(v, "Project")) return A.projectInfo();
+      if (inst(v, "File") || inst(v, "Folder")) return v.fsName;
+      if (inst(v, "TextDocument") || inst(v, "Shape") || inst(v, "MarkerValue")) return A.valueOf(v);
+      if (inst(v, "KeyframeEase")) return { speed: A.round(v.speed), influence: A.round(v.influence) };
+      if (inst(v, "RenderQueueItem")) return { comp: v.comp.name, status: A.enumName(RQItemStatus, v.status) };
+      if (inst(v, "Collection") || inst(v, "ItemCollection") || inst(v, "LayerCollection")) {
+        if (depth <= 0) return "[collection of " + v.length + "]";
+        var c = []; for (var ci = 1; ci <= v.length; ci++) c.push(A.serialize(v[ci], depth - 1, nest + 1)); return c;
+      }
+    } catch (e) {}
+    if (v instanceof Array) {
+      var a = [], n = Math.min(v.length, 2000);
+      for (var i = 0; i < n; i++) a.push(A.serialize(v[i], depth, nest + 1));
+      if (v.length > n) a.push("... " + (v.length - n) + " more");
+      return a;
+    }
+    var isPlain = false;
+    try { isPlain = v.constructor === Object; } catch (e) {}
+    if (!isPlain && depth <= 0) return "[" + (v.reflect ? v.reflect.name : "object") + "]";
+    var o = {};
+    for (var k in v) { try { if (typeof v[k] !== "function") o[k] = A.serialize(v[k], isPlain ? depth : depth - 1, nest + 1); } catch (e) {} }
+    return o;
+  };
+
+  A.projectInfo = function () {
+    var p = app.project, counts = { comp: 0, footage: 0, folder: 0, solid: 0, placeholder: 0 };
+    for (var i = 1; i <= p.numItems; i++) { var t = A.itemType(p.item(i)); counts[t] = (counts[t] || 0) + 1; }
+    var o = { file: p.file ? p.file.fsName : null, name: p.file ? p.file.name : "Untitled", dirty: p.dirty, numItems: p.numItems, counts: counts,
+      bitsPerChannel: p.bitsPerChannel, renderQueueItems: p.renderQueue.numItems };
+    try { o.frameRate = A.round(p.frameRate); } catch (e) {}
+    try { o.workingSpace = p.workingSpace; } catch (e) {}
+    try { o.expressionEngine = p.expressionEngine; } catch (e) {}
+    var a = p.activeItem;
+    o.activeItem = a ? { id: a.id, name: a.name, type: A.itemType(a) } : null;
+    return o;
+  };
+
+  // ---------- value helpers used by tools ----------
+  A.toAEValue = function (prop, v) {
+    if (prop.propertyValueType === PropertyValueType.TEXT_DOCUMENT) {
+      var td = prop.value;
+      if (typeof v === "string") { td.text = v; return td; }
+      A.applyText(td, v); return td;
+    }
+    if (prop.propertyValueType === PropertyValueType.SHAPE && v && v.vertices) {
+      var s = new Shape(); s.vertices = v.vertices; if (v.inTangents) s.inTangents = v.inTangents; if (v.outTangents) s.outTangents = v.outTangents; s.closed = v.closed !== false; return s;
+    }
+    if (prop.propertyValueType === PropertyValueType.COLOR) return A.color(v);
+    return v;
+  };
+  // Accepts [r,g,b], [r,g,b,a] (0-1 or 0-255) or "#rrggbb".
+  A.color = function (v) {
+    if (typeof v === "string") {
+      var h = v.replace("#", "");
+      if (h.length === 3) h = h.charAt(0) + h.charAt(0) + h.charAt(1) + h.charAt(1) + h.charAt(2) + h.charAt(2);
+      return [parseInt(h.substr(0, 2), 16) / 255, parseInt(h.substr(2, 2), 16) / 255, parseInt(h.substr(4, 2), 16) / 255, 1];
+    }
+    if (v instanceof Array) {
+      var big = false; for (var i = 0; i < v.length; i++) if (v[i] > 1) big = true;
+      var c = []; for (var j = 0; j < v.length; j++) c.push(big ? v[j] / 255 : v[j]);
+      if (c.length === 3) c.push(1);
+      return c;
+    }
+    return v;
+  };
+  A.color3 = function (v) { var c = A.color(v); return [c[0], c[1], c[2]]; };
+  A.applyText = function (td, o) {
+    if (o.text !== undefined) td.text = o.text;
+    if (o.font !== undefined) td.font = o.font;
+    if (o.fontSize !== undefined) td.fontSize = o.fontSize;
+    if (o.fillColor !== undefined) { td.applyFill = true; td.fillColor = A.color3(o.fillColor); }
+    if (o.strokeColor !== undefined) { td.applyStroke = true; td.strokeColor = A.color3(o.strokeColor); }
+    if (o.strokeWidth !== undefined) td.strokeWidth = o.strokeWidth;
+    if (o.tracking !== undefined) td.tracking = o.tracking;
+    if (o.leading !== undefined) { try { td.autoLeading = false; } catch (e) {} td.leading = o.leading; }
+    if (o.fauxBold !== undefined) td.fauxBold = o.fauxBold;
+    if (o.fauxItalic !== undefined) td.fauxItalic = o.fauxItalic;
+    if (o.allCaps !== undefined) td.allCaps = o.allCaps;
+    if (o.justification !== undefined) td.justification = ParagraphJustification[String(o.justification).toUpperCase()] || td.justification;
+    return td;
+  };
+  A.interp = function (name) {
+    if (!name) return null;
+    var m = { linear: KeyframeInterpolationType.LINEAR, bezier: KeyframeInterpolationType.BEZIER, hold: KeyframeInterpolationType.HOLD };
+    return m[String(name).toLowerCase()] || null;
+  };
+  // ease: {speed, influence} or number (influence %, speed 0) applied to every dimension
+  A.easeArr = function (prop, e) {
+    var dims = 1;
+    if (prop.propertyValueType === PropertyValueType.TwoD) dims = 2;
+    else if (prop.propertyValueType === PropertyValueType.ThreeD) dims = 3;
+    var sp = typeof e === "number" ? 0 : (e.speed || 0), inf = typeof e === "number" ? e : (e.influence || 33.333);
+    var a = []; for (var i = 0; i < dims; i++) a.push(new KeyframeEase(sp, Math.max(0.1, Math.min(100, inf))));
+    return a;
+  };
+
+  // ---------- change report ----------
+  // Snapshots before/after a tool call and a diff of them. Items are always compared; layers and
+  // property values only for the comps in scope (the active comp and comps named in the call),
+  // with a budget on property reads so very large comps stay fast.
+  var PROP_BUDGET = 25000;
+  function brief(v) {
+    if (v === null || v === undefined) return "none";
+    if (typeof v === "number") return String(Math.round(v * 100) / 100);
+    if (typeof v === "string") return v.length > 40 ? '"' + v.substr(0, 37) + '..."' : '"' + v + '"';
+    if (typeof v === "boolean") return v ? "on" : "off";
+    if (v instanceof Array) {
+      if (v.length > 4) return "[" + v.length + " values]";
+      var a = []; for (var i = 0; i < v.length; i++) a.push(brief(v[i])); return "[" + a.join(",") + "]";
+    }
+    if (v.text !== undefined) return brief(v.text);
+    if (v.vertices) return "path(" + v.vertices.length + " points)";
+    return "{...}";
+  }
+  function keySig(p) {
+    var n = p.numKeys; if (!n) return "";
+    var s = n + ":";
+    var lim = Math.min(n, 40);
+    for (var k = 1; k <= lim; k++) { var kv; try { kv = p.keyValue(k); } catch (e) { kv = "?"; } s += A.round(p.keyTime(k)) + "=" + A.stringify(A.valueOf(kv)) + ";"; }
+    return s;
+  }
+  function layerSig(L) {
+    var o = [L.name, A.round(L.inPoint), A.round(L.outPoint), A.round(L.startTime), L.stretch, L.parent ? (L.parent.id || L.parent.index) : 0, L.enabled, L.solo, L.locked, L.shy, L.label];
+    try { o.push(L.threeDLayer, L.blendingMode, L.trackMatteType, L.adjustmentLayer, L.motionBlur, L.guideLayer, L.audioEnabled); } catch (e) {}
+    return o;
+  }
+  var LAYER_FIELDS = ["name", "in", "out", "start", "stretch", "parent", "enabled", "solo", "locked", "shy", "label", "3D", "blend mode", "track matte", "adjustment", "motion blur", "guide", "audio"];
+  function layerKey(L) { return L.id !== undefined ? "L" + L.id : "i" + L.index + ":" + L.name; }
+  // Per-character style fingerprint (AE 24+): catches styling applied to part of a text.
+  A.textStyleSig = function (td) {
+    if (typeof td.characterRange !== "function") return "";
+    var n = Math.min(td.text.length, 300), sig = "", prev = null;
+    for (var i = 0; i < n; i++) {
+      try {
+        var cr = td.characterRange(i, i + 1);
+        var cur = [cr.font, cr.fontSize, cr.fauxBold, cr.fauxItalic, cr.applyFill ? cr.fillColor : 0, cr.applyStroke ? cr.strokeColor : 0, cr.strokeWidth, cr.tracking, cr.baselineShift, cr.horizontalScale, cr.verticalScale].join("/");
+        if (cur !== prev) { sig += "|" + i + ":" + cur; prev = cur; }
+      } catch (e) { return sig; }
+    }
+    return sig;
+  };
+  function snapProps(L, out, groups, budget) {
+    function walk(g, path, depth) {
+      for (var i = 1; i <= g.numProperties; i++) {
+        if (budget.n <= 0) { budget.over = true; return; }
+        var p = g.property(i), pp = path ? path + "/" + p.name : p.name;
+        budget.n--;
+        if (p.propertyType === PropertyType.PROPERTY) {
+          if (p.propertyValueType === PropertyValueType.NO_VALUE) continue;
+          var ex = ""; try { if (p.canSetExpression && p.expression) ex = (p.expressionEnabled ? "" : "(off)") + p.expression; } catch (e) {}
+          // Reading .value evaluates the expression, which can take milliseconds per property in
+          // expression-heavy comps. The expression text is compared already, so use the value before
+          // the expression (cheap) for those properties.
+          var raw; try { raw = ex ? p.valueAtTime(budget.time, true) : p.value; } catch (e) { continue; }
+          // cheap fingerprints for the common cases (numbers, arrays); full JSON only for the rest
+          var v = raw, vs;
+          if (typeof raw === "number" || typeof raw === "boolean") vs = String(raw);
+          else if (raw instanceof Array) vs = raw.join(",");
+          else { v = A.valueOf(raw); vs = A.stringify(v); if (p.propertyValueType === PropertyValueType.TEXT_DOCUMENT) vs += A.textStyleSig(raw); }
+          var nk = p.numKeys;
+          out[pp] = { s: vs + "|" + (nk ? keySig(p) : "") + "|" + ex, v: v, k: nk, e: ex };
+        } else {
+          if (p.propertyType === PropertyType.INDEXED_GROUP || depth < 3) {
+            var en = ""; try { if (p.canSetEnabled) en = p.enabled ? "on" : "off"; } catch (e) {}
+            if (path) groups[pp] = en;
+          }
+          walk(p, pp, depth + 1);
+        }
+      }
+    }
+    walk(L, "", 0);
+  }
+  function snapComp(c, deep, budget) {
+    var o = { id: c.id, name: c.name, layers: {}, order: [], deep: deep };
+    budget.time = c.time;
+    for (var i = 1; i <= c.numLayers; i++) {
+      var L = c.layer(i), k = layerKey(L);
+      var e = { name: L.name, index: i, sig: layerSig(L) };
+      if (deep) { e.props = {}; e.groups = {}; snapProps(L, e.props, e.groups, budget); }
+      o.layers[k] = e; o.order.push(k);
+    }
+    if (budget.over) o.partial = true;
+    return o;
+  }
+  // [label, value] pairs, so the report can name exactly what changed for any item type
+  function itemSig(it) {
+    var s = [["name", it.name], ["folder", it.parentFolder ? it.parentFolder.name : ""], ["label", it.label], ["comment", it.comment]];
+    try { if (it instanceof CompItem) s.push(["width", it.width], ["height", it.height], ["duration", A.round(it.duration)], ["frame rate", A.round(it.frameRate)], ["pixel aspect", it.pixelAspect], ["background", A.stringify(it.bgColor)], ["work area start", A.round(it.workAreaStart)], ["work area duration", A.round(it.workAreaDuration)], ["layers", it.numLayers]); } catch (e) {}
+    try {
+      if (it instanceof FootageItem) {
+        s.push(["file", it.file ? it.file.fsName : ""], ["width", it.width], ["height", it.height]);
+        var ms = it.mainSource;
+        if (ms instanceof SolidSource) s.push(["color", A.stringify(ms.color)]);
+        else { try { s.push(["frame rate", A.round(ms.conformFrameRate)], ["alpha", A.enumName(AlphaMode, ms.alphaMode)], ["loop", ms.loop], ["fields", A.enumName(FieldSeparationType, ms.fieldSeparationType)], ["pixel aspect", it.pixelAspect]); } catch (e) {} }
+      }
+    } catch (e) {}
+    try { if (it instanceof CompItem || it instanceof FootageItem) s.push(["proxy", it.proxySource ? (it.proxySource.file ? it.proxySource.file.fsName : "placeholder") : ""], ["use proxy", it.useProxy]); } catch (e) {}
+    return s;
+  }
+  A.snapshot = function (scopeRefs) {
+    var p = app.project, snap = { items: {}, comps: {} }, budget = { n: PROP_BUDGET, over: false };
+    for (var i = 1; i <= p.numItems; i++) { var it = p.item(i); snap.items[it.id] = { name: it.name, type: A.itemType(it), sig: itemSig(it), layers: it instanceof CompItem ? it.numLayers : undefined }; }
+    var ids = {};
+    // a call that names a comp is compared there only; otherwise the active comp is compared
+    // (so editing a small comp doesn't pay for snapshotting a huge active comp)
+    if (!scopeRefs.length) { try { if (p.activeItem instanceof CompItem) ids[p.activeItem.id] = true; } catch (e) {} }
+    for (var r = 0; r < scopeRefs.length; r++) {
+      if (scopeRefs[r] === "*") { for (var ai = 1; ai <= p.numItems; ai++) if (p.item(ai) instanceof CompItem) ids[p.item(ai).id] = true; continue; } // every comp
+      try { ids[A.findComp(scopeRefs[r]).id] = true; } catch (e) {}
+    }
+    for (var id in ids) { var c = p.itemByID(Number(id)); if (c) snap.comps[id] = snapComp(c, true, budget); }
+    return snap;
+  };
+  A.diff = function (a, b) {
+    var ch = { items: [], layers: [], props: [], scope: [], partial: false }, MAX = 80, n = 0;
+    function add(list, v) { if (n++ < MAX) list.push(v); else ch.truncated = true; }
+    for (var id in b.items) {
+      var x = b.items[id], y = a.items[id];
+      if (!y) { add(ch.items, ["+", x.type, x.name, x.layers]); continue; }
+      var d = [], ys = {};
+      for (var f0 = 0; f0 < y.sig.length; f0++) ys[y.sig[f0][0]] = y.sig[f0][1];
+      for (var f = 0; f < x.sig.length; f++) { var lab = x.sig[f][0]; if (A.stringify(x.sig[f][1]) !== A.stringify(ys[lab])) d.push(lab + " " + brief(ys[lab]) + " -> " + brief(x.sig[f][1])); }
+      if (d.length) add(ch.items, ["~", x.type, x.name, d.join("; ")]);
+    }
+    for (var id2 in a.items) if (!b.items[id2]) add(ch.items, ["-", a.items[id2].type, a.items[id2].name]);
+    for (var cid in b.comps) {
+      var cb = b.comps[cid], ca = a.comps[cid];
+      if (!ca) continue; // comp entered the scope during the call (e.g. newly opened): reported as an item
+      ch.scope.push(cb.name);
+      if (ca.partial || cb.partial) ch.partial = true;
+      for (var k in cb.layers) {
+        var lb = cb.layers[k], la = ca.layers[k];
+        if (!la) { add(ch.layers, ["+", cb.name, lb.name]); continue; }
+        var ld = [];
+        for (var g = 0; g < lb.sig.length; g++) if (A.stringify(lb.sig[g]) !== A.stringify(la.sig[g])) ld.push(LAYER_FIELDS[g] + " " + brief(la.sig[g]) + " -> " + brief(lb.sig[g]));
+        if (la.index !== lb.index) ld.push("order " + la.index + " -> " + lb.index);
+        if (ld.length) add(ch.layers, ["~", cb.name, lb.name, ld.join("; ")]);
+        if (la.props && lb.props) {
+          // added/removed groups (effects, masks, shape groups...): report only the outermost one
+          var addedG = [], removedG = [];
+          for (var gp in lb.groups) {
+            if (la.groups[gp] === undefined) addedG.push(gp);
+            else if (la.groups[gp] !== lb.groups[gp]) add(ch.props, ["~", lb.name, gp, "enabled " + la.groups[gp] + " -> " + lb.groups[gp]]);
+          }
+          for (var gq in la.groups) if (lb.groups[gq] === undefined) removedG.push(gq);
+          var outermost = function (list) {
+            list.sort();
+            var keep = [];
+            for (var q = 0; q < list.length; q++) {
+              var inner = false;
+              for (var z = 0; z < keep.length; z++) if (list[q].indexOf(keep[z] + "/") === 0) { inner = true; break; }
+              if (!inner) keep.push(list[q]);
+            }
+            return keep;
+          };
+          addedG = outermost(addedG); removedG = outermost(removedG);
+          for (var ga = 0; ga < addedG.length; ga++) add(ch.props, ["+", lb.name, addedG[ga]]);
+          for (var gr = 0; gr < removedG.length; gr++) add(ch.props, ["-", lb.name, removedG[gr]]);
+          for (var pp in lb.props) {
+            var pb = lb.props[pp], pa = la.props[pp];
+            if (!pa || pa.s === pb.s) continue;
+            var parts = [];
+            if (A.stringify(pa.v) !== A.stringify(pb.v)) parts.push(brief(pa.v) + " -> " + brief(pb.v));
+            if (pa.k !== pb.k) parts.push("keyframes " + pa.k + " -> " + pb.k); else if (pb.k && pa.s.split("|")[1] !== pb.s.split("|")[1]) parts.push("keyframes changed");
+            if (pa.e !== pb.e) parts.push(!pa.e ? "expression added" : (!pb.e ? "expression removed" : "expression changed"));
+            if (!parts.length) parts.push("changed");
+            add(ch.props, ["~", lb.name, pp, parts.join(", ")]);
+          }
+        }
+      }
+      for (var k2 in ca.layers) if (!cb.layers[k2]) add(ch.layers, ["-", cb.name, ca.layers[k2].name]);
+    }
+    return ch;
+  };
+
+  // ---------- runner ----------
+  A.run = function (fn, args, opts) {
+    opts = opts || {};
+    var logs = [];
+    function log() {
+      var parts = [];
+      for (var i = 0; i < arguments.length; i++) { var a = arguments[i]; parts.push(typeof a === "string" ? a : A.stringify(A.serialize(a, 2))); }
+      logs.push(parts.join(" "));
+    }
+    var undo = opts.undoGroup !== false && opts.undoGroup !== "";
+    var res;
+    try {
+      if (opts.suppressDialogs !== false) { try { app.beginSuppressDialogs(); } catch (e) {} }
+      if (undo) app.beginUndoGroup(opts.undoGroup || "AE MCP");
+      var before = null;
+      if (opts.report) { try { before = A.snapshot(opts.report); } catch (e) { before = null; } }
+      var r = fn(args || {}, log);
+      res = { ok: true, result: opts.raw ? r : A.serialize(r, opts.depth || 4), logs: logs };
+      if (before) { try { res.changes = A.diff(before, A.snapshot(opts.report)); } catch (e) { res.changes = { error: e.message }; } }
+    } catch (e) {
+      res = { ok: false, error: { message: e.message || String(e), name: e.name, line: e.line, user: !!e.aemcpUser }, logs: logs };
+      // a failed script may have changed things before it stopped: report those too
+      if (before) { try { res.changes = A.diff(before, A.snapshot(opts.report)); } catch (e2) {} }
+    } finally {
+      if (undo) { try { app.endUndoGroup(); } catch (e) {} }
+      if (opts.suppressDialogs !== false) { try { app.endSuppressDialogs(false); } catch (e) {} }
+    }
+    return A.stringify(res);
+  };
+
+  return A;
+})();
+// JSON for scripts (AE's ExtendScript has no JSON object)
+if (typeof JSON === "undefined" || !JSON.stringify) {
+  JSON = {
+    stringify: function (v) { return aemcp.stringify(v); },
+    parse: function (s) {
+      s = String(s);
+      // only data: reject anything that could run code
+      if (/[^,:{}\\[\\]0-9.\\-+Eaeflnr-u \\n\\r\\t]/.test(s.replace(/"(\\\\.|[^"\\\\])*"/g, ""))) throw new SyntaxError("JSON.parse: invalid JSON");
+      return eval("(" + s + ")");
+    }
+  };
+}
+"aemcp loaded " + aemcp.version;
+`;
+
+// src/context.ts
+init_define_AEMCP_CEP_FILES();
+import { AsyncLocalStorage } from "node:async_hooks";
+var callContext = new AsyncLocalStorage();
+
+// src/jsx.ts
+var NEED_HELPERS = "__AEMCP_NEED_HELPERS__";
+var HELPER_VERSION = `${VERSION}-${createHash("sha1").update(aemcp_default).digest("hex").slice(0, 10)}`;
+var helperSource = aemcp_default.replace("__AEMCP_VERSION__", HELPER_VERSION);
+function toJsLiteral(v) {
+  return (JSON.stringify(v ?? null) ?? "null").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
+}
+function wrapBody(body, args, opts = {}) {
+  const runOpts = { undoGroup: opts.undoGroup === void 0 ? "AE MCP" : opts.undoGroup, depth: opts.depth, report: opts.report };
+  return `(function(){
+if (typeof aemcp === 'undefined' || aemcp.version !== ${toJsLiteral(HELPER_VERSION)}) return ${toJsLiteral(NEED_HELPERS)};
+return aemcp.run(function(args, log){
+` + body + `
+}, ${toJsLiteral(args ?? {})}, ${toJsLiteral(runOpts)});
+})()`;
+}
+function evalBody(fnSource) {
+  return `var __fn = eval(${toJsLiteral(fnSource)});
+return __fn(args, log);`;
+}
+function errorHint(message) {
+  const m = message || "";
+  if (/Object is invalid/i.test(m)) return "The After Effects object no longer exists (e.g. a layer/comp was removed or the project changed). Look it up again.";
+  if (/out of range|index.*range/i.test(m)) return "AE collections are 1-based: app.project.item(1..numItems), comp.layer(1..numLayers), prop.property(1..numProperties).";
+  if (/Function .+ is undefined/i.test(m)) return "That method doesn't exist on this object in ExtendScript. Check the object type (ae_get_scripting_guide) or use aemcp helpers.";
+  if (/undefined is not an object|null is not an object/i.test(m)) return "Something is undefined: a lookup returned nothing (names are case-sensitive; activeItem may not be a comp).";
+  if (/does not have a value/i.test(m)) return "Syntax error (ExtendScript reports these as '... does not have a value').";
+  if (/Can not .* to a (layer|property)|cannot set|not settable|read.?only/i.test(m)) return "That attribute is read-only or can't be set in this state (e.g. the layer is locked, or the property has expressions/keyframes).";
+  return null;
+}
+function codeExcerpt(code, line, context = 2) {
+  const lines = code.split(/\r?\n/);
+  if (!line || line < 1 || line > lines.length) return "";
+  const from = Math.max(1, line - context), to = Math.min(lines.length, line + context);
+  const width = String(to).length;
+  const out = [];
+  for (let i = from; i <= to; i++) out.push(`${i === line ? ">" : " "} ${String(i).padStart(width)} | ${lines[i - 1]}`);
+  return out.join("\n");
+}
+function parseResult(raw) {
+  if (raw === "EvalScript error.")
+    return { ok: false, logs: [], error: { message: "ExtendScript could not evaluate the script (EvalScript error). This usually means a syntax error outside the user code wrapper." } };
+  try {
+    const r = JSON.parse(raw);
+    if (r && typeof r === "object" && "ok" in r) return { logs: [], ...r };
+    return { ok: true, result: r, logs: [] };
+  } catch {
+    return { ok: true, result: raw, logs: [] };
+  }
+}
+var helperLoader = "(function(){try{eval(" + toJsLiteral(helperSource) + ");return 'aemcp loaded ' + aemcp.version;}catch(e){return 'aemcp load error: ' + e.message + ' (line ' + e.line + ')';}})()";
+async function ensureHelpers() {
+  const r = await evalRaw(helperLoader, 3e4);
+  if (!r.startsWith("aemcp loaded")) throw new Error("Failed to load the aemcp helper library into After Effects: " + r);
+}
+async function runJsx(body, args = {}, opts = {}) {
+  const script = wrapBody(body, args, opts);
+  const ctx = callContext.getStore();
+  opts = { ...opts, bridge: { label: ctx?.tool, cancel: ctx?.signal, ...opts.bridge } };
+  if (opts.bridge?.approval) {
+    const probe2 = await evalRaw(`(typeof aemcp !== 'undefined' && aemcp.version === ${toJsLiteral(HELPER_VERSION)}) ? 'ok' : 'no'`, 1e4, { cancel: opts.bridge.cancel });
+    if (probe2 !== "ok") await ensureHelpers();
+  }
+  let raw = await evalRaw(script, opts.timeoutMs, opts.bridge);
+  if (raw === NEED_HELPERS) {
+    await ensureHelpers();
+    raw = await evalRaw(script, opts.timeoutMs, opts.bridge);
+  }
+  return parseResult(raw);
+}
+function formatChanges(ch) {
+  if (!ch) return null;
+  if (ch.error) return `Changes: (could not be determined: ${ch.error})`;
+  const lines = [];
+  for (const [op, type, name, extra] of ch.items) {
+    if (op === "+") lines.push(`+ ${type} "${name}"${type === "comp" && extra !== void 0 ? ` (${extra} layers)` : ""}`);
+    else if (op === "-") lines.push(`- ${type} "${name}"`);
+    else lines.push(`~ ${type} "${name}": ${extra}`);
+  }
+  for (const [op, comp, layer, extra] of ch.layers) {
+    if (op === "+") lines.push(`+ layer "${layer}" in "${comp}"`);
+    else if (op === "-") lines.push(`- layer "${layer}" in "${comp}"`);
+    else lines.push(`~ layer "${layer}" in "${comp}": ${extra}`);
+  }
+  for (const [op, layer, path, extra] of ch.props) {
+    if (op === "+") lines.push(`+ ${layer} > ${path}`);
+    else if (op === "-") lines.push(`- ${layer} > ${path}`);
+    else lines.push(`~ ${layer} > ${path}: ${extra}`);
+  }
+  if (!lines.length) return "Changes: none";
+  const notes = [];
+  if (ch.scope.length) notes.push(`layers/properties compared in: ${ch.scope.join(", ")}`);
+  if (ch.partial) notes.push("very large comp: some properties not compared");
+  if (ch.truncated) notes.push("more changes not listed");
+  return `Changes${notes.length ? ` (${notes.join("; ")})` : ""}:
+${lines.join("\n")}`;
+}
+
+// src/permissions.ts
+init_define_AEMCP_CEP_FILES();
+function permissions() {
+  const p = loadConfig().permissions || {};
+  const mode = p.mode === "ask" || p.mode === "read-only" ? p.mode : "full";
+  return { mode, allowShell: p.allowShell !== false };
+}
+function usesShell(code) {
+  return /callSystem|\bsystem\s*\[/.test(code);
+}
+var READ_ONLY_REFUSAL = "After Effects MCP is in read-only mode, so tools that change the project are disabled. The user can change this in After Effects: Window > Extensions > AE MCP > Permissions.";
+var SHELL_REFUSAL = 'Shell commands (system.callSystem) are disabled in the AE MCP permissions. The user can allow them in Window > Extensions > AE MCP > Permissions (or "allowShell": true in ~/.aemcp/config.json).';
+function approvalSummary(tool, args) {
+  if (!args) return tool;
+  if (typeof args.code === "string") return args.code;
+  const json3 = JSON.stringify(args);
+  return json3.length > 1500 ? json3.slice(0, 1500) + "\u2026" : json3;
+}
+
+// src/tools/registry.ts
 var compRef = external_exports.union([external_exports.number().int(), external_exports.string()]).optional().describe('Composition: item id (number) or exact name. Omit (or "active") for the active/open composition.');
 var layerRef = external_exports.union([external_exports.number().int(), external_exports.string()]).describe("Layer: 1-based index (number) or exact layer name.");
 var itemRef = external_exports.union([external_exports.number().int(), external_exports.string()]).describe("Project item id (number) or exact name.");
@@ -75190,13 +74982,17 @@ function registerJsxTools(server, tools) {
       },
       async (args) => {
         try {
+          const edits = !t.readOnly && !t.tempItems;
+          const perm = permissions();
+          if (edits && perm.mode === "read-only") return { isError: true, content: [{ type: "text", text: READ_ONLY_REFUSAL }] };
           const timeoutMs = typeof args.timeoutSeconds === "number" ? args.timeoutSeconds * 1e3 : t.timeoutMs;
           const wantsReport = t.report ?? (!t.readOnly && !t.noUndo);
           return formatResult(
             await runJsx(t.jsx, args, {
               undoGroup: t.tempItems ? "AE MCP " + t.title : t.readOnly || t.noUndo ? false : t.title,
               timeoutMs,
-              report: wantsReport ? reportScope(args) : void 0
+              report: wantsReport ? reportScope(args) : void 0,
+              bridge: edits && perm.mode === "ask" ? { approval: { tool: t.title, summary: approvalSummary(t.name, args) } } : void 0
             })
           );
         } catch (e) {
@@ -75356,14 +75152,65 @@ return aemcp.markers(mp);`
 
 // src/tools/core.ts
 init_define_AEMCP_CEP_FILES();
-import { existsSync as existsSync3, mkdirSync as mkdirSync4, readFileSync as readFileSync5, statSync, unlinkSync } from "node:fs";
+import { existsSync as existsSync3, mkdirSync as mkdirSync4, readFileSync as readFileSync6, statSync, unlinkSync } from "node:fs";
 import { homedir as homedir4 } from "node:os";
-import { join as join5 } from "node:path";
-init_bridge();
-init_setup();
-init_update();
-init_config();
-init_jsx();
+import { join as join6 } from "node:path";
+
+// src/update.ts
+init_define_AEMCP_CEP_FILES();
+import { mkdirSync as mkdirSync3, readFileSync as readFileSync5, writeFileSync as writeFileSync3 } from "node:fs";
+import { homedir as homedir3 } from "node:os";
+import { dirname as dirname4, join as join5 } from "node:path";
+var REPO = "ronyitzhaki/after-effects-mcp";
+var RELEASES_URL = `https://github.com/${REPO}/releases/latest`;
+var CACHE = join5(homedir3(), ".aemcp", "update-check.json");
+var DAY = 24 * 3600 * 1e3;
+function compareVersions(a, b) {
+  const pa = a.replace(/^v/, "").split(/[.-]/).map((x) => parseInt(x, 10) || 0);
+  const pb = b.replace(/^v/, "").split(/[.-]/).map((x) => parseInt(x, 10) || 0);
+  for (let i = 0; i < 3; i++) if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) > (pb[i] ?? 0) ? 1 : -1;
+  return 0;
+}
+function updateCheckEnabled() {
+  return !process.env.AEMCP_NO_UPDATE_CHECK && loadConfig().updateCheck !== false;
+}
+function readCache() {
+  try {
+    return JSON.parse(readFileSync5(CACHE, "utf8"));
+  } catch {
+    return null;
+  }
+}
+var current = null;
+function knownUpdate() {
+  const c = current ?? readCache();
+  if (!c?.latest) return null;
+  return { ...c, current: VERSION, updateAvailable: compareVersions(c.latest, VERSION) > 0 };
+}
+async function checkForUpdate(force = false) {
+  if (!updateCheckEnabled()) return null;
+  const cached2 = readCache();
+  if (!force && cached2 && Date.now() - Date.parse(cached2.checkedAt) < DAY) return current = knownUpdate();
+  try {
+    const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
+      headers: { "user-agent": `ae-mcp/${VERSION}`, accept: "application/vnd.github+json" },
+      signal: AbortSignal.timeout(4e3)
+    });
+    if (!res.ok) return knownUpdate();
+    const rel = await res.json();
+    if (!rel.tag_name) return knownUpdate();
+    const latest = rel.tag_name.replace(/^v/, "");
+    current = { checkedAt: (/* @__PURE__ */ new Date()).toISOString(), current: VERSION, latest, url: rel.html_url || RELEASES_URL, updateAvailable: compareVersions(latest, VERSION) > 0 };
+    mkdirSync3(dirname4(CACHE), { recursive: true });
+    writeFileSync3(CACHE, JSON.stringify(current, null, 2));
+    return current;
+  } catch {
+    return knownUpdate();
+  }
+}
+function updateMessage(u) {
+  return u?.updateAvailable ? `A newer version of AE MCP is available: v${u.latest} (you have v${u.current}). Download: ${u.url}` : null;
+}
 
 // src/transpile.ts
 init_define_AEMCP_CEP_FILES();
@@ -75558,7 +75405,7 @@ try {
 } finally { sheet.remove(); }
 return r;`;
 async function renderPng(body, args) {
-  const tmpDir = join5(homedir4(), ".aemcp", "tmp");
+  const tmpDir = join6(homedir4(), ".aemcp", "tmp");
   mkdirSync4(tmpDir, { recursive: true });
   const r = await runJsx(body, { ...args, tmpDir }, { undoGroup: "AE MCP preview", timeoutMs: 18e4 });
   if (!r.ok) return { error: formatResult(r) };
@@ -75573,7 +75420,7 @@ async function renderPng(body, args) {
     await sleep2(100);
   }
   if (!existsSync3(info.path)) return { error: errorResult(`After Effects did not write the image to ${info.path}`) };
-  const data = readFileSync5(info.path).toString("base64");
+  const data = readFileSync6(info.path).toString("base64");
   if (!args.outputPath) {
     try {
       unlinkSync(info.path);
@@ -75601,13 +75448,26 @@ function registerCoreTools(server) {
     },
     async ({ code, args, undoGroup, depth, timeoutSeconds, transpile, report }) => {
       try {
+        const perm = permissions();
+        if (!perm.allowShell && usesShell(code)) return errorResult(SHELL_REFUSAL);
+        const readOnly = perm.mode === "read-only";
         const t = transpileUserCode(code, transpile !== false);
         const r = await runJsx(evalBody(t.source), args ?? {}, {
-          undoGroup: undoGroup === "" ? false : undoGroup || "AE MCP Script",
+          // read-only mode needs a named undo group (to undo the script) and a report over every comp
+          undoGroup: readOnly ? "AE MCP Script (read-only check)" : undoGroup === "" ? false : undoGroup || "AE MCP Script",
           depth,
           timeoutMs: (timeoutSeconds ?? 120) * 1e3,
-          report: report === false ? void 0 : reportScope(args)
+          report: readOnly ? ["*"] : report === false ? void 0 : reportScope(args),
+          bridge: perm.mode === "ask" ? { approval: { tool: "Run script", summary: approvalSummary("ae_run_script", { code }) } } : void 0
         });
+        if (readOnly && r.changes && formatChanges(r.changes) !== "Changes: none") {
+          await evalRaw("app.executeCommand(16); 'undone'", 3e4);
+          return errorResult(
+            `${READ_ONLY_REFUSAL}
+This script changed the project, so its changes were undone:
+${formatChanges(r.changes)}`
+          );
+        }
         if (!r.ok && r.error) {
           if (t.syntaxError && /does not have a value|syntax|expected|illegal|unterminated/i.test(r.error.message)) {
             return { isError: true, content: [{ type: "text", text: `Syntax error: ${t.syntaxError}` }] };
@@ -75644,8 +75504,25 @@ function registerCoreTools(server) {
     async ({ path, args, timeoutSeconds }) => {
       try {
         if (!existsSync3(path)) return errorResult(`File not found: ${path}`);
+        const perm = permissions();
+        if (perm.mode === "read-only") return errorResult(READ_ONLY_REFUSAL);
+        let source = "";
+        try {
+          source = readFileSync6(path, "utf8");
+        } catch {
+        }
+        if (!perm.allowShell && usesShell(source)) return errorResult(SHELL_REFUSAL);
         const body = "var f = new File(args.path); if (!f.exists) aemcp.fail('File not found in AE: ' + args.path);\n$.global.AEMCP_ARGS = args.args || {};\nreturn $.evalFile(f);";
-        return formatResult(await runJsx(body, { path, args: args ?? {} }, { undoGroup: "AE MCP Script File", timeoutMs: (timeoutSeconds ?? 300) * 1e3 }));
+        return formatResult(
+          await runJsx(body, { path, args: args ?? {} }, {
+            undoGroup: "AE MCP Script File",
+            timeoutMs: (timeoutSeconds ?? 300) * 1e3,
+            report: reportScope(args),
+            bridge: perm.mode === "ask" ? { approval: { tool: "Run script file", summary: `${path}
+
+${source.slice(0, 1500)}` } } : void 0
+          })
+        );
       } catch (e) {
         return errorResult(e);
       }
@@ -75655,30 +75532,52 @@ function registerCoreTools(server) {
     "ae_status",
     {
       title: "After Effects status",
-      description: "Check the connection to After Effects and get app version, OS, open project and active item. Call this first if unsure AE is reachable.",
-      inputSchema: {},
+      description: 'Check the connection to After Effects: app version, OS, open project, active item, permission mode, and whether AE is busy. Lists every running After Effects instance when several are open; pass `instance` (e.g. "2025", "2026" or a port) to choose which one this session controls. Call this first if unsure AE is reachable.',
+      inputSchema: {
+        instance: external_exports.string().optional().describe('Switch to another running After Effects: "2026", "26.5", or a bridge port. Omit to keep the current one.')
+      },
       annotations: { readOnlyHint: true, openWorldHint: false }
     },
-    async () => {
+    async ({ instance }) => {
       try {
-        const h = await health();
+        const list = await listInstances(true);
+        if (instance) {
+          const m = matchInstance(list, instance);
+          if (!m) return errorResult(`No running After Effects matches "${instance}". Running: ${list.map((i) => `${i.label} (port ${i.port})`).join(", ") || "none"}.`);
+          selectInstance(m.port);
+        }
+        const port = await resolvePort();
+        const h = await health(port);
         const r = await runJsx(
           "return { appVersion: app.version, buildName: app.buildName, language: String(app.isoLanguage), os: $.os, extendScriptVersion: $.version, memoryInUse: app.memoryInUse, isRenderEngine: app.isRenderEngine, project: aemcp.projectInfo(), canWriteFiles: (function(){ try { return app.preferences.getPrefAsLong('Main Pref Section', 'Pref_SCRIPTING_FILE_NETWORK_SECURITY') === 1; } catch (e) { return null; } })() };",
           {},
-          { undoGroup: false }
+          { undoGroup: false, timeoutMs: 15e3 }
         );
         const out = formatResult(r);
+        const head = [`Connected to ${aeLabel(h.host?.appVersion)} (bridge v${h.version} on port ${port}, MCP server v${VERSION}).`];
+        if (list.length > 1)
+          head.push(
+            `${list.length} After Effects instances are running: ${list.map((i) => `${i.label} (port ${i.port}${i.port === port ? ", in use" : ""})`).join(", ")}. Pass instance to ae_status to switch.`
+          );
+        const perm = permissions();
+        if (perm.mode !== "full" || !perm.allowShell)
+          head.push(
+            `Permissions: ${perm.mode === "ask" ? "every edit waits for the user's approval in After Effects" : perm.mode === "read-only" ? "read-only (edits are refused)" : "full"}${perm.allowShell ? "" : "; shell commands disabled"}.`
+          );
+        out.content.unshift({ type: "text", text: head.join("\n") });
         if (r.ok && r.result?.canWriteFiles === false)
           out.content.push({
             type: "text",
             text: "WARNING: 'Allow Scripts to Write Files and Access Network' is OFF in After Effects, so scripts cannot write files (frame previews, exports, File.write). Ask the user to enable it: After Effects > Settings > Scripting & Expressions (Windows: Edit > Preferences > Scripting & Expressions)."
           });
-        out.content.unshift({ type: "text", text: `Connected to After Effects bridge v${h.version} (MCP server v${VERSION}).` });
         const upd = updateMessage(await checkForUpdate());
         if (upd) out.content.push({ type: "text", text: `${upd}
 Tell the user about this update.` });
-        if (lastSetup?.extensionUpdated)
-          out.content.push({ type: "text", text: "Note: the After Effects extension was updated on disk; ask the user to restart After Effects when convenient to load the new version." });
+        if (lastSetup?.extensionUpdated || h.version && h.version !== VERSION)
+          out.content.push({
+            type: "text",
+            text: `Note: After Effects is running bridge v${h.version} but v${VERSION} is installed; ask the user to restart After Effects when convenient to load it.`
+          });
         return out;
       } catch (e) {
         return errorResult(e);
@@ -76354,6 +76253,741 @@ return { root: root.name, comps: comps, parenting: parenting, trackMattes: matte
   }
 ];
 
+// src/tools/keyframes.ts
+init_define_AEMCP_CEP_FILES();
+var ease = external_exports.union([external_exports.number(), external_exports.object({ speed: external_exports.number().optional(), influence: external_exports.number().optional() }), external_exports.array(external_exports.object({ speed: external_exports.number(), influence: external_exports.number() }))]).describe("Temporal ease: influence % (number), {speed, influence}, or one {speed, influence} per dimension (Graph Editor values).");
+var interp = external_exports.enum(["linear", "bezier", "hold"]);
+var pair = external_exports.array(external_exports.number()).min(2).max(3);
+var findKey = `
+function keyIndex(p, k) {
+  if (k.index !== undefined) { if (k.index < 1 || k.index > p.numKeys) aemcp.fail("Keyframe index " + k.index + " out of range 1-" + p.numKeys); return k.index; }
+  if (k.time === undefined) aemcp.fail("Each keyframe needs index or time");
+  var i = p.nearestKeyIndex(k.time);
+  if (!p.numKeys || Math.abs(p.keyTime(i) - k.time) > 0.0005) aemcp.fail("No keyframe at " + k.time + "s on " + p.name);
+  return i;
+}
+function easeList(p, e) {
+  if (e instanceof Array) { var a = []; for (var i = 0; i < e.length; i++) a.push(new KeyframeEase(e[i].speed, Math.max(0.1, Math.min(100, e[i].influence)))); return a; }
+  return aemcp.easeArr(p, e);
+}`;
+var keyframeTools = [
+  {
+    name: "ae_edit_keyframes",
+    title: "Edit keyframes",
+    description: "Graph Editor-level control of existing keyframes on a property: change value, move in time, in/out interpolation, temporal ease (speed + influence per dimension), temporal/spatial continuous and auto-Bezier, spatial tangents (motion path handles), roving, keyframe label color, and remove keyframes. Address keys by index or exact time. ae_get_properties with keyframes:true shows all of these.",
+    input: {
+      comp: compRef,
+      layer: layerRef,
+      path: external_exports.string().describe('Property path, e.g. "Transform/Position".'),
+      keys: external_exports.array(
+        external_exports.object({
+          index: external_exports.number().int().optional(),
+          time: external_exports.number().optional().describe("Find the key at this time (seconds) if no index."),
+          value: anyValue.optional(),
+          moveTo: external_exports.number().optional().describe("New time in seconds (all attributes are kept)."),
+          interpolation: interp.optional(),
+          inInterpolation: interp.optional(),
+          outInterpolation: interp.optional(),
+          easeIn: ease.optional(),
+          easeOut: ease.optional(),
+          temporalContinuous: external_exports.boolean().optional(),
+          temporalAutoBezier: external_exports.boolean().optional(),
+          spatialContinuous: external_exports.boolean().optional(),
+          spatialAutoBezier: external_exports.boolean().optional(),
+          inSpatialTangent: pair.optional().describe("Incoming motion-path handle, relative to the key's position."),
+          outSpatialTangent: pair.optional(),
+          roving: external_exports.boolean().optional(),
+          label: external_exports.number().int().min(0).max(16).optional().describe("Keyframe color label (0 = none).")
+        })
+      ).optional(),
+      remove: external_exports.array(external_exports.union([external_exports.number().int(), external_exports.object({ time: external_exports.number() })])).optional().describe("Keyframes to delete: indices or {time}.")
+    },
+    jsx: `${findKey}
+var c = aemcp.findComp(args.comp), l = aemcp.findLayer(c, args.layer), p = aemcp.resolveProp(l, args.path);
+if (p.propertyType !== PropertyType.PROPERTY) aemcp.fail("'" + p.name + "' is a group");
+var I = function (n) { return aemcp.interp(n); };
+// resolve all targets to times first: moving/removing keys changes indices
+var edits = [], keys = args.keys || [];
+for (var i = 0; i < keys.length; i++) edits.push({ spec: keys[i], time: p.keyTime(keyIndex(p, keys[i])) });
+var removeTimes = [];
+for (var r = 0; r < (args.remove || []).length; r++) { var rm = args.remove[r]; removeTimes.push(p.keyTime(keyIndex(p, typeof rm === "number" ? { index: rm } : rm))); }
+for (var j = 0; j < edits.length; j++) {
+  var e = edits[j], k = e.spec, idx = p.nearestKeyIndex(e.time);
+  if (k.moveTo !== undefined && Math.abs(k.moveTo - e.time) > 0.0005) {
+    var d = aemcp.captureKey(p, idx);
+    p.removeKey(idx);
+    idx = aemcp.restoreKey(p, d, k.moveTo);
+  }
+  if (k.value !== undefined) p.setValueAtKey(idx, aemcp.toAEValue(p, k.value));
+  var ii = I(k.inInterpolation || k.interpolation), oi = I(k.outInterpolation || k.interpolation);
+  if (ii || oi) p.setInterpolationTypeAtKey(idx, ii || p.keyInInterpolationType(idx), oi || p.keyOutInterpolationType(idx));
+  if (k.easeIn !== undefined || k.easeOut !== undefined)
+    p.setTemporalEaseAtKey(idx, k.easeIn !== undefined ? easeList(p, k.easeIn) : p.keyInTemporalEase(idx), k.easeOut !== undefined ? easeList(p, k.easeOut) : p.keyOutTemporalEase(idx));
+  if (k.temporalContinuous !== undefined) p.setTemporalContinuousAtKey(idx, k.temporalContinuous);
+  if (k.temporalAutoBezier !== undefined) p.setTemporalAutoBezierAtKey(idx, k.temporalAutoBezier);
+  if (p.isSpatial) {
+    if (k.spatialContinuous !== undefined) p.setSpatialContinuousAtKey(idx, k.spatialContinuous);
+    if (k.spatialAutoBezier !== undefined) p.setSpatialAutoBezierAtKey(idx, k.spatialAutoBezier);
+    if (k.inSpatialTangent || k.outSpatialTangent) {
+      // AE wants as many values as the property has dimensions (3 for Position, even in 2D)
+      var dims = p.keyValue(idx).length, pad = function (v) { var a = v.slice(0); while (a.length < dims) a.push(0); return a.slice(0, dims); };
+      p.setSpatialTangentsAtKey(idx, k.inSpatialTangent ? pad(k.inSpatialTangent) : p.keyInSpatialTangent(idx), k.outSpatialTangent ? pad(k.outSpatialTangent) : p.keyOutSpatialTangent(idx));
+    }
+    if (k.roving !== undefined) p.setRovingAtKey(idx, k.roving);
+  } else if (k.inSpatialTangent || k.outSpatialTangent || k.roving !== undefined || k.spatialContinuous !== undefined) {
+    log("'" + p.name + "' is not a spatial property: spatial settings ignored");
+  }
+  if (k.label !== undefined) p.setLabelAtKey(idx, k.label);
+}
+for (var q = 0; q < removeTimes.length; q++) { var ri = p.nearestKeyIndex(removeTimes[q]); if (Math.abs(p.keyTime(ri) - removeTimes[q]) < 0.0005) p.removeKey(ri); }
+return { property: p.name, numKeys: p.numKeys, keyframes: aemcp.keyframes(p) };`
+  },
+  {
+    name: "ae_copy_keyframes",
+    title: "Copy keyframes",
+    description: "Copy keyframes (with interpolation, ease, tangents and labels) from one property to one or more others, in the same or other layers/comps. Optionally only a time range, shifted in time, replacing existing keys.",
+    input: {
+      from: external_exports.object({ comp: external_exports.union([external_exports.number().int(), external_exports.string()]).optional(), layer: layerRef, path: external_exports.string() }),
+      to: external_exports.array(external_exports.object({ comp: external_exports.union([external_exports.number().int(), external_exports.string()]).optional(), layer: layerRef, path: external_exports.string() })).min(1),
+      startTime: external_exports.number().optional().describe("Only keys at or after this time."),
+      endTime: external_exports.number().optional().describe("Only keys at or before this time."),
+      offset: external_exports.number().optional().describe("Shift the copies by this many seconds (e.g. to place them at the target's time)."),
+      replace: external_exports.boolean().optional().describe("Remove the target's existing keyframes first.")
+    },
+    jsx: `
+var sc = aemcp.findComp(args.from.comp), src = aemcp.resolveProp(aemcp.findLayer(sc, args.from.layer), args.from.path);
+if (!src.numKeys) aemcp.fail("'" + src.name + "' has no keyframes");
+var keys = [];
+for (var k = 1; k <= src.numKeys; k++) {
+  var t = src.keyTime(k);
+  if ((args.startTime === undefined || t >= args.startTime - 0.0005) && (args.endTime === undefined || t <= args.endTime + 0.0005)) keys.push(aemcp.captureKey(src, k));
+}
+if (!keys.length) aemcp.fail("No keyframes in that time range");
+var out = [];
+for (var i = 0; i < args.to.length; i++) {
+  var tc = aemcp.findComp(args.to[i].comp), dst = aemcp.resolveProp(aemcp.findLayer(tc, args.to[i].layer), args.to[i].path);
+  if (dst.propertyValueType !== src.propertyValueType) aemcp.fail("Can't copy " + aemcp.enumName(PropertyValueType, src.propertyValueType) + " keyframes to '" + dst.name + "' (" + aemcp.enumName(PropertyValueType, dst.propertyValueType) + ")");
+  if (args.replace) while (dst.numKeys) dst.removeKey(1);
+  for (var j = 0; j < keys.length; j++) aemcp.restoreKey(dst, keys[j], keys[j].time + (args.offset || 0));
+  out.push({ comp: tc.name, property: dst.name, numKeys: dst.numKeys });
+}
+return { copied: keys.length, targets: out };`
+  },
+  {
+    name: "ae_set_time_remap",
+    title: "Time remapping",
+    description: "Enable or disable time remapping on a layer (footage or precomp) and set its keyframes: each maps a comp time to a source time. Use freezeAt to hold a single source frame for the whole layer.",
+    input: {
+      comp: compRef,
+      layer: layerRef,
+      enabled: external_exports.boolean().optional().describe("Default true."),
+      keyframes: external_exports.array(external_exports.object({ time: external_exports.number(), sourceTime: external_exports.number(), interpolation: interp.optional() })).optional(),
+      freezeAt: external_exports.number().optional().describe("Freeze on this source time (seconds) for the whole layer.")
+    },
+    jsx: `
+var c = aemcp.findComp(args.comp), l = aemcp.findLayer(c, args.layer);
+if (!l.canSetTimeRemapEnabled) aemcp.fail("Layer '" + l.name + "' can't be time-remapped (only footage and precomp layers)");
+if (args.enabled === false) { l.timeRemapEnabled = false; return { layer: l.name, timeRemap: false }; }
+l.timeRemapEnabled = true;
+var tr = l.property("ADBE Time Remapping");
+// Time Remap is hidden while it has no keyframes, so new keys are added before old ones are removed
+var wanted = [];
+if (args.freezeAt !== undefined) wanted.push({ time: l.inPoint, sourceTime: args.freezeAt, interpolation: "hold" });
+else if (args.keyframes) wanted = args.keyframes;
+if (wanted.length) {
+  var keep = {};
+  for (var i = 0; i < wanted.length; i++) {
+    var k = wanted[i];
+    tr.setValueAtTime(k.time, k.sourceTime);
+    var idx = tr.nearestKeyIndex(k.time);
+    keep[String(Math.round(tr.keyTime(idx) * 10000))] = true;
+    var mode = aemcp.interp(k.interpolation);
+    if (mode) tr.setInterpolationTypeAtKey(idx, mode, mode);
+  }
+  for (var r = tr.numKeys; r >= 1; r--) if (!keep[String(Math.round(tr.keyTime(r) * 10000))]) tr.removeKey(r);
+}
+return { layer: l.name, timeRemap: true, keyframes: aemcp.keyframes(tr) };`
+  }
+];
+
+// src/tools/footage.ts
+init_define_AEMCP_CEP_FILES();
+var interpretation = `
+function interp(it) {
+  var s = it.mainSource, o = { item: it.name, id: it.id, file: it.file ? it.file.fsName : null, missing: it.footageMissing, pixelAspect: it.pixelAspect };
+  try { o.isStill = s.isStill; } catch (e) {}
+  try { o.nativeFrameRate = aemcp.round(s.nativeFrameRate); o.conformFrameRate = aemcp.round(s.conformFrameRate); o.displayFrameRate = aemcp.round(s.displayFrameRate); } catch (e) {}
+  try { o.hasAlpha = s.hasAlpha; o.alphaMode = aemcp.enumName(AlphaMode, s.alphaMode); o.invertAlpha = s.invertAlpha; o.premulColor = s.premulColor; } catch (e) {}
+  try { o.fieldSeparation = aemcp.enumName(FieldSeparationType, s.fieldSeparationType); o.highQualityFieldSeparation = s.highQualityFieldSeparation; o.removePulldown = aemcp.enumName(PulldownPhase, s.removePulldown); } catch (e) {}
+  try { o.loop = s.loop; } catch (e) {}
+  try { o.useProxy = it.useProxy; o.proxy = it.proxySource ? (it.proxySource.file ? it.proxySource.file.fsName : "placeholder") : null; } catch (e) {}
+  return o;
+}`;
+var footageTools = [
+  {
+    name: "ae_set_footage_interpretation",
+    title: "Interpret footage",
+    description: "Read or change how footage is interpreted (File > Interpret Footage): conform frame rate, alpha (ignore/straight/premultiplied, invert, premultiplied color), field separation, pulldown removal, looping, pixel aspect ratio. With no settings it only reports the current interpretation.",
+    input: {
+      items: external_exports.array(itemRef).min(1),
+      conformFrameRate: external_exports.number().min(0).optional().describe("0 = use the file's native rate."),
+      alphaMode: external_exports.enum(["IGNORE", "STRAIGHT", "PREMULTIPLIED"]).optional(),
+      invertAlpha: external_exports.boolean().optional(),
+      premulColor: external_exports.union([external_exports.string(), external_exports.array(external_exports.number())]).optional(),
+      fieldSeparation: external_exports.enum(["OFF", "UPPER_FIELD_FIRST", "LOWER_FIELD_FIRST"]).optional(),
+      highQualityFieldSeparation: external_exports.boolean().optional(),
+      removePulldown: external_exports.enum(["OFF", "SSWWW", "SWWWS", "SWWWW_24P_ADVANCE", "WSSWW", "WSWWW_24P_ADVANCE", "WWSSW", "WWSWW_24P_ADVANCE", "WWWSS", "WWWSW_24P_ADVANCE", "WWWWS_24P_ADVANCE"]).optional(),
+      loop: external_exports.number().int().min(1).optional(),
+      pixelAspect: external_exports.number().optional()
+    },
+    jsx: `${interpretation}
+var out = [];
+for (var i = 0; i < args.items.length; i++) {
+  var it = aemcp.findItem(args.items[i]);
+  if (!(it instanceof FootageItem)) aemcp.fail("'" + it.name + "' is not footage");
+  var s = it.mainSource, skipped = [];
+  // each setting on its own: some don't apply to every file (e.g. loop or frame rate on a still)
+  var set = function (label, fn) { try { fn(); } catch (e) { skipped.push(label + ": " + e.message.replace(/^After Effects error: /, "")); } };
+  if (args.conformFrameRate !== undefined) set("conformFrameRate", function () { s.conformFrameRate = args.conformFrameRate; });
+  if (args.alphaMode) set("alphaMode", function () { s.alphaMode = AlphaMode[args.alphaMode]; });
+  if (args.invertAlpha !== undefined) set("invertAlpha", function () { s.invertAlpha = args.invertAlpha; });
+  if (args.premulColor !== undefined) set("premulColor", function () { s.premulColor = aemcp.color3(args.premulColor); });
+  if (args.fieldSeparation) set("fieldSeparation", function () { s.fieldSeparationType = FieldSeparationType[args.fieldSeparation]; });
+  if (args.highQualityFieldSeparation !== undefined) set("highQualityFieldSeparation", function () { s.highQualityFieldSeparation = args.highQualityFieldSeparation; });
+  if (args.removePulldown) set("removePulldown", function () { s.removePulldown = PulldownPhase[args.removePulldown]; });
+  if (args.loop !== undefined) set("loop", function () { s.loop = args.loop; });
+  if (args.pixelAspect !== undefined) set("pixelAspect", function () { it.pixelAspect = args.pixelAspect; });
+  var info = interp(it);
+  if (skipped.length) info.notApplied = skipped;
+  out.push(info);
+}
+return out;`
+  },
+  {
+    name: "ae_set_proxy",
+    title: "Set proxy",
+    description: "Assign a proxy file (or image sequence) to footage or a comp, switch between proxy and original, or remove the proxy.",
+    input: {
+      item: itemRef,
+      path: external_exports.string().optional().describe("Absolute path to the proxy file; omit to only toggle useProxy."),
+      sequence: external_exports.boolean().optional().describe("The proxy is an image sequence (path = first frame)."),
+      remove: external_exports.boolean().optional().describe("Remove the proxy."),
+      useProxy: external_exports.boolean().optional().describe("Use the proxy (true) or the original (false).")
+    },
+    jsx: `${interpretation}
+var it = aemcp.findItem(args.item);
+if (!(it instanceof FootageItem || it instanceof CompItem)) aemcp.fail("'" + it.name + "' is not footage or a comp");
+if (args.remove) it.setProxyToNone();
+else if (args.path) {
+  var f = new File(args.path); if (!f.exists) aemcp.fail("File not found: " + args.path);
+  if (args.sequence) it.setProxyWithSequence(f, false); else it.setProxy(f);
+}
+if (args.useProxy !== undefined) it.useProxy = args.useProxy;
+return it instanceof FootageItem ? interp(it) : { item: it.name, useProxy: it.useProxy, proxy: it.proxySource ? it.proxySource.file.fsName : null };`
+  },
+  {
+    name: "ae_relink_footage",
+    title: "Relink footage",
+    description: "Find missing footage by file name inside a folder (searched recursively) and relink it; image sequences stay sequences. By default handles every missing item; pass items to relink specific ones (also when not missing, e.g. to switch to a new folder).",
+    input: {
+      searchFolder: external_exports.string().describe("Absolute folder to search."),
+      items: external_exports.array(itemRef).optional(),
+      maxFiles: external_exports.number().int().min(100).max(5e5).optional().describe("Stop scanning after this many files (default 50000).")
+    },
+    jsx: `
+var root = new Folder(args.searchFolder);
+if (!root.exists) aemcp.fail("Folder not found: " + args.searchFolder);
+var targets = [];
+if (args.items) { for (var i = 0; i < args.items.length; i++) targets.push(aemcp.findItem(args.items[i])); }
+else { for (var j = 1; j <= app.project.numItems; j++) { var it = app.project.item(j); if (it instanceof FootageItem && it.footageMissing) targets.push(it); } }
+if (!targets.length) return { relinked: [], notFound: [], message: "No missing footage" };
+// index file names in the folder tree (case-insensitive)
+var index = {}, scanned = 0, limit = args.maxFiles || 50000, truncated = false;
+function scan(folder) {
+  var list = folder.getFiles();
+  for (var k = 0; k < list.length; k++) {
+    if (scanned >= limit) { truncated = true; return; }
+    if (list[k] instanceof Folder) scan(list[k]);
+    else { scanned++; var n = "f:" + decodeURI(list[k].name).toLowerCase(); if (!index[n]) index[n] = list[k]; } // prefixed key: see aemcp notes
+  }
+}
+scan(root);
+var relinked = [], notFound = [];
+for (var t = 0; t < targets.length; t++) {
+  var item = targets[t];
+  if (!(item instanceof FootageItem) || !item.file) { notFound.push({ item: item.name, reason: "not file footage" }); continue; }
+  var name = decodeURI(item.file.name).toLowerCase(), hit = index["f:" + name];
+  if (!hit) { notFound.push({ item: item.name, file: decodeURI(item.file.name) }); continue; }
+  var seq = false;
+  try { seq = !item.mainSource.isStill && /\\d+\\.(png|jpe?g|exr|tiff?|dpx|tga|psd|bmp|cin|hdr|sgi)$/i.test(name); } catch (e) {}
+  if (seq) item.replaceWithSequence(hit, false); else item.replace(hit);
+  relinked.push({ item: item.name, file: hit.fsName, sequence: seq });
+}
+return { relinked: relinked, notFound: notFound, filesScanned: scanned, truncated: truncated };`
+  }
+];
+
+// src/tools/text.ts
+init_define_AEMCP_CEP_FILES();
+var charStyle = external_exports.object({
+  font: external_exports.string().optional().describe("PostScript name (see ae_get_fonts)."),
+  fontSize: external_exports.number().optional(),
+  fillColor: colorSchema.optional(),
+  strokeColor: colorSchema.optional(),
+  strokeWidth: external_exports.number().optional(),
+  applyFill: external_exports.boolean().optional(),
+  applyStroke: external_exports.boolean().optional(),
+  tracking: external_exports.number().optional(),
+  leading: external_exports.number().optional(),
+  baselineShift: external_exports.number().optional(),
+  horizontalScale: external_exports.number().optional().describe("Percent."),
+  verticalScale: external_exports.number().optional().describe("Percent."),
+  fauxBold: external_exports.boolean().optional(),
+  fauxItalic: external_exports.boolean().optional(),
+  allCaps: external_exports.boolean().optional(),
+  smallCaps: external_exports.boolean().optional(),
+  superscript: external_exports.boolean().optional(),
+  subscript: external_exports.boolean().optional()
+}).describe("Character style to apply.");
+var textTools = [
+  {
+    name: "ae_style_text_range",
+    title: "Style part of a text",
+    description: "Apply character styling to part of a text layer: by character range (start/end) or every occurrence of a word or phrase (match). Font, size, fill/stroke color, tracking, leading, baseline shift, scale, faux bold/italic, caps, super/subscript. Needs After Effects 24.0+.",
+    input: {
+      comp: compRef,
+      layer: layerRef,
+      start: external_exports.number().int().min(0).optional().describe("First character (0-based)."),
+      end: external_exports.number().int().optional().describe("End character, exclusive (default: end of text)."),
+      match: external_exports.string().optional().describe("Style every occurrence of this text instead of a range."),
+      caseSensitive: external_exports.boolean().optional(),
+      style: charStyle,
+      time: external_exports.number().optional().describe("Apply at this time (Source Text keyframe) when the text is animated.")
+    },
+    jsx: `
+var c = aemcp.findComp(args.comp), l = aemcp.findLayer(c, args.layer);
+var tp = l.property("ADBE Text Properties"); if (!tp) aemcp.fail("'" + l.name + "' is not a text layer");
+var src = tp.property("ADBE Text Document");
+var td = args.time !== undefined ? src.valueAtTime(args.time, false) : src.value;
+if (typeof td.characterRange !== "function") aemcp.fail("Per-character styling needs After Effects 24.0 or newer");
+var text = td.text, ranges = [];
+if (args.match) {
+  var hay = args.caseSensitive ? text : text.toLowerCase(), needle = args.caseSensitive ? args.match : args.match.toLowerCase();
+  var at = hay.indexOf(needle);
+  while (at >= 0 && needle.length) { ranges.push([at, at + needle.length]); at = hay.indexOf(needle, at + needle.length); }
+  if (!ranges.length) aemcp.fail("'" + args.match + "' not found in the text");
+} else ranges.push([args.start || 0, args.end === undefined ? text.length : args.end]);
+var st = args.style, keys = ["font", "fontSize", "strokeWidth", "applyFill", "applyStroke", "tracking", "leading", "baselineShift", "horizontalScale", "verticalScale", "fauxBold", "fauxItalic", "allCaps", "smallCaps", "superscript", "subscript"];
+for (var r = 0; r < ranges.length; r++) {
+  var cr = td.characterRange(ranges[r][0], ranges[r][1]);
+  for (var k = 0; k < keys.length; k++) if (st[keys[k]] !== undefined) {
+    if (keys[k] === "leading") { try { cr.autoLeading = false; } catch (e) {} }
+    cr[keys[k]] = st[keys[k]];
+  }
+  if (st.fillColor !== undefined) { cr.applyFill = true; cr.fillColor = aemcp.color3(st.fillColor); }
+  if (st.strokeColor !== undefined) { cr.applyStroke = true; cr.strokeColor = aemcp.color3(st.strokeColor); }
+}
+if (args.time !== undefined || src.numKeys) src.setValueAtTime(args.time !== undefined ? args.time : c.time, td); else src.setValue(td);
+return { layer: l.name, text: text, styled: ranges };`
+  },
+  {
+    name: "ae_set_paragraph",
+    title: "Paragraph settings",
+    description: "Paragraph formatting of a text layer (all paragraphs or one): justification, indents, space before/after, plus paragraph text box size. Needs After Effects 24.0+ for per-paragraph settings.",
+    input: {
+      comp: compRef,
+      layer: layerRef,
+      paragraph: external_exports.number().int().min(0).optional().describe("0-based paragraph index (default: all)."),
+      justification: external_exports.enum(["LEFT_JUSTIFY", "CENTER_JUSTIFY", "RIGHT_JUSTIFY", "FULL_JUSTIFY_LASTLINE_LEFT", "FULL_JUSTIFY_LASTLINE_CENTER", "FULL_JUSTIFY_LASTLINE_RIGHT", "FULL_JUSTIFY_LASTLINE_FULL"]).optional(),
+      firstLineIndent: external_exports.number().optional(),
+      startIndent: external_exports.number().optional(),
+      endIndent: external_exports.number().optional(),
+      spaceBefore: external_exports.number().optional(),
+      spaceAfter: external_exports.number().optional(),
+      boxSize: external_exports.array(external_exports.number()).length(2).optional().describe("Paragraph (box) text only: [width, height].")
+    },
+    jsx: `
+var c = aemcp.findComp(args.comp), l = aemcp.findLayer(c, args.layer);
+var tp = l.property("ADBE Text Properties"); if (!tp) aemcp.fail("'" + l.name + "' is not a text layer");
+var src = tp.property("ADBE Text Document"), td = src.value;
+var target = td;
+if (typeof td.paragraphRange === "function") {
+  var count = td.paragraphCount || 1;
+  target = args.paragraph === undefined ? td.paragraphRange(0, count) : td.paragraphRange(args.paragraph, args.paragraph + 1);
+} else if (args.paragraph !== undefined) aemcp.fail("Per-paragraph settings need After Effects 24.0 or newer");
+if (args.justification) target.justification = ParagraphJustification[args.justification];
+var keys = ["firstLineIndent", "startIndent", "endIndent", "spaceBefore", "spaceAfter"];
+for (var i = 0; i < keys.length; i++) if (args[keys[i]] !== undefined) target[keys[i]] = args[keys[i]];
+if (args.boxSize) { if (!td.boxText) aemcp.fail("boxSize only applies to paragraph (box) text"); td.boxTextSize = args.boxSize; }
+if (src.numKeys) src.setValueAtTime(c.time, td); else src.setValue(td);
+return { layer: l.name, text: aemcp.textInfo(src.value) };`
+  },
+  {
+    name: "ae_add_text_animator",
+    title: "Add text animator",
+    description: 'Add a text animator to a text layer: the properties it changes (position, scale, rotation, opacity, fill/stroke color, tracking, blur, skew, anchor point, character offset...) and a selector (range, wiggly or expression) with its settings. Animate the selector afterwards with ae_set_keyframes on paths like "Text/Animators/Animator 1/Selectors/Range Selector 1/Offset" (use ae_get_properties to see the exact names).',
+    input: {
+      comp: compRef,
+      layer: layerRef,
+      name: external_exports.string().optional(),
+      properties: external_exports.object({
+        position: external_exports.array(external_exports.number()).min(2).max(3).optional(),
+        anchorPoint: external_exports.array(external_exports.number()).min(2).max(3).optional(),
+        scale: external_exports.array(external_exports.number()).min(2).max(3).optional(),
+        rotation: external_exports.number().optional(),
+        opacity: external_exports.number().optional(),
+        skew: external_exports.number().optional(),
+        tracking: external_exports.number().optional(),
+        lineSpacing: external_exports.array(external_exports.number()).length(2).optional(),
+        blur: external_exports.array(external_exports.number()).length(2).optional(),
+        fillColor: colorSchema.optional(),
+        fillOpacity: external_exports.number().optional(),
+        strokeColor: colorSchema.optional(),
+        strokeWidth: external_exports.number().optional(),
+        characterOffset: external_exports.number().optional()
+      }).describe("Animator properties and their values (at full selection)."),
+      selector: external_exports.object({
+        type: external_exports.enum(["range", "wiggly", "expression"]).optional().describe("Default range."),
+        start: external_exports.number().optional().describe("Percent (or index with units: index)."),
+        end: external_exports.number().optional(),
+        offset: external_exports.number().optional(),
+        units: external_exports.enum(["percentage", "index"]).optional(),
+        basedOn: external_exports.enum(["characters", "charactersExcludingSpaces", "words", "lines"]).optional(),
+        mode: external_exports.enum(["add", "subtract", "intersect", "min", "max", "difference"]).optional(),
+        shape: external_exports.enum(["square", "rampUp", "rampDown", "triangle", "round", "smooth"]).optional(),
+        smoothness: external_exports.number().optional(),
+        easeHigh: external_exports.number().optional(),
+        easeLow: external_exports.number().optional(),
+        randomizeOrder: external_exports.boolean().optional(),
+        amountExpression: external_exports.string().optional().describe('For type "expression": the Amount expression, e.g. "textIndex * 10".'),
+        maxAmount: external_exports.number().optional().describe("Wiggly: max amount %."),
+        minAmount: external_exports.number().optional(),
+        wigglesPerSecond: external_exports.number().optional()
+      }).optional()
+    },
+    jsx: `
+var c = aemcp.findComp(args.comp), l = aemcp.findLayer(c, args.layer);
+var tp = l.property("ADBE Text Properties"); if (!tp) aemcp.fail("'" + l.name + "' is not a text layer");
+var an = tp.property("ADBE Text Animators").addProperty("ADBE Text Animator");
+if (args.name) an.name = args.name;
+var props = an.property("ADBE Text Animator Properties"), P = args.properties || {};
+var map = { position: "ADBE Text Position 3D", anchorPoint: "ADBE Text Anchor Point 3D", scale: "ADBE Text Scale 3D", rotation: "ADBE Text Rotation",
+  opacity: "ADBE Text Opacity", skew: "ADBE Text Skew", tracking: "ADBE Text Tracking Amount", lineSpacing: "ADBE Text Line Spacing", blur: "ADBE Text Blur",
+  fillColor: "ADBE Text Fill Color", fillOpacity: "ADBE Text Fill Opacity", strokeColor: "ADBE Text Stroke Color", strokeWidth: "ADBE Text Stroke Width",
+  characterOffset: "ADBE Text Character Offset" };
+var added = [];
+for (var k in P) {
+  if (!P.hasOwnProperty(k) || P[k] === undefined) continue;
+  if (!map[k]) aemcp.fail("Unknown animator property " + k);
+  var ap = props.addProperty(map[k]);
+  var v = P[k];
+  if (k === "fillColor" || k === "strokeColor") v = aemcp.color3(v);
+  if ((k === "position" || k === "anchorPoint") && v.length === 2) v = [v[0], v[1], 0];
+  if (k === "scale" && v.length === 2) v = [v[0], v[1], 100];
+  ap.setValue(v);
+  if (k === "tracking") { try { props.property("ADBE Text Track Type").setValue(1); } catch (e) {} }
+  added.push(ap.name);
+}
+var S = args.selector || {}, type = S.type || "range";
+var sel = an.property("ADBE Text Selectors").addProperty(type === "wiggly" ? "ADBE Text Wiggly Selector" : (type === "expression" ? "ADBE Text Expressible Selector" : "ADBE Text Selector"));
+var adv = sel.property("ADBE Text Range Advanced");
+function setIf(group, mn, val) { if (val === undefined) return; var q = group ? group.property(mn) : null; if (!q) { log("selector property " + mn + " not available"); return; } q.setValue(val); }
+var units = { percentage: 1, index: 2 }, based = { characters: 1, charactersExcludingSpaces: 2, words: 3, lines: 4 };
+var modes = { add: 1, subtract: 2, intersect: 3, min: 4, max: 5, difference: 6 }, shapes = { square: 1, rampUp: 2, rampDown: 3, triangle: 4, round: 5, smooth: 6 };
+if (type === "range") {
+  if (S.units) setIf(adv, "ADBE Text Range Units", units[S.units]);
+  setIf(sel, "ADBE Text Percent Start", S.start);
+  setIf(sel, "ADBE Text Percent End", S.end);
+  setIf(sel, "ADBE Text Percent Offset", S.offset);
+  if (S.units === "index") { setIf(sel, "ADBE Text Index Start", S.start); setIf(sel, "ADBE Text Index End", S.end); setIf(sel, "ADBE Text Index Offset", S.offset); }
+  if (S.shape) setIf(adv, "ADBE Text Range Shape", shapes[S.shape]);
+  setIf(adv, "ADBE Text Selector Smoothness", S.smoothness);
+  setIf(adv, "ADBE Text Levels Max Ease", S.easeHigh);
+  setIf(adv, "ADBE Text Levels Min Ease", S.easeLow);
+  if (S.randomizeOrder !== undefined) setIf(adv, "ADBE Text Randomize Order", S.randomizeOrder ? 1 : 0);
+} else if (type === "wiggly") {
+  setIf(sel, "ADBE Text Wiggly Max Amount", S.maxAmount);
+  setIf(sel, "ADBE Text Wiggly Min Amount", S.minAmount);
+  setIf(sel, "ADBE Text Temporal Freq", S.wigglesPerSecond);
+} else if (S.amountExpression) {
+  sel.property("ADBE Text Expressible Amount").expression = S.amountExpression;
+}
+if (S.basedOn) setIf(adv || sel, "ADBE Text Range Type2", based[S.basedOn]); // wiggly selectors keep these at the top level
+if (S.mode) setIf(adv || sel, "ADBE Text Selector Mode", modes[S.mode]);
+return { layer: l.name, animator: an.name, properties: added, selector: sel.name, tree: aemcp.propInfo(an, { depth: 3 }) };`
+  }
+];
+var egpTools = [
+  {
+    name: "ae_essential_graphics",
+    title: "Essential Graphics",
+    description: "Work with a composition's Essential Graphics panel (Motion Graphics template): list its controllers, add a property as a controller (with a display name), and set the template name. Export the result with ae_export_mogrt.",
+    input: {
+      comp: compRef,
+      add: external_exports.array(external_exports.object({ layer: layerRef, path: external_exports.string(), name: external_exports.string() })).optional().describe("Properties to add as controllers."),
+      templateName: external_exports.string().optional()
+    },
+    jsx: `
+var c = aemcp.findComp(args.comp), added = [];
+if (args.templateName) c.motionGraphicsTemplateName = args.templateName;
+for (var i = 0; i < (args.add || []).length; i++) {
+  var a = args.add[i], p = aemcp.resolveProp(aemcp.findLayer(c, a.layer), a.path);
+  if (!p.canAddToMotionGraphicsTemplate(c)) aemcp.fail("'" + a.path + "' can't be added to the Essential Graphics panel");
+  p.addToMotionGraphicsTemplateAs(c, a.name);
+  added.push(a.name);
+}
+var names = [];
+for (var k = 0; k < c.motionGraphicsTemplateControllerCount; k++) names.push(c.getMotionGraphicsTemplateControllerName(k + 1));
+return { comp: c.name, templateName: c.motionGraphicsTemplateName, controllers: names, added: added };`
+  },
+  {
+    name: "ae_export_mogrt",
+    title: "Export Motion Graphics template",
+    description: "Export a composition as a Motion Graphics template (.mogrt) for Premiere Pro, to a folder (default: the user's Essential Graphics templates folder).",
+    input: {
+      comp: compRef,
+      folder: external_exports.string().optional().describe("Absolute output folder (default: the Essential Graphics local templates folder)."),
+      overwrite: external_exports.boolean().optional()
+    },
+    noUndo: true,
+    jsx: `
+var c = aemcp.findComp(args.comp);
+if (!c.motionGraphicsTemplateControllerCount) log("Note: the template has no Essential Graphics controllers");
+// read everything first: After Effects invalidates the comp object during the export
+var info = { comp: c.name, templateName: c.motionGraphicsTemplateName || c.name, controllers: c.motionGraphicsTemplateControllerCount };
+var ok = args.folder ? c.exportAsMotionGraphicsTemplate(!!args.overwrite, args.folder) : c.exportAsMotionGraphicsTemplate(!!args.overwrite);
+if (!ok) aemcp.fail("Export failed (does the file exist already? pass overwrite: true)");
+info.exported = true;
+info.file = (args.folder ? args.folder : "the Essential Graphics templates folder") + "/" + info.templateName + ".mogrt";
+return info;`
+  }
+];
+var healthTools = [
+  {
+    name: "ae_project_health",
+    title: "Project health check",
+    description: "Check the whole project for problems: missing footage, missing or substituted fonts, effects whose plug-in is not installed, expressions with errors, unused footage, empty comps and folders, duplicate comp names. Read-only.",
+    input: { maxLayers: external_exports.number().int().min(100).max(1e5).optional().describe("Stop scanning after this many layers (default 5000).") },
+    readOnly: true,
+    timeoutMs: 3e5,
+    jsx: `
+var p = app.project, R = { missingFootage: [], missingFonts: [], missingEffects: [], expressionErrors: [], unusedFootage: [], emptyComps: [], emptyFolders: [], duplicateCompNames: [] };
+var installed = {}, all = app.effects;
+for (var e = 0; e < all.length; e++) installed["m:" + all[e].matchName] = true;
+var names = {}, layersSeen = 0, lim = args.maxLayers || 5000, truncated = false;
+// a plain function declaration: ExtendScript mishandles recursive named function expressions inside loops
+function scanExpressions(g, path, comp, layer) {
+  for (var q = 1; q <= g.numProperties; q++) {
+    var pr = g.property(q), pp = path ? path + "/" + pr.name : pr.name;
+    if (pr.propertyType === PropertyType.PROPERTY) { try { if (pr.canSetExpression && pr.expression && pr.expressionEnabled && pr.expressionError) R.expressionErrors.push({ comp: comp.name, layer: layer.name, property: pp, error: pr.expressionError }); } catch (x) {} }
+    else scanExpressions(pr, pp, comp, layer);
+  }
+}
+for (var i = 1; i <= p.numItems; i++) {
+  var it = p.item(i);
+  if (it instanceof FootageItem) {
+    if (it.footageMissing) R.missingFootage.push({ id: it.id, name: it.name, file: it.file ? it.file.fsName : null });
+    else if (it.usedIn.length === 0 && !(it.mainSource instanceof PlaceholderSource)) R.unusedFootage.push({ id: it.id, name: it.name });
+  } else if (it instanceof FolderItem) {
+    if (it.numItems === 0) R.emptyFolders.push(it.name);
+  } else if (it instanceof CompItem) {
+    var nk = "n:" + it.name; // prefixed: ExtendScript objects have built-in members (reflect, watch, toSource...)
+    names[nk] = (names[nk] || 0) + 1;
+    if (names[nk] === 2) R.duplicateCompNames.push(it.name);
+    if (it.numLayers === 0) R.emptyComps.push(it.name);
+    for (var j = 1; j <= it.numLayers; j++) {
+      if (layersSeen++ >= lim) { truncated = true; break; }
+      var L = it.layer(j), fx = L.property("ADBE Effect Parade");
+      if (fx) for (var f = 1; f <= fx.numProperties; f++) { var ef = fx.property(f); if (!installed["m:" + ef.matchName]) R.missingEffects.push({ comp: it.name, layer: L.name, effect: ef.name, matchName: ef.matchName }); }
+      scanExpressions(L, "", it, L);
+    }
+  }
+}
+try {
+  var mf = app.fonts.missingOrSubstitutedFonts;
+  for (var m = 0; m < mf.length; m++) R.missingFonts.push({ postScriptName: mf[m].postScriptName, family: mf[m].familyName, style: mf[m].styleName, substitute: mf[m].isSubstitute });
+} catch (x) { R.missingFonts = "requires After Effects 24.0+"; }
+var cap = function (a) { return a instanceof Array && a.length > 100 ? a.slice(0, 100).concat(["... " + (a.length - 100) + " more"]) : a; };
+var summary = {};
+for (var key in R) if (R.hasOwnProperty(key)) { summary[key] = R[key] instanceof Array ? R[key].length : R[key]; R[key] = cap(R[key]); }
+return { summary: summary, layersScanned: layersSeen, truncated: truncated, details: R };`
+  }
+];
+
+// src/tools/renderjobs.ts
+init_define_AEMCP_CEP_FILES();
+import { spawn } from "node:child_process";
+import { createWriteStream, existsSync as existsSync4, mkdirSync as mkdirSync5 } from "node:fs";
+import { homedir as homedir5 } from "node:os";
+import { dirname as dirname5, join as join7 } from "node:path";
+var jobs = /* @__PURE__ */ new Map();
+var LOG_DIR = join7(homedir5(), ".aemcp", "renders");
+function aerenderPath(appPackage) {
+  const candidates = process.platform === "win32" ? [join7(appPackage, "aerender.exe"), join7(dirname5(appPackage), "aerender.exe"), join7(appPackage, "Support Files", "aerender.exe")] : [join7(dirname5(appPackage), "aerender"), join7(appPackage, "..", "aerender")];
+  return candidates.find((p) => existsSync4(p)) ?? null;
+}
+function view(j) {
+  const pct = j.frames ? Math.min(100, Math.round(j.frameRendered / j.frames * 100)) : null;
+  const rendering = j.tail.some((l) => /PROGRESS:.*\(\d+\)/.test(l));
+  return {
+    id: j.id,
+    comp: j.comp,
+    status: j.status,
+    // aerender starts its own copy of After Effects first, which often takes a minute or two
+    phase: j.status !== "running" ? void 0 : rendering ? "rendering" : "starting the render engine (can take a minute or two)",
+    elapsedSeconds: Math.round(((j.endedAt ? Date.parse(j.endedAt) : Date.now()) - Date.parse(j.startedAt)) / 1e3),
+    progress: j.status === "done" ? 100 : pct,
+    framesRendered: j.frameRendered,
+    totalFrames: j.frames || null,
+    output: j.output,
+    startedAt: j.startedAt,
+    endedAt: j.endedAt,
+    log: j.log,
+    lastLines: j.tail.slice(-6)
+  };
+}
+function registerRenderJobs(server) {
+  server.registerTool(
+    "ae_render_background",
+    {
+      title: "Render in background",
+      description: "Render a composition (or a render queue item) with aerender in a separate process, so After Effects stays usable. It renders the project as saved on disk: pass save:true to save the open project first (required when it has unsaved changes). Returns a job id; check progress with ae_render_jobs and cancel there.",
+      inputSchema: {
+        comp: external_exports.union([external_exports.number().int(), external_exports.string()]).optional().describe("Composition to render (id or name; default: the active comp)."),
+        rqIndex: external_exports.number().int().min(1).optional().describe("Render this render queue item with its own settings instead of a comp."),
+        output: external_exports.string().optional().describe("Absolute output path (with comp). Extension should match the output module."),
+        renderSettingsTemplate: external_exports.string().optional().describe('e.g. "Best Settings".'),
+        outputModuleTemplate: external_exports.string().optional().describe('e.g. "High Quality", "H.264 - Match Render Settings - 15 Mbps".'),
+        startFrame: external_exports.number().int().optional(),
+        endFrame: external_exports.number().int().optional(),
+        save: external_exports.boolean().optional().describe("Save the open project first (needed if it has unsaved changes).")
+      },
+      annotations: { destructiveHint: false, openWorldHint: false }
+    },
+    async (args) => {
+      try {
+        if (permissions().mode === "read-only" && args.save) return errorResult(READ_ONLY_REFUSAL);
+        if (!args.rqIndex && !args.output) return errorResult("Pass output (an absolute file path) when rendering a comp.");
+        const r = await runJsx(
+          `
+var p = app.project;
+if (!p.file) aemcp.fail("The project has never been saved. Save it first (ae_save_project with a path), then render.");
+if (p.dirty) { if (args.save) p.save(); else aemcp.fail("The project has unsaved changes; aerender renders the file on disk. Pass save:true to save first."); }
+var name = null, frames = 0;
+if (args.rqIndex) {
+  if (args.rqIndex > p.renderQueue.numItems) aemcp.fail("No render queue item " + args.rqIndex);
+  var it = p.renderQueue.item(args.rqIndex); name = it.comp.name;
+  frames = Math.round(it.timeSpanDuration / it.comp.frameDuration);
+} else {
+  var c = aemcp.findComp(args.comp); name = c.name;
+  var dupes = 0; for (var i = 1; i <= p.numItems; i++) if (p.item(i) instanceof CompItem && p.item(i).name === name) dupes++;
+  if (dupes > 1) aemcp.fail("Several comps are named '" + name + "'; aerender needs a unique name. Rename one, or use rqIndex.");
+  frames = Math.round(c.workAreaDuration / c.frameDuration);
+}
+if (args.startFrame !== undefined && args.endFrame !== undefined) frames = args.endFrame - args.startFrame + 1;
+return { project: p.file.fsName, comp: name, frames: frames, app: Folder.appPackage.fsName };`,
+          args,
+          { undoGroup: false, timeoutMs: 12e4 }
+        );
+        if (!r.ok) return formatResult(r);
+        const info = r.result;
+        const bin = aerenderPath(info.app);
+        if (!bin) return errorResult(`aerender was not found next to ${info.app}.`);
+        const cli = ["-project", info.project, "-v", "ERRORS_AND_PROGRESS"];
+        if (args.rqIndex) cli.push("-rqindex", String(args.rqIndex));
+        else cli.push("-comp", info.comp);
+        if (args.output) cli.push("-output", args.output);
+        if (args.renderSettingsTemplate) cli.push("-RStemplate", args.renderSettingsTemplate);
+        if (args.outputModuleTemplate) cli.push("-OMtemplate", args.outputModuleTemplate);
+        if (args.startFrame !== void 0) cli.push("-s", String(args.startFrame));
+        if (args.endFrame !== void 0) cli.push("-e", String(args.endFrame));
+        if (args.output) mkdirSync5(dirname5(args.output), { recursive: true });
+        mkdirSync5(LOG_DIR, { recursive: true });
+        const id = `r${Date.now().toString(36)}`;
+        const logPath = join7(LOG_DIR, `${id}.log`);
+        const logStream = createWriteStream(logPath);
+        const job = {
+          id,
+          comp: info.comp,
+          output: args.output || "(render queue item output)",
+          project: info.project,
+          status: "running",
+          startedAt: (/* @__PURE__ */ new Date()).toISOString(),
+          frames: info.frames,
+          frameRendered: 0,
+          log: logPath,
+          tail: []
+        };
+        const proc = spawn(bin, cli, { stdio: ["ignore", "pipe", "pipe"] });
+        job.proc = proc;
+        const onData = (d) => {
+          const text = d.toString();
+          logStream.write(text);
+          for (const line of text.split(/\r?\n/)) {
+            if (!line.trim()) continue;
+            const m = line.match(/PROGRESS:.*\((\d+)\)/);
+            if (m) job.frameRendered = Math.max(job.frameRendered, Number(m[1]));
+            job.tail.push(line.trim());
+            if (job.tail.length > 50) job.tail.shift();
+          }
+        };
+        proc.stdout.on("data", onData);
+        proc.stderr.on("data", onData);
+        proc.on("error", (e) => {
+          job.status = "failed";
+          job.tail.push(String(e));
+          job.endedAt = (/* @__PURE__ */ new Date()).toISOString();
+        });
+        proc.on("exit", (code) => {
+          logStream.end();
+          job.exitCode = code;
+          job.endedAt = (/* @__PURE__ */ new Date()).toISOString();
+          if (job.status === "running") job.status = code === 0 && !job.tail.some((l) => /aerender ERROR|^ERROR/i.test(l)) ? "done" : "failed";
+          job.proc = void 0;
+        });
+        jobs.set(id, job);
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Background render started: job ${id} (${info.comp}, ${info.frames || "?"} frames) from ${info.project}.
+Check progress with ae_render_jobs. Log: ${logPath}`
+            }
+          ]
+        };
+      } catch (e) {
+        return errorResult(e);
+      }
+    }
+  );
+  server.registerTool(
+    "ae_render_jobs",
+    {
+      title: "Background render jobs",
+      description: "Status and progress of background renders started with ae_render_background (this session), or cancel one.",
+      inputSchema: {
+        id: external_exports.string().optional().describe("Only this job."),
+        cancel: external_exports.string().optional().describe("Cancel this job id.")
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false }
+    },
+    async ({ id, cancel }) => {
+      if (cancel) {
+        const j = jobs.get(cancel);
+        if (!j) return errorResult(`No job ${cancel}`);
+        if (j.status === "running" && j.proc) {
+          j.status = "cancelled";
+          j.proc.kill();
+        }
+        return { content: [{ type: "text", text: JSON.stringify(view(j)) }] };
+      }
+      const list = [...jobs.values()].filter((j) => !id || j.id === id).map(view);
+      if (id && !list.length) return errorResult(`No job ${id}`);
+      return { content: [{ type: "text", text: list.length ? JSON.stringify(id ? list[0] : list) : "No background renders in this session." }] };
+    }
+  );
+}
+
 // src/tools/project.ts
 init_define_AEMCP_CEP_FILES();
 var projectTools = [
@@ -76720,6 +77354,57 @@ if (args.workAreaOnly === false) { it.timeSpanStart = 0; it.timeSpanDuration = c
 return { index: app.project.renderQueue.numItems, comp: c.name, output: om.file ? om.file.fsName : null, template: om.name };`
   },
   {
+    name: "ae_get_render_settings",
+    title: "Get render settings",
+    description: "Read the exact render settings and output-module settings of a render queue item (resolution, quality, time span, frame rate, motion blur, color depth, format, codec/video output, audio, resize, crop...), as editable key/value pairs for ae_set_render_settings.",
+    input: { index: external_exports.number().int().min(1).optional().describe("Render queue item (default: the last one).") },
+    readOnly: true,
+    jsx: `
+var rq = app.project.renderQueue; if (!rq.numItems) aemcp.fail("Render queue is empty");
+var it = rq.item(args.index || rq.numItems), oms = [];
+for (var i = 1; i <= it.numOutputModules; i++) {
+  var om = it.outputModule(i);
+  oms.push({ index: i, template: om.name, file: om.file ? om.file.fsName : null, settings: om.getSettings(GetSettingsFormat.STRING_SETTABLE) });
+}
+return { index: args.index || rq.numItems, comp: it.comp.name, status: aemcp.enumName(RQItemStatus, it.status),
+  renderSettings: it.getSettings(GetSettingsFormat.STRING_SETTABLE), outputModules: oms,
+  renderSettingsTemplates: it.templates, outputModuleTemplates: it.outputModule(1).templates };`
+  },
+  {
+    name: "ae_set_render_settings",
+    title: "Set render settings",
+    description: 'Change render settings and/or output-module settings of a render queue item using the keys from ae_get_render_settings (e.g. renderSettings {"Quality": "Best", "Resolution": "Full", "Time Span": "Custom", "Time Span Start": "1.0"}; outputModule {"Output File Info": {"Full Flat Path": "/out/a.mov"}, "Format": "QuickTime"}). Returns the resulting settings.',
+    input: {
+      index: external_exports.number().int().min(1).optional().describe("Render queue item (default: the last one)."),
+      renderSettings: external_exports.record(external_exports.string(), external_exports.any()).optional(),
+      outputModule: external_exports.record(external_exports.string(), external_exports.any()).optional(),
+      outputModuleIndex: external_exports.number().int().min(1).optional().describe("Default 1."),
+      renderSettingsTemplate: external_exports.string().optional().describe("Apply a template first."),
+      outputModuleTemplate: external_exports.string().optional().describe("Apply a template first.")
+    },
+    jsx: `
+var rq = app.project.renderQueue; if (!rq.numItems) aemcp.fail("Render queue is empty");
+var it = rq.item(args.index || rq.numItems), om = it.outputModule(args.outputModuleIndex || 1);
+if (args.renderSettingsTemplate) it.applyTemplate(args.renderSettingsTemplate);
+if (args.outputModuleTemplate) om.applyTemplate(args.outputModuleTemplate);
+if (args.renderSettings) it.setSettings(args.renderSettings);
+if (args.outputModule) om.setSettings(args.outputModule);
+return { comp: it.comp.name, renderSettings: it.getSettings(GetSettingsFormat.STRING_SETTABLE), outputModule: om.getSettings(GetSettingsFormat.STRING_SETTABLE), file: om.file ? om.file.fsName : null };`
+  },
+  {
+    name: "ae_queue_in_media_encoder",
+    title: "Queue in Media Encoder",
+    description: "Send the queued render queue items to Adobe Media Encoder (Composition > Add to Adobe Media Encoder Queue), optionally starting the encode.",
+    input: { start: external_exports.boolean().optional().describe("Start encoding immediately in Media Encoder (default false).") },
+    noUndo: true,
+    jsx: `
+var rq = app.project.renderQueue;
+if (!rq.numItems) aemcp.fail("Render queue is empty");
+if (!rq.canQueueInAME) aemcp.fail("Media Encoder can't be used: it may not be installed, or no render queue item is queued");
+rq.queueInAME(!!args.start);
+return { sentToMediaEncoder: true, started: !!args.start };`
+  },
+  {
     name: "ae_render_queue_start",
     title: "Start render",
     description: "Render all queued items (blocks After Effects until finished). Use timeoutSeconds for long renders. For background renders prefer aerender via a shell.",
@@ -76745,17 +77430,685 @@ return { removed: n };`
   }
 ];
 
+// src/tools/profile.ts
+init_define_AEMCP_CEP_FILES();
+
+// src/activity.ts
+init_define_AEMCP_CEP_FILES();
+import { appendFileSync, existsSync as existsSync5, mkdirSync as mkdirSync6, readFileSync as readFileSync7, renameSync, statSync as statSync2 } from "node:fs";
+import { homedir as homedir6 } from "node:os";
+import { join as join8 } from "node:path";
+var ACTIVITY_FILE = join8(homedir6(), ".aemcp", "activity.jsonl");
+var MAX_BYTES = 5 * 1024 * 1024;
+function trimArgs(args) {
+  const json3 = JSON.stringify(args ?? {});
+  if (json3.length <= 2e4) return args;
+  return { truncated: true, preview: json3.slice(0, 2e4) };
+}
+function logActivity(e) {
+  if (process.env.AEMCP_NO_ACTIVITY_LOG) return;
+  try {
+    mkdirSync6(join8(homedir6(), ".aemcp"), { recursive: true });
+    if (existsSync5(ACTIVITY_FILE) && statSync2(ACTIVITY_FILE).size > MAX_BYTES) renameSync(ACTIVITY_FILE, ACTIVITY_FILE + ".1");
+    appendFileSync(ACTIVITY_FILE, JSON.stringify({ ...e, args: trimArgs(e.args) }) + "\n");
+  } catch {
+  }
+}
+function readActivity(limit = 50) {
+  try {
+    const lines = readFileSync7(ACTIVITY_FILE, "utf8").trim().split("\n");
+    return lines.slice(-limit).map((l) => JSON.parse(l)).reverse();
+  } catch {
+    return [];
+  }
+}
+
+// src/tools/profile.ts
+var CORE_TOOLS = /* @__PURE__ */ new Set([
+  // connection, scripting, seeing
+  "ae_status",
+  "ae_run_script",
+  "ae_get_scripting_guide",
+  "ae_render_frame",
+  "ae_render_contact_sheet",
+  // understanding the project
+  "ae_get_project_info",
+  "ae_get_comp_info",
+  "ae_get_layer_info",
+  "ae_get_selection",
+  "ae_get_properties",
+  "ae_find_properties",
+  "ae_get_layer_bounds",
+  "ae_get_comp_map",
+  // common edits
+  "ae_create_comp",
+  "ae_add_layer",
+  "ae_add_shape",
+  "ae_set_property",
+  "ae_set_keyframes",
+  "ae_set_expression",
+  "ae_apply_effect",
+  "ae_get_effect_params",
+  "ae_undo"
+]);
+function resolveProfile(argv = process.argv) {
+  const i = argv.indexOf("--tools");
+  const env = process.env.AEMCP_TOOLS && process.env.AEMCP_TOOLS.toLowerCase() !== "false" ? process.env.AEMCP_TOOLS : void 0;
+  const raw = (i >= 0 ? argv[i + 1] : void 0) ?? env ?? loadConfig().toolProfile ?? "core";
+  const v = String(raw).trim().toLowerCase();
+  if (v === "full" || v === "all" || v === "true") return { name: "full", allows: () => true };
+  if (v === "core" || v === "false" || v === "") return { name: "core", allows: (t) => CORE_TOOLS.has(t) };
+  const extra = new Set(v.split(",").map((s) => s.trim()).filter((s) => s && s !== "core"));
+  return { name: "custom", allows: (t) => CORE_TOOLS.has(t) || extra.has(t) };
+}
+function applyProfile(server, profile) {
+  const original = server.registerTool.bind(server);
+  server.registerTool = (name, config2, cb) => {
+    if (!profile.allows(name)) return void 0;
+    const wrapped = async (args, extra) => {
+      const t0 = Date.now();
+      let result;
+      try {
+        result = await callContext.run({ tool: name, signal: extra?.signal }, () => cb(args, extra));
+        return result;
+      } finally {
+        const text = result?.content?.find((c) => c.type === "text")?.text ?? "";
+        const changesAt = text.indexOf("\nChanges");
+        logActivity({
+          at: new Date(t0).toISOString(),
+          client: server.server.getClientVersion?.()?.name,
+          tool: name,
+          args,
+          ms: Date.now() - t0,
+          ok: !!result && !result.isError,
+          summary: text.split("\n")[0].slice(0, 300) || (result ? void 0 : "no result (exception)"),
+          changes: changesAt >= 0 ? text.slice(changesAt).split("\n").filter((l) => /^[+~-] /.test(l)).length : void 0
+        });
+      }
+    };
+    return original(name, config2, wrapped);
+  };
+}
+
+// src/cli/chatgpt.ts
+init_define_AEMCP_CEP_FILES();
+import { spawn as spawn2 } from "node:child_process";
+import { existsSync as existsSync6 } from "node:fs";
+import { fileURLToPath } from "node:url";
+function chatgpt(argv) {
+  ensureConfig();
+  const cfg = loadConfig();
+  const port = String(cfg.httpPort);
+  const children = [];
+  const cleanup = () => children.forEach((c) => {
+    try {
+      c.kill();
+    } catch {
+    }
+  });
+  process.on("SIGINT", () => {
+    cleanup();
+    process.exit(0);
+  });
+  process.on("exit", cleanup);
+  const srv = spawn2(process.execPath, [fileURLToPath(import.meta.url), "--http", "--port", port], { stdio: ["ignore", "inherit", "inherit"] });
+  children.push(srv);
+  srv.on("exit", (code) => {
+    fail(`MCP server exited (${code})`);
+    process.exit(1);
+  });
+  const announce = (base) => console.log(`
+${bold("ChatGPT connector URL")} (keep it secret, it contains your access token):
+
+  ${yellow(`${base}/mcp/${cfg.token}`)}
+
+In ChatGPT: Settings > Apps & Connectors > Advanced settings > turn on Developer mode,
+then Create a connector > paste the URL above > Authentication: "No authentication" > Create.
+Keep this window open while you use it. Press Ctrl+C to stop.
+`);
+  console.log(dim("Tip: the ChatGPT desktop app does not need this; 1. Install connects it directly (Settings > Plugins).\n"));
+  if (argv.includes("--local")) return announce(`http://127.0.0.1:${port}`);
+  const cloudflared = which("cloudflared") || (isWin ? null : ["/opt/homebrew/bin/cloudflared", "/usr/local/bin/cloudflared"].find((p) => existsSync6(p)) ?? null);
+  const ngrok = which("ngrok");
+  let shown = false;
+  if (cloudflared) {
+    const t = spawn2(cloudflared, ["tunnel", "--no-autoupdate", "--url", `http://127.0.0.1:${port}`], { stdio: ["ignore", "pipe", "pipe"] });
+    children.push(t);
+    const onData = (d) => {
+      const m = String(d).match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/);
+      if (m && !shown) {
+        shown = true;
+        announce(m[0]);
+      }
+    };
+    t.stdout.on("data", onData);
+    t.stderr.on("data", onData);
+    console.log(dim("Starting Cloudflare tunnel..."));
+  } else if (ngrok) {
+    const t = spawn2(ngrok, ["http", port, "--log", "stdout", "--log-format", "json"], { stdio: ["ignore", "pipe", "inherit"] });
+    children.push(t);
+    t.stdout.on("data", (d) => {
+      for (const line of String(d).split("\n")) {
+        try {
+          const j = JSON.parse(line);
+          if (j.url?.startsWith("https") && !shown) {
+            shown = true;
+            announce(j.url);
+          }
+        } catch {
+        }
+      }
+    });
+    console.log(dim("Starting ngrok tunnel..."));
+  } else {
+    warn("ChatGPT needs a public HTTPS address, which needs a free tunnel tool. Install one, then run this again:");
+    console.log(`  - cloudflared (no account): ${isWin ? "winget install --id Cloudflare.cloudflared" : "brew install cloudflared"}`);
+    console.log("  - or ngrok: https://ngrok.com/download");
+    console.log(`
+The server is running locally at http://127.0.0.1:${port}/mcp (token in ~/.aemcp/config.json).`);
+  }
+}
+
+// src/cli/diagnostics.ts
+init_define_AEMCP_CEP_FILES();
+import { spawnSync as spawnSync3 } from "node:child_process";
+import { arch, release } from "node:os";
+import { join as join9 } from "node:path";
+import { existsSync as existsSync7, readFileSync as readFileSync8 } from "node:fs";
+function debugMode() {
+  return CSXS_VERSIONS.map((v) => {
+    const r = isWin ? spawnSync3("reg", ["query", `HKCU\\Software\\Adobe\\CSXS.${v}`, "/v", "PlayerDebugMode"], { encoding: "utf8" }) : isMac ? spawnSync3("defaults", ["read", `com.adobe.CSXS.${v}`, "PlayerDebugMode"], { encoding: "utf8" }) : null;
+    return `${v}:${r && r.status === 0 && /(^|\s)1\s*$/m.test(r.stdout) ? "on" : "off"}`;
+  }).join(" ");
+}
+function clientEntry(file2) {
+  const data = readJson(file2, null);
+  const e = data?.mcpServers?.[SERVER_NAME];
+  if (!e) return data ? "no entry" : "not found";
+  return `${e.command} ${(e.args || []).join(" ")}${e.command && !existsSync7(e.command) ? "  (COMMAND MISSING)" : ""}`;
+}
+async function diagnostics() {
+  const L = ["### AE MCP diagnostics", `time: ${(/* @__PURE__ */ new Date()).toISOString()}`];
+  L.push(`server: v${VERSION} (helpers ${HELPER_VERSION}) \xB7 tools profile: ${resolveProfile().name}`);
+  L.push(`os: ${process.platform} ${release()} ${arch()} \xB7 node ${process.version} at ${process.execPath}`);
+  const cfg = readJson(CONFIG_FILE, null);
+  if (cfg) L.push(`config: ${JSON.stringify({ ...cfg, token: cfg.token ? `<set, ${cfg.token.length} chars>` : "MISSING" })}`);
+  else L.push(`config: MISSING (${CONFIG_FILE})`);
+  L.push(`installed server: ${existsSync7(INSTALLED_SERVER) ? INSTALLED_SERVER : "not installed (fine when using the .mcpb)"}`);
+  L.push(`extension: ${extensionDir()} \xB7 ${existsSync7(join9(extensionDir(), "CSXS", "manifest.xml")) ? `hash ${installedExtensionHash()} (bundled ${"42052ad26295"})` : "MISSING"}`);
+  L.push(`PlayerDebugMode: ${debugMode()}`);
+  L.push(`Claude Desktop: ${clientEntry(claudeDesktopConfig())}`);
+  L.push(`Claude Code: ${clientEntry(claudeCodeConfig())}`);
+  L.push(`Cursor: ${clientEntry(cursorConfig())}`);
+  let codex = "not found";
+  try {
+    codex = readFileSync8(codexConfig(), "utf8").includes(`[mcp_servers.${SERVER_NAME}]`) ? "entry present" : "no entry";
+  } catch {
+  }
+  L.push(`ChatGPT desktop / Codex (${codexConfig()}): ${codex}`);
+  L.push(`bridge status file: ${JSON.stringify(readJson(join9(AEMCP_DIR, "bridge-status.json"), null))}`);
+  const u = knownUpdate();
+  L.push(`update: ${u ? `latest v${u.latest}${u.updateAvailable ? " (UPDATE AVAILABLE)" : ""}` : "unknown"}`);
+  try {
+    const h = await health();
+    L.push(`bridge: reachable \xB7 ${h.host?.appName} ${h.host?.appVersion} \xB7 bridge v${h.version} \xB7 authorized ${h.authorized}`);
+    const r = await evalRaw(
+      "(function(){var w=null;try{w=app.preferences.getPrefAsLong('Main Pref Section','Pref_SCRIPTING_FILE_NETWORK_SECURITY')===1;}catch(e){}return 'ae: '+app.version+' \xB7 '+$.os+' \xB7 items '+app.project.numItems+' \xB7 scriptsCanWriteFiles '+w+' \xB7 helpers '+(typeof aemcp==='undefined'?'not loaded':aemcp.version);})()",
+      1e4
+    );
+    L.push(r);
+  } catch (e) {
+    L.push(`bridge: NOT reachable (${e.message.split(".")[0]})`);
+  }
+  return L.join("\n");
+}
+
+// src/cli/install.ts
+init_define_AEMCP_CEP_FILES();
+import { spawn as spawn3, spawnSync as spawnSync4 } from "node:child_process";
+import { chmodSync, copyFileSync as copyFileSync2, existsSync as existsSync8, mkdirSync as mkdirSync7, readdirSync as readdirSync3, readFileSync as readFileSync9, writeFileSync as writeFileSync4 } from "node:fs";
+import { dirname as dirname6, join as join10 } from "node:path";
+import { fileURLToPath as fileURLToPath2 } from "node:url";
+function mcpbInstalled() {
+  try {
+    return readdirSync3(join10(claudeDesktopDir(), "Claude Extensions")).some((n) => /after-effects/i.test(n) && !n.endsWith(".json"));
+  } catch {
+    return false;
+  }
+}
+function claudeDesktopRunning() {
+  if (isMac)
+    return (spawnSync4("ps", ["-axo", "comm="], { encoding: "utf8" }).stdout || "").split("\n").some((l) => l.trim().endsWith(".app/Contents/MacOS/Claude"));
+  if (isWin) return (spawnSync4("tasklist", ["/FI", "IMAGENAME eq claude.exe", "/NH"], { encoding: "utf8" }).stdout || "").toLowerCase().includes("claude.exe");
+  return false;
+}
+async function quitClaudeDesktop() {
+  if (isMac) spawnSync4("osascript", ["-e", 'tell application "Claude" to quit']);
+  else if (isWin) spawnSync4("taskkill", ["/IM", "claude.exe", "/T"]);
+  for (let i = 0; i < 40; i++) {
+    if (!claudeDesktopRunning()) return true;
+    await sleep(500);
+  }
+  if (isWin) {
+    spawnSync4("taskkill", ["/IM", "claude.exe", "/T", "/F"]);
+    await sleep(1e3);
+  }
+  return !claudeDesktopRunning();
+}
+function startClaudeDesktop() {
+  if (isMac) spawnSync4("open", ["-a", "Claude"]);
+  else if (isWin && existsSync8(claudeDesktopExe())) spawn3(claudeDesktopExe(), [], { detached: true, stdio: "ignore" }).unref();
+}
+async function install(argv) {
+  const flags = new Set(argv);
+  const want = (name) => !flags.has("--skip-clients") && !flags.has(`--no-${name}`);
+  console.log(bold(`
+After Effects MCP installer v${VERSION}`));
+  console.log(dim(`${process.platform} \xB7 node ${process.version}`));
+  if (!isMac && !isWin) warn("After Effects only runs on macOS and Windows; continuing anyway.");
+  step("1/4  Installing the MCP server");
+  const self2 = fileURLToPath2(import.meta.url);
+  mkdirSync7(dirname6(INSTALLED_SERVER), { recursive: true });
+  if (self2 !== INSTALLED_SERVER) copyFileSync2(self2, INSTALLED_SERVER);
+  if (!isWin) chmodSync(INSTALLED_SERVER, 493);
+  ok(`Server: ${INSTALLED_SERVER}`);
+  ensureConfig();
+  ok(`Config: ${CONFIG_FILE}`);
+  step("2/4  Installing the After Effects extension");
+  try {
+    ensureExtension(true);
+    ok(`Extension: ${extensionDir()}`);
+  } catch (e) {
+    fail(`Could not install the extension: ${e.message}`);
+    process.exit(1);
+  }
+  try {
+    ensureDebugMode();
+    ok(`Unsigned extensions enabled (PlayerDebugMode, CSXS ${CSXS_VERSIONS[0]}-${CSXS_VERSIONS.at(-1)})`);
+  } catch (e) {
+    warn(`${e.message}. The extension will not load until PlayerDebugMode is enabled (see README > Troubleshooting).`);
+  }
+  step("3/4  Connecting AI apps");
+  const nodePath = stableNodePath();
+  const entry = { command: nodePath, args: [INSTALLED_SERVER] };
+  const registered = [];
+  const addJson = (label, file2, value2 = entry) => {
+    try {
+      const data = readJson(file2, {});
+      data.mcpServers ||= {};
+      data.mcpServers[SERVER_NAME] = value2;
+      writeJsonWithBackup(file2, data);
+      ok(`${label}`);
+      registered.push(label);
+    } catch (e) {
+      warn(`${label}: could not update ${file2}: ${e.message}`);
+    }
+  };
+  let restartClaude = false;
+  if (want("claude-desktop")) {
+    if (mcpbInstalled()) {
+      ok("Claude Desktop: already connected through the AE MCP extension (.mcpb)");
+      registered.push("Claude Desktop");
+    } else if (existsSync8(claudeDesktopDir())) {
+      const cfg = readJson(claudeDesktopConfig(), {});
+      const cur = cfg.mcpServers?.[SERVER_NAME];
+      const already = !!cur && cur.args?.[0] === INSTALLED_SERVER && typeof cur.command === "string" && existsSync8(cur.command);
+      if (!already && claudeDesktopRunning()) {
+        console.log("  Claude Desktop is open. It must be closed while it is connected, then it reopens.");
+        if (await ask("Restart Claude Desktop now?", true)) {
+          if (await quitClaudeDesktop()) restartClaude = true;
+          else warn("Could not close Claude Desktop. Quit it manually and run the installer again.");
+        } else warn("Quit Claude Desktop (Cmd+Q / tray > Quit) and run this installer again, or the setting may be lost.");
+      }
+      if (already) {
+        ok("Claude Desktop (already connected)");
+        registered.push("Claude Desktop");
+      } else addJson("Claude Desktop", claudeDesktopConfig());
+    } else console.log(dim("  - Claude Desktop not installed (skipped)"));
+  }
+  if (want("claude-code")) {
+    const claude = findClaudeCli();
+    if (claude) {
+      try {
+        try {
+          run(claude, ["mcp", "remove", SERVER_NAME, "--scope", "user"]);
+        } catch {
+        }
+        run(claude, ["mcp", "add", "--scope", "user", SERVER_NAME, "--", nodePath, INSTALLED_SERVER]);
+        ok("Claude Code");
+        registered.push("Claude Code");
+      } catch (e) {
+        warn(`Claude Code: ${String(e.stderr || e.message).split("\n")[0]}`);
+      }
+    } else if (existsSync8(claudeCodeConfig())) addJson("Claude Code", claudeCodeConfig(), { type: "stdio", ...entry, env: {} });
+    else console.log(dim("  - Claude Code not installed (skipped)"));
+  }
+  if (want("cursor") && existsSync8(dirname6(cursorConfig()))) addJson("Cursor", cursorConfig());
+  if (want("codex") && (existsSync8(dirname6(codexConfig())) || chatgptDesktopInstalled())) {
+    try {
+      const file2 = codexConfig();
+      mkdirSync7(dirname6(file2), { recursive: true });
+      const text = existsSync8(file2) ? readFileSync9(file2, "utf8") : "";
+      if (existsSync8(file2) && !existsSync8(file2 + ".aemcp.bak")) copyFileSync2(file2, file2 + ".aemcp.bak");
+      const rest = removeCodexBlock(text).trim();
+      writeFileSync4(file2, (rest ? rest + "\n\n" : "") + codexBlock(nodePath, INSTALLED_SERVER));
+      ok("ChatGPT desktop / Codex");
+      registered.push("ChatGPT desktop");
+    } catch (e) {
+      warn(`Codex: ${e.message}`);
+    }
+  }
+  if (restartClaude) {
+    startClaudeDesktop();
+    ok("Claude Desktop restarted");
+  }
+  step("4/4  Done!");
+  console.log(`
+  ${bold("Restart After Effects")} if it is open. The connection starts automatically with it.
+  ${registered.length ? `Connected: ${registered.join(", ")}. Restart ${registered.filter((r) => r !== "Claude Desktop" || !restartClaude).join(", ") || "nothing else"} if open.` : "No AI apps were found to connect."}
+
+  Try asking Claude: ${bold('"Check After Effects is connected, then make a 1080p comp with an animated title."')}
+  Check the installation any time with ${bold("2. Test Installation")} (in the ${isWin ? "Windows" : "Mac"} folder).
+${registered.includes("ChatGPT desktop") ? "  ChatGPT desktop app: restart it; after-effects appears under Settings > Plugins > Servers.\n" : ""}  ChatGPT on the web: run ${bold("3. Connect ChatGPT")} from the same folder.
+
+  Other MCP apps can use:  command ${nodePath}
+                           args    ["${INSTALLED_SERVER}"]
+`);
+}
+
+// src/cli/selftest.ts
+init_define_AEMCP_CEP_FILES();
+import { existsSync as existsSync10, mkdirSync as mkdirSync9, readFileSync as readFileSync10, statSync as statSync4, unlinkSync as unlinkSync3 } from "node:fs";
+import { join as join12 } from "node:path";
+
+// src/cli/fulltest.ts
+init_define_AEMCP_CEP_FILES();
+import { existsSync as existsSync9, mkdirSync as mkdirSync8, statSync as statSync3, unlinkSync as unlinkSync2, writeFileSync as writeFileSync5 } from "node:fs";
+import { homedir as homedir7 } from "node:os";
+import { join as join11 } from "node:path";
+var ALL = [...projectTools, ...compTools, ...layerTools, ...propertyTools, ...effectTools, ...renderTools, ...appTools, ...inspectTools, ...keyframeTools, ...footageTools, ...textTools, ...egpTools, ...healthTools];
+var C = "__aemcp_fulltest";
+async function fullSelftest() {
+  console.log(bold(`
+Full self-test: every major tool against this After Effects (temporary comps, removed afterwards)
+`));
+  const caps = await runJsx(CAPABILITIES_JSX, {}, { undoGroup: "AE MCP self-test", timeoutMs: 6e4 });
+  if (!caps.ok) {
+    fail(`Could not read capabilities: ${caps.error?.message}`);
+    return 1;
+  }
+  const { appVersion, os, features } = caps.result;
+  console.log(`  After Effects ${appVersion} \xB7 ${os}`);
+  for (const [k, v] of Object.entries(features)) {
+    if (k === "expressionEngine" || k === "scriptsCanWriteFiles") continue;
+    (v ? ok : warn)(`${k}: ${v ? "yes" : "no"}${FEATURE_NOTES[k] ? `  (${FEATURE_NOTES[k]})` : ""}`);
+  }
+  console.log(`  expression engine: ${features.expressionEngine} \xB7 scripts can write files: ${features.scriptsCanWriteFiles}
+`);
+  const start = await runJsx("var m = 0; for (var i = 1; i <= app.project.numItems; i++) m = Math.max(m, app.project.item(i).id); return { maxId: m, rq: app.project.renderQueue.numItems };", {}, { undoGroup: false });
+  const { maxId, rq } = start.result;
+  const tmpDir = join11(homedir7(), ".aemcp", "tmp");
+  mkdirSync8(tmpDir, { recursive: true });
+  const frame = join11(tmpDir, `fulltest_${Date.now()}.png`);
+  const steps = [
+    { name: "create comp", tool: "ae_create_comp", args: { name: C, width: 1280, height: 720, duration: 4, frameRate: 25 } },
+    { name: "solid layer", tool: "ae_add_layer", args: { comp: C, type: "solid", name: "BG", color: "#20304a" } },
+    { name: "text layer", tool: "ae_add_layer", args: { comp: C, type: "text", name: "Title", text: "Full Self Test", fontSize: 72, font: "ArialMT" } },
+    { name: "shape layer", tool: "ae_add_shape", args: { comp: C, shape: "ellipse", size: [200, 200], fill: "#ffcc00", name: "Dot" } },
+    { name: "null + camera", tool: "ae_add_layer", args: { comp: C, type: "null", name: "Rig" } },
+    { name: "set property", tool: "ae_set_property", args: { comp: C, layer: "BG", path: "Transform/Opacity", value: 90 } },
+    { name: "keyframes + ease", tool: "ae_set_keyframes", args: { comp: C, layer: "Title", path: "Transform/Position", keyframes: [{ time: 0, value: [640, 800] }, { time: 1, value: [640, 360] }], easyEase: true } },
+    { name: "edit keyframes (tangents, label, move)", tool: "ae_edit_keyframes", args: { comp: C, layer: "Title", path: "Transform/Position", keys: [{ index: 2, label: 2, inSpatialTangent: [-50, 0], moveTo: 1.5 }] } },
+    { name: "copy keyframes", tool: "ae_copy_keyframes", args: { from: { comp: C, layer: "Title", path: "Transform/Position" }, to: [{ comp: C, layer: "Rig", path: "Transform/Position" }] } },
+    { name: "expression", tool: "ae_set_expression", args: { comp: C, layer: "Dot", path: "Transform/Rotation", expression: "time * 90" }, check: (r) => r.result?.error ? "expression error" : null },
+    { name: "list expressions", tool: "ae_get_expressions", args: { comp: C } },
+    { name: "apply effect + params", tool: "ae_apply_effect", args: { comp: C, layer: "Title", effect: "ADBE Drop Shadow", params: { Distance: 10 } } },
+    { name: "inspect effect", tool: "ae_get_effect_params", args: { effect: "Glow" } },
+    { name: "mask", tool: "ae_add_mask", args: { comp: C, layer: "BG", shape: "ellipse", feather: 50 } },
+    { name: "parent + blend", tool: "ae_set_layer_attributes", args: { comp: C, layer: "Dot", parent: "Rig", blendingMode: "SCREEN" } },
+    { name: "style text range", tool: "ae_style_text_range", args: { comp: C, layer: "Title", match: "Self", style: { fillColor: "#ff3b30" } }, needs: "perCharacterText" },
+    { name: "paragraph", tool: "ae_set_paragraph", args: { comp: C, layer: "Title", justification: "CENTER_JUSTIFY" } },
+    { name: "text animator", tool: "ae_add_text_animator", args: { comp: C, layer: "Title", properties: { opacity: 0 }, selector: { basedOn: "words", shape: "rampUp" } } },
+    { name: "layer bounds", tool: "ae_get_layer_bounds", args: { comp: C }, check: (r) => (r.result?.layers || []).some((l) => l.bounds) ? null : "no bounds measured" },
+    { name: "sample pixels", tool: "ae_sample_pixels", args: { comp: C, points: [[640, 360]] } },
+    { name: "comp map", tool: "ae_get_comp_map", args: { comp: C } },
+    { name: "find properties", tool: "ae_find_properties", args: { comp: C, onlyAnimated: true } },
+    { name: "precompose", tool: "ae_precompose", args: { comp: C, layers: ["Dot"], name: `${C}_pre` } },
+    { name: "time remap", tool: "ae_set_time_remap", args: { comp: C, layer: `${C}_pre`, freezeAt: 0.5 } },
+    { name: "essential graphics", tool: "ae_essential_graphics", args: { comp: C, add: [{ layer: "BG", path: "Transform/Opacity", name: "BG Opacity" }] }, needs: "essentialGraphics" },
+    { name: "render queue add", tool: "ae_add_to_render_queue", args: { comp: C, outputPath: join11(tmpDir, "fulltest.mov") } },
+    { name: "render settings", tool: "ae_set_render_settings", args: { renderSettings: { Quality: "Draft" } }, needs: "renderSettingsApi" },
+    { name: "project health", tool: "ae_project_health", args: {} },
+    { name: "system info", tool: "ae_system_info", args: {} },
+    { name: "frame preview", jsx: RENDER_FRAME_JSX, args: { comp: C, time: 1, outputPath: frame, tmpDir }, check: () => existsSync9(frame) && statSync3(frame).size > 0 ? null : "no PNG written" },
+    { name: "contact sheet", jsx: CONTACT_SHEET_JSX, args: { comp: C, frames: 4, tmpDir } },
+    {
+      name: "modern JavaScript",
+      jsx: evalBody(transpileUserCode("const names = [];\nfor (let i = 1; i <= app.project.numItems; i++) names.push(app.project.item(i).name);\nreturn names.filter((n) => n.startsWith('__aemcp_fulltest')).length ?? 0;").source),
+      args: {},
+      check: (r) => Number(r.result) >= 1 ? null : `unexpected result ${JSON.stringify(r.result)}`
+    }
+  ];
+  const results = [];
+  for (const s of steps) {
+    if (s.needs && !features[s.needs]) {
+      results.push({ step: s.name, ok: true, ms: 0, skipped: true });
+      warn(`${s.name}: skipped (needs ${s.needs})`);
+      continue;
+    }
+    const t0 = Date.now();
+    let r;
+    try {
+      const body = s.jsx ?? ALL.find((t) => t.name === s.tool)?.jsx;
+      if (!body) throw new Error(`unknown tool ${s.tool}`);
+      r = await runJsx(body, s.args ?? {}, { undoGroup: "AE MCP self-test", timeoutMs: 12e4, report: [C] });
+    } catch (e) {
+      r = { ok: false, logs: [], error: { message: e.message } };
+    }
+    const problem = !r.ok ? r.error?.message ?? "failed" : s.check?.(r) ?? null;
+    const ms = Date.now() - t0;
+    results.push({ step: s.name, ok: !problem, ms, error: problem ?? void 0 });
+    problem ? fail(`${s.name}: ${problem}`) : ok(`${s.name} (${ms} ms)`);
+  }
+  await runJsx(
+    `var p = app.project, rq = p.renderQueue;
+for (var r = rq.numItems; r > args.rq; r--) rq.item(r).remove();
+for (var i = p.numItems; i >= 1; i--) { var it = p.item(i); if (it.id > args.maxId) it.remove(); }
+return p.numItems;`,
+    { maxId, rq },
+    { undoGroup: "AE MCP self-test cleanup" }
+  );
+  try {
+    unlinkSync2(frame);
+  } catch {
+  }
+  const failed = results.filter((r) => !r.ok);
+  const dir = join11(homedir7(), ".aemcp", "compat");
+  mkdirSync8(dir, { recursive: true });
+  const file2 = join11(dir, `after-effects-${appVersion.replace(/[^\w.]+/g, "_")}.json`);
+  writeFileSync5(file2, JSON.stringify({ at: (/* @__PURE__ */ new Date()).toISOString(), server: VERSION, appVersion, os, platform: process.platform, features, results }, null, 2));
+  console.log(
+    failed.length ? `
+${red(bold(`${failed.length} of ${results.length} steps failed`))} on After Effects ${appVersion}.` : `
+${green(bold(`All ${results.length} steps passed`))} on After Effects ${appVersion}.`
+  );
+  console.log(`Compatibility report: ${file2}
+`);
+  return failed.length ? 1 : 0;
+}
+
+// src/cli/selftest.ts
+import { spawnSync as spawnSync5 } from "node:child_process";
+async function selftest(full = false) {
+  let failures = 0;
+  const bad = (m) => {
+    failures++;
+    fail(m);
+  };
+  console.log(bold(`
+After Effects MCP self-test v${VERSION}`));
+  console.log(`  ${process.platform} \xB7 node ${process.version}
+`);
+  if (updateCheckEnabled()) {
+    const u = await checkForUpdate(true);
+    const msg = updateMessage(u);
+    if (msg) warn(msg);
+    else if (u?.latest) ok(`Up to date (latest release v${u.latest})`);
+  }
+  if (existsSync10(CONFIG_FILE) && loadConfig().token) ok(`Config ${CONFIG_FILE}`);
+  else bad(`No config at ${CONFIG_FILE}. Run the installer.`);
+  const hash2 = installedExtensionHash();
+  if (!existsSync10(join12(extensionDir(), "CSXS", "manifest.xml"))) bad(`After Effects extension missing at ${extensionDir()}. Run the installer.`);
+  else if (hash2 !== "42052ad26295") warn(`Extension at ${extensionDir()} is a different version (${hash2 ?? "unknown"} vs ${"42052ad26295"}). Re-run the installer.`);
+  else ok("After Effects extension installed");
+  const offVersions = CSXS_VERSIONS.filter((v) => {
+    const r = isWin ? spawnSync5("reg", ["query", `HKCU\\Software\\Adobe\\CSXS.${v}`, "/v", "PlayerDebugMode"], { encoding: "utf8" }) : isMac ? spawnSync5("defaults", ["read", `com.adobe.CSXS.${v}`, "PlayerDebugMode"], { encoding: "utf8" }) : null;
+    return r && !(r.status === 0 && /(^|\s)1\s*$/m.test(r.stdout));
+  });
+  if (offVersions.length) bad(`PlayerDebugMode not enabled for CSXS ${offVersions.join(", ")}. Run the installer.`);
+  else ok("Unsigned extensions allowed (PlayerDebugMode)");
+  const desktop = readJson(claudeDesktopConfig(), null);
+  if (desktop?.mcpServers?.[SERVER_NAME]) {
+    const cmd = desktop.mcpServers[SERVER_NAME].command;
+    if (cmd && !existsSync10(cmd)) bad(`Claude Desktop points to a Node that no longer exists: ${cmd}. Re-run the installer.`);
+    else ok("Claude Desktop configured");
+  } else console.log("  - Claude Desktop config has no after-effects entry (fine if you use the .mcpb extension or another app)");
+  console.log("");
+  let h;
+  try {
+    h = await health();
+  } catch (e) {
+    bad(`Bridge not reachable on 127.0.0.1:${loadConfig().bridgePort}. Is After Effects running? (restart it after installing)`);
+    const statusFile = join12(AEMCP_DIR, "bridge-status.json");
+    if (existsSync10(statusFile)) {
+      const st = readJson(statusFile, {});
+      console.log(`    last bridge status: ${st.listening ? "listening" : "not listening"}${st.error ? " - " + st.error : ""} (${st.at})`);
+    }
+    return summary(failures);
+  }
+  ok(`Bridge running inside ${h.host?.appName ?? "AE"} ${h.host?.appVersion ?? ""} (bridge v${h.version})`);
+  if (h.authorized === false) {
+    bad("Bridge rejected our token: config mismatch. Re-run the installer and restart After Effects.");
+    return summary(failures);
+  }
+  const info = await runJsx(
+    "var w = null; try { w = app.preferences.getPrefAsLong('Main Pref Section', 'Pref_SCRIPTING_FILE_NETWORK_SECURITY') === 1; } catch (e) {} return { version: app.version, os: $.os, canWrite: w };",
+    {},
+    { undoGroup: false, timeoutMs: 15e3 }
+  ).catch((e) => ({ ok: false, error: { message: e.message } }));
+  if (!info.ok) return bad(`ExtendScript failed: ${info.error?.message}`), summary(failures);
+  ok(`ExtendScript works: After Effects ${info.result.version} on ${info.result.os}`);
+  if (info.result.canWrite === false)
+    warn("'Allow Scripts to Write Files and Access Network' is OFF: enable it in AE Settings > Scripting & Expressions (needed for frame previews).");
+  const tmpDir = join12(AEMCP_DIR, "tmp");
+  mkdirSync9(tmpDir, { recursive: true });
+  const png = join12(tmpDir, `selftest_${Date.now()}.png`);
+  const job = await runJsx(
+    `var c = app.project.items.addComp("__aemcp_selftest", 640, 360, 1, 2, 30);
+var t = c.layers.addText("AE MCP OK");
+var p = t.property("ADBE Transform Group").property("ADBE Position");
+p.setValuesAtTimes([0, 1], [[100, 180], [540, 180]]);
+var fx = t.property("ADBE Effect Parade").addProperty("ADBE Drop Shadow");
+t.property("ADBE Transform Group").property("ADBE Opacity").expression = "50 + 50 * Math.sin(time)";
+var f = new File(args.png);
+var wrote = false;
+if (args.canWrite !== false) { c.saveFrameToPng(1, f); var w = 0; while (!f.exists && w < 10000) { $.sleep(50); w += 50; } wrote = f.exists; $.sleep(100); }
+var r = { keys: p.numKeys, effect: fx.matchName, exprError: t.property("ADBE Transform Group").property("ADBE Opacity").expressionError, wrote: wrote };
+c.remove();
+return r;`,
+    { png, canWrite: info.result.canWrite },
+    { undoGroup: "AE MCP self-test", timeoutMs: 6e4 }
+  );
+  if (!job.ok) bad(`Test job failed: ${job.error?.message}`);
+  else {
+    const r = job.result;
+    if (r.keys === 2 && r.effect === "ADBE Drop Shadow" && !r.exprError) ok("Created a comp, text layer, keyframes, effect and expression (then removed it)");
+    else bad(`Unexpected test result: ${JSON.stringify(r)}`);
+    if (info.result.canWrite !== false) {
+      for (let i = 0; i < 50 && !(existsSync10(png) && statSync4(png).size > 0); i++) await sleep(100);
+      if (existsSync10(png) && statSync4(png).size > 0) {
+        const sig = readFileSync10(png).subarray(1, 4).toString();
+        sig === "PNG" ? ok("Rendered a frame preview") : bad("Frame preview is not a valid PNG");
+        try {
+          unlinkSync3(png);
+        } catch {
+        }
+      } else bad(`Frame preview was not written to ${png}`);
+    }
+  }
+  if (full && !failures) {
+    failures += await fullSelftest();
+  }
+  return summary(failures);
+}
+async function summary(failures) {
+  if (!failures) {
+    console.log(`
+${green(bold("All checks passed. After Effects MCP is ready."))}
+`);
+    return 0;
+  }
+  console.log(`
+${red(bold(`${failures} problem(s) found.`))} See README > Troubleshooting.`);
+  console.log("If you report it, include everything below (it contains no secrets):\n");
+  console.log(await diagnostics());
+  return 1;
+}
+
+// src/cli/uninstall.ts
+init_define_AEMCP_CEP_FILES();
+import { existsSync as existsSync11, readdirSync as readdirSync4, readFileSync as readFileSync11, rmSync as rmSync2, writeFileSync as writeFileSync6 } from "node:fs";
+import { join as join13 } from "node:path";
+function uninstall(argv) {
+  console.log(bold("\nAfter Effects MCP uninstaller\n"));
+  const keepConfig = argv.includes("--keep-config");
+  if (existsSync11(extensionDir())) {
+    rmSync2(extensionDir(), { recursive: true, force: true });
+    ok(`Removed the After Effects extension`);
+  }
+  if (existsSync11(AEMCP_DIR)) {
+    for (const name of readdirSync4(AEMCP_DIR))
+      if (name !== "node" && !(keepConfig && name === "config.json")) rmSync2(join13(AEMCP_DIR, name), { recursive: true, force: true });
+  }
+  ok(keepConfig ? "Removed the server (kept ~/.aemcp/config.json)" : `Removed ${AEMCP_DIR}`);
+  for (const [label, file2] of [["Claude Desktop", claudeDesktopConfig()], ["Cursor", cursorConfig()], ["Claude Code", claudeCodeConfig()]]) {
+    const data = readJson(file2, null);
+    if (data?.mcpServers?.[SERVER_NAME]) {
+      delete data.mcpServers[SERVER_NAME];
+      writeJsonWithBackup(file2, data);
+      ok(`Removed from ${label}`);
+    }
+  }
+  const claude = findClaudeCli();
+  if (claude) {
+    try {
+      run(claude, ["mcp", "remove", SERVER_NAME, "--scope", "user"]);
+      ok("Removed from Claude Code");
+    } catch {
+    }
+  }
+  if (existsSync11(codexConfig())) {
+    const t = readFileSync11(codexConfig(), "utf8");
+    const n = removeCodexBlock(t);
+    if (n !== t) {
+      writeFileSync6(codexConfig(), n.trimEnd() + "\n");
+      ok("Removed from Codex");
+    }
+  }
+  console.log("\nDone. Restart After Effects and your AI apps.");
+  console.log("If you installed the Claude Desktop extension (.mcpb), remove it in Claude Desktop > Settings > Extensions.");
+  warn("PlayerDebugMode was left enabled (harmless; other extensions may rely on it).");
+}
+
 // src/index.ts
-init_setup();
-init_profile();
-init_update();
 function createMcpServer() {
   const profile = resolveProfile();
   const instructions = INSTRUCTIONS + (profile.name === "full" ? "" : '\n- This is the core tool set. Anything else (render queue, import, project/folder management, masks, markers, fonts, menu commands...) is done with ae_run_script. The user can enable every tool by setting "toolProfile": "full" (AE MCP panel or ~/.aemcp/config.json).');
   const server = new McpServer({ name: "after-effects", title: "Adobe After Effects", version: VERSION }, { instructions });
   applyProfile(server, profile);
   registerCoreTools(server);
-  registerJsxTools(server, [...projectTools, ...compTools, ...layerTools, ...propertyTools, ...effectTools, ...renderTools, ...appTools, ...inspectTools]);
+  registerJsxTools(server, [...projectTools, ...compTools, ...layerTools, ...propertyTools, ...effectTools, ...renderTools, ...appTools, ...inspectTools, ...keyframeTools, ...footageTools, ...textTools, ...egpTools, ...healthTools]);
+  registerRenderJobs(server);
   server.registerResource(
     "extendscript-cheatsheet",
     "aemcp://docs/extendscript",
@@ -76848,8 +78201,10 @@ Usage:
   ae-mcp install [--skip-clients] [--no-claude-desktop|--no-claude-code|--no-cursor|--no-codex]
                          install the server + After Effects extension and connect AI apps
   ae-mcp uninstall [--keep-config]
-  ae-mcp selftest        check the installation and the connection to After Effects
+  ae-mcp selftest [--full]  check the installation and the connection to After Effects;
+                         --full also runs every major tool and saves a compatibility report
   ae-mcp diagnostics     print a report to paste into a bug report (no secrets)
+  ae-mcp activity [n]    the last n tool calls (default 30); full log in ~/.aemcp/activity.jsonl
   ae-mcp chatgpt [--local]
                          HTTP server + public tunnel for ChatGPT
   ae-mcp setup           only install/update the After Effects extension and config
@@ -76872,17 +78227,26 @@ async function main() {
   if (process.argv.includes("--help") || cmd === "help") return void console.log(HELP);
   switch (cmd) {
     case "install":
-      return (await Promise.resolve().then(() => (init_install(), install_exports))).install(rest);
+      return install(rest);
     case "uninstall":
-      return (await Promise.resolve().then(() => (init_uninstall(), uninstall_exports))).uninstall(rest);
+      return uninstall(rest);
     case "selftest":
     case "test":
-      process.exitCode = await (await Promise.resolve().then(() => (init_selftest(), selftest_exports))).selftest();
+      process.exitCode = await selftest(rest.includes("--full"));
       return;
+    case "activity": {
+      const n = Number(rest[0]) || 30;
+      const list = readActivity(n).reverse();
+      if (!list.length) return void console.log(`No activity yet (${ACTIVITY_FILE}).`);
+      for (const e of list)
+        console.log(`${e.at}  ${e.ok ? "ok " : "ERR"}  ${String(e.ms).padStart(6)}ms  ${e.tool}${e.client ? `  [${e.client}]` : ""}  ${e.summary ?? ""}`);
+      return void console.log(`
+Full log with arguments and code: ${ACTIVITY_FILE}`);
+    }
     case "diagnostics":
-      return void console.log(await (await Promise.resolve().then(() => (init_diagnostics(), diagnostics_exports))).diagnostics());
+      return void console.log(await diagnostics());
     case "chatgpt":
-      return (await Promise.resolve().then(() => (init_chatgpt(), chatgpt_exports))).chatgpt(rest);
+      return chatgpt(rest);
     case "setup": {
       const r = ensureAeSetup({ forceExtension: rest.includes("--force") });
       console.log(JSON.stringify(r, null, 2));

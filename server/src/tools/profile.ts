@@ -3,6 +3,8 @@
 // can still be done with ae_run_script.
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { loadConfig } from "../config.js";
+import { logActivity } from "../activity.js";
+import { callContext } from "../context.js";
 
 export const CORE_TOOLS = new Set([
   // connection, scripting, seeing
@@ -55,8 +57,36 @@ export function resolveProfile(argv = process.argv): ToolProfile {
   return { name: "custom", allows: (t) => CORE_TOOLS.has(t) || extra.has(t) };
 }
 
-/** Make server.registerTool skip tools outside the profile (they are simply never registered). */
+/**
+ * Wraps server.registerTool so that tools outside the profile are never registered, and every
+ * registered tool call runs with a call context (tool name + the AI app's cancel signal) and is
+ * written to the activity log.
+ */
 export function applyProfile(server: McpServer, profile: ToolProfile) {
   const original = server.registerTool.bind(server) as (...a: any[]) => any;
-  (server as any).registerTool = (name: string, ...rest: any[]) => (profile.allows(name) ? original(name, ...rest) : undefined);
+  (server as any).registerTool = (name: string, config: any, cb: (...a: any[]) => any) => {
+    if (!profile.allows(name)) return undefined;
+    const wrapped = async (args: any, extra: any) => {
+      const t0 = Date.now();
+      let result: any;
+      try {
+        result = await callContext.run({ tool: name, signal: extra?.signal }, () => cb(args, extra));
+        return result;
+      } finally {
+        const text: string = result?.content?.find((c: any) => c.type === "text")?.text ?? "";
+        const changesAt = text.indexOf("\nChanges");
+        logActivity({
+          at: new Date(t0).toISOString(),
+          client: (server.server as any).getClientVersion?.()?.name,
+          tool: name,
+          args,
+          ms: Date.now() - t0,
+          ok: !!result && !result.isError,
+          summary: text.split("\n")[0].slice(0, 300) || (result ? undefined : "no result (exception)"),
+          changes: changesAt >= 0 ? text.slice(changesAt).split("\n").filter((l) => /^[+~-] /.test(l)).length : undefined,
+        });
+      }
+    };
+    return original(name, config, wrapped);
+  };
 }

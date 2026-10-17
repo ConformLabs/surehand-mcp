@@ -34,7 +34,8 @@
   def(AP, "findLast", function (f, t) { for (var i = this.length - 1; i >= 0; i--) if (f.call(t, this[i], i, this)) return this[i]; return undefined; });
   def(AP, "includes", function (x) { for (var i = 0, n = this.length; i < n; i++) if (this[i] === x || (x !== x && this[i] !== this[i])) return true; return false; });
   def(AP, "fill", function (v, s, e) { var n = this.length, i = toInt(s || 0), end = e === undefined ? n : toInt(e); if (i < 0) i += n; if (end < 0) end += n; for (; i < end; i++) this[i] = v; return this; });
-  def(AP, "flat", function (d) { d = d === undefined ? 1 : toInt(d); var r = []; (function walk(a, k) { for (var i = 0; i < a.length; i++) { if (a[i] instanceof Array && k > 0) walk(a[i], k - 1); else r.push(a[i]); } })(this, d); return r; });
+  function flatInto(a, k, r) { for (var i = 0; i < a.length; i++) { if (a[i] instanceof Array && k > 0) flatInto(a[i], k - 1, r); else r.push(a[i]); } return r; }
+  def(AP, "flat", function (d) { return flatInto(this, d === undefined ? 1 : toInt(d), []); });
   def(Array, "isArray", function (a) { return a instanceof Array; });
   def(Array, "from", function (src, f, t) { var r = []; if (src == null) return r; var n = src.length >>> 0; for (var i = 0; i < n; i++) { var v = typeof src === "string" ? src.charAt(i) : src[i]; r.push(f ? f.call(t, v, i) : v); } return r; });
   def(Array, "of", function () { return AP.slice.call(arguments); });
@@ -354,16 +355,52 @@ aemcp = (function () {
     }
     return o;
   };
+  // Every attribute of a keyframe, so it can be inspected, edited, moved and copied without loss.
+  A.captureKey = function (p, k) {
+    var d = { time: p.keyTime(k), value: p.keyValue(k) };
+    try { d.inInterp = p.keyInInterpolationType(k); d.outInterp = p.keyOutInterpolationType(k); } catch (e) {}
+    try { d.inEase = p.keyInTemporalEase(k); d.outEase = p.keyOutTemporalEase(k); } catch (e) {}
+    try { d.tc = p.keyTemporalContinuous(k); d.tab = p.keyTemporalAutoBezier(k); } catch (e) {}
+    if (p.isSpatial) {
+      try { d.sc = p.keySpatialContinuous(k); d.sab = p.keySpatialAutoBezier(k); d.inTan = p.keyInSpatialTangent(k); d.outTan = p.keyOutSpatialTangent(k); d.roving = p.keyRoving(k); } catch (e) {}
+    }
+    try { d.label = p.keyLabel(k); } catch (e) {}
+    try { d.selected = p.keySelected(k); } catch (e) {}
+    return d;
+  };
+  A.restoreKey = function (p, d, time) {
+    var k = p.addKey(time === undefined ? d.time : time);
+    p.setValueAtKey(k, d.value);
+    A.applyKeyAttrs(p, k, d);
+    return k;
+  };
+  A.applyKeyAttrs = function (p, k, d) {
+    if (d.inInterp !== undefined) { try { p.setInterpolationTypeAtKey(k, d.inInterp, d.outInterp); } catch (e) {} }
+    if (d.inEase) { try { p.setTemporalEaseAtKey(k, d.inEase, d.outEase); } catch (e) {} }
+    if (d.tc !== undefined) { try { p.setTemporalContinuousAtKey(k, d.tc); p.setTemporalAutoBezierAtKey(k, d.tab); } catch (e) {} }
+    if (p.isSpatial && d.inTan) { try { p.setSpatialTangentsAtKey(k, d.inTan, d.outTan); } catch (e) {} }
+    if (p.isSpatial && d.sc !== undefined) { try { p.setSpatialContinuousAtKey(k, d.sc); p.setSpatialAutoBezierAtKey(k, d.sab); } catch (e) {} }
+    if (d.label !== undefined) { try { p.setLabelAtKey(k, d.label); } catch (e) {} }
+    if (d.roving) { try { p.setRovingAtKey(k, true); } catch (e) {} }
+    if (d.selected !== undefined) { try { p.setSelectedAtKey(k, d.selected); } catch (e) {} }
+  };
   A.keyframes = function (p) {
     var ks = [];
     for (var k = 1; k <= p.numKeys; k++) {
-      var kf = { index: k, time: A.round(p.keyTime(k)), value: A.valueOf(p.keyValue(k)) };
-      try { kf.inInterpolation = A.enumName(KeyframeInterpolationType, p.keyInInterpolationType(k)); kf.outInterpolation = A.enumName(KeyframeInterpolationType, p.keyOutInterpolationType(k)); } catch (e) {}
-      try {
-        var ie = p.keyInTemporalEase(k), oe = p.keyOutTemporalEase(k);
+      var d = A.captureKey(p, k);
+      var kf = { index: k, time: A.round(d.time), value: A.valueOf(d.value) };
+      if (d.inInterp !== undefined) { kf.inInterpolation = A.enumName(KeyframeInterpolationType, d.inInterp); kf.outInterpolation = A.enumName(KeyframeInterpolationType, d.outInterp); }
+      if (d.inEase) {
         kf.easeIn = []; kf.easeOut = [];
-        for (var d = 0; d < ie.length; d++) { kf.easeIn.push({ speed: A.round(ie[d].speed), influence: A.round(ie[d].influence) }); kf.easeOut.push({ speed: A.round(oe[d].speed), influence: A.round(oe[d].influence) }); }
-      } catch (e) {}
+        for (var e = 0; e < d.inEase.length; e++) { kf.easeIn.push({ speed: A.round(d.inEase[e].speed), influence: A.round(d.inEase[e].influence) }); kf.easeOut.push({ speed: A.round(d.outEase[e].speed), influence: A.round(d.outEase[e].influence) }); }
+      }
+      if (d.tc) kf.temporalContinuous = true;
+      if (d.tab) kf.temporalAutoBezier = true;
+      if (d.inTan) { kf.inSpatialTangent = A.valueOf(d.inTan); kf.outSpatialTangent = A.valueOf(d.outTan); }
+      if (d.sc) kf.spatialContinuous = true;
+      if (d.sab) kf.spatialAutoBezier = true;
+      if (d.roving) kf.roving = true;
+      if (d.label) kf.label = d.label;
       ks.push(kf);
     }
     return ks;
@@ -513,6 +550,19 @@ aemcp = (function () {
   }
   var LAYER_FIELDS = ["name", "in", "out", "start", "stretch", "parent", "enabled", "solo", "locked", "shy", "label", "3D", "blend mode", "track matte", "adjustment", "motion blur", "guide", "audio"];
   function layerKey(L) { return L.id !== undefined ? "L" + L.id : "i" + L.index + ":" + L.name; }
+  // Per-character style fingerprint (AE 24+): catches styling applied to part of a text.
+  A.textStyleSig = function (td) {
+    if (typeof td.characterRange !== "function") return "";
+    var n = Math.min(td.text.length, 300), sig = "", prev = null;
+    for (var i = 0; i < n; i++) {
+      try {
+        var cr = td.characterRange(i, i + 1);
+        var cur = [cr.font, cr.fontSize, cr.fauxBold, cr.fauxItalic, cr.applyFill ? cr.fillColor : 0, cr.applyStroke ? cr.strokeColor : 0, cr.strokeWidth, cr.tracking, cr.baselineShift, cr.horizontalScale, cr.verticalScale].join("/");
+        if (cur !== prev) { sig += "|" + i + ":" + cur; prev = cur; }
+      } catch (e) { return sig; }
+    }
+    return sig;
+  };
   function snapProps(L, out, groups, budget) {
     function walk(g, path, depth) {
       for (var i = 1; i <= g.numProperties; i++) {
@@ -521,13 +571,16 @@ aemcp = (function () {
         budget.n--;
         if (p.propertyType === PropertyType.PROPERTY) {
           if (p.propertyValueType === PropertyValueType.NO_VALUE) continue;
-          var raw; try { raw = p.value; } catch (e) { continue; }
+          var ex = ""; try { if (p.canSetExpression && p.expression) ex = (p.expressionEnabled ? "" : "(off)") + p.expression; } catch (e) {}
+          // Reading .value evaluates the expression, which can take milliseconds per property in
+          // expression-heavy comps. The expression text is compared already, so use the value before
+          // the expression (cheap) for those properties.
+          var raw; try { raw = ex ? p.valueAtTime(budget.time, true) : p.value; } catch (e) { continue; }
           // cheap fingerprints for the common cases (numbers, arrays); full JSON only for the rest
           var v = raw, vs;
           if (typeof raw === "number" || typeof raw === "boolean") vs = String(raw);
           else if (raw instanceof Array) vs = raw.join(",");
-          else { v = A.valueOf(raw); vs = A.stringify(v); }
-          var ex = ""; try { if (p.canSetExpression && p.expression) ex = (p.expressionEnabled ? "" : "(off)") + p.expression; } catch (e) {}
+          else { v = A.valueOf(raw); vs = A.stringify(v); if (p.propertyValueType === PropertyValueType.TEXT_DOCUMENT) vs += A.textStyleSig(raw); }
           var nk = p.numKeys;
           out[pp] = { s: vs + "|" + (nk ? keySig(p) : "") + "|" + ex, v: v, k: nk, e: ex };
         } else {
@@ -543,6 +596,7 @@ aemcp = (function () {
   }
   function snapComp(c, deep, budget) {
     var o = { id: c.id, name: c.name, layers: {}, order: [], deep: deep };
+    budget.time = c.time;
     for (var i = 1; i <= c.numLayers; i++) {
       var L = c.layer(i), k = layerKey(L);
       var e = { name: L.name, index: i, sig: layerSig(L) };
@@ -552,19 +606,32 @@ aemcp = (function () {
     if (budget.over) o.partial = true;
     return o;
   }
+  // [label, value] pairs, so the report can name exactly what changed for any item type
   function itemSig(it) {
-    var s = [it.name, it.parentFolder ? it.parentFolder.id : 0, it.label, it.comment];
-    try { if (it instanceof CompItem) s.push(it.width, it.height, A.round(it.duration), A.round(it.frameRate), it.pixelAspect, A.stringify(it.bgColor), A.round(it.workAreaStart), A.round(it.workAreaDuration), it.numLayers); } catch (e) {}
-    try { if (it instanceof FootageItem) { s.push(it.file ? it.file.fsName : "", it.width, it.height); if (it.mainSource instanceof SolidSource) s.push(A.stringify(it.mainSource.color)); } } catch (e) {}
+    var s = [["name", it.name], ["folder", it.parentFolder ? it.parentFolder.name : ""], ["label", it.label], ["comment", it.comment]];
+    try { if (it instanceof CompItem) s.push(["width", it.width], ["height", it.height], ["duration", A.round(it.duration)], ["frame rate", A.round(it.frameRate)], ["pixel aspect", it.pixelAspect], ["background", A.stringify(it.bgColor)], ["work area start", A.round(it.workAreaStart)], ["work area duration", A.round(it.workAreaDuration)], ["layers", it.numLayers]); } catch (e) {}
+    try {
+      if (it instanceof FootageItem) {
+        s.push(["file", it.file ? it.file.fsName : ""], ["width", it.width], ["height", it.height]);
+        var ms = it.mainSource;
+        if (ms instanceof SolidSource) s.push(["color", A.stringify(ms.color)]);
+        else { try { s.push(["frame rate", A.round(ms.conformFrameRate)], ["alpha", A.enumName(AlphaMode, ms.alphaMode)], ["loop", ms.loop], ["fields", A.enumName(FieldSeparationType, ms.fieldSeparationType)], ["pixel aspect", it.pixelAspect]); } catch (e) {} }
+      }
+    } catch (e) {}
+    try { if (it instanceof CompItem || it instanceof FootageItem) s.push(["proxy", it.proxySource ? (it.proxySource.file ? it.proxySource.file.fsName : "placeholder") : ""], ["use proxy", it.useProxy]); } catch (e) {}
     return s;
   }
-  var ITEM_FIELDS = ["name", "folder", "label", "comment", "width", "height", "duration", "frame rate", "pixel aspect", "background", "work area start", "work area duration", "layers"];
   A.snapshot = function (scopeRefs) {
     var p = app.project, snap = { items: {}, comps: {} }, budget = { n: PROP_BUDGET, over: false };
     for (var i = 1; i <= p.numItems; i++) { var it = p.item(i); snap.items[it.id] = { name: it.name, type: A.itemType(it), sig: itemSig(it), layers: it instanceof CompItem ? it.numLayers : undefined }; }
     var ids = {};
-    try { if (p.activeItem instanceof CompItem) ids[p.activeItem.id] = true; } catch (e) {}
-    for (var r = 0; r < scopeRefs.length; r++) { try { ids[A.findComp(scopeRefs[r]).id] = true; } catch (e) {} }
+    // a call that names a comp is compared there only; otherwise the active comp is compared
+    // (so editing a small comp doesn't pay for snapshotting a huge active comp)
+    if (!scopeRefs.length) { try { if (p.activeItem instanceof CompItem) ids[p.activeItem.id] = true; } catch (e) {} }
+    for (var r = 0; r < scopeRefs.length; r++) {
+      if (scopeRefs[r] === "*") { for (var ai = 1; ai <= p.numItems; ai++) if (p.item(ai) instanceof CompItem) ids[p.item(ai).id] = true; continue; } // every comp
+      try { ids[A.findComp(scopeRefs[r]).id] = true; } catch (e) {}
+    }
     for (var id in ids) { var c = p.itemByID(Number(id)); if (c) snap.comps[id] = snapComp(c, true, budget); }
     return snap;
   };
@@ -574,8 +641,9 @@ aemcp = (function () {
     for (var id in b.items) {
       var x = b.items[id], y = a.items[id];
       if (!y) { add(ch.items, ["+", x.type, x.name, x.layers]); continue; }
-      var d = [];
-      for (var f = 0; f < x.sig.length; f++) if (A.stringify(x.sig[f]) !== A.stringify(y.sig[f])) d.push(ITEM_FIELDS[f] + " " + brief(y.sig[f]) + " -> " + brief(x.sig[f]));
+      var d = [], ys = {};
+      for (var f0 = 0; f0 < y.sig.length; f0++) ys[y.sig[f0][0]] = y.sig[f0][1];
+      for (var f = 0; f < x.sig.length; f++) { var lab = x.sig[f][0]; if (A.stringify(x.sig[f][1]) !== A.stringify(ys[lab])) d.push(lab + " " + brief(ys[lab]) + " -> " + brief(x.sig[f][1])); }
       if (d.length) add(ch.items, ["~", x.type, x.name, d.join("; ")]);
     }
     for (var id2 in a.items) if (!b.items[id2]) add(ch.items, ["-", a.items[id2].type, a.items[id2].name]);

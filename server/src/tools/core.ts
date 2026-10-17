@@ -4,12 +4,13 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import { health } from "../bridge.js";
+import { aeLabel, evalRaw, health, listInstances, matchInstance, resolvePort, selectInstance } from "../bridge.js";
 import { lastSetup } from "../cli/setup.js";
 import { checkForUpdate, updateMessage } from "../update.js";
 import { VERSION } from "../config.js";
-import { codeExcerpt, ensureHelpers, errorHint, evalBody, runJsx } from "../jsx.js";
+import { codeExcerpt, ensureHelpers, errorHint, evalBody, formatChanges, runJsx } from "../jsx.js";
 import { transpileUserCode } from "../transpile.js";
+import { approvalSummary, permissions, READ_ONLY_REFUSAL, SHELL_REFUSAL, usesShell } from "../permissions.js";
 import { compRef, errorResult, formatResult, layerRef, reportScope } from "./registry.js";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -204,13 +205,24 @@ export function registerCoreTools(server: McpServer) {
     },
     async ({ code, args, undoGroup, depth, timeoutSeconds, transpile, report }) => {
       try {
+        const perm = permissions();
+        if (!perm.allowShell && usesShell(code)) return errorResult(SHELL_REFUSAL);
+        const readOnly = perm.mode === "read-only";
         const t = transpileUserCode(code, transpile !== false);
         const r = await runJsx(evalBody(t.source), args ?? {}, {
-          undoGroup: undoGroup === "" ? false : undoGroup || "AE MCP Script",
+          // read-only mode needs a named undo group (to undo the script) and a report over every comp
+          undoGroup: readOnly ? "AE MCP Script (read-only check)" : undoGroup === "" ? false : undoGroup || "AE MCP Script",
           depth,
           timeoutMs: (timeoutSeconds ?? 120) * 1000,
-          report: report === false ? undefined : reportScope(args),
+          report: readOnly ? ["*"] : report === false ? undefined : reportScope(args),
+          bridge: perm.mode === "ask" ? { approval: { tool: "Run script", summary: approvalSummary("ae_run_script", { code }) } } : undefined,
         });
+        if (readOnly && r.changes && formatChanges(r.changes) !== "Changes: none") {
+          await evalRaw("app.executeCommand(16); 'undone'", 30_000); // Edit > Undo: reverts this script's undo group
+          return errorResult(
+            `${READ_ONLY_REFUSAL}\nThis script changed the project, so its changes were undone:\n${formatChanges(r.changes)}`,
+          );
+        }
         if (!r.ok && r.error) {
           // AE rejected code that wasn't valid JavaScript either: Babel's message is far clearer
           if (t.syntaxError && /does not have a value|syntax|expected|illegal|unterminated/i.test(r.error.message)) {
@@ -251,10 +263,24 @@ export function registerCoreTools(server: McpServer) {
     async ({ path, args, timeoutSeconds }) => {
       try {
         if (!existsSync(path)) return errorResult(`File not found: ${path}`);
+        const perm = permissions();
+        if (perm.mode === "read-only") return errorResult(READ_ONLY_REFUSAL);
+        let source = "";
+        try {
+          source = readFileSync(path, "utf8");
+        } catch {}
+        if (!perm.allowShell && usesShell(source)) return errorResult(SHELL_REFUSAL);
         const body =
           "var f = new File(args.path); if (!f.exists) aemcp.fail('File not found in AE: ' + args.path);\n" +
           "$.global.AEMCP_ARGS = args.args || {};\nreturn $.evalFile(f);";
-        return formatResult(await runJsx(body, { path, args: args ?? {} }, { undoGroup: "AE MCP Script File", timeoutMs: (timeoutSeconds ?? 300) * 1000 }));
+        return formatResult(
+          await runJsx(body, { path, args: args ?? {} }, {
+            undoGroup: "AE MCP Script File",
+            timeoutMs: (timeoutSeconds ?? 300) * 1000,
+            report: reportScope(args),
+            bridge: perm.mode === "ask" ? { approval: { tool: "Run script file", summary: `${path}\n\n${source.slice(0, 1500)}` } } : undefined,
+          }),
+        );
       } catch (e) {
         return errorResult(e);
       }
@@ -265,21 +291,46 @@ export function registerCoreTools(server: McpServer) {
     "ae_status",
     {
       title: "After Effects status",
-      description: "Check the connection to After Effects and get app version, OS, open project and active item. Call this first if unsure AE is reachable.",
-      inputSchema: {},
+      description:
+        "Check the connection to After Effects: app version, OS, open project, active item, permission mode, and whether AE is busy. " +
+        "Lists every running After Effects instance when several are open; pass `instance` (e.g. \"2025\", \"2026\" or a port) to choose which one " +
+        "this session controls. Call this first if unsure AE is reachable.",
+      inputSchema: {
+        instance: z.string().optional().describe('Switch to another running After Effects: "2026", "26.5", or a bridge port. Omit to keep the current one.'),
+      },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    async () => {
+    async ({ instance }) => {
       try {
-        const h = await health();
+        const list = await listInstances(true);
+        if (instance) {
+          const m = matchInstance(list, instance);
+          if (!m) return errorResult(`No running After Effects matches "${instance}". Running: ${list.map((i) => `${i.label} (port ${i.port})`).join(", ") || "none"}.`);
+          selectInstance(m.port);
+        }
+        const port = await resolvePort();
+        const h = await health(port);
         const r = await runJsx(
           "return { appVersion: app.version, buildName: app.buildName, language: String(app.isoLanguage), os: $.os, extendScriptVersion: $.version, " +
             "memoryInUse: app.memoryInUse, isRenderEngine: app.isRenderEngine, project: aemcp.projectInfo(), " +
             "canWriteFiles: (function(){ try { return app.preferences.getPrefAsLong('Main Pref Section', 'Pref_SCRIPTING_FILE_NETWORK_SECURITY') === 1; } catch (e) { return null; } })() };",
           {},
-          { undoGroup: false },
+          { undoGroup: false, timeoutMs: 15_000 },
         );
         const out = formatResult(r);
+        const head: string[] = [`Connected to ${aeLabel(h.host?.appVersion)} (bridge v${h.version} on port ${port}, MCP server v${VERSION}).`];
+        if (list.length > 1)
+          head.push(
+            `${list.length} After Effects instances are running: ${list.map((i) => `${i.label} (port ${i.port}${i.port === port ? ", in use" : ""})`).join(", ")}. ` +
+              "Pass instance to ae_status to switch.",
+          );
+        const perm = permissions();
+        if (perm.mode !== "full" || !perm.allowShell)
+          head.push(
+            `Permissions: ${perm.mode === "ask" ? "every edit waits for the user's approval in After Effects" : perm.mode === "read-only" ? "read-only (edits are refused)" : "full"}` +
+              `${perm.allowShell ? "" : "; shell commands disabled"}.`,
+          );
+        out.content.unshift({ type: "text", text: head.join("\n") });
         if (r.ok && (r.result as any)?.canWriteFiles === false)
           out.content.push({
             type: "text",
@@ -287,11 +338,13 @@ export function registerCoreTools(server: McpServer) {
               "WARNING: 'Allow Scripts to Write Files and Access Network' is OFF in After Effects, so scripts cannot write files (frame previews, exports, File.write). " +
               "Ask the user to enable it: After Effects > Settings > Scripting & Expressions (Windows: Edit > Preferences > Scripting & Expressions).",
           });
-        out.content.unshift({ type: "text", text: `Connected to After Effects bridge v${h.version} (MCP server v${VERSION}).` });
         const upd = updateMessage(await checkForUpdate());
         if (upd) out.content.push({ type: "text", text: `${upd}\nTell the user about this update.` });
-        if (lastSetup?.extensionUpdated)
-          out.content.push({ type: "text", text: "Note: the After Effects extension was updated on disk; ask the user to restart After Effects when convenient to load the new version." });
+        if (lastSetup?.extensionUpdated || (h.version && h.version !== VERSION))
+          out.content.push({
+            type: "text",
+            text: `Note: After Effects is running bridge v${h.version} but v${VERSION} is installed; ask the user to restart After Effects when convenient to load it.`,
+          });
         return out;
       } catch (e) {
         return errorResult(e);

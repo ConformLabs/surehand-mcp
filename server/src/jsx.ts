@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
 import helperTemplate from "./aemcp.jsxinc";
 import { VERSION } from "./config.js";
-import { evalRaw } from "./bridge.js";
+import { evalRaw, type EvalOptions } from "./bridge.js";
+import { callContext } from "./context.js";
 
 export const NEED_HELPERS = "__AEMCP_NEED_HELPERS__";
 /** Version + content hash, so AE reloads the helpers whenever their source changes. */
@@ -16,6 +17,8 @@ export interface RunOptions {
   /** Serialization depth for the returned value. */
   depth?: number;
   timeoutMs?: number;
+  /** Bridge options: label for the AE panel log, approval request ("ask" mode), cancellation. */
+  bridge?: EvalOptions;
 }
 
 export interface Changes {
@@ -123,10 +126,18 @@ export async function ensureHelpers(): Promise<void> {
 /** Run a JSX function body in AE, loading the helper library on demand. */
 export async function runJsx(body: string, args: unknown = {}, opts: RunOptions = {}): Promise<RunResult> {
   const script = wrapBody(body, args, opts);
-  let raw = await evalRaw(script, opts.timeoutMs);
+  // defaults from the tool call: label for the AE panel log, and the AI app's cancel signal
+  const ctx = callContext.getStore();
+  opts = { ...opts, bridge: { label: ctx?.tool, cancel: ctx?.signal, ...opts.bridge } };
+  if (opts.bridge?.approval) {
+    // make sure the helpers are loaded first, so the user is asked to approve only once
+    const probe = await evalRaw(`(typeof aemcp !== 'undefined' && aemcp.version === ${toJsLiteral(HELPER_VERSION)}) ? 'ok' : 'no'`, 10_000, { cancel: opts.bridge.cancel });
+    if (probe !== "ok") await ensureHelpers();
+  }
+  let raw = await evalRaw(script, opts.timeoutMs, opts.bridge);
   if (raw === NEED_HELPERS) {
     await ensureHelpers();
-    raw = await evalRaw(script, opts.timeoutMs);
+    raw = await evalRaw(script, opts.timeoutMs, opts.bridge);
   }
   return parseResult(raw);
 }

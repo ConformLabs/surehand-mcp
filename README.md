@@ -4,8 +4,9 @@
 
 Connect **Claude** (Desktop / Code), **ChatGPT** (desktop app or web), Cursor, Codex, or any MCP client to **Adobe After Effects**.
 The AI can run any script inside After Effects (modern JavaScript, converted for AE's ExtendScript engine automatically),
-read information back, and use up to 64 ready-made tools for projects, comps, layers, keyframes, expressions, effects,
-shapes, masks and rendering. It can *see* and *measure* its work (frames, contact sheets, zoomed regions, difference
+read information back, and use up to 81 ready-made tools for projects, comps, layers, keyframes (Graph Editor level),
+text styling and animators, footage, effects, shapes, masks, Essential Graphics and rendering (including background
+renders with aerender). It can *see* and *measure* its work (frames, contact sheets, zoomed regions, difference
 images, exact layer bounds, pixel colors), and every edit returns an exact list of what changed in the project.
 
 ```
@@ -144,7 +145,7 @@ To rotate the token, delete `token` from `~/.aemcp/config.json` and re-run the i
 | `ae_get_scripting_guide` | ExtendScript cheat sheet for the model (also an MCP resource `aemcp://docs/extendscript`). |
 
 **Tool profiles.** Every tool description is sent to the AI in every chat, so by default only a **core set of
-22 tools** is enabled (about 7k tokens instead of 16k for all 64); everything else is still possible through
+22 tools** is enabled (about 7k tokens instead of 22k for all 81); everything else is still possible through
 `ae_run_script`. Switch to **Full** in After Effects (**Window > Extensions > AE MCP > AI tools**), in Claude Desktop's
 extension settings ("Enable all tools") for the `.mcpb`, or with `"toolProfile": "full"` in `~/.aemcp/config.json`, then
 restart the AI app. Advanced: `"toolProfile": "core,ae_import_files,ae_render_queue_start"` adds single tools.
@@ -168,7 +169,20 @@ Core set: `ae_status`, `ae_run_script`, `ae_get_scripting_guide`, `ae_render_fra
 - **Layers:** `ae_get_layer_info`, `ae_add_layer` (solid, text, shape, null, adjustment, camera, light, footage/comp), `ae_set_layer_attributes` (switches, timing, parent, blend mode, track matte, order...), `ae_delete_layers`, `ae_duplicate_layer`, `ae_split_layer`, `ae_get_selection`, `ae_select_layers`, `ae_set_text`
 - **Properties & animation:** `ae_get_properties`, `ae_find_properties` (search all layers by name/match name, or list animated / expression properties), `ae_set_property`, `ae_set_keyframes` (interpolation + easing), `ae_remove_keyframes`, `ae_set_expression`, `ae_get_expressions`
 - **Effects, shapes & masks:** `ae_list_available_effects`, `ae_get_effect_params` (an effect's exact parameter names, types, defaults and ranges, without touching your layers), `ae_apply_effect`, `ae_set_effect_params`, `ae_remove_effect`, `ae_apply_preset`, `ae_add_shape`, `ae_add_mask`
-- **Render:** `ae_list_render_queue`, `ae_add_to_render_queue`, `ae_render_queue_start`, `ae_clear_render_queue`
+- **Keyframes (Graph Editor level):** `ae_edit_keyframes` (value, move in time, in/out interpolation, speed + influence per
+  dimension, continuous/auto-Bezier, spatial tangents, roving, keyframe color labels, delete), `ae_copy_keyframes` (between
+  properties/layers/comps, time range, offset), `ae_set_time_remap` (keys or freeze frame)
+- **Text:** `ae_style_text_range` (per-character styling by range or matching words), `ae_set_paragraph` (justification,
+  indents, spacing, box size), `ae_add_text_animator` (animator properties + range/wiggly/expression selector)
+- **Footage:** `ae_set_footage_interpretation` (conform frame rate, alpha, fields, pulldown, loop, pixel aspect),
+  `ae_set_proxy`, `ae_relink_footage` (find missing files by name in a folder tree, keeps sequences)
+- **Essential Graphics:** `ae_essential_graphics` (add properties as controllers, template name), `ae_export_mogrt`
+- **Project:** `ae_project_health` (missing footage/fonts/effects, expression errors, unused footage, empty comps/folders,
+  duplicate comp names)
+- **Render:** `ae_list_render_queue`, `ae_add_to_render_queue`, `ae_get_render_settings` / `ae_set_render_settings` (every
+  render-settings and output-module setting as editable key/value pairs), `ae_queue_in_media_encoder`,
+  `ae_render_background` + `ae_render_jobs` (aerender in a separate process, with progress and cancel; After Effects stays
+  usable), `ae_render_queue_start`, `ae_clear_render_queue`
 
 Comps can be referenced by id, name, or omitted for the active comp; layers by 1-based index or name; properties by
 paths like `"Transform/Position"` or `"Effects/Gaussian Blur/Blurriness"` (display names or match names).
@@ -198,6 +212,36 @@ second per edit; turn it off with `"changeReport": false` in `~/.aemcp/config.js
 - "List every expression in the active comp that has an error and fix them."
 - "Rename all layers in the selected comp to Title Case and color-label text layers yellow."
 - "Import /Users/me/footage/*.mov, make a comp for each clip and add them all to the render queue as ProRes."
+
+## Control and trust
+
+**Permissions** (After Effects: Window > Extensions > AE MCP, or `"permissions"` in `~/.aemcp/config.json`; applies to
+the next request, no restart):
+
+| Mode | What happens |
+|---|---|
+| Full access (default) | Everything runs. Your AI app may still ask you before each tool call. |
+| Ask before every change | Every edit and script waits in the AE MCP panel, showing the exact code or arguments, until you click **Allow** or **Deny**. The panel opens by itself. Reads are not held. |
+| Read-only | Tools that edit are refused. Scripts still run (to read information), but if one changes the project it is undone immediately and the AI is told what it tried to change. |
+
+**Shell commands** (`system.callSystem`) can be blocked separately. These are safeguards against mistakes, not a
+sandbox: a script can still read and write files.
+
+**Activity log.** Every tool call is recorded in `~/.aemcp/activity.jsonl` with time, AI app, tool, arguments
+(including the full script code), duration and result. The AE MCP panel shows the latest calls (click one for its code),
+**Open log** reveals the file, and `ae-mcp activity` prints it.
+
+**Several After Effects versions at once.** Each running After Effects registers its own bridge (ports 8765+). The AI
+controls the one you used most recently; `ae_status` lists all of them and switches with `instance: "2025"` (or a
+version or port). Set a permanent preference with `"instance": "2026"` in the config.
+
+**Cancel and stuck detection.** When the AI app cancels a request, it is dropped if After Effects hasn't started it yet.
+If After Effects doesn't answer, the error says what it is busy with and for how long, and suggests checking for an open
+dialog. `ae_status` shows the same.
+
+**Compatibility check.** `ae-mcp selftest --full` runs every major tool against temporary comps (removed afterwards),
+lists which scripting features your After Effects version has, and saves a report to `~/.aemcp/compat/`. Tested so far
+on After Effects 2026 (26.5) on macOS; please share reports from other versions.
 
 ## Troubleshooting
 

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { BridgeError } from "../bridge.js";
 import { loadConfig } from "../config.js";
 import { formatChanges, runJsx, type RunResult } from "../jsx.js";
+import { approvalSummary, permissions, READ_ONLY_REFUSAL } from "../permissions.js";
 
 export interface JsxTool {
   name: string;
@@ -96,6 +97,9 @@ export function registerJsxTools(server: McpServer, tools: JsxTool[]) {
       },
       async (args: Record<string, unknown>) => {
         try {
+          const edits = !t.readOnly && !t.tempItems;
+          const perm = permissions();
+          if (edits && perm.mode === "read-only") return { isError: true, content: [{ type: "text", text: READ_ONLY_REFUSAL }] };
           const timeoutMs = typeof args.timeoutSeconds === "number" ? args.timeoutSeconds * 1000 : t.timeoutMs;
           const wantsReport = t.report ?? (!t.readOnly && !t.noUndo);
           return formatResult(
@@ -103,6 +107,7 @@ export function registerJsxTools(server: McpServer, tools: JsxTool[]) {
               undoGroup: t.tempItems ? "AE MCP " + t.title : t.readOnly || t.noUndo ? false : t.title,
               timeoutMs,
               report: wantsReport ? reportScope(args) : undefined,
+              bridge: edits && perm.mode === "ask" ? { approval: { tool: t.title, summary: approvalSummary(t.name, args) } } : undefined,
             }),
           );
         } catch (e) {

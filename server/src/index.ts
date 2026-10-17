@@ -11,6 +11,10 @@ import { registerCoreTools } from "./tools/core.js";
 import { effectTools } from "./tools/effects.js";
 import { layerTools } from "./tools/layer.js";
 import { inspectTools } from "./tools/inspect.js";
+import { keyframeTools } from "./tools/keyframes.js";
+import { footageTools } from "./tools/footage.js";
+import { egpTools, healthTools, textTools } from "./tools/text.js";
+import { registerRenderJobs } from "./tools/renderjobs.js";
 import { projectTools } from "./tools/project.js";
 import { propertyTools } from "./tools/property.js";
 import { registerJsxTools } from "./tools/registry.js";
@@ -18,6 +22,14 @@ import { renderTools } from "./tools/render.js";
 import { ensureAeSetup } from "./cli/setup.js";
 import { applyProfile, resolveProfile } from "./tools/profile.js";
 import { checkForUpdate } from "./update.js";
+// CLI commands are imported statically: lazily imported modules made esbuild initialize shared
+// dependencies (zod) too late for the MCP SDK, crashing the bundle at startup.
+import { ACTIVITY_FILE, readActivity } from "./activity.js";
+import { chatgpt } from "./cli/chatgpt.js";
+import { diagnostics } from "./cli/diagnostics.js";
+import { install } from "./cli/install.js";
+import { selftest } from "./cli/selftest.js";
+import { uninstall } from "./cli/uninstall.js";
 
 export function createMcpServer(): McpServer {
   const profile = resolveProfile();
@@ -30,7 +42,8 @@ export function createMcpServer(): McpServer {
   const server = new McpServer({ name: "after-effects", title: "Adobe After Effects", version: VERSION }, { instructions });
   applyProfile(server, profile);
   registerCoreTools(server);
-  registerJsxTools(server, [...projectTools, ...compTools, ...layerTools, ...propertyTools, ...effectTools, ...renderTools, ...appTools, ...inspectTools]);
+  registerJsxTools(server, [...projectTools, ...compTools, ...layerTools, ...propertyTools, ...effectTools, ...renderTools, ...appTools, ...inspectTools, ...keyframeTools, ...footageTools, ...textTools, ...egpTools, ...healthTools]);
+  registerRenderJobs(server);
   server.registerResource(
     "extendscript-cheatsheet",
     "aemcp://docs/extendscript",
@@ -135,8 +148,10 @@ Usage:
   ae-mcp install [--skip-clients] [--no-claude-desktop|--no-claude-code|--no-cursor|--no-codex]
                          install the server + After Effects extension and connect AI apps
   ae-mcp uninstall [--keep-config]
-  ae-mcp selftest        check the installation and the connection to After Effects
+  ae-mcp selftest [--full]  check the installation and the connection to After Effects;
+                         --full also runs every major tool and saves a compatibility report
   ae-mcp diagnostics     print a report to paste into a bug report (no secrets)
+  ae-mcp activity [n]    the last n tool calls (default 30); full log in ~/.aemcp/activity.jsonl
   ae-mcp chatgpt [--local]
                          HTTP server + public tunnel for ChatGPT
   ae-mcp setup           only install/update the After Effects extension and config
@@ -162,17 +177,25 @@ async function main() {
   if (process.argv.includes("--help") || cmd === "help") return void console.log(HELP);
   switch (cmd) {
     case "install":
-      return (await import("./cli/install.js")).install(rest);
+      return install(rest);
     case "uninstall":
-      return (await import("./cli/uninstall.js")).uninstall(rest);
+      return uninstall(rest);
     case "selftest":
     case "test":
-      process.exitCode = await (await import("./cli/selftest.js")).selftest();
+      process.exitCode = await selftest(rest.includes("--full"));
       return;
+    case "activity": {
+            const n = Number(rest[0]) || 30;
+      const list = readActivity(n).reverse();
+      if (!list.length) return void console.log(`No activity yet (${ACTIVITY_FILE}).`);
+      for (const e of list)
+        console.log(`${e.at}  ${e.ok ? "ok " : "ERR"}  ${String(e.ms).padStart(6)}ms  ${e.tool}${e.client ? `  [${e.client}]` : ""}  ${e.summary ?? ""}`);
+      return void console.log(`\nFull log with arguments and code: ${ACTIVITY_FILE}`);
+    }
     case "diagnostics":
-      return void console.log(await (await import("./cli/diagnostics.js")).diagnostics());
+      return void console.log(await diagnostics());
     case "chatgpt":
-      return (await import("./cli/chatgpt.js")).chatgpt(rest);
+      return chatgpt(rest);
     case "setup": {
       const r = ensureAeSetup({ forceExtension: rest.includes("--force") });
       console.log(JSON.stringify(r, null, 2));

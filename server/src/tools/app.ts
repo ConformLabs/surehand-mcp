@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CAPABILITIES_JSX } from "../capabilities.js";
 import type { JsxTool } from "./registry.js";
 
 export const appTools: JsxTool[] = [
@@ -58,11 +59,16 @@ return out;`,
   {
     name: "ae_system_info",
     title: "System & app info",
-    description: "After Effects version, OS, memory, preferences folder, scripting permissions, project expression engine.",
+    description:
+      "After Effects version, OS, memory, folders, scripting permissions, expression engine, and which newer scripting features this " +
+      "AE version supports (per-character text, render settings API, Essential Graphics, keyframe labels...).",
     input: {},
     readOnly: true,
+    tempItems: true,
     jsx: `
-var o = { appVersion: app.version, buildName: app.buildName, os: $.os, locale: $.locale, screens: $.screens, memoryInUse: app.memoryInUse, tempFolder: Folder.temp.fsName,
+var caps = (function () {${CAPABILITIES_JSX}
+})();
+var o = { features: caps.features, appVersion: app.version, buildName: app.buildName, os: $.os, locale: $.locale, screens: $.screens, memoryInUse: app.memoryInUse, tempFolder: Folder.temp.fsName,
   userDataFolder: Folder.userData.fsName, appFolder: Folder.appPackage ? Folder.appPackage.fsName : null };
 try { o.canWriteFiles = app.preferences.getPrefAsLong("Main Pref Section", "Pref_SCRIPTING_FILE_NETWORK_SECURITY") === 1; } catch (e) {}
 try { o.expressionEngine = app.project.expressionEngine; } catch (e) {}

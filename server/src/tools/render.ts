@@ -40,6 +40,62 @@ if (args.workAreaOnly === false) { it.timeSpanStart = 0; it.timeSpanDuration = c
 return { index: app.project.renderQueue.numItems, comp: c.name, output: om.file ? om.file.fsName : null, template: om.name };`,
   },
   {
+    name: "ae_get_render_settings",
+    title: "Get render settings",
+    description:
+      "Read the exact render settings and output-module settings of a render queue item (resolution, quality, time span, frame rate, " +
+      "motion blur, color depth, format, codec/video output, audio, resize, crop...), as editable key/value pairs for ae_set_render_settings.",
+    input: { index: z.number().int().min(1).optional().describe("Render queue item (default: the last one).") },
+    readOnly: true,
+    jsx: `
+var rq = app.project.renderQueue; if (!rq.numItems) aemcp.fail("Render queue is empty");
+var it = rq.item(args.index || rq.numItems), oms = [];
+for (var i = 1; i <= it.numOutputModules; i++) {
+  var om = it.outputModule(i);
+  oms.push({ index: i, template: om.name, file: om.file ? om.file.fsName : null, settings: om.getSettings(GetSettingsFormat.STRING_SETTABLE) });
+}
+return { index: args.index || rq.numItems, comp: it.comp.name, status: aemcp.enumName(RQItemStatus, it.status),
+  renderSettings: it.getSettings(GetSettingsFormat.STRING_SETTABLE), outputModules: oms,
+  renderSettingsTemplates: it.templates, outputModuleTemplates: it.outputModule(1).templates };`,
+  },
+  {
+    name: "ae_set_render_settings",
+    title: "Set render settings",
+    description:
+      "Change render settings and/or output-module settings of a render queue item using the keys from ae_get_render_settings " +
+      '(e.g. renderSettings {"Quality": "Best", "Resolution": "Full", "Time Span": "Custom", "Time Span Start": "1.0"}; ' +
+      'outputModule {"Output File Info": {"Full Flat Path": "/out/a.mov"}, "Format": "QuickTime"}). Returns the resulting settings.',
+    input: {
+      index: z.number().int().min(1).optional().describe("Render queue item (default: the last one)."),
+      renderSettings: z.record(z.string(), z.any()).optional(),
+      outputModule: z.record(z.string(), z.any()).optional(),
+      outputModuleIndex: z.number().int().min(1).optional().describe("Default 1."),
+      renderSettingsTemplate: z.string().optional().describe("Apply a template first."),
+      outputModuleTemplate: z.string().optional().describe("Apply a template first."),
+    },
+    jsx: `
+var rq = app.project.renderQueue; if (!rq.numItems) aemcp.fail("Render queue is empty");
+var it = rq.item(args.index || rq.numItems), om = it.outputModule(args.outputModuleIndex || 1);
+if (args.renderSettingsTemplate) it.applyTemplate(args.renderSettingsTemplate);
+if (args.outputModuleTemplate) om.applyTemplate(args.outputModuleTemplate);
+if (args.renderSettings) it.setSettings(args.renderSettings);
+if (args.outputModule) om.setSettings(args.outputModule);
+return { comp: it.comp.name, renderSettings: it.getSettings(GetSettingsFormat.STRING_SETTABLE), outputModule: om.getSettings(GetSettingsFormat.STRING_SETTABLE), file: om.file ? om.file.fsName : null };`,
+  },
+  {
+    name: "ae_queue_in_media_encoder",
+    title: "Queue in Media Encoder",
+    description: "Send the queued render queue items to Adobe Media Encoder (Composition > Add to Adobe Media Encoder Queue), optionally starting the encode.",
+    input: { start: z.boolean().optional().describe("Start encoding immediately in Media Encoder (default false).") },
+    noUndo: true,
+    jsx: `
+var rq = app.project.renderQueue;
+if (!rq.numItems) aemcp.fail("Render queue is empty");
+if (!rq.canQueueInAME) aemcp.fail("Media Encoder can't be used: it may not be installed, or no render queue item is queued");
+rq.queueInAME(!!args.start);
+return { sentToMediaEncoder: true, started: !!args.start };`,
+  },
+  {
     name: "ae_render_queue_start",
     title: "Start render",
     description:

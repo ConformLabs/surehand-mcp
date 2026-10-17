@@ -4,6 +4,8 @@ import { join } from "node:path";
 import { health } from "../bridge.js";
 import { loadConfig, VERSION } from "../config.js";
 import { runJsx } from "../jsx.js";
+import { diagnostics } from "./diagnostics.js";
+import { fullSelftest } from "./fulltest.js";
 import { checkForUpdate, updateCheckEnabled, updateMessage } from "../update.js";
 import { installedExtensionHash } from "./setup.js";
 import {
@@ -11,7 +13,7 @@ import {
 } from "./util.js";
 import { spawnSync } from "node:child_process";
 
-export async function selftest(): Promise<number> {
+export async function selftest(full = false): Promise<number> {
   let failures = 0;
   const bad = (m: string) => { failures++; fail(m); };
   console.log(bold(`\nAfter Effects MCP self-test v${VERSION}`));
@@ -115,6 +117,9 @@ return r;`,
       } else bad(`Frame preview was not written to ${png}`);
     }
   }
+  if (full && !failures) {
+    failures += await fullSelftest();
+  }
   return summary(failures);
 }
 
@@ -125,7 +130,6 @@ async function summary(failures: number): Promise<number> {
   }
   console.log(`\n${red(bold(`${failures} problem(s) found.`))} See README > Troubleshooting.`);
   console.log("If you report it, include everything below (it contains no secrets):\n");
-  const { diagnostics } = await import("./diagnostics.js");
   console.log(await diagnostics());
   return 1;
 }

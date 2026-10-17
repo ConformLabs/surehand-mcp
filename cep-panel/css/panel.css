@@ -21,3 +21,15 @@ footer { margin-top: 10px; font-size: 10px; }
 .setting label { color: var(--muted); }
 select { background: #3a3a3a; color: var(--fg); border: 1px solid #4a4a4a; border-radius: 4px; padding: 3px 6px; font: inherit; flex: 1; }
 .small { font-size: 10px; margin: -6px 0 10px; }
+.grid { display: grid; grid-template-columns: auto 1fr; gap: 6px 8px; align-items: center; margin-bottom: 8px; }
+.grid label { color: var(--muted); }
+#approvals { border: 1px solid #5c531c; background: #2d2a12; border-radius: 4px; padding: 6px 8px; margin-bottom: 10px; }
+.approval { border-top: 1px solid #4a4520; padding: 6px 0; }
+.approval:first-child { border-top: 0; }
+.approval .what { font-weight: 600; margin-bottom: 4px; }
+.approval pre, li pre { max-height: 160px; overflow: auto; background: #181818; padding: 6px; border-radius: 3px; margin: 4px 0; white-space: pre-wrap; word-break: break-word; font: 11px Menlo, Consolas, monospace; }
+.approval .row { margin: 4px 0 0; }
+button.allow { background: #1f4d2b; border-color: #2e6b3d; }
+button.deny { background: #5a1f1f; border-color: #7a2c2c; }
+li { cursor: pointer; }
+li .c { color: var(--muted); }
