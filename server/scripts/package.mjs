@@ -94,7 +94,7 @@ copyFileSync(join(ROOT, "INSTALL.txt"), join(OUT, "START HERE.txt"));
 
 // --- zip (keeps the executable bits on the macOS launchers) ---
 const zip = `AE-MCP-${pkg.version}.zip`;
-if (process.platform === "darwin") run("ditto", ["-c", "-k", "--keepParent", "AE-MCP", zip], OUT_BASE);
+if (process.platform === "darwin") run("ditto", ["-c", "-k", "--norsrc", "--noextattr", "--noqtn", "--noacl", "--keepParent", "AE-MCP", zip], OUT_BASE); // no ._ AppleDouble files (they show up on Windows)
 else if (process.platform === "win32")
   run("powershell", ["-NoProfile", "-Command", `Compress-Archive -Path AE-MCP -DestinationPath ${zip} -Force`], OUT_BASE);
 else run("zip", ["-qr", zip, "AE-MCP"], OUT_BASE);
