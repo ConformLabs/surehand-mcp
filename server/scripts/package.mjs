@@ -91,7 +91,7 @@ const LAUNCHERS = [
 ];
 for (const [name, cmd, desc] of LAUNCHERS) {
   const mac = join(DIRS.mac, `${name}.command`);
-  writeFileSync(mac, `#!/bin/bash\n# ${desc}\nbash "$(dirname "$0")/../Support files/run.sh" ${cmd} "$@"\necho\nread -r -p "Press Enter to close..."\n`);
+  writeFileSync(mac, `#!/bin/bash\n# ${desc}\nbash "$(dirname "$0")/../Support files/run.sh" ${cmd} "$@"\necho\nread -r -p "Press Enter to close..." || true\n`);
   chmodSync(mac, 0o755);
   writeFileSync(
     join(DIRS.win, `${name}.bat`),
