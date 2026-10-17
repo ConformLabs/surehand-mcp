@@ -63,7 +63,7 @@ var init_define_AEMCP_CEP_FILES = __esm({
   var path = nodeRequire("path");
   var crypto = nodeRequire("crypto");
 
-  var VERSION = "1.2.0"; // replaced with the release version at build time
+  var VERSION = "1.3.0"; // replaced with the release version at build time
   var CONFIG_DIR = path.join(os.homedir(), ".aemcp");
   var CONFIG_FILE = path.join(CONFIG_DIR, "config.json");
   var STATUS_FILE = path.join(CONFIG_DIR, "bridge-status.json");
@@ -73441,7 +73441,7 @@ init_define_AEMCP_CEP_FILES();
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-var VERSION = "1.2.0";
+var VERSION = "1.3.0";
 function configPath() {
   return process.env.AEMCP_CONFIG || join(homedir(), ".aemcp", "config.json");
 }
@@ -73738,7 +73738,7 @@ function installedExtensionHash() {
 function ensureExtension(force = false) {
   const dir = extensionDir();
   const current2 = installedExtensionHash();
-  if (!force && current2 === "3227945cae12" && existsSync2(join3(dir, "CSXS", "manifest.xml"))) return { installed: false, updated: false };
+  if (!force && current2 === "741b2e86b263" && existsSync2(join3(dir, "CSXS", "manifest.xml"))) return { installed: false, updated: false };
   const updated = existsSync2(dir);
   rmSync(dir, { recursive: true, force: true });
   for (const [rel, content] of Object.entries(define_AEMCP_CEP_FILES_default)) {
@@ -73746,7 +73746,7 @@ function ensureExtension(force = false) {
     mkdirSync2(dirname2(p), { recursive: true });
     writeFileSync2(p, content);
   }
-  writeFileSync2(join3(dir, HASH_FILE), "3227945cae12");
+  writeFileSync2(join3(dir, HASH_FILE), "741b2e86b263");
   return { installed: true, updated };
 }
 function debugModeOn(v) {
@@ -78408,7 +78408,7 @@ async function diagnostics() {
   if (cfg) L.push(`config: ${JSON.stringify({ ...cfg, token: cfg.token ? `<set, ${cfg.token.length} chars>` : "MISSING" })}`);
   else L.push(`config: MISSING (${CONFIG_FILE})`);
   L.push(`installed server: ${existsSync8(INSTALLED_SERVER) ? INSTALLED_SERVER : "not installed (fine when using the .mcpb)"}`);
-  L.push(`extension: ${extensionDir()} \xB7 ${existsSync8(join10(extensionDir(), "CSXS", "manifest.xml")) ? `hash ${installedExtensionHash()} (bundled ${"3227945cae12"})` : "MISSING"}`);
+  L.push(`extension: ${extensionDir()} \xB7 ${existsSync8(join10(extensionDir(), "CSXS", "manifest.xml")) ? `hash ${installedExtensionHash()} (bundled ${"741b2e86b263"})` : "MISSING"}`);
   L.push(`PlayerDebugMode: ${debugMode()}`);
   L.push(`Claude Desktop: ${clientEntry(claudeDesktopConfig())}`);
   L.push(`Claude Code: ${clientEntry(claudeCodeConfig())}`);
@@ -78740,7 +78740,7 @@ After Effects MCP self-test v${VERSION}`));
   else bad(`No config at ${CONFIG_FILE}. Run the installer.`);
   const hash2 = installedExtensionHash();
   if (!existsSync11(join13(extensionDir(), "CSXS", "manifest.xml"))) bad(`After Effects extension missing at ${extensionDir()}. Run the installer.`);
-  else if (hash2 !== "3227945cae12") warn(`Extension at ${extensionDir()} is a different version (${hash2 ?? "unknown"} vs ${"3227945cae12"}). Re-run the installer.`);
+  else if (hash2 !== "741b2e86b263") warn(`Extension at ${extensionDir()} is a different version (${hash2 ?? "unknown"} vs ${"741b2e86b263"}). Re-run the installer.`);
   else ok("After Effects extension installed");
   const offVersions = CSXS_VERSIONS.filter((v) => {
     const r = isWin ? spawnSync5("reg", ["query", `HKCU\\Software\\Adobe\\CSXS.${v}`, "/v", "PlayerDebugMode"], { encoding: "utf8" }) : isMac ? spawnSync5("defaults", ["read", `com.adobe.CSXS.${v}`, "PlayerDebugMode"], { encoding: "utf8" }) : null;
