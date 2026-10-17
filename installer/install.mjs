@@ -100,8 +100,16 @@ function addToJsonClient(label, file, onlyIfDirExists = true) {
 }
 
 if (want("claude-desktop")) {
-  if (existsSync(dirname(claudeDesktopConfig()))) addToJsonClient("Claude Desktop", claudeDesktopConfig());
-  else warn("Claude Desktop not found (skipped). Install it, then re-run this installer.");
+  if (existsSync(dirname(claudeDesktopConfig()))) {
+    addToJsonClient("Claude Desktop", claudeDesktopConfig());
+    // A running Claude Desktop rewrites its config from memory and would drop our entry
+    const running = isWin
+      ? spawnSync("tasklist", ["/FI", "IMAGENAME eq Claude.exe"], { encoding: "utf8" }).stdout?.includes("Claude.exe")
+      : spawnSync("pgrep", ["-f", "Claude.app/Contents/MacOS/Claude"], { encoding: "utf8" }).status === 0;
+    if (running)
+      warn(bold("Claude Desktop is running: quit it completely (Cmd+Q / tray > Quit) and run this installer again,") +
+        "\n    otherwise Claude Desktop may overwrite the new setting when it closes.");
+  } else warn("Claude Desktop not found (skipped). Install it, then re-run this installer.");
 }
 if (want("claude-code")) {
   const claude = findClaudeCli();
