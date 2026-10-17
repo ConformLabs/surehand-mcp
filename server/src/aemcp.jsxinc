@@ -1,0 +1,432 @@
+// aemcp helper library — loaded once into the After Effects ExtendScript engine
+// by the MCP server (sent over the bridge whenever the version check fails).
+// ES3 only: no let/const, arrow functions, Array.prototype.map, JSON, etc.
+aemcp = (function () {
+  var A = {};
+  A.version = "__AEMCP_VERSION__";
+
+  // ---------- JSON ----------
+  function quote(s) {
+    return '"' + String(s).replace(/[\\"\u0000-\u001f\u2028\u2029]/g, function (c) {
+      switch (c) {
+        case '"': return '\\"';
+        case "\\": return "\\\\";
+        case "\n": return "\\n";
+        case "\r": return "\\r";
+        case "\t": return "\\t";
+        case "\b": return "\\b";
+        case "\f": return "\\f";
+      }
+      var h = c.charCodeAt(0).toString(16);
+      return "\\u" + "0000".substr(h.length) + h;
+    }) + '"';
+  }
+  A.stringify = function (v) {
+    if (v === null || v === undefined) return "null";
+    var t = typeof v;
+    if (t === "number") return isFinite(v) ? String(v) : "null";
+    if (t === "boolean") return v ? "true" : "false";
+    if (t === "string") return quote(v);
+    if (v instanceof Array) {
+      var parts = [];
+      for (var i = 0; i < v.length; i++) parts.push(A.stringify(v[i]));
+      return "[" + parts.join(",") + "]";
+    }
+    if (t === "object") {
+      var out = [];
+      for (var k in v) {
+        if (!v.hasOwnProperty(k)) continue;
+        var val = v[k];
+        if (typeof val === "function" || val === undefined) continue;
+        out.push(quote(k) + ":" + A.stringify(val));
+      }
+      return "{" + out.join(",") + "}";
+    }
+    return "null";
+  };
+
+  // ---------- small utils ----------
+  A.round = function (n) { return typeof n === "number" ? Math.round(n * 10000) / 10000 : n; };
+  function isAE(name) { try { return typeof $.global[name] !== "undefined"; } catch (e) { return false; } }
+  function inst(v, ctor) { try { return isAE(ctor) && v instanceof $.global[ctor]; } catch (e) { return false; } }
+  A.fail = function (msg) { var e = new Error(msg); e.aemcpUser = true; throw e; };
+
+  // ---------- finders ----------
+  // ref: number (item id) | string (name) | "active" | undefined (=active)
+  A.findItem = function (ref) {
+    var p = app.project;
+    if (ref === undefined || ref === null || ref === "active") {
+      if (!p.activeItem) A.fail("No active item. Open/select a composition or pass an id/name.");
+      return p.activeItem;
+    }
+    if (typeof ref === "number") {
+      var it = p.itemByID(ref);
+      if (!it) A.fail("No project item with id " + ref);
+      return it;
+    }
+    for (var i = 1; i <= p.numItems; i++) if (p.item(i).name === ref) return p.item(i);
+    A.fail("No project item named '" + ref + "'");
+  };
+  A.findComp = function (ref) {
+    if (ref === undefined || ref === null || ref === "active") {
+      var a = app.project.activeItem;
+      if (a && a instanceof CompItem) return a;
+      // fall back to the comp open in the viewer
+      try { if (app.activeViewer && app.activeViewer.type === ViewerType.VIEWER_COMPOSITION) { app.activeViewer.setActive(); a = app.project.activeItem; if (a instanceof CompItem) return a; } } catch (e) {}
+      A.fail("No active composition. Open a comp or pass compId / compName.");
+    }
+    var it = A.findItem(ref);
+    if (!(it instanceof CompItem)) A.fail("Item '" + it.name + "' is not a composition");
+    return it;
+  };
+  // ref: number (1-based index) | string (name) | {id:n}
+  A.findLayer = function (comp, ref) {
+    if (ref === undefined || ref === null) {
+      if (comp.selectedLayers.length) return comp.selectedLayers[0];
+      A.fail("No layer specified and none selected");
+    }
+    if (typeof ref === "number") {
+      if (ref < 1 || ref > comp.numLayers) A.fail("Layer index " + ref + " out of range 1-" + comp.numLayers);
+      return comp.layer(ref);
+    }
+    if (typeof ref === "object" && ref.id !== undefined) {
+      for (var i = 1; i <= comp.numLayers; i++) if (comp.layer(i).id === ref.id) return comp.layer(i);
+      A.fail("No layer with id " + ref.id);
+    }
+    var l = comp.layer(String(ref));
+    if (!l) A.fail("No layer named '" + ref + "' in comp '" + comp.name + "'");
+    return l;
+  };
+  // path: "Transform/Position" | ["ADBE Transform Group","ADBE Position"] | "Effects/Gaussian Blur/Blurriness"
+  // Each segment may be a display name, match name, or 1-based index.
+  A.resolveProp = function (layer, path) {
+    var segs = path instanceof Array ? path : String(path).split("/");
+    var cur = layer;
+    for (var i = 0; i < segs.length; i++) {
+      var s = segs[i];
+      if (s === "" || s === undefined) continue;
+      var next = null;
+      if (typeof s === "number" || /^\d+$/.test(s)) next = cur.property(Number(s));
+      else {
+        try { next = cur.property(s); } catch (e) { next = null; }
+        if (!next && String(s).toLowerCase() === "effects") next = cur.property("ADBE Effect Parade");
+        if (!next && cur.numProperties) {
+          var low = String(s).toLowerCase();
+          for (var j = 1; j <= cur.numProperties; j++) {
+            var c = cur.property(j);
+            if (c.name.toLowerCase() === low || c.matchName.toLowerCase() === low) { next = c; break; }
+          }
+        }
+      }
+      if (!next) A.fail("Property '" + s + "' not found under '" + (cur.name || "layer") + "' (path " + segs.join("/") + ")");
+      cur = next;
+    }
+    return cur;
+  };
+
+  // ---------- serializers ----------
+  A.itemType = function (it) {
+    if (it instanceof CompItem) return "comp";
+    if (it instanceof FolderItem) return "folder";
+    if (it instanceof FootageItem) {
+      try {
+        if (it.mainSource instanceof SolidSource) return "solid";
+        if (it.mainSource instanceof PlaceholderSource) return "placeholder";
+      } catch (e) {}
+      return "footage";
+    }
+    return "item";
+  };
+  A.itemInfo = function (it) {
+    var o = { id: it.id, name: it.name, type: A.itemType(it), parentFolder: it.parentFolder ? it.parentFolder.name : null, comment: it.comment, label: it.label };
+    if (it instanceof CompItem || it instanceof FootageItem) {
+      o.width = it.width; o.height = it.height; o.duration = A.round(it.duration); o.pixelAspect = it.pixelAspect;
+      o.hasVideo = it.hasVideo; o.hasAudio = it.hasAudio;
+      try { o.frameRate = A.round(it.frameRate); } catch (e) {}
+    }
+    if (it instanceof CompItem) { o.numLayers = it.numLayers; o.bgColor = it.bgColor; o.workAreaStart = A.round(it.workAreaStart); o.workAreaDuration = A.round(it.workAreaDuration); o.displayStartTime = A.round(it.displayStartTime); }
+    if (it instanceof FootageItem) {
+      try { o.file = it.file ? it.file.fsName : null; } catch (e) {}
+      try { o.isStill = it.mainSource.isStill; } catch (e) {}
+      try { if (it.mainSource instanceof SolidSource) o.color = it.mainSource.color; } catch (e) {}
+      o.footageMissing = it.footageMissing;
+    }
+    if (it instanceof FolderItem) o.numItems = it.numItems;
+    return o;
+  };
+  A.layerType = function (l) {
+    if (inst(l, "TextLayer")) return "text";
+    if (inst(l, "ShapeLayer")) return "shape";
+    if (inst(l, "CameraLayer")) return "camera";
+    if (inst(l, "LightLayer")) return "light";
+    if (inst(l, "AVLayer")) {
+      if (l.nullLayer) return "null";
+      if (l.adjustmentLayer) return "adjustment";
+      try { if (l.source instanceof CompItem) return "precomp"; } catch (e) {}
+      try { if (l.source.mainSource instanceof SolidSource) return "solid"; } catch (e) {}
+      return "footage";
+    }
+    return "layer";
+  };
+  A.layerInfo = function (l, detail) {
+    var o = { index: l.index, id: l.id, name: l.name, type: A.layerType(l), enabled: l.enabled, solo: l.solo, locked: l.locked, shy: l.shy,
+      inPoint: A.round(l.inPoint), outPoint: A.round(l.outPoint), startTime: A.round(l.startTime), stretch: l.stretch, label: l.label,
+      parent: l.parent ? l.parent.index : null, selected: l.selected, comment: l.comment };
+    if (inst(l, "AVLayer")) {
+      o.threeD = l.threeDLayer; o.blendingMode = A.enumName(BlendingMode, l.blendingMode);
+      o.trackMatteType = A.enumName(TrackMatteType, l.trackMatteType); o.audioEnabled = l.audioEnabled;
+      o.adjustmentLayer = l.adjustmentLayer; o.motionBlur = l.motionBlur; o.collapseTransformation = l.collapseTransformation;
+      try { if (l.source) o.source = { id: l.source.id, name: l.source.name, type: A.itemType(l.source) }; } catch (e) {}
+    }
+    if (detail) {
+      var tr = l.property("ADBE Transform Group");
+      o.transform = {};
+      for (var i = 1; i <= tr.numProperties; i++) {
+        var p = tr.property(i);
+        try { if (p.propertyValueType !== PropertyValueType.NO_VALUE) o.transform[p.name] = A.valueOf(p.value); } catch (e) {}
+      }
+      o.effects = [];
+      var fx = l.property("ADBE Effect Parade");
+      if (fx) for (var j = 1; j <= fx.numProperties; j++) o.effects.push({ index: j, name: fx.property(j).name, matchName: fx.property(j).matchName, enabled: fx.property(j).enabled });
+      var masks = l.property("ADBE Mask Parade");
+      o.numMasks = masks ? masks.numProperties : 0;
+      o.markers = A.markers(l.property("ADBE Marker"));
+      if (inst(l, "TextLayer")) o.text = A.textInfo(l.property("ADBE Text Properties").property("ADBE Text Document").value);
+      o.animated = A.animatedProps(l);
+    }
+    return o;
+  };
+  A.compInfo = function (c, withLayers) {
+    var o = A.itemInfo(c);
+    o.time = A.round(c.time); o.frameDuration = A.round(c.frameDuration); o.motionBlur = c.motionBlur; o.renderer = c.renderer;
+    try { o.activeCamera = c.activeCamera ? c.activeCamera.name : null; } catch (e) {}
+    if (withLayers) { o.layers = []; for (var i = 1; i <= c.numLayers; i++) o.layers.push(A.layerInfo(c.layer(i), false)); }
+    return o;
+  };
+  A.textInfo = function (td) {
+    var o = { text: td.text };
+    var keys = ["font", "fontSize", "fillColor", "strokeColor", "strokeWidth", "applyFill", "applyStroke", "tracking", "leading", "fauxBold", "fauxItalic", "allCaps", "boxText", "pointText"];
+    for (var i = 0; i < keys.length; i++) { try { var v = td[keys[i]]; if (v !== undefined) o[keys[i]] = A.valueOf(v); } catch (e) {} }
+    try { o.justification = A.enumName(ParagraphJustification, td.justification); } catch (e) {}
+    try { if (td.boxText) o.boxTextSize = td.boxTextSize; } catch (e) {}
+    return o;
+  };
+  A.enumName = function (en, val) {
+    for (var k in en) { try { if (en[k] === val) return k; } catch (e) {} }
+    return val;
+  };
+  A.markers = function (mp) {
+    var out = [];
+    if (!mp) return out;
+    for (var i = 1; i <= mp.numKeys; i++) {
+      var m = mp.keyValue(i);
+      out.push({ time: A.round(mp.keyTime(i)), comment: m.comment, duration: A.round(m.duration), chapter: m.chapter, url: m.url });
+    }
+    return out;
+  };
+  A.valueOf = function (v) {
+    if (v === null || v === undefined) return null;
+    if (typeof v === "number") return A.round(v);
+    if (v instanceof Array) { var a = []; for (var i = 0; i < v.length; i++) a.push(A.valueOf(v[i])); return a; }
+    if (inst(v, "TextDocument")) return A.textInfo(v);
+    if (inst(v, "Shape")) return { vertices: v.vertices, inTangents: v.inTangents, outTangents: v.outTangents, closed: v.closed };
+    if (inst(v, "MarkerValue")) return { comment: v.comment, duration: v.duration };
+    return v;
+  };
+  A.animatedProps = function (layer) {
+    var out = [];
+    function walk(g, path) {
+      for (var i = 1; i <= g.numProperties; i++) {
+        var p = g.property(i), pp = path + "/" + p.name;
+        if (p.propertyType === PropertyType.PROPERTY) {
+          var e = false; try { e = p.canSetExpression && p.expressionEnabled; } catch (x) {}
+          if (p.numKeys > 0 || e) out.push({ path: pp.substr(1), numKeys: p.numKeys, expression: e ? p.expression : undefined });
+        } else walk(p, pp);
+      }
+    }
+    try { walk(layer, ""); } catch (e) {}
+    return out;
+  };
+  A.propInfo = function (p, opts) {
+    opts = opts || {};
+    var o = { name: p.name, matchName: p.matchName, propertyIndex: p.propertyIndex };
+    if (p.propertyType === PropertyType.PROPERTY) {
+      o.kind = "property";
+      o.valueType = A.enumName(PropertyValueType, p.propertyValueType);
+      try { if (p.propertyValueType !== PropertyValueType.NO_VALUE) o.value = A.valueOf(p.value); } catch (e) {}
+      o.numKeys = p.numKeys;
+      try { o.canSetExpression = p.canSetExpression; if (p.expression) { o.expression = p.expression; o.expressionEnabled = p.expressionEnabled; o.expressionError = p.expressionError; } } catch (e) {}
+      try { if (p.hasMin) o.min = p.minValue; if (p.hasMax) o.max = p.maxValue; } catch (e) {}
+      try { o.unitsText = p.unitsText; } catch (e) {}
+      if (opts.keyframes && p.numKeys) o.keyframes = A.keyframes(p);
+    } else {
+      o.kind = p.propertyType === PropertyType.INDEXED_GROUP ? "indexedGroup" : "group";
+      o.numProperties = p.numProperties;
+      try { if (p.canSetEnabled) o.enabled = p.enabled; } catch (e) {}
+      var depth = opts.depth === undefined ? 1 : opts.depth;
+      if (depth > 0) {
+        o.children = [];
+        for (var i = 1; i <= p.numProperties; i++) {
+          var c = p.property(i);
+          if (!opts.includeHidden) { try { if (c.propertyType === PropertyType.PROPERTY && c.propertyValueType === PropertyValueType.NO_VALUE) continue; } catch (e) {} }
+          o.children.push(A.propInfo(c, { depth: depth - 1, keyframes: opts.keyframes, includeHidden: opts.includeHidden }));
+        }
+      }
+    }
+    return o;
+  };
+  A.keyframes = function (p) {
+    var ks = [];
+    for (var k = 1; k <= p.numKeys; k++) {
+      var kf = { index: k, time: A.round(p.keyTime(k)), value: A.valueOf(p.keyValue(k)) };
+      try { kf.inInterpolation = A.enumName(KeyframeInterpolationType, p.keyInInterpolationType(k)); kf.outInterpolation = A.enumName(KeyframeInterpolationType, p.keyOutInterpolationType(k)); } catch (e) {}
+      try {
+        var ie = p.keyInTemporalEase(k), oe = p.keyOutTemporalEase(k);
+        kf.easeIn = []; kf.easeOut = [];
+        for (var d = 0; d < ie.length; d++) { kf.easeIn.push({ speed: A.round(ie[d].speed), influence: A.round(ie[d].influence) }); kf.easeOut.push({ speed: A.round(oe[d].speed), influence: A.round(oe[d].influence) }); }
+      } catch (e) {}
+      ks.push(kf);
+    }
+    return ks;
+  };
+
+  // Generic serializer for arbitrary return values of user scripts.
+  // `depth` limits how far AE objects (comps, layers, properties) are expanded;
+  // plain arrays/objects are copied as-is up to a nesting guard.
+  A.serialize = function (v, depth, nest) {
+    if (depth === undefined) depth = 4;
+    nest = nest || 0;
+    if (v === null || v === undefined) return null;
+    var t = typeof v;
+    if (t === "number" || t === "string" || t === "boolean") return v;
+    if (t === "function") return "[function]";
+    if (nest > 30) return "[too deep]";
+    try {
+      if (v instanceof CompItem) return A.compInfo(v, depth > 1);
+      if (inst(v, "Item")) return A.itemInfo(v);
+      if (inst(v, "Layer")) return A.layerInfo(v, depth > 2);
+      if (inst(v, "PropertyBase")) return A.propInfo(v, { depth: depth > 2 ? 1 : 0 });
+      if (inst(v, "Project")) return A.projectInfo();
+      if (inst(v, "File") || inst(v, "Folder")) return v.fsName;
+      if (inst(v, "TextDocument") || inst(v, "Shape") || inst(v, "MarkerValue")) return A.valueOf(v);
+      if (inst(v, "KeyframeEase")) return { speed: A.round(v.speed), influence: A.round(v.influence) };
+      if (inst(v, "RenderQueueItem")) return { comp: v.comp.name, status: A.enumName(RQItemStatus, v.status) };
+      if (inst(v, "Collection") || inst(v, "ItemCollection") || inst(v, "LayerCollection")) {
+        if (depth <= 0) return "[collection of " + v.length + "]";
+        var c = []; for (var ci = 1; ci <= v.length; ci++) c.push(A.serialize(v[ci], depth - 1, nest + 1)); return c;
+      }
+    } catch (e) {}
+    if (v instanceof Array) {
+      var a = [], n = Math.min(v.length, 2000);
+      for (var i = 0; i < n; i++) a.push(A.serialize(v[i], depth, nest + 1));
+      if (v.length > n) a.push("... " + (v.length - n) + " more");
+      return a;
+    }
+    var isPlain = false;
+    try { isPlain = v.constructor === Object; } catch (e) {}
+    if (!isPlain && depth <= 0) return "[" + (v.reflect ? v.reflect.name : "object") + "]";
+    var o = {};
+    for (var k in v) { try { if (typeof v[k] !== "function") o[k] = A.serialize(v[k], isPlain ? depth : depth - 1, nest + 1); } catch (e) {} }
+    return o;
+  };
+
+  A.projectInfo = function () {
+    var p = app.project, counts = { comp: 0, footage: 0, folder: 0, solid: 0, placeholder: 0 };
+    for (var i = 1; i <= p.numItems; i++) { var t = A.itemType(p.item(i)); counts[t] = (counts[t] || 0) + 1; }
+    var o = { file: p.file ? p.file.fsName : null, name: p.file ? p.file.name : "Untitled", dirty: p.dirty, numItems: p.numItems, counts: counts,
+      bitsPerChannel: p.bitsPerChannel, renderQueueItems: p.renderQueue.numItems };
+    try { o.frameRate = A.round(p.frameRate); } catch (e) {}
+    try { o.workingSpace = p.workingSpace; } catch (e) {}
+    try { o.expressionEngine = p.expressionEngine; } catch (e) {}
+    var a = p.activeItem;
+    o.activeItem = a ? { id: a.id, name: a.name, type: A.itemType(a) } : null;
+    return o;
+  };
+
+  // ---------- value helpers used by tools ----------
+  A.toAEValue = function (prop, v) {
+    if (prop.propertyValueType === PropertyValueType.TEXT_DOCUMENT) {
+      var td = prop.value;
+      if (typeof v === "string") { td.text = v; return td; }
+      A.applyText(td, v); return td;
+    }
+    if (prop.propertyValueType === PropertyValueType.SHAPE && v && v.vertices) {
+      var s = new Shape(); s.vertices = v.vertices; if (v.inTangents) s.inTangents = v.inTangents; if (v.outTangents) s.outTangents = v.outTangents; s.closed = v.closed !== false; return s;
+    }
+    if (prop.propertyValueType === PropertyValueType.COLOR) return A.color(v);
+    return v;
+  };
+  // Accepts [r,g,b], [r,g,b,a] (0-1 or 0-255) or "#rrggbb".
+  A.color = function (v) {
+    if (typeof v === "string") {
+      var h = v.replace("#", "");
+      if (h.length === 3) h = h.charAt(0) + h.charAt(0) + h.charAt(1) + h.charAt(1) + h.charAt(2) + h.charAt(2);
+      return [parseInt(h.substr(0, 2), 16) / 255, parseInt(h.substr(2, 2), 16) / 255, parseInt(h.substr(4, 2), 16) / 255, 1];
+    }
+    if (v instanceof Array) {
+      var big = false; for (var i = 0; i < v.length; i++) if (v[i] > 1) big = true;
+      var c = []; for (var j = 0; j < v.length; j++) c.push(big ? v[j] / 255 : v[j]);
+      if (c.length === 3) c.push(1);
+      return c;
+    }
+    return v;
+  };
+  A.color3 = function (v) { var c = A.color(v); return [c[0], c[1], c[2]]; };
+  A.applyText = function (td, o) {
+    if (o.text !== undefined) td.text = o.text;
+    if (o.font !== undefined) td.font = o.font;
+    if (o.fontSize !== undefined) td.fontSize = o.fontSize;
+    if (o.fillColor !== undefined) { td.applyFill = true; td.fillColor = A.color3(o.fillColor); }
+    if (o.strokeColor !== undefined) { td.applyStroke = true; td.strokeColor = A.color3(o.strokeColor); }
+    if (o.strokeWidth !== undefined) td.strokeWidth = o.strokeWidth;
+    if (o.tracking !== undefined) td.tracking = o.tracking;
+    if (o.leading !== undefined) { try { td.autoLeading = false; } catch (e) {} td.leading = o.leading; }
+    if (o.fauxBold !== undefined) td.fauxBold = o.fauxBold;
+    if (o.fauxItalic !== undefined) td.fauxItalic = o.fauxItalic;
+    if (o.allCaps !== undefined) td.allCaps = o.allCaps;
+    if (o.justification !== undefined) td.justification = ParagraphJustification[String(o.justification).toUpperCase()] || td.justification;
+    return td;
+  };
+  A.interp = function (name) {
+    if (!name) return null;
+    var m = { linear: KeyframeInterpolationType.LINEAR, bezier: KeyframeInterpolationType.BEZIER, hold: KeyframeInterpolationType.HOLD };
+    return m[String(name).toLowerCase()] || null;
+  };
+  // ease: {speed, influence} or number (influence %, speed 0) applied to every dimension
+  A.easeArr = function (prop, e) {
+    var dims = 1;
+    if (prop.propertyValueType === PropertyValueType.TwoD) dims = 2;
+    else if (prop.propertyValueType === PropertyValueType.ThreeD) dims = 3;
+    var sp = typeof e === "number" ? 0 : (e.speed || 0), inf = typeof e === "number" ? e : (e.influence || 33.333);
+    var a = []; for (var i = 0; i < dims; i++) a.push(new KeyframeEase(sp, Math.max(0.1, Math.min(100, inf))));
+    return a;
+  };
+
+  // ---------- runner ----------
+  A.run = function (fn, args, opts) {
+    opts = opts || {};
+    var logs = [];
+    function log() {
+      var parts = [];
+      for (var i = 0; i < arguments.length; i++) { var a = arguments[i]; parts.push(typeof a === "string" ? a : A.stringify(A.serialize(a, 2))); }
+      logs.push(parts.join(" "));
+    }
+    var undo = opts.undoGroup !== false && opts.undoGroup !== "";
+    var res;
+    try {
+      if (opts.suppressDialogs !== false) { try { app.beginSuppressDialogs(); } catch (e) {} }
+      if (undo) app.beginUndoGroup(opts.undoGroup || "AE MCP");
+      var r = fn(args || {}, log);
+      res = { ok: true, result: opts.raw ? r : A.serialize(r, opts.depth || 4), logs: logs };
+    } catch (e) {
+      res = { ok: false, error: { message: e.message || String(e), name: e.name, line: e.line, user: !!e.aemcpUser }, logs: logs };
+    } finally {
+      if (undo) { try { app.endUndoGroup(); } catch (e) {} }
+      if (opts.suppressDialogs !== false) { try { app.endSuppressDialogs(false); } catch (e) {} }
+    }
+    return A.stringify(res);
+  };
+
+  return A;
+})();
+"aemcp loaded " + aemcp.version;
