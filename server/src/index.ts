@@ -5,20 +5,11 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { timingSafeEqual } from "node:crypto";
 import { loadConfig, VERSION } from "./config.js";
 import { EXTENDSCRIPT_DOC, INSTRUCTIONS } from "./docs.js";
-import { appTools } from "./tools/app.js";
-import { compTools } from "./tools/comp.js";
 import { registerCoreTools } from "./tools/core.js";
-import { effectTools } from "./tools/effects.js";
-import { layerTools } from "./tools/layer.js";
-import { inspectTools } from "./tools/inspect.js";
-import { keyframeTools } from "./tools/keyframes.js";
-import { footageTools } from "./tools/footage.js";
-import { egpTools, healthTools, textTools } from "./tools/text.js";
 import { registerRenderJobs } from "./tools/renderjobs.js";
-import { projectTools } from "./tools/project.js";
-import { propertyTools } from "./tools/property.js";
+import { registerWorkflowTools } from "./tools/workflow.js";
 import { registerJsxTools } from "./tools/registry.js";
-import { renderTools } from "./tools/render.js";
+import { ALL_JSX_TOOLS } from "./tools/all.js";
 import { ensureAeSetup } from "./cli/setup.js";
 import { applyProfile, resolveProfile } from "./tools/profile.js";
 import { checkForUpdate } from "./update.js";
@@ -42,8 +33,9 @@ export function createMcpServer(): McpServer {
   const server = new McpServer({ name: "after-effects", title: "Adobe After Effects", version: VERSION }, { instructions });
   applyProfile(server, profile);
   registerCoreTools(server);
-  registerJsxTools(server, [...projectTools, ...compTools, ...layerTools, ...propertyTools, ...effectTools, ...renderTools, ...appTools, ...inspectTools, ...keyframeTools, ...footageTools, ...textTools, ...egpTools, ...healthTools]);
+  registerJsxTools(server, ALL_JSX_TOOLS);
   registerRenderJobs(server);
+  registerWorkflowTools(server);
   server.registerResource(
     "extendscript-cheatsheet",
     "aemcp://docs/extendscript",

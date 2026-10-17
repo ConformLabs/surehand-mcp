@@ -4,9 +4,10 @@
 
 Connect **Claude** (Desktop / Code), **ChatGPT** (desktop app or web), Cursor, Codex, or any MCP client to **Adobe After Effects**.
 The AI can run any script inside After Effects (modern JavaScript, converted for AE's ExtendScript engine automatically),
-read information back, and use up to 81 ready-made tools for projects, comps, layers, keyframes (Graph Editor level),
-text styling and animators, footage, effects, shapes, masks, Essential Graphics and rendering (including background
-renders with aerender). It can *see* and *measure* its work (frames, contact sheets, zoomed regions, difference
+read information back, and use up to 92 ready-made tools for projects, comps, layers, keyframes (Graph Editor level),
+text styling and animators, footage, effects, shapes, masks, 3D cameras/lights/materials, audio, color management,
+Essential Graphics and rendering (including background renders with aerender). Batch edits run many steps as one
+undo step, checkpoints keep safety copies of the project, and your own scripts can be listed and run. It can *see* and *measure* its work (frames, contact sheets, zoomed regions, difference
 images, exact layer bounds, pixel colors), and every edit returns an exact list of what changed in the project.
 
 ```
@@ -145,7 +146,7 @@ To rotate the token, delete `token` from `~/.aemcp/config.json` and re-run the i
 | `ae_get_scripting_guide` | ExtendScript cheat sheet for the model (also an MCP resource `aemcp://docs/extendscript`). |
 
 **Tool profiles.** Every tool description is sent to the AI in every chat, so by default only a **core set of
-22 tools** is enabled (about 7k tokens instead of 22k for all 81); everything else is still possible through
+26 tools** is enabled (about 8k tokens instead of 26k for all 92); everything else is still possible through
 `ae_run_script`. Switch to **Full** in After Effects (**Window > Extensions > AE MCP > AI tools**), in Claude Desktop's
 extension settings ("Enable all tools") for the `.mcpb`, or with `"toolProfile": "full"` in `~/.aemcp/config.json`, then
 restart the AI app. Advanced: `"toolProfile": "core,ae_import_files,ae_render_queue_start"` adds single tools.
@@ -153,9 +154,22 @@ restart the AI app. Advanced: `"toolProfile": "core,ae_import_files,ae_render_qu
 Core set: `ae_status`, `ae_run_script`, `ae_get_scripting_guide`, `ae_render_frame`, `ae_render_contact_sheet`,
 `ae_get_project_info`, `ae_get_comp_info`, `ae_get_layer_info`, `ae_get_selection`, `ae_get_properties`,
 `ae_find_properties`, `ae_get_layer_bounds`, `ae_get_comp_map`, `ae_create_comp`, `ae_add_layer`, `ae_add_shape`, `ae_set_property`, `ae_set_keyframes`,
-`ae_set_expression`, `ae_apply_effect`, `ae_get_effect_params`, `ae_undo`.
+`ae_set_expression`, `ae_apply_effect`, `ae_get_effect_params`, `ae_undo`, `ae_batch`, `ae_checkpoint`, `ae_list_scripts`,
+`ae_run_script_file`.
 
 **All tools (Full profile):**
+
+- **Workflow:** `ae_batch` (many tool steps or scripts in one call and ONE undo step, with one change report; atomic by
+  default: if a step fails everything is undone), `ae_checkpoint` (save a timestamped copy of the project, list, restore
+  as a new file next to the original; the original is never overwritten), `ae_list_scripts` (your scripts: AE's Scripts
+  folder, ScriptUI Panels, and folders listed as `"scriptFolders"` in `~/.aemcp/config.json`, with their descriptions)
+  + `ae_run_script_file`
+- **3D:** `ae_set_camera` (one/two-node, focal length in mm, depth of field; reports angle of view), `ae_set_light`
+  (type, color, intensity, cone, falloff, shadows), `ae_set_material` (material options, lists the 3D renderers)
+- **Audio:** `ae_audio_to_keyframes` (Convert Audio to Keyframes), `ae_audio_markers` (markers at beats/peaks)
+- **Expressions:** `ae_check_expression` (try an expression and see errors and values without keeping it),
+  `ae_replace_in_expressions` (project-wide find & replace, dry run, errors after the change)
+- **Color:** `ae_color_settings` (Adobe or OCIO color engine, working space, bit depth, linearization, OCIO spaces)
 
 - **Seeing the result:** `ae_render_frame` (a frame as an image; options: zoom into a region, render only some layers,
   transparency on a checkerboard or a color, difference image against another time or comp), `ae_render_contact_sheet`
@@ -239,9 +253,9 @@ version or port). Set a permanent preference with `"instance": "2026"` in the co
 If After Effects doesn't answer, the error says what it is busy with and for how long, and suggests checking for an open
 dialog. `ae_status` shows the same.
 
-**Compatibility check.** `ae-mcp selftest --full` runs every major tool against temporary comps (removed afterwards),
-lists which scripting features your After Effects version has, and saves a report to `~/.aemcp/compat/`. All 32 steps
-pass on After Effects 2026 (26.5) on macOS and Windows 11, and the panel, permissions, approvals and background
+**Compatibility check.** `ae-mcp selftest --full` runs every major tool (38 steps) against temporary comps (removed afterwards),
+lists which scripting features your After Effects version has, and saves a report to `~/.aemcp/compat/`. Tested on After Effects 2026 (26.5)
+on macOS and Windows 11, and the panel, permissions, approvals and background
 rendering are verified on both; please share reports from other versions.
 
 ## Troubleshooting

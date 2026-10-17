@@ -73457,7 +73457,8 @@ function loadConfig() {
     updateCheck: file2.updateCheck,
     changeReport: file2.changeReport,
     permissions: file2.permissions,
-    instance: file2.instance
+    instance: file2.instance,
+    scriptFolders: file2.scriptFolders
   };
 }
 
@@ -73584,125 +73585,11 @@ comp.saveFrameToPng(time, new File("/tmp/frame.png"));
 - $.sleep(ms), $.os, app.version, app.project.save(new File(path)).
 `;
 
-// src/tools/app.ts
+// src/tools/core.ts
 init_define_AEMCP_CEP_FILES();
-
-// src/capabilities.ts
-init_define_AEMCP_CEP_FILES();
-var CAPABILITIES_JSX = `
-var c = app.project.items.addComp("__aemcp_caps", 64, 64, 1, 1, 30), f = {};
-try {
-  var t = c.layers.addText("ab"), td = t.property("ADBE Text Properties").property("ADBE Text Document").value;
-  var op = t.property("ADBE Transform Group").property("ADBE Opacity");
-  var has = function (o, k) { try { return typeof o[k] !== "undefined"; } catch (e) { return false; } };
-  var rq = app.project.renderQueue.items.add(c);
-  f.perCharacterText = has(td, "characterRange");
-  f.paragraphRanges = has(td, "paragraphRange");
-  f.renderSettingsApi = has(rq, "getSettings") && has(rq.outputModule(1), "getSettings");
-  f.mediaEncoderQueue = has(app.project.renderQueue, "queueInAME");
-  rq.remove();
-  f.essentialGraphics = has(op, "addToMotionGraphicsTemplateAs");
-  f.mogrtExport = has(c, "exportAsMotionGraphicsTemplate");
-  f.fontsApi = !!app.fonts;
-  f.missingFontsApi = !!app.fonts && has(app.fonts, "missingOrSubstitutedFonts");
-  f.keyframeLabels = has(op, "setLabelAtKey");
-  f.layerIds = has(t, "id");
-  f.anyLayerTrackMatte = has(t, "setTrackMatte");
-  f.expressionEngine = app.project.expressionEngine;
-  f.scriptsCanWriteFiles = (function () { try { return app.preferences.getPrefAsLong("Main Pref Section", "Pref_SCRIPTING_FILE_NETWORK_SECURITY") === 1; } catch (e) { return null; } })();
-} finally { c.remove(); }
-return { appVersion: app.version, os: $.os, features: f };`;
-var FEATURE_NOTES = {
-  perCharacterText: "ae_style_text_range (AE 24.0+)",
-  paragraphRanges: "per-paragraph settings in ae_set_paragraph (AE 24.0+)",
-  renderSettingsApi: "ae_get/set_render_settings",
-  mediaEncoderQueue: "ae_queue_in_media_encoder",
-  essentialGraphics: "ae_essential_graphics",
-  mogrtExport: "ae_export_mogrt",
-  fontsApi: "ae_get_fonts (AE 24.0+)",
-  missingFontsApi: "missing-font check in ae_project_health (AE 24.0+)",
-  keyframeLabels: "keyframe color labels in ae_edit_keyframes (AE 22.6+)",
-  layerIds: "stable layer ids for the change report (AE 22.0+; older versions match layers by index+name)",
-  anyLayerTrackMatte: "track matte to any layer in ae_set_layer_attributes (AE 23.0+)"
-};
-
-// src/tools/app.ts
-var appTools = [
-  {
-    name: "ae_execute_menu_command",
-    title: "Execute menu command",
-    description: 'Run any After Effects menu command by its exact menu name (e.g. "Pre-compose...", "Easy Ease", "Center Anchor Point in Layer Content", "Fit to Comp", "Sequence Layers...") or numeric command id. Acts on the current selection.',
-    input: { command: external_exports.union([external_exports.string(), external_exports.number().int()]) },
-    jsx: `
-var id = typeof args.command === "number" ? args.command : app.findMenuCommandId(args.command);
-if (!id) aemcp.fail("Menu command not found: " + args.command);
-app.executeCommand(id); return { executed: args.command, id: id };`
-  },
-  {
-    name: "ae_undo",
-    title: "Undo",
-    description: "Undo the last action(s) in After Effects (Edit > Undo).",
-    input: { steps: external_exports.number().int().min(1).max(50).optional() },
-    noUndo: true,
-    report: true,
-    jsx: `var n = args.steps || 1; for (var i = 0; i < n; i++) app.executeCommand(16); return { undone: n };`
-  },
-  {
-    name: "ae_redo",
-    title: "Redo",
-    description: "Redo the last undone action(s).",
-    input: { steps: external_exports.number().int().min(1).max(50).optional() },
-    noUndo: true,
-    report: true,
-    jsx: `var n = args.steps || 1; for (var i = 0; i < n; i++) app.executeCommand(2035); return { redone: n };`
-  },
-  {
-    name: "ae_purge",
-    title: "Purge caches",
-    description: "Purge memory/disk caches (all memory, undo history, image caches, snapshot).",
-    input: { target: external_exports.enum(["ALL_CACHES", "ALL_MEMORY_CACHES", "UNDO_CACHES", "SNAPSHOT_CACHES", "IMAGE_CACHES"]).optional() },
-    noUndo: true,
-    jsx: `app.purge(PurgeTarget[args.target || "ALL_MEMORY_CACHES"]); return { purged: args.target || "ALL_MEMORY_CACHES" };`
-  },
-  {
-    name: "ae_get_fonts",
-    title: "List fonts",
-    description: "Search installed fonts (AE 24.0+): returns PostScript names to use for text layers.",
-    input: { nameContains: external_exports.string().optional(), limit: external_exports.number().int().optional().describe("Default 100.") },
-    readOnly: true,
-    jsx: `
-if (!app.fonts) aemcp.fail("app.fonts requires After Effects 24.0 or newer");
-var out = [], q = args.nameContains ? args.nameContains.toLowerCase() : null, lim = args.limit || 100, all = app.fonts.allFonts;
-for (var i = 0; i < all.length && out.length < lim; i++) for (var j = 0; j < all[i].length && out.length < lim; j++) {
-  var f = all[i][j];
-  if (q && f.familyName.toLowerCase().indexOf(q) < 0 && f.postScriptName.toLowerCase().indexOf(q) < 0) continue;
-  out.push({ postScriptName: f.postScriptName, family: f.familyName, style: f.styleName });
-}
-return out;`
-  },
-  {
-    name: "ae_system_info",
-    title: "System & app info",
-    description: "After Effects version, OS, memory, folders, scripting permissions, expression engine, and which newer scripting features this AE version supports (per-character text, render settings API, Essential Graphics, keyframe labels...).",
-    input: {},
-    readOnly: true,
-    tempItems: true,
-    jsx: `
-var caps = (function () {${CAPABILITIES_JSX}
-})();
-var o = { features: caps.features, appVersion: app.version, buildName: app.buildName, os: $.os, locale: $.locale, screens: $.screens, memoryInUse: app.memoryInUse, tempFolder: Folder.temp.fsName,
-  userDataFolder: Folder.userData.fsName, appFolder: Folder.appPackage ? Folder.appPackage.fsName : null };
-try { o.canWriteFiles = app.preferences.getPrefAsLong("Main Pref Section", "Pref_SCRIPTING_FILE_NETWORK_SECURITY") === 1; } catch (e) {}
-try { o.expressionEngine = app.project.expressionEngine; } catch (e) {}
-return o;`
-  }
-];
-
-// src/tools/comp.ts
-init_define_AEMCP_CEP_FILES();
-
-// src/tools/registry.ts
-init_define_AEMCP_CEP_FILES();
+import { existsSync as existsSync3, mkdirSync as mkdirSync4, readFileSync as readFileSync6, statSync, unlinkSync } from "node:fs";
+import { homedir as homedir4 } from "node:os";
+import { join as join6 } from "node:path";
 
 // src/bridge.ts
 init_define_AEMCP_CEP_FILES();
@@ -74051,6 +73938,62 @@ async function evalRaw(script, timeoutMs = 12e4, opts = {}) {
     cancel: opts.cancel
   });
   return String(body.result ?? "");
+}
+
+// src/update.ts
+init_define_AEMCP_CEP_FILES();
+import { mkdirSync as mkdirSync3, readFileSync as readFileSync5, writeFileSync as writeFileSync3 } from "node:fs";
+import { homedir as homedir3 } from "node:os";
+import { dirname as dirname4, join as join5 } from "node:path";
+var REPO = "ronyitzhaki/after-effects-mcp";
+var RELEASES_URL = `https://github.com/${REPO}/releases/latest`;
+var CACHE = join5(homedir3(), ".aemcp", "update-check.json");
+var DAY = 24 * 3600 * 1e3;
+function compareVersions(a, b) {
+  const pa = a.replace(/^v/, "").split(/[.-]/).map((x) => parseInt(x, 10) || 0);
+  const pb = b.replace(/^v/, "").split(/[.-]/).map((x) => parseInt(x, 10) || 0);
+  for (let i = 0; i < 3; i++) if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) > (pb[i] ?? 0) ? 1 : -1;
+  return 0;
+}
+function updateCheckEnabled() {
+  return !process.env.AEMCP_NO_UPDATE_CHECK && loadConfig().updateCheck !== false;
+}
+function readCache() {
+  try {
+    return JSON.parse(readFileSync5(CACHE, "utf8"));
+  } catch {
+    return null;
+  }
+}
+var current = null;
+function knownUpdate() {
+  const c = current ?? readCache();
+  if (!c?.latest) return null;
+  return { ...c, current: VERSION, updateAvailable: compareVersions(c.latest, VERSION) > 0 };
+}
+async function checkForUpdate(force = false) {
+  if (!updateCheckEnabled()) return null;
+  const cached2 = readCache();
+  if (!force && cached2 && Date.now() - Date.parse(cached2.checkedAt) < DAY) return current = knownUpdate();
+  try {
+    const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
+      headers: { "user-agent": `ae-mcp/${VERSION}`, accept: "application/vnd.github+json" },
+      signal: AbortSignal.timeout(4e3)
+    });
+    if (!res.ok) return knownUpdate();
+    const rel = await res.json();
+    if (!rel.tag_name) return knownUpdate();
+    const latest = rel.tag_name.replace(/^v/, "");
+    current = { checkedAt: (/* @__PURE__ */ new Date()).toISOString(), current: VERSION, latest, url: rel.html_url || RELEASES_URL, updateAvailable: compareVersions(latest, VERSION) > 0 };
+    mkdirSync3(dirname4(CACHE), { recursive: true });
+    writeFileSync3(CACHE, JSON.stringify(current, null, 2));
+    return current;
+  } catch {
+    return knownUpdate();
+  }
+}
+function updateMessage(u) {
+  return u?.updateAvailable ? `A newer version of AE MCP is available: v${u.latest} (you have v${u.current}). Download: ${u.url}` : null;
 }
 
 // src/jsx.ts
@@ -74580,35 +74523,48 @@ aemcp = (function () {
 
   // ---------- change report ----------
   // Snapshots before/after a tool call and a diff of them. Items are always compared; layers and
-  // property values only for the comps in scope (the active comp and comps named in the call),
+  // property values only for the comps in scope (the comp named in the call, else the active comp),
   // with a budget on property reads so very large comps stay fast.
-  var PROP_BUDGET = 25000;
-  function brief(v) {
-    if (v === null || v === undefined) return "none";
-    if (typeof v === "number") return String(Math.round(v * 100) / 100);
-    if (typeof v === "string") return v.length > 40 ? '"' + v.substr(0, 37) + '..."' : '"' + v + '"';
-    if (typeof v === "boolean") return v ? "on" : "off";
-    if (v instanceof Array) {
-      if (v.length > 4) return "[" + v.length + " values]";
-      var a = []; for (var i = 0; i < v.length; i++) a.push(brief(v[i])); return "[" + a.join(",") + "]";
-    }
-    if (v.text !== undefined) return brief(v.text);
-    if (v.vertices) return "path(" + v.vertices.length + " points)";
-    return "{...}";
+  // Everything is stored as one compact string per item / layer / property: ExtendScript's garbage
+  // collector slows down sharply with many small objects (thousands of {..} per snapshot cost ~1s).
+  var PROP_BUDGET = 25000, SEP = "\\u0001", PSEP = "\\u0002";
+  // typed encoding of a value, so the report can show it readably: n=number b=boolean a=array s=string j=JSON
+  function enc(v) {
+    if (v === null || v === undefined) return "j";
+    var t = typeof v;
+    if (t === "number") return "n" + v;
+    if (t === "boolean") return v ? "b1" : "b0";
+    if (t === "string") return "s" + v;
+    if (v instanceof Array) return "a" + v.join(",");
+    return "j" + A.stringify(A.valueOf(v));
   }
+  function show(e) {
+    if (e === undefined) return "none";
+    var t = e.charAt(0), b = e.substr(1);
+    if (t === "n") return String(Math.round(Number(b) * 100) / 100);
+    if (t === "b") return b === "1" ? "on" : "off";
+    if (t === "s") return b.length > 40 ? '"' + b.substr(0, 37) + '..."' : '"' + b + '"';
+    if (t === "a") { var parts = b.split(","); if (parts.length > 4) return "[" + parts.length + " values]"; for (var i = 0; i < parts.length; i++) parts[i] = String(Math.round(Number(parts[i]) * 100) / 100); return "[" + parts.join(",") + "]"; }
+    if (!b) return "none";
+    var cut = b.indexOf("\\u0003"); if (cut >= 0) b = b.substr(0, cut);
+    try { var o = JSON.parse(b); if (o && o.text !== undefined) return show("s" + o.text); if (o && o.vertices) return "path(" + o.vertices.length + " points)"; } catch (x) {}
+    return b.length > 40 ? b.substr(0, 37) + "..." : b;
+  }
+  // the plain text of an encoded string field (names): no quotes, no truncation
+  function raw(e) { return e && e.charAt(0) === "s" ? e.substr(1) : show(e); }
   function keySig(p) {
     var n = p.numKeys; if (!n) return "";
     var s = n + ":";
     var lim = Math.min(n, 40);
-    for (var k = 1; k <= lim; k++) { var kv; try { kv = p.keyValue(k); } catch (e) { kv = "?"; } s += A.round(p.keyTime(k)) + "=" + A.stringify(A.valueOf(kv)) + ";"; }
+    for (var k = 1; k <= lim; k++) { var kv; try { kv = p.keyValue(k); } catch (e) { kv = "?"; } s += A.round(p.keyTime(k)) + "=" + enc(kv) + ";"; }
     return s;
   }
-  function layerSig(L) {
-    var o = [L.name, A.round(L.inPoint), A.round(L.outPoint), A.round(L.startTime), L.stretch, L.parent ? (L.parent.id || L.parent.index) : 0, L.enabled, L.solo, L.locked, L.shy, L.label];
-    try { o.push(L.threeDLayer, L.blendingMode, L.trackMatteType, L.adjustmentLayer, L.motionBlur, L.guideLayer, L.audioEnabled); } catch (e) {}
-    return o;
-  }
   var LAYER_FIELDS = ["name", "in", "out", "start", "stretch", "parent", "enabled", "solo", "locked", "shy", "label", "3D", "blend mode", "track matte", "adjustment", "motion blur", "guide", "audio"];
+  function layerSig(L) {
+    var o = [enc(L.name), enc(A.round(L.inPoint)), enc(A.round(L.outPoint)), enc(A.round(L.startTime)), enc(L.stretch), enc(L.parent ? L.parent.name : "none"), enc(L.enabled), enc(L.solo), enc(L.locked), enc(L.shy), enc(L.label)];
+    try { o.push(enc(L.threeDLayer), enc(A.enumName(BlendingMode, L.blendingMode)), enc(A.enumName(TrackMatteType, L.trackMatteType)), enc(L.adjustmentLayer), enc(L.motionBlur), enc(L.guideLayer), enc(L.audioEnabled)); } catch (e) {}
+    return o.join(SEP);
+  }
   function layerKey(L) { return L.id !== undefined ? "L" + L.id : "i" + L.index + ":" + L.name; }
   // Per-character style fingerprint (AE 24+): catches styling applied to part of a text.
   A.textStyleSig = function (td) {
@@ -74636,13 +74592,9 @@ aemcp = (function () {
           // expression-heavy comps. The expression text is compared already, so use the value before
           // the expression (cheap) for those properties.
           var raw; try { raw = ex ? p.valueAtTime(budget.time, true) : p.value; } catch (e) { continue; }
-          // cheap fingerprints for the common cases (numbers, arrays); full JSON only for the rest
-          var v = raw, vs;
-          if (typeof raw === "number" || typeof raw === "boolean") vs = String(raw);
-          else if (raw instanceof Array) vs = raw.join(",");
-          else { v = A.valueOf(raw); vs = A.stringify(v); if (p.propertyValueType === PropertyValueType.TEXT_DOCUMENT) vs += A.textStyleSig(raw); }
-          var nk = p.numKeys;
-          out[pp] = { s: vs + "|" + (nk ? keySig(p) : "") + "|" + ex, v: v, k: nk, e: ex };
+          var ve = enc(raw);
+          if (p.propertyValueType === PropertyValueType.TEXT_DOCUMENT) ve += "\\u0003" + A.textStyleSig(raw); // style after a separator: show() ignores it
+          out[pp] = ve + PSEP + (p.numKeys ? keySig(p) : "") + PSEP + ex;
         } else {
           if (p.propertyType === PropertyType.INDEXED_GROUP || depth < 3) {
             var en = ""; try { if (p.canSetEnabled) en = p.enabled ? "on" : "off"; } catch (e) {}
@@ -74654,105 +74606,135 @@ aemcp = (function () {
     }
     walk(L, "", 0);
   }
-  function snapComp(c, deep, budget) {
-    var o = { id: c.id, name: c.name, layers: {}, order: [], deep: deep };
+  function snapComp(c, budget) {
+    var o = { name: c.name, layers: {}, order: [] };
     budget.time = c.time;
     for (var i = 1; i <= c.numLayers; i++) {
       var L = c.layer(i), k = layerKey(L);
-      var e = { name: L.name, index: i, sig: layerSig(L) };
-      if (deep) { e.props = {}; e.groups = {}; snapProps(L, e.props, e.groups, budget); }
+      var e = { sig: layerSig(L), props: {}, groups: {} };
+      snapProps(L, e.props, e.groups, budget);
       o.layers[k] = e; o.order.push(k);
     }
     if (budget.over) o.partial = true;
     return o;
   }
-  // [label, value] pairs, so the report can name exactly what changed for any item type
+  // [kind, ...encoded fields]; field labels per kind below
+  var ITEM_FIELDS = {
+    comp: ["name", "folder", "label", "comment", "width", "height", "duration", "frame rate", "pixel aspect", "background", "work area start", "work area duration", "layers", "proxy", "use proxy"],
+    solid: ["name", "folder", "label", "comment", "file", "width", "height", "color", "proxy", "use proxy"],
+    footage: ["name", "folder", "label", "comment", "file", "width", "height", "frame rate", "alpha", "loop", "fields", "pixel aspect", "proxy", "use proxy"],
+    other: ["name", "folder", "label", "comment"]
+  };
+  function proxyOf(it) { try { return it.proxySource ? (it.proxySource.file ? it.proxySource.file.fsName : "placeholder") : ""; } catch (e) { return ""; } }
   function itemSig(it) {
-    var s = [["name", it.name], ["folder", it.parentFolder ? it.parentFolder.name : ""], ["label", it.label], ["comment", it.comment]];
-    try { if (it instanceof CompItem) s.push(["width", it.width], ["height", it.height], ["duration", A.round(it.duration)], ["frame rate", A.round(it.frameRate)], ["pixel aspect", it.pixelAspect], ["background", A.stringify(it.bgColor)], ["work area start", A.round(it.workAreaStart)], ["work area duration", A.round(it.workAreaDuration)], ["layers", it.numLayers]); } catch (e) {}
+    var type = A.itemType(it), kind = type === "comp" ? "comp" : (type === "solid" ? "solid" : (it instanceof FootageItem ? "footage" : "other"));
+    var s = [type, kind, enc(it.name), enc(it.parentFolder ? it.parentFolder.name : ""), enc(it.label), enc(it.comment)];
     try {
-      if (it instanceof FootageItem) {
-        s.push(["file", it.file ? it.file.fsName : ""], ["width", it.width], ["height", it.height]);
-        var ms = it.mainSource;
-        if (ms instanceof SolidSource) s.push(["color", A.stringify(ms.color)]);
-        else { try { s.push(["frame rate", A.round(ms.conformFrameRate)], ["alpha", A.enumName(AlphaMode, ms.alphaMode)], ["loop", ms.loop], ["fields", A.enumName(FieldSeparationType, ms.fieldSeparationType)], ["pixel aspect", it.pixelAspect]); } catch (e) {} }
+      if (kind === "comp") s.push(enc(it.width), enc(it.height), enc(A.round(it.duration)), enc(A.round(it.frameRate)), enc(it.pixelAspect), enc(it.bgColor), enc(A.round(it.workAreaStart)), enc(A.round(it.workAreaDuration)), enc(it.numLayers), enc(proxyOf(it)), enc(it.useProxy));
+      else if (kind === "solid") s.push(enc(it.file ? it.file.fsName : ""), enc(it.width), enc(it.height), enc(it.mainSource.color), enc(proxyOf(it)), enc(it.useProxy));
+      else if (kind === "footage") {
+        var ms = it.mainSource, fr = "", al = "", lp = "", fs = "";
+        try { fr = A.round(ms.conformFrameRate); al = A.enumName(AlphaMode, ms.alphaMode); lp = ms.loop; fs = A.enumName(FieldSeparationType, ms.fieldSeparationType); } catch (e) {}
+        s.push(enc(it.file ? it.file.fsName : ""), enc(it.width), enc(it.height), enc(fr), enc(al), enc(lp), enc(fs), enc(it.pixelAspect), enc(proxyOf(it)), enc(it.useProxy));
       }
     } catch (e) {}
-    try { if (it instanceof CompItem || it instanceof FootageItem) s.push(["proxy", it.proxySource ? (it.proxySource.file ? it.proxySource.file.fsName : "placeholder") : ""], ["use proxy", it.useProxy]); } catch (e) {}
-    return s;
+    return s.join(SEP);
+  }
+  // project-wide settings (color management, bit depth, expression engine...)
+  var PROJECT_FIELDS = ["bit depth", "working space", "linear blending", "linearize working space", "scene-referred compensation", "color engine", "OCIO config", "OCIO working space", "OCIO display space", "expression engine", "time display"];
+  function projectSig(p) {
+    var g = function (k) { try { return p[k]; } catch (e) { return ""; } };
+    return [enc(g("bitsPerChannel")), enc(g("workingSpace")), enc(g("linearBlending")), enc(g("linearizeWorkingSpace")), enc(g("compensateForSceneReferredProfiles")),
+      enc(g("colorManagementSystem") === 1 ? "OCIO" : "Adobe"), enc(g("ocioConfigurationFile")), enc(g("workingColorSpace")), enc(g("displayColorSpace")), enc(g("expressionEngine")), enc(g("timeDisplayType"))].join(SEP);
   }
   A.snapshot = function (scopeRefs) {
-    var p = app.project, snap = { items: {}, comps: {} }, budget = { n: PROP_BUDGET, over: false };
-    for (var i = 1; i <= p.numItems; i++) { var it = p.item(i); snap.items[it.id] = { name: it.name, type: A.itemType(it), sig: itemSig(it), layers: it instanceof CompItem ? it.numLayers : undefined }; }
+    var p = app.project, snap = { items: {}, comps: {}, project: projectSig(p) }, budget = { n: PROP_BUDGET, over: false };
+    for (var i = 1; i <= p.numItems; i++) { var it = p.item(i); snap.items["i" + it.id] = itemSig(it); }
     var ids = {};
     // a call that names a comp is compared there only; otherwise the active comp is compared
     // (so editing a small comp doesn't pay for snapshotting a huge active comp)
-    if (!scopeRefs.length) { try { if (p.activeItem instanceof CompItem) ids[p.activeItem.id] = true; } catch (e) {} }
+    if (!scopeRefs.length) { try { if (p.activeItem instanceof CompItem) ids["c" + p.activeItem.id] = true; } catch (e) {} }
     for (var r = 0; r < scopeRefs.length; r++) {
-      if (scopeRefs[r] === "*") { for (var ai = 1; ai <= p.numItems; ai++) if (p.item(ai) instanceof CompItem) ids[p.item(ai).id] = true; continue; } // every comp
-      try { ids[A.findComp(scopeRefs[r]).id] = true; } catch (e) {}
+      if (scopeRefs[r] === "*") { for (var ai = 1; ai <= p.numItems; ai++) if (p.item(ai) instanceof CompItem) ids["c" + p.item(ai).id] = true; continue; } // every comp
+      try { ids["c" + A.findComp(scopeRefs[r]).id] = true; } catch (e) {}
     }
-    for (var id in ids) { var c = p.itemByID(Number(id)); if (c) snap.comps[id] = snapComp(c, true, budget); }
+    for (var id in ids) { if (!ids.hasOwnProperty(id)) continue; var c = p.itemByID(Number(id.substr(1))); if (c) snap.comps[id] = snapComp(c, budget); }
     return snap;
   };
   A.diff = function (a, b) {
     var ch = { items: [], layers: [], props: [], scope: [], partial: false }, MAX = 80, n = 0;
     function add(list, v) { if (n++ < MAX) list.push(v); else ch.truncated = true; }
-    for (var id in b.items) {
-      var x = b.items[id], y = a.items[id];
-      if (!y) { add(ch.items, ["+", x.type, x.name, x.layers]); continue; }
-      var d = [], ys = {};
-      for (var f0 = 0; f0 < y.sig.length; f0++) ys[y.sig[f0][0]] = y.sig[f0][1];
-      for (var f = 0; f < x.sig.length; f++) { var lab = x.sig[f][0]; if (A.stringify(x.sig[f][1]) !== A.stringify(ys[lab])) d.push(lab + " " + brief(ys[lab]) + " -> " + brief(x.sig[f][1])); }
-      if (d.length) add(ch.items, ["~", x.type, x.name, d.join("; ")]);
+    if (a.project !== undefined && a.project !== b.project) {
+      var pa0 = a.project.split(SEP), pb0 = b.project.split(SEP), pd = [];
+      for (var pi = 0; pi < pb0.length; pi++) if (pa0[pi] !== pb0[pi]) pd.push(PROJECT_FIELDS[pi] + " " + show(pa0[pi]) + " -> " + show(pb0[pi]));
+      if (pd.length) add(ch.items, ["~", "project", "settings", pd.join("; ")]);
     }
-    for (var id2 in a.items) if (!b.items[id2]) add(ch.items, ["-", a.items[id2].type, a.items[id2].name]);
+    for (var id in b.items) {
+      if (!b.items.hasOwnProperty(id)) continue;
+      var xb = b.items[id], xa = a.items[id], fb = xb.split(SEP);
+      if (xa === undefined) { add(ch.items, ["+", fb[0], raw(fb[2]), fb[1] === "comp" ? Number(fb[14].substr(1)) : undefined]); continue; }
+      if (xa === xb) continue;
+      var fa = xa.split(SEP), labels = ITEM_FIELDS[fb[1]] || ITEM_FIELDS.other, d = [];
+      for (var f = 2; f < fb.length; f++) if (fa[f] !== fb[f]) d.push(labels[f - 2] + " " + show(fa[f]) + " -> " + show(fb[f]));
+      if (d.length) add(ch.items, ["~", fb[0], raw(fb[2]), d.join("; ")]);
+    }
+    for (var id2 in a.items) if (a.items.hasOwnProperty(id2) && b.items[id2] === undefined) { var fr = a.items[id2].split(SEP); add(ch.items, ["-", fr[0], raw(fr[2])]); }
     for (var cid in b.comps) {
+      if (!b.comps.hasOwnProperty(cid)) continue;
       var cb = b.comps[cid], ca = a.comps[cid];
       if (!ca) continue; // comp entered the scope during the call (e.g. newly opened): reported as an item
       ch.scope.push(cb.name);
       if (ca.partial || cb.partial) ch.partial = true;
       for (var k in cb.layers) {
-        var lb = cb.layers[k], la = ca.layers[k];
-        if (!la) { add(ch.layers, ["+", cb.name, lb.name]); continue; }
-        var ld = [];
-        for (var g = 0; g < lb.sig.length; g++) if (A.stringify(lb.sig[g]) !== A.stringify(la.sig[g])) ld.push(LAYER_FIELDS[g] + " " + brief(la.sig[g]) + " -> " + brief(lb.sig[g]));
-        if (la.index !== lb.index) ld.push("order " + la.index + " -> " + lb.index);
-        if (ld.length) add(ch.layers, ["~", cb.name, lb.name, ld.join("; ")]);
-        if (la.props && lb.props) {
-          // added/removed groups (effects, masks, shape groups...): report only the outermost one
-          var addedG = [], removedG = [];
-          for (var gp in lb.groups) {
-            if (la.groups[gp] === undefined) addedG.push(gp);
-            else if (la.groups[gp] !== lb.groups[gp]) add(ch.props, ["~", lb.name, gp, "enabled " + la.groups[gp] + " -> " + lb.groups[gp]]);
+        if (!cb.layers.hasOwnProperty(k)) continue;
+        var lb = cb.layers[k], la = ca.layers[k], lbs = lb.sig.split(SEP), lname = raw(lbs[0]);
+        if (!la) { add(ch.layers, ["+", cb.name, lname]); continue; }
+        if (la.sig !== lb.sig) {
+          var las = la.sig.split(SEP), ld = [];
+          for (var g = 0; g < lbs.length; g++) if (las[g] !== lbs[g]) ld.push(LAYER_FIELDS[g] + " " + show(las[g]) + " -> " + show(lbs[g]));
+          if (ld.length) add(ch.layers, ["~", cb.name, lname, ld.join("; ")]);
+        }
+        // added/removed groups (effects, masks, shape groups...): report only the outermost one
+        var addedG = [], removedG = [];
+        for (var gp in lb.groups) {
+          if (!lb.groups.hasOwnProperty(gp)) continue;
+          if (la.groups[gp] === undefined) addedG.push(gp);
+          else if (la.groups[gp] !== lb.groups[gp]) add(ch.props, ["~", lname, gp, "enabled " + la.groups[gp] + " -> " + lb.groups[gp]]);
+        }
+        for (var gq in la.groups) if (la.groups.hasOwnProperty(gq) && lb.groups[gq] === undefined) removedG.push(gq);
+        var outermost = function (list) {
+          list.sort();
+          var keep = [];
+          for (var q = 0; q < list.length; q++) {
+            var inner = false;
+            for (var z = 0; z < keep.length; z++) if (list[q].indexOf(keep[z] + "/") === 0) { inner = true; break; }
+            if (!inner) keep.push(list[q]);
           }
-          for (var gq in la.groups) if (lb.groups[gq] === undefined) removedG.push(gq);
-          var outermost = function (list) {
-            list.sort();
-            var keep = [];
-            for (var q = 0; q < list.length; q++) {
-              var inner = false;
-              for (var z = 0; z < keep.length; z++) if (list[q].indexOf(keep[z] + "/") === 0) { inner = true; break; }
-              if (!inner) keep.push(list[q]);
-            }
-            return keep;
-          };
-          addedG = outermost(addedG); removedG = outermost(removedG);
-          for (var ga = 0; ga < addedG.length; ga++) add(ch.props, ["+", lb.name, addedG[ga]]);
-          for (var gr = 0; gr < removedG.length; gr++) add(ch.props, ["-", lb.name, removedG[gr]]);
-          for (var pp in lb.props) {
-            var pb = lb.props[pp], pa = la.props[pp];
-            if (!pa || pa.s === pb.s) continue;
-            var parts = [];
-            if (A.stringify(pa.v) !== A.stringify(pb.v)) parts.push(brief(pa.v) + " -> " + brief(pb.v));
-            if (pa.k !== pb.k) parts.push("keyframes " + pa.k + " -> " + pb.k); else if (pb.k && pa.s.split("|")[1] !== pb.s.split("|")[1]) parts.push("keyframes changed");
-            if (pa.e !== pb.e) parts.push(!pa.e ? "expression added" : (!pb.e ? "expression removed" : "expression changed"));
-            if (!parts.length) parts.push("changed");
-            add(ch.props, ["~", lb.name, pp, parts.join(", ")]);
-          }
+          return keep;
+        };
+        addedG = outermost(addedG); removedG = outermost(removedG);
+        for (var ga = 0; ga < addedG.length; ga++) add(ch.props, ["+", lname, addedG[ga]]);
+        for (var gr = 0; gr < removedG.length; gr++) add(ch.props, ["-", lname, removedG[gr]]);
+        for (var pp in lb.props) {
+          if (!lb.props.hasOwnProperty(pp)) continue;
+          var sb = lb.props[pp], sa = la.props[pp];
+          if (sa === undefined || sa === sb) continue;
+          var pa = sa.split(PSEP), pb = sb.split(PSEP), parts = [];
+          if (pa[0] !== pb[0]) { var va = show(pa[0]), vb = show(pb[0]); parts.push(va === vb ? "formatting changed" : va + " -> " + vb); }
+          var ka = parseInt(pa[1], 10) || 0, kb = parseInt(pb[1], 10) || 0;
+          if (ka !== kb) parts.push("keyframes " + ka + " -> " + kb); else if (kb && pa[1] !== pb[1]) parts.push("keyframes changed");
+          var ea = pa.slice(2).join(PSEP), eb = pb.slice(2).join(PSEP);
+          if (ea !== eb) parts.push(!ea ? "expression added" : (!eb ? "expression removed" : "expression changed"));
+          if (!parts.length) parts.push("changed");
+          add(ch.props, ["~", lname, pp, parts.join(", ")]);
         }
       }
-      for (var k2 in ca.layers) if (!cb.layers[k2]) add(ch.layers, ["-", cb.name, ca.layers[k2].name]);
+      for (var k2 in ca.layers) if (ca.layers.hasOwnProperty(k2) && !cb.layers[k2]) add(ch.layers, ["-", cb.name, raw(ca.layers[k2].sig.split(SEP)[0])]);
+      // stacking order of the layers that exist before and after
+      var oa = [], ob = [];
+      for (var x = 0; x < ca.order.length; x++) if (cb.layers[ca.order[x]]) oa.push(ca.order[x]);
+      for (var y = 0; y < cb.order.length; y++) if (ca.layers[cb.order[y]]) ob.push(cb.order[y]);
+      if (oa.join(",") !== ob.join(",")) add(ch.layers, ["~", cb.name, "(stacking order)", "layers were reordered"]);
     }
     return ch;
   };
@@ -74886,6 +74868,7 @@ function formatChanges(ch) {
   for (const [op, type, name, extra] of ch.items) {
     if (op === "+") lines.push(`+ ${type} "${name}"${type === "comp" && extra !== void 0 ? ` (${extra} layers)` : ""}`);
     else if (op === "-") lines.push(`- ${type} "${name}"`);
+    else if (type === "project") lines.push(`~ project settings: ${extra}`);
     else lines.push(`~ ${type} "${name}": ${extra}`);
   }
   for (const [op, comp, layer, extra] of ch.layers) {
@@ -74905,6 +74888,71 @@ function formatChanges(ch) {
   if (ch.truncated) notes.push("more changes not listed");
   return `Changes${notes.length ? ` (${notes.join("; ")})` : ""}:
 ${lines.join("\n")}`;
+}
+
+// src/transpile.ts
+init_define_AEMCP_CEP_FILES();
+var Babel = __toESM(require_babel_min(), 1);
+var PREFIX = "(function(args, log){";
+function extendScriptOnly(code) {
+  return /^\s*#(include|target|targetengine|strict|script|includepath)\b/m.test(code) || /<[A-Za-z][\w:.-]*[\s>][\s\S]*<\/[A-Za-z]/.test(code) && /=\s*<[A-Za-z]/.test(code);
+}
+function transpileUserCode(code, enabled = true) {
+  const plain = PREFIX + code + "\n})";
+  if (!enabled || extendScriptOnly(code)) return { source: plain, transpiled: false };
+  try {
+    const out = Babel.transform(plain, {
+      presets: [["env", { targets: { ie: "11" }, modules: false }]],
+      assumptions: {
+        iterableIsArray: true,
+        // for...of / spread over arrays -> plain index loops
+        objectRestNoSymbols: true,
+        setSpreadProperties: true,
+        noClassCalls: true,
+        constantSuper: true,
+        setPublicClassFields: true,
+        privateFieldsAsProperties: true
+      },
+      sourceType: "script",
+      retainLines: true,
+      comments: false,
+      compact: false,
+      babelrc: false,
+      configFile: false
+    }).code;
+    return { source: parenthesizeTernaries(out).replace(/;\s*$/, ""), transpiled: true };
+  } catch (e) {
+    return { source: plain, transpiled: false, syntaxError: cleanSyntaxError(String(e?.message || e)) };
+  }
+}
+function parenthesizeTernaries(code) {
+  const plugin = ({ types: t }) => ({
+    visitor: {
+      ConditionalExpression(path) {
+        for (const key of ["test", "consequent", "alternate"]) {
+          const child = path.node[key];
+          if (child && child.type === "ConditionalExpression") path.node[key] = t.parenthesizedExpression(child);
+        }
+      }
+    }
+  });
+  return Babel.transform(code, {
+    plugins: [plugin],
+    sourceType: "script",
+    retainLines: true,
+    comments: false,
+    compact: false,
+    babelrc: false,
+    configFile: false,
+    parserOpts: { createParenthesizedExpressions: true }
+  }).code;
+}
+function cleanSyntaxError(msg) {
+  const pre = PREFIX.length;
+  let m = msg.replace(/^unknown file:\s*/, "").replace(/^\/?[^:\n]*: /, "");
+  m = m.replace(/\((\d+):(\d+)\)/, (_, l, c) => `(line ${l}, column ${l === "1" ? Math.max(0, Number(c) - pre) + 1 : Number(c) + 1})`);
+  const lines = m.split("\n").filter((l) => !/^\s*\d+\s*\|\s*\}\)\s*$/.test(l));
+  return lines.map((l) => /^[ >]\s*1\s*\|/.test(l) ? l.replace(PREFIX, "") : l).join("\n").replace(/(\n\s*\|\s)( *)\^/, (all, a, sp) => m.includes("> 1 |") ? a + sp.slice(Math.min(sp.length, pre)) + "^" : all);
 }
 
 // src/permissions.ts
@@ -74927,6 +74975,7 @@ function approvalSummary(tool, args) {
 }
 
 // src/tools/registry.ts
+init_define_AEMCP_CEP_FILES();
 var compRef = external_exports.union([external_exports.number().int(), external_exports.string()]).optional().describe('Composition: item id (number) or exact name. Omit (or "active") for the active/open composition.');
 var layerRef = external_exports.union([external_exports.number().int(), external_exports.string()]).describe("Layer: 1-based index (number) or exact layer name.");
 var itemRef = external_exports.union([external_exports.number().int(), external_exports.string()]).describe("Project item id (number) or exact name.");
@@ -75005,280 +75054,6 @@ function registerJsxTools(server, tools) {
       }
     );
   }
-}
-
-// src/tools/comp.ts
-var compTools = [
-  {
-    name: "ae_list_comps",
-    title: "List compositions",
-    description: "List all compositions with id, size, duration, frame rate and layer count.",
-    input: { nameContains: external_exports.string().optional() },
-    readOnly: true,
-    jsx: `
-var out = [], q = args.nameContains ? String(args.nameContains).toLowerCase() : null;
-for (var i = 1; i <= app.project.numItems; i++) { var it = app.project.item(i); if (it instanceof CompItem && (!q || it.name.toLowerCase().indexOf(q) >= 0)) out.push(aemcp.itemInfo(it)); }
-return out;`
-  },
-  {
-    name: "ae_get_comp_info",
-    title: "Get composition info",
-    description: "Composition settings plus a summary of its layers (index, id, name, type, timing, parent, switches). Large comps are paged: use layerOffset/layerLimit (see totalLayers / nextLayerOffset in the result).",
-    input: {
-      comp: compRef,
-      includeLayers: external_exports.boolean().optional().describe("Default true."),
-      layerOffset: external_exports.number().int().min(0).optional().describe("Skip this many layers (default 0)."),
-      layerLimit: external_exports.number().int().min(1).max(1e3).optional().describe("Max layers to return (default 150).")
-    },
-    readOnly: true,
-    jsx: `
-var c = aemcp.findComp(args.comp), o = aemcp.compInfo(c, false);
-o.markers = aemcp.markers(c.markerProperty);
-if (args.includeLayers !== false) {
-  var off = args.layerOffset || 0, lim = args.layerLimit || 150, end = Math.min(c.numLayers, off + lim);
-  o.layers = [];
-  for (var i = off + 1; i <= end; i++) o.layers.push(aemcp.layerInfo(c.layer(i), false));
-  o.totalLayers = c.numLayers;
-  if (end < c.numLayers) o.nextLayerOffset = end;
-}
-return o;`
-  },
-  {
-    name: "ae_create_comp",
-    title: "Create composition",
-    description: "Create a new composition and (by default) open it in the viewer.",
-    input: {
-      name: external_exports.string(),
-      width: external_exports.number().int().min(4).max(3e4).optional().describe("Default 1920."),
-      height: external_exports.number().int().min(4).max(3e4).optional().describe("Default 1080."),
-      duration: external_exports.number().min(0.01).optional().describe("Seconds, default 10."),
-      frameRate: external_exports.number().min(1).max(999).optional().describe("Default 30."),
-      pixelAspect: external_exports.number().optional().describe("Default 1."),
-      bgColor: colorSchema.optional(),
-      folder: itemRef.optional(),
-      open: external_exports.boolean().optional().describe("Open in viewer (default true).")
-    },
-    jsx: `
-var c = app.project.items.addComp(args.name, args.width || 1920, args.height || 1080, args.pixelAspect || 1, args.duration || 10, args.frameRate || 30);
-if (args.bgColor) c.bgColor = aemcp.color3(args.bgColor);
-if (args.folder !== undefined) c.parentFolder = aemcp.findItem(args.folder);
-if (args.open !== false) c.openInViewer();
-return aemcp.compInfo(c, false);`
-  },
-  {
-    name: "ae_set_comp_settings",
-    title: "Set composition settings",
-    description: "Change composition settings: name, size, duration, frame rate, background, work area, current time, motion blur, renderer, start timecode.",
-    input: {
-      comp: compRef,
-      name: external_exports.string().optional(),
-      width: external_exports.number().int().optional(),
-      height: external_exports.number().int().optional(),
-      pixelAspect: external_exports.number().optional(),
-      duration: external_exports.number().optional(),
-      frameRate: external_exports.number().optional(),
-      bgColor: colorSchema.optional(),
-      workAreaStart: external_exports.number().optional(),
-      workAreaDuration: external_exports.number().optional(),
-      time: external_exports.number().optional().describe("Move the current-time indicator (seconds)."),
-      displayStartTime: external_exports.number().optional(),
-      motionBlur: external_exports.boolean().optional(),
-      shutterAngle: external_exports.number().optional(),
-      renderer: external_exports.string().optional().describe('e.g. "ADBE Advanced 3d" (Classic 3D), "ADBE Ernst" (Cinema 4D), "ADBE Calder" (Advanced 3D).'),
-      resolutionFactor: external_exports.array(external_exports.number().int()).length(2).optional().describe("Preview resolution, [1,1]=Full, [2,2]=Half.")
-    },
-    jsx: `
-var c = aemcp.findComp(args.comp), keys = ["name","width","height","pixelAspect","duration","frameRate","displayStartTime","motionBlur","shutterAngle","renderer","resolutionFactor"];
-for (var i = 0; i < keys.length; i++) if (args[keys[i]] !== undefined) c[keys[i]] = args[keys[i]];
-if (args.bgColor) c.bgColor = aemcp.color3(args.bgColor);
-if (args.workAreaStart !== undefined) c.workAreaStart = args.workAreaStart;
-if (args.workAreaDuration !== undefined) c.workAreaDuration = args.workAreaDuration;
-if (args.time !== undefined) c.time = args.time;
-return aemcp.compInfo(c, false);`
-  },
-  {
-    name: "ae_duplicate_comp",
-    title: "Duplicate composition",
-    description: "Duplicate a composition (layers reference the same sources).",
-    input: { comp: compRef, newName: external_exports.string().optional() },
-    jsx: `var c = aemcp.findComp(args.comp).duplicate(); if (args.newName) c.name = args.newName; return aemcp.compInfo(c, false);`
-  },
-  {
-    name: "ae_open_comp",
-    title: "Open composition",
-    description: "Open a composition in the Composition viewer / timeline and make it active.",
-    input: { comp: compRef },
-    readOnly: true,
-    jsx: `var c = aemcp.findComp(args.comp); c.openInViewer(); return { opened: c.name, id: c.id };`
-  },
-  {
-    name: "ae_precompose",
-    title: "Pre-compose layers",
-    description: "Pre-compose the given layers into a new composition.",
-    input: {
-      comp: compRef,
-      layers: external_exports.array(layerRef).min(1),
-      name: external_exports.string(),
-      moveAllAttributes: external_exports.boolean().optional().describe("Default true. false = leave attributes in the original comp (single layer only)."),
-      open: external_exports.boolean().optional()
-    },
-    jsx: `
-var c = aemcp.findComp(args.comp), idx = [];
-for (var i = 0; i < args.layers.length; i++) idx.push(aemcp.findLayer(c, args.layers[i]).index);
-var nc = c.layers.precompose(idx, args.name, args.moveAllAttributes !== false);
-if (args.open) nc.openInViewer();
-return aemcp.compInfo(nc, true);`
-  },
-  {
-    name: "ae_add_comp_marker",
-    title: "Add marker",
-    description: "Add a marker to the composition, or to a layer if `layer` is given.",
-    input: {
-      comp: compRef,
-      layer: layerRef.optional(),
-      time: external_exports.number().describe("Seconds."),
-      comment: external_exports.string().optional(),
-      duration: external_exports.number().optional(),
-      chapter: external_exports.string().optional(),
-      label: external_exports.number().int().min(0).max(16).optional()
-    },
-    jsx: `
-var c = aemcp.findComp(args.comp);
-var mp = args.layer !== undefined ? aemcp.findLayer(c, args.layer).property("ADBE Marker") : c.markerProperty;
-var m = new MarkerValue(args.comment || "");
-if (args.duration) m.duration = args.duration;
-if (args.chapter) m.chapter = args.chapter;
-if (args.label !== undefined) { try { m.label = args.label; } catch (e) {} }
-mp.setValueAtTime(args.time, m);
-return aemcp.markers(mp);`
-  }
-];
-
-// src/tools/core.ts
-init_define_AEMCP_CEP_FILES();
-import { existsSync as existsSync3, mkdirSync as mkdirSync4, readFileSync as readFileSync6, statSync, unlinkSync } from "node:fs";
-import { homedir as homedir4 } from "node:os";
-import { join as join6 } from "node:path";
-
-// src/update.ts
-init_define_AEMCP_CEP_FILES();
-import { mkdirSync as mkdirSync3, readFileSync as readFileSync5, writeFileSync as writeFileSync3 } from "node:fs";
-import { homedir as homedir3 } from "node:os";
-import { dirname as dirname4, join as join5 } from "node:path";
-var REPO = "ronyitzhaki/after-effects-mcp";
-var RELEASES_URL = `https://github.com/${REPO}/releases/latest`;
-var CACHE = join5(homedir3(), ".aemcp", "update-check.json");
-var DAY = 24 * 3600 * 1e3;
-function compareVersions(a, b) {
-  const pa = a.replace(/^v/, "").split(/[.-]/).map((x) => parseInt(x, 10) || 0);
-  const pb = b.replace(/^v/, "").split(/[.-]/).map((x) => parseInt(x, 10) || 0);
-  for (let i = 0; i < 3; i++) if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) > (pb[i] ?? 0) ? 1 : -1;
-  return 0;
-}
-function updateCheckEnabled() {
-  return !process.env.AEMCP_NO_UPDATE_CHECK && loadConfig().updateCheck !== false;
-}
-function readCache() {
-  try {
-    return JSON.parse(readFileSync5(CACHE, "utf8"));
-  } catch {
-    return null;
-  }
-}
-var current = null;
-function knownUpdate() {
-  const c = current ?? readCache();
-  if (!c?.latest) return null;
-  return { ...c, current: VERSION, updateAvailable: compareVersions(c.latest, VERSION) > 0 };
-}
-async function checkForUpdate(force = false) {
-  if (!updateCheckEnabled()) return null;
-  const cached2 = readCache();
-  if (!force && cached2 && Date.now() - Date.parse(cached2.checkedAt) < DAY) return current = knownUpdate();
-  try {
-    const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
-      headers: { "user-agent": `ae-mcp/${VERSION}`, accept: "application/vnd.github+json" },
-      signal: AbortSignal.timeout(4e3)
-    });
-    if (!res.ok) return knownUpdate();
-    const rel = await res.json();
-    if (!rel.tag_name) return knownUpdate();
-    const latest = rel.tag_name.replace(/^v/, "");
-    current = { checkedAt: (/* @__PURE__ */ new Date()).toISOString(), current: VERSION, latest, url: rel.html_url || RELEASES_URL, updateAvailable: compareVersions(latest, VERSION) > 0 };
-    mkdirSync3(dirname4(CACHE), { recursive: true });
-    writeFileSync3(CACHE, JSON.stringify(current, null, 2));
-    return current;
-  } catch {
-    return knownUpdate();
-  }
-}
-function updateMessage(u) {
-  return u?.updateAvailable ? `A newer version of AE MCP is available: v${u.latest} (you have v${u.current}). Download: ${u.url}` : null;
-}
-
-// src/transpile.ts
-init_define_AEMCP_CEP_FILES();
-var Babel = __toESM(require_babel_min(), 1);
-var PREFIX = "(function(args, log){";
-function extendScriptOnly(code) {
-  return /^\s*#(include|target|targetengine|strict|script|includepath)\b/m.test(code) || /<[A-Za-z][\w:.-]*[\s>][\s\S]*<\/[A-Za-z]/.test(code) && /=\s*<[A-Za-z]/.test(code);
-}
-function transpileUserCode(code, enabled = true) {
-  const plain = PREFIX + code + "\n})";
-  if (!enabled || extendScriptOnly(code)) return { source: plain, transpiled: false };
-  try {
-    const out = Babel.transform(plain, {
-      presets: [["env", { targets: { ie: "11" }, modules: false }]],
-      assumptions: {
-        iterableIsArray: true,
-        // for...of / spread over arrays -> plain index loops
-        objectRestNoSymbols: true,
-        setSpreadProperties: true,
-        noClassCalls: true,
-        constantSuper: true,
-        setPublicClassFields: true,
-        privateFieldsAsProperties: true
-      },
-      sourceType: "script",
-      retainLines: true,
-      comments: false,
-      compact: false,
-      babelrc: false,
-      configFile: false
-    }).code;
-    return { source: parenthesizeTernaries(out).replace(/;\s*$/, ""), transpiled: true };
-  } catch (e) {
-    return { source: plain, transpiled: false, syntaxError: cleanSyntaxError(String(e?.message || e)) };
-  }
-}
-function parenthesizeTernaries(code) {
-  const plugin = ({ types: t }) => ({
-    visitor: {
-      ConditionalExpression(path) {
-        for (const key of ["test", "consequent", "alternate"]) {
-          const child = path.node[key];
-          if (child && child.type === "ConditionalExpression") path.node[key] = t.parenthesizedExpression(child);
-        }
-      }
-    }
-  });
-  return Babel.transform(code, {
-    plugins: [plugin],
-    sourceType: "script",
-    retainLines: true,
-    comments: false,
-    compact: false,
-    babelrc: false,
-    configFile: false,
-    parserOpts: { createParenthesizedExpressions: true }
-  }).code;
-}
-function cleanSyntaxError(msg) {
-  const pre = PREFIX.length;
-  let m = msg.replace(/^unknown file:\s*/, "").replace(/^\/?[^:\n]*: /, "");
-  m = m.replace(/\((\d+):(\d+)\)/, (_, l, c) => `(line ${l}, column ${l === "1" ? Math.max(0, Number(c) - pre) + 1 : Number(c) + 1})`);
-  const lines = m.split("\n").filter((l) => !/^\s*\d+\s*\|\s*\}\)\s*$/.test(l));
-  return lines.map((l) => /^[ >]\s*1\s*\|/.test(l) ? l.replace(PREFIX, "") : l).join("\n").replace(/(\n\s*\|\s)( *)\^/, (all, a, sp) => m.includes("> 1 |") ? a + sp.slice(Math.min(sp.length, pre)) + "^" : all);
 }
 
 // src/tools/core.ts
@@ -75679,6 +75454,452 @@ Tell the user about this update.` });
   );
 }
 
+// src/tools/renderjobs.ts
+init_define_AEMCP_CEP_FILES();
+import { spawn } from "node:child_process";
+import { createWriteStream, existsSync as existsSync4, mkdirSync as mkdirSync5 } from "node:fs";
+import { homedir as homedir5 } from "node:os";
+import { dirname as dirname5, join as join7 } from "node:path";
+var jobs = /* @__PURE__ */ new Map();
+var LOG_DIR = join7(homedir5(), ".aemcp", "renders");
+function aerenderPath(appPackage) {
+  const candidates = process.platform === "win32" ? [join7(appPackage, "aerender.exe"), join7(dirname5(appPackage), "aerender.exe"), join7(appPackage, "Support Files", "aerender.exe")] : [join7(dirname5(appPackage), "aerender"), join7(appPackage, "..", "aerender")];
+  return candidates.find((p) => existsSync4(p)) ?? null;
+}
+function view(j) {
+  const pct = j.frames ? Math.min(100, Math.round(j.frameRendered / j.frames * 100)) : null;
+  const rendering = j.tail.some((l) => /PROGRESS:.*\(\d+\)/.test(l));
+  return {
+    id: j.id,
+    comp: j.comp,
+    status: j.status,
+    // aerender starts its own copy of After Effects first, which often takes a minute or two
+    phase: j.status !== "running" ? void 0 : rendering ? "rendering" : "starting the render engine (can take a minute or two)",
+    elapsedSeconds: Math.round(((j.endedAt ? Date.parse(j.endedAt) : Date.now()) - Date.parse(j.startedAt)) / 1e3),
+    progress: j.status === "done" ? 100 : pct,
+    framesRendered: j.frameRendered,
+    totalFrames: j.frames || null,
+    output: j.output,
+    startedAt: j.startedAt,
+    endedAt: j.endedAt,
+    log: j.log,
+    lastLines: j.tail.slice(-6)
+  };
+}
+function registerRenderJobs(server) {
+  server.registerTool(
+    "ae_render_background",
+    {
+      title: "Render in background",
+      description: "Render a composition (or a render queue item) with aerender in a separate process, so After Effects stays usable. It renders the project as saved on disk: pass save:true to save the open project first (required when it has unsaved changes). Returns a job id; check progress with ae_render_jobs and cancel there.",
+      inputSchema: {
+        comp: external_exports.union([external_exports.number().int(), external_exports.string()]).optional().describe("Composition to render (id or name; default: the active comp)."),
+        rqIndex: external_exports.number().int().min(1).optional().describe("Render this render queue item with its own settings instead of a comp."),
+        output: external_exports.string().optional().describe("Absolute output path (with comp). Extension should match the output module."),
+        renderSettingsTemplate: external_exports.string().optional().describe('e.g. "Best Settings".'),
+        outputModuleTemplate: external_exports.string().optional().describe('e.g. "High Quality", "H.264 - Match Render Settings - 15 Mbps".'),
+        startFrame: external_exports.number().int().optional(),
+        endFrame: external_exports.number().int().optional(),
+        save: external_exports.boolean().optional().describe("Save the open project first (needed if it has unsaved changes).")
+      },
+      annotations: { destructiveHint: false, openWorldHint: false }
+    },
+    async (args) => {
+      try {
+        if (permissions().mode === "read-only" && args.save) return errorResult(READ_ONLY_REFUSAL);
+        if (!args.rqIndex && !args.output) return errorResult("Pass output (an absolute file path) when rendering a comp.");
+        const r = await runJsx(
+          `
+var p = app.project;
+if (!p.file) aemcp.fail("The project has never been saved. Save it first (ae_save_project with a path), then render.");
+if (p.dirty) { if (args.save) p.save(); else aemcp.fail("The project has unsaved changes; aerender renders the file on disk. Pass save:true to save first."); }
+var name = null, frames = 0;
+if (args.rqIndex) {
+  if (args.rqIndex > p.renderQueue.numItems) aemcp.fail("No render queue item " + args.rqIndex);
+  var it = p.renderQueue.item(args.rqIndex); name = it.comp.name;
+  frames = Math.round(it.timeSpanDuration / it.comp.frameDuration);
+} else {
+  var c = aemcp.findComp(args.comp); name = c.name;
+  var dupes = 0; for (var i = 1; i <= p.numItems; i++) if (p.item(i) instanceof CompItem && p.item(i).name === name) dupes++;
+  if (dupes > 1) aemcp.fail("Several comps are named '" + name + "'; aerender needs a unique name. Rename one, or use rqIndex.");
+  frames = Math.round(c.workAreaDuration / c.frameDuration);
+}
+if (args.startFrame !== undefined && args.endFrame !== undefined) frames = args.endFrame - args.startFrame + 1;
+return { project: p.file.fsName, comp: name, frames: frames, app: Folder.appPackage.fsName };`,
+          args,
+          { undoGroup: false, timeoutMs: 12e4 }
+        );
+        if (!r.ok) return formatResult(r);
+        const info = r.result;
+        const bin = aerenderPath(info.app);
+        if (!bin) return errorResult(`aerender was not found next to ${info.app}.`);
+        const cli = ["-project", info.project, "-v", "ERRORS_AND_PROGRESS"];
+        if (args.rqIndex) cli.push("-rqindex", String(args.rqIndex));
+        else cli.push("-comp", info.comp);
+        if (args.output) cli.push("-output", args.output);
+        if (args.renderSettingsTemplate) cli.push("-RStemplate", args.renderSettingsTemplate);
+        if (args.outputModuleTemplate) cli.push("-OMtemplate", args.outputModuleTemplate);
+        if (args.startFrame !== void 0) cli.push("-s", String(args.startFrame));
+        if (args.endFrame !== void 0) cli.push("-e", String(args.endFrame));
+        if (args.output) mkdirSync5(dirname5(args.output), { recursive: true });
+        mkdirSync5(LOG_DIR, { recursive: true });
+        const id = `r${Date.now().toString(36)}`;
+        const logPath = join7(LOG_DIR, `${id}.log`);
+        const logStream = createWriteStream(logPath);
+        const job = {
+          id,
+          comp: info.comp,
+          output: args.output || "(render queue item output)",
+          project: info.project,
+          status: "running",
+          startedAt: (/* @__PURE__ */ new Date()).toISOString(),
+          frames: info.frames,
+          frameRendered: 0,
+          log: logPath,
+          tail: []
+        };
+        const proc = spawn(bin, cli, { stdio: ["ignore", "pipe", "pipe"] });
+        job.proc = proc;
+        const onData = (d) => {
+          const text = d.toString();
+          logStream.write(text);
+          for (const line of text.split(/\r?\n/)) {
+            if (!line.trim()) continue;
+            const m = line.match(/PROGRESS:.*\((\d+)\)/);
+            if (m) job.frameRendered = Math.max(job.frameRendered, Number(m[1]));
+            job.tail.push(line.trim());
+            if (job.tail.length > 50) job.tail.shift();
+          }
+        };
+        proc.stdout.on("data", onData);
+        proc.stderr.on("data", onData);
+        proc.on("error", (e) => {
+          job.status = "failed";
+          job.tail.push(String(e));
+          job.endedAt = (/* @__PURE__ */ new Date()).toISOString();
+        });
+        proc.on("exit", (code) => {
+          logStream.end();
+          job.exitCode = code;
+          job.endedAt = (/* @__PURE__ */ new Date()).toISOString();
+          if (job.status === "running") job.status = code === 0 && !job.tail.some((l) => /aerender ERROR|^ERROR/i.test(l)) ? "done" : "failed";
+          job.proc = void 0;
+        });
+        jobs.set(id, job);
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Background render started: job ${id} (${info.comp}, ${info.frames || "?"} frames) from ${info.project}.
+Check progress with ae_render_jobs. Log: ${logPath}`
+            }
+          ]
+        };
+      } catch (e) {
+        return errorResult(e);
+      }
+    }
+  );
+  server.registerTool(
+    "ae_render_jobs",
+    {
+      title: "Background render jobs",
+      description: "Status and progress of background renders started with ae_render_background (this session), or cancel one.",
+      inputSchema: {
+        id: external_exports.string().optional().describe("Only this job."),
+        cancel: external_exports.string().optional().describe("Cancel this job id.")
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false }
+    },
+    async ({ id, cancel }) => {
+      if (cancel) {
+        const j = jobs.get(cancel);
+        if (!j) return errorResult(`No job ${cancel}`);
+        if (j.status === "running" && j.proc) {
+          j.status = "cancelled";
+          j.proc.kill();
+        }
+        return { content: [{ type: "text", text: JSON.stringify(view(j)) }] };
+      }
+      const list = [...jobs.values()].filter((j) => !id || j.id === id).map(view);
+      if (id && !list.length) return errorResult(`No job ${id}`);
+      return { content: [{ type: "text", text: list.length ? JSON.stringify(id ? list[0] : list) : "No background renders in this session." }] };
+    }
+  );
+}
+
+// src/tools/workflow.ts
+init_define_AEMCP_CEP_FILES();
+import { createHash as createHash2 } from "node:crypto";
+import { copyFileSync as copyFileSync2, existsSync as existsSync5, mkdirSync as mkdirSync6, readdirSync as readdirSync3, readFileSync as readFileSync7, statSync as statSync2, unlinkSync as unlinkSync2, writeFileSync as writeFileSync4 } from "node:fs";
+import { homedir as homedir6 } from "node:os";
+import { basename, dirname as dirname6, extname, join as join8 } from "node:path";
+
+// src/tools/all.ts
+init_define_AEMCP_CEP_FILES();
+
+// src/tools/app.ts
+init_define_AEMCP_CEP_FILES();
+
+// src/capabilities.ts
+init_define_AEMCP_CEP_FILES();
+var CAPABILITIES_JSX = `
+var c = app.project.items.addComp("__aemcp_caps", 64, 64, 1, 1, 30), f = {};
+try {
+  var t = c.layers.addText("ab"), td = t.property("ADBE Text Properties").property("ADBE Text Document").value;
+  var op = t.property("ADBE Transform Group").property("ADBE Opacity");
+  var has = function (o, k) { try { return typeof o[k] !== "undefined"; } catch (e) { return false; } };
+  var rq = app.project.renderQueue.items.add(c);
+  f.perCharacterText = has(td, "characterRange");
+  f.paragraphRanges = has(td, "paragraphRange");
+  f.renderSettingsApi = has(rq, "getSettings") && has(rq.outputModule(1), "getSettings");
+  f.mediaEncoderQueue = has(app.project.renderQueue, "queueInAME");
+  rq.remove();
+  f.essentialGraphics = has(op, "addToMotionGraphicsTemplateAs");
+  f.mogrtExport = has(c, "exportAsMotionGraphicsTemplate");
+  f.fontsApi = !!app.fonts;
+  f.missingFontsApi = !!app.fonts && has(app.fonts, "missingOrSubstitutedFonts");
+  f.keyframeLabels = has(op, "setLabelAtKey");
+  f.layerIds = has(t, "id");
+  f.anyLayerTrackMatte = has(t, "setTrackMatte");
+  f.expressionEngine = app.project.expressionEngine;
+  f.scriptsCanWriteFiles = (function () { try { return app.preferences.getPrefAsLong("Main Pref Section", "Pref_SCRIPTING_FILE_NETWORK_SECURITY") === 1; } catch (e) { return null; } })();
+} finally { c.remove(); }
+return { appVersion: app.version, os: $.os, features: f };`;
+var FEATURE_NOTES = {
+  perCharacterText: "ae_style_text_range (AE 24.0+)",
+  paragraphRanges: "per-paragraph settings in ae_set_paragraph (AE 24.0+)",
+  renderSettingsApi: "ae_get/set_render_settings",
+  mediaEncoderQueue: "ae_queue_in_media_encoder",
+  essentialGraphics: "ae_essential_graphics",
+  mogrtExport: "ae_export_mogrt",
+  fontsApi: "ae_get_fonts (AE 24.0+)",
+  missingFontsApi: "missing-font check in ae_project_health (AE 24.0+)",
+  keyframeLabels: "keyframe color labels in ae_edit_keyframes (AE 22.6+)",
+  layerIds: "stable layer ids for the change report (AE 22.0+; older versions match layers by index+name)",
+  anyLayerTrackMatte: "track matte to any layer in ae_set_layer_attributes (AE 23.0+)"
+};
+
+// src/tools/app.ts
+var appTools = [
+  {
+    name: "ae_execute_menu_command",
+    title: "Execute menu command",
+    description: 'Run any After Effects menu command by its exact menu name (e.g. "Pre-compose...", "Easy Ease", "Center Anchor Point in Layer Content", "Fit to Comp", "Sequence Layers...") or numeric command id. Acts on the current selection.',
+    input: { command: external_exports.union([external_exports.string(), external_exports.number().int()]) },
+    jsx: `
+var id = typeof args.command === "number" ? args.command : app.findMenuCommandId(args.command);
+if (!id) aemcp.fail("Menu command not found: " + args.command);
+app.executeCommand(id); return { executed: args.command, id: id };`
+  },
+  {
+    name: "ae_undo",
+    title: "Undo",
+    description: "Undo the last action(s) in After Effects (Edit > Undo).",
+    input: { steps: external_exports.number().int().min(1).max(50).optional() },
+    noUndo: true,
+    report: true,
+    jsx: `var n = args.steps || 1; for (var i = 0; i < n; i++) app.executeCommand(16); return { undone: n };`
+  },
+  {
+    name: "ae_redo",
+    title: "Redo",
+    description: "Redo the last undone action(s).",
+    input: { steps: external_exports.number().int().min(1).max(50).optional() },
+    noUndo: true,
+    report: true,
+    jsx: `var n = args.steps || 1; for (var i = 0; i < n; i++) app.executeCommand(2035); return { redone: n };`
+  },
+  {
+    name: "ae_purge",
+    title: "Purge caches",
+    description: "Purge memory/disk caches (all memory, undo history, image caches, snapshot).",
+    input: { target: external_exports.enum(["ALL_CACHES", "ALL_MEMORY_CACHES", "UNDO_CACHES", "SNAPSHOT_CACHES", "IMAGE_CACHES"]).optional() },
+    noUndo: true,
+    jsx: `app.purge(PurgeTarget[args.target || "ALL_MEMORY_CACHES"]); return { purged: args.target || "ALL_MEMORY_CACHES" };`
+  },
+  {
+    name: "ae_get_fonts",
+    title: "List fonts",
+    description: "Search installed fonts (AE 24.0+): returns PostScript names to use for text layers.",
+    input: { nameContains: external_exports.string().optional(), limit: external_exports.number().int().optional().describe("Default 100.") },
+    readOnly: true,
+    jsx: `
+if (!app.fonts) aemcp.fail("app.fonts requires After Effects 24.0 or newer");
+var out = [], q = args.nameContains ? args.nameContains.toLowerCase() : null, lim = args.limit || 100, all = app.fonts.allFonts;
+for (var i = 0; i < all.length && out.length < lim; i++) for (var j = 0; j < all[i].length && out.length < lim; j++) {
+  var f = all[i][j];
+  if (q && f.familyName.toLowerCase().indexOf(q) < 0 && f.postScriptName.toLowerCase().indexOf(q) < 0) continue;
+  out.push({ postScriptName: f.postScriptName, family: f.familyName, style: f.styleName });
+}
+return out;`
+  },
+  {
+    name: "ae_system_info",
+    title: "System & app info",
+    description: "After Effects version, OS, memory, folders, scripting permissions, expression engine, and which newer scripting features this AE version supports (per-character text, render settings API, Essential Graphics, keyframe labels...).",
+    input: {},
+    readOnly: true,
+    tempItems: true,
+    jsx: `
+var caps = (function () {${CAPABILITIES_JSX}
+})();
+var o = { features: caps.features, appVersion: app.version, buildName: app.buildName, os: $.os, locale: $.locale, screens: $.screens, memoryInUse: app.memoryInUse, tempFolder: Folder.temp.fsName,
+  userDataFolder: Folder.userData.fsName, appFolder: Folder.appPackage ? Folder.appPackage.fsName : null };
+try { o.canWriteFiles = app.preferences.getPrefAsLong("Main Pref Section", "Pref_SCRIPTING_FILE_NETWORK_SECURITY") === 1; } catch (e) {}
+try { o.expressionEngine = app.project.expressionEngine; } catch (e) {}
+return o;`
+  }
+];
+
+// src/tools/comp.ts
+init_define_AEMCP_CEP_FILES();
+var compTools = [
+  {
+    name: "ae_list_comps",
+    title: "List compositions",
+    description: "List all compositions with id, size, duration, frame rate and layer count.",
+    input: { nameContains: external_exports.string().optional() },
+    readOnly: true,
+    jsx: `
+var out = [], q = args.nameContains ? String(args.nameContains).toLowerCase() : null;
+for (var i = 1; i <= app.project.numItems; i++) { var it = app.project.item(i); if (it instanceof CompItem && (!q || it.name.toLowerCase().indexOf(q) >= 0)) out.push(aemcp.itemInfo(it)); }
+return out;`
+  },
+  {
+    name: "ae_get_comp_info",
+    title: "Get composition info",
+    description: "Composition settings plus a summary of its layers (index, id, name, type, timing, parent, switches). Large comps are paged: use layerOffset/layerLimit (see totalLayers / nextLayerOffset in the result).",
+    input: {
+      comp: compRef,
+      includeLayers: external_exports.boolean().optional().describe("Default true."),
+      layerOffset: external_exports.number().int().min(0).optional().describe("Skip this many layers (default 0)."),
+      layerLimit: external_exports.number().int().min(1).max(1e3).optional().describe("Max layers to return (default 150).")
+    },
+    readOnly: true,
+    jsx: `
+var c = aemcp.findComp(args.comp), o = aemcp.compInfo(c, false);
+o.markers = aemcp.markers(c.markerProperty);
+if (args.includeLayers !== false) {
+  var off = args.layerOffset || 0, lim = args.layerLimit || 150, end = Math.min(c.numLayers, off + lim);
+  o.layers = [];
+  for (var i = off + 1; i <= end; i++) o.layers.push(aemcp.layerInfo(c.layer(i), false));
+  o.totalLayers = c.numLayers;
+  if (end < c.numLayers) o.nextLayerOffset = end;
+}
+return o;`
+  },
+  {
+    name: "ae_create_comp",
+    title: "Create composition",
+    description: "Create a new composition and (by default) open it in the viewer.",
+    input: {
+      name: external_exports.string(),
+      width: external_exports.number().int().min(4).max(3e4).optional().describe("Default 1920."),
+      height: external_exports.number().int().min(4).max(3e4).optional().describe("Default 1080."),
+      duration: external_exports.number().min(0.01).optional().describe("Seconds, default 10."),
+      frameRate: external_exports.number().min(1).max(999).optional().describe("Default 30."),
+      pixelAspect: external_exports.number().optional().describe("Default 1."),
+      bgColor: colorSchema.optional(),
+      folder: itemRef.optional(),
+      open: external_exports.boolean().optional().describe("Open in viewer (default true).")
+    },
+    jsx: `
+var c = app.project.items.addComp(args.name, args.width || 1920, args.height || 1080, args.pixelAspect || 1, args.duration || 10, args.frameRate || 30);
+if (args.bgColor) c.bgColor = aemcp.color3(args.bgColor);
+if (args.folder !== undefined) c.parentFolder = aemcp.findItem(args.folder);
+if (args.open !== false) c.openInViewer();
+return aemcp.compInfo(c, false);`
+  },
+  {
+    name: "ae_set_comp_settings",
+    title: "Set composition settings",
+    description: "Change composition settings: name, size, duration, frame rate, background, work area, current time, motion blur, renderer, start timecode.",
+    input: {
+      comp: compRef,
+      name: external_exports.string().optional(),
+      width: external_exports.number().int().optional(),
+      height: external_exports.number().int().optional(),
+      pixelAspect: external_exports.number().optional(),
+      duration: external_exports.number().optional(),
+      frameRate: external_exports.number().optional(),
+      bgColor: colorSchema.optional(),
+      workAreaStart: external_exports.number().optional(),
+      workAreaDuration: external_exports.number().optional(),
+      time: external_exports.number().optional().describe("Move the current-time indicator (seconds)."),
+      displayStartTime: external_exports.number().optional(),
+      motionBlur: external_exports.boolean().optional(),
+      shutterAngle: external_exports.number().optional(),
+      renderer: external_exports.string().optional().describe('e.g. "ADBE Advanced 3d" (Classic 3D), "ADBE Ernst" (Cinema 4D), "ADBE Calder" (Advanced 3D).'),
+      resolutionFactor: external_exports.array(external_exports.number().int()).length(2).optional().describe("Preview resolution, [1,1]=Full, [2,2]=Half.")
+    },
+    jsx: `
+var c = aemcp.findComp(args.comp), keys = ["name","width","height","pixelAspect","duration","frameRate","displayStartTime","motionBlur","shutterAngle","renderer","resolutionFactor"];
+for (var i = 0; i < keys.length; i++) if (args[keys[i]] !== undefined) c[keys[i]] = args[keys[i]];
+if (args.bgColor) c.bgColor = aemcp.color3(args.bgColor);
+if (args.workAreaStart !== undefined) c.workAreaStart = args.workAreaStart;
+if (args.workAreaDuration !== undefined) c.workAreaDuration = args.workAreaDuration;
+if (args.time !== undefined) c.time = args.time;
+return aemcp.compInfo(c, false);`
+  },
+  {
+    name: "ae_duplicate_comp",
+    title: "Duplicate composition",
+    description: "Duplicate a composition (layers reference the same sources).",
+    input: { comp: compRef, newName: external_exports.string().optional() },
+    jsx: `var c = aemcp.findComp(args.comp).duplicate(); if (args.newName) c.name = args.newName; return aemcp.compInfo(c, false);`
+  },
+  {
+    name: "ae_open_comp",
+    title: "Open composition",
+    description: "Open a composition in the Composition viewer / timeline and make it active.",
+    input: { comp: compRef },
+    readOnly: true,
+    jsx: `var c = aemcp.findComp(args.comp); c.openInViewer(); return { opened: c.name, id: c.id };`
+  },
+  {
+    name: "ae_precompose",
+    title: "Pre-compose layers",
+    description: "Pre-compose the given layers into a new composition.",
+    input: {
+      comp: compRef,
+      layers: external_exports.array(layerRef).min(1),
+      name: external_exports.string(),
+      moveAllAttributes: external_exports.boolean().optional().describe("Default true. false = leave attributes in the original comp (single layer only)."),
+      open: external_exports.boolean().optional()
+    },
+    jsx: `
+var c = aemcp.findComp(args.comp), idx = [];
+for (var i = 0; i < args.layers.length; i++) idx.push(aemcp.findLayer(c, args.layers[i]).index);
+var nc = c.layers.precompose(idx, args.name, args.moveAllAttributes !== false);
+if (args.open) nc.openInViewer();
+return aemcp.compInfo(nc, true);`
+  },
+  {
+    name: "ae_add_comp_marker",
+    title: "Add marker",
+    description: "Add a marker to the composition, or to a layer if `layer` is given.",
+    input: {
+      comp: compRef,
+      layer: layerRef.optional(),
+      time: external_exports.number().describe("Seconds."),
+      comment: external_exports.string().optional(),
+      duration: external_exports.number().optional(),
+      chapter: external_exports.string().optional(),
+      label: external_exports.number().int().min(0).max(16).optional()
+    },
+    jsx: `
+var c = aemcp.findComp(args.comp);
+var mp = args.layer !== undefined ? aemcp.findLayer(c, args.layer).property("ADBE Marker") : c.markerProperty;
+var m = new MarkerValue(args.comment || "");
+if (args.duration) m.duration = args.duration;
+if (args.chapter) m.chapter = args.chapter;
+if (args.label !== undefined) { try { m.label = args.label; } catch (e) {} }
+mp.setValueAtTime(args.time, m);
+return aemcp.markers(mp);`
+  }
+];
+
 // src/tools/effects.ts
 init_define_AEMCP_CEP_FILES();
 var params = external_exports.record(external_exports.string(), external_exports.any()).optional().describe('Effect parameters by display name or match name, e.g. {"Blurriness": 20, "Repeat Edge Pixels": true} or {"Color": "#ff0000"}.');
@@ -75913,207 +76134,120 @@ return aemcp.propInfo(m, { depth: 1 });`
   }
 ];
 
-// src/tools/layer.ts
+// src/tools/footage.ts
 init_define_AEMCP_CEP_FILES();
-var textStyle = {
-  font: external_exports.string().optional().describe('PostScript font name, e.g. "Arial-BoldMT", "Helvetica", "Montserrat-Bold".'),
-  fontSize: external_exports.number().optional(),
-  fillColor: colorSchema.optional(),
-  strokeColor: colorSchema.optional(),
-  strokeWidth: external_exports.number().optional(),
-  tracking: external_exports.number().optional(),
-  leading: external_exports.number().optional(),
-  justification: external_exports.enum(["LEFT_JUSTIFY", "CENTER_JUSTIFY", "RIGHT_JUSTIFY", "FULL_JUSTIFY_LASTLINE_LEFT", "FULL_JUSTIFY_LASTLINE_CENTER", "FULL_JUSTIFY_LASTLINE_RIGHT", "FULL_JUSTIFY_LASTLINE_FULL"]).optional(),
-  fauxBold: external_exports.boolean().optional(),
-  fauxItalic: external_exports.boolean().optional(),
-  allCaps: external_exports.boolean().optional()
-};
-var layerTools = [
+var interpretation = `
+function interp(it) {
+  var s = it.mainSource, o = { item: it.name, id: it.id, file: it.file ? it.file.fsName : null, missing: it.footageMissing, pixelAspect: it.pixelAspect };
+  try { o.isStill = s.isStill; } catch (e) {}
+  try { o.nativeFrameRate = aemcp.round(s.nativeFrameRate); o.conformFrameRate = aemcp.round(s.conformFrameRate); o.displayFrameRate = aemcp.round(s.displayFrameRate); } catch (e) {}
+  try { o.hasAlpha = s.hasAlpha; o.alphaMode = aemcp.enumName(AlphaMode, s.alphaMode); o.invertAlpha = s.invertAlpha; o.premulColor = s.premulColor; } catch (e) {}
+  try { o.fieldSeparation = aemcp.enumName(FieldSeparationType, s.fieldSeparationType); o.highQualityFieldSeparation = s.highQualityFieldSeparation; o.removePulldown = aemcp.enumName(PulldownPhase, s.removePulldown); } catch (e) {}
+  try { o.loop = s.loop; } catch (e) {}
+  try { o.useProxy = it.useProxy; o.proxy = it.proxySource ? (it.proxySource.file ? it.proxySource.file.fsName : "placeholder") : null; } catch (e) {}
+  return o;
+}`;
+var footageTools = [
   {
-    name: "ae_get_layer_info",
-    title: "Get layer info",
-    description: "Full info for one layer: switches, timing, parent, source, transform values, effects, masks count, markers, text, and every animated/expression property.",
-    input: { comp: compRef, layer: layerRef },
-    readOnly: true,
-    jsx: `var c = aemcp.findComp(args.comp); return aemcp.layerInfo(aemcp.findLayer(c, args.layer), true);`
+    name: "ae_set_footage_interpretation",
+    title: "Interpret footage",
+    description: "Read or change how footage is interpreted (File > Interpret Footage): conform frame rate, alpha (ignore/straight/premultiplied, invert, premultiplied color), field separation, pulldown removal, looping, pixel aspect ratio. With no settings it only reports the current interpretation.",
+    input: {
+      items: external_exports.array(itemRef).min(1),
+      conformFrameRate: external_exports.number().min(0).optional().describe("0 = use the file's native rate."),
+      alphaMode: external_exports.enum(["IGNORE", "STRAIGHT", "PREMULTIPLIED"]).optional(),
+      invertAlpha: external_exports.boolean().optional(),
+      premulColor: external_exports.union([external_exports.string(), external_exports.array(external_exports.number())]).optional(),
+      fieldSeparation: external_exports.enum(["OFF", "UPPER_FIELD_FIRST", "LOWER_FIELD_FIRST"]).optional(),
+      highQualityFieldSeparation: external_exports.boolean().optional(),
+      removePulldown: external_exports.enum(["OFF", "SSWWW", "SWWWS", "SWWWW_24P_ADVANCE", "WSSWW", "WSWWW_24P_ADVANCE", "WWSSW", "WWSWW_24P_ADVANCE", "WWWSS", "WWWSW_24P_ADVANCE", "WWWWS_24P_ADVANCE"]).optional(),
+      loop: external_exports.number().int().min(1).optional(),
+      pixelAspect: external_exports.number().optional()
+    },
+    jsx: `${interpretation}
+var out = [];
+for (var i = 0; i < args.items.length; i++) {
+  var it = aemcp.findItem(args.items[i]);
+  if (!(it instanceof FootageItem)) aemcp.fail("'" + it.name + "' is not footage");
+  var s = it.mainSource, skipped = [];
+  // each setting on its own: some don't apply to every file (e.g. loop or frame rate on a still)
+  var set = function (label, fn) { try { fn(); } catch (e) { skipped.push(label + ": " + e.message.replace(/^After Effects error: /, "")); } };
+  if (args.conformFrameRate !== undefined) set("conformFrameRate", function () { s.conformFrameRate = args.conformFrameRate; });
+  if (args.alphaMode) set("alphaMode", function () { s.alphaMode = AlphaMode[args.alphaMode]; });
+  if (args.invertAlpha !== undefined) set("invertAlpha", function () { s.invertAlpha = args.invertAlpha; });
+  if (args.premulColor !== undefined) set("premulColor", function () { s.premulColor = aemcp.color3(args.premulColor); });
+  if (args.fieldSeparation) set("fieldSeparation", function () { s.fieldSeparationType = FieldSeparationType[args.fieldSeparation]; });
+  if (args.highQualityFieldSeparation !== undefined) set("highQualityFieldSeparation", function () { s.highQualityFieldSeparation = args.highQualityFieldSeparation; });
+  if (args.removePulldown) set("removePulldown", function () { s.removePulldown = PulldownPhase[args.removePulldown]; });
+  if (args.loop !== undefined) set("loop", function () { s.loop = args.loop; });
+  if (args.pixelAspect !== undefined) set("pixelAspect", function () { it.pixelAspect = args.pixelAspect; });
+  var info = interp(it);
+  if (skipped.length) info.notApplied = skipped;
+  out.push(info);
+}
+return out;`
   },
   {
-    name: "ae_add_layer",
-    title: "Add layer",
-    description: "Add a layer to a composition: solid, text, shape (empty, use ae_add_shape to draw), null, adjustment, camera, light, or an existing project item (footage/comp).",
+    name: "ae_set_proxy",
+    title: "Set proxy",
+    description: "Assign a proxy file (or image sequence) to footage or a comp, switch between proxy and original, or remove the proxy.",
     input: {
-      comp: compRef,
-      type: external_exports.enum(["solid", "text", "shape", "null", "adjustment", "camera", "light", "item"]),
-      name: external_exports.string().optional(),
-      text: external_exports.string().optional().describe("For text layers."),
-      boxSize: external_exports.array(external_exports.number()).length(2).optional().describe("Paragraph (box) text size [w,h]; omit for point text."),
-      ...textStyle,
-      color: colorSchema.optional().describe("Solid/adjustment color, or light color."),
-      width: external_exports.number().int().optional().describe("Solid size (default comp size)."),
-      height: external_exports.number().int().optional(),
-      item: itemRef.optional().describe("For type 'item': project item to add."),
-      lightType: external_exports.enum(["PARALLEL", "SPOT", "POINT", "AMBIENT"]).optional(),
-      position: external_exports.array(external_exports.number()).min(2).max(3).optional(),
-      startTime: external_exports.number().optional(),
-      duration: external_exports.number().optional().describe("Layer duration in seconds (default comp duration)."),
-      threeD: external_exports.boolean().optional(),
-      moveToIndex: external_exports.number().int().optional().describe("Move the new layer to this 1-based index (new layers are added on top).")
+      item: itemRef,
+      path: external_exports.string().optional().describe("Absolute path to the proxy file; omit to only toggle useProxy."),
+      sequence: external_exports.boolean().optional().describe("The proxy is an image sequence (path = first frame)."),
+      remove: external_exports.boolean().optional().describe("Remove the proxy."),
+      useProxy: external_exports.boolean().optional().describe("Use the proxy (true) or the original (false).")
+    },
+    jsx: `${interpretation}
+var it = aemcp.findItem(args.item);
+if (!(it instanceof FootageItem || it instanceof CompItem)) aemcp.fail("'" + it.name + "' is not footage or a comp");
+if (args.remove) it.setProxyToNone();
+else if (args.path) {
+  var f = new File(args.path); if (!f.exists) aemcp.fail("File not found: " + args.path);
+  if (args.sequence) it.setProxyWithSequence(f, false); else it.setProxy(f);
+}
+if (args.useProxy !== undefined) it.useProxy = args.useProxy;
+return it instanceof FootageItem ? interp(it) : { item: it.name, useProxy: it.useProxy, proxy: it.proxySource ? it.proxySource.file.fsName : null };`
+  },
+  {
+    name: "ae_relink_footage",
+    title: "Relink footage",
+    description: "Find missing footage by file name inside a folder (searched recursively) and relink it; image sequences stay sequences. By default handles every missing item; pass items to relink specific ones (also when not missing, e.g. to switch to a new folder).",
+    input: {
+      searchFolder: external_exports.string().describe("Absolute folder to search."),
+      items: external_exports.array(itemRef).optional(),
+      maxFiles: external_exports.number().int().min(100).max(5e5).optional().describe("Stop scanning after this many files (default 50000).")
     },
     jsx: `
-var c = aemcp.findComp(args.comp), L = c.layers, l, center = [c.width / 2, c.height / 2];
-switch (args.type) {
-  case "solid":
-  case "adjustment":
-    l = L.addSolid(args.color ? aemcp.color3(args.color) : (args.type === "adjustment" ? [1,1,1] : [0.5,0.5,0.5]), args.name || (args.type === "adjustment" ? "Adjustment Layer" : "Solid"), args.width || c.width, args.height || c.height, c.pixelAspect, args.duration || c.duration);
-    if (args.type === "adjustment") l.adjustmentLayer = true;
-    break;
-  case "text":
-    l = args.boxSize ? L.addBoxText(args.boxSize, args.text || "") : L.addText(args.text || "");
-    var tp = l.property("ADBE Text Properties").property("ADBE Text Document");
-    tp.setValue(aemcp.applyText(tp.value, args));
-    break;
-  case "shape": l = L.addShape(); break;
-  case "null": l = L.addNull(args.duration || c.duration); break;
-  case "camera": l = L.addCamera(args.name || "Camera", center); break;
-  case "light":
-    l = L.addLight(args.name || "Light", center);
-    if (args.lightType) l.lightType = LightType[args.lightType];
-    if (args.color) l.property("ADBE Light Options Group").property("ADBE Light Color").setValue(aemcp.color3(args.color));
-    break;
-  case "item":
-    if (args.item === undefined) aemcp.fail("type 'item' requires item");
-    l = L.add(aemcp.findItem(args.item));
-    break;
-}
-if (args.name && args.type !== "camera" && args.type !== "light") l.name = args.name;
-if (args.startTime !== undefined) l.startTime = args.startTime;
-if (args.duration !== undefined && args.type !== "solid" && args.type !== "adjustment" && args.type !== "null") l.outPoint = l.inPoint + args.duration;
-if (args.threeD && l.threeDLayer !== undefined) l.threeDLayer = true;
-if (args.position) l.property("ADBE Transform Group").property("ADBE Position").setValue(args.position);
-if (args.moveToIndex && args.moveToIndex > 1) l.moveAfter(c.layer(Math.min(args.moveToIndex, c.numLayers)));
-return aemcp.layerInfo(l, false);`
-  },
-  {
-    name: "ae_set_layer_attributes",
-    title: "Set layer attributes",
-    description: "Change layer attributes: name, switches (enabled/solo/locked/shy/3D/motion blur/adjustment/guide), timing (in/out/start/stretch), parent, blend mode, track matte, label, comment, stacking order.",
-    input: {
-      comp: compRef,
-      layer: layerRef,
-      name: external_exports.string().optional(),
-      enabled: external_exports.boolean().optional(),
-      audioEnabled: external_exports.boolean().optional(),
-      solo: external_exports.boolean().optional(),
-      locked: external_exports.boolean().optional(),
-      shy: external_exports.boolean().optional(),
-      threeD: external_exports.boolean().optional(),
-      motionBlur: external_exports.boolean().optional(),
-      adjustmentLayer: external_exports.boolean().optional(),
-      guideLayer: external_exports.boolean().optional(),
-      collapseTransformation: external_exports.boolean().optional(),
-      inPoint: external_exports.number().optional(),
-      outPoint: external_exports.number().optional(),
-      startTime: external_exports.number().optional(),
-      stretch: external_exports.number().optional().describe("Time stretch percent (100 = normal)."),
-      parent: external_exports.union([external_exports.number().int(), external_exports.string(), external_exports.null()]).optional().describe("Parent layer index/name, or null to unparent."),
-      blendingMode: external_exports.string().optional().describe('BlendingMode enum name, e.g. "NORMAL", "ADD", "SCREEN", "MULTIPLY", "OVERLAY".'),
-      trackMatte: external_exports.object({ layer: external_exports.union([external_exports.number().int(), external_exports.string()]).optional(), type: external_exports.enum(["NO_TRACK_MATTE", "ALPHA", "ALPHA_INVERTED", "LUMA", "LUMA_INVERTED"]) }).optional().describe("Track matte (AE 2023+: any layer; older: the layer above)."),
-      label: external_exports.number().int().min(0).max(16).optional(),
-      comment: external_exports.string().optional(),
-      moveTo: external_exports.number().int().optional().describe("New 1-based stacking index."),
-      selected: external_exports.boolean().optional()
-    },
-    jsx: `
-var c = aemcp.findComp(args.comp), l = aemcp.findLayer(c, args.layer);
-var keys = ["name","enabled","audioEnabled","solo","locked","shy","motionBlur","adjustmentLayer","guideLayer","collapseTransformation","inPoint","outPoint","startTime","stretch","label","comment","selected"];
-var wasLocked = l.locked; if (wasLocked && args.locked !== true) l.locked = false;
-for (var i = 0; i < keys.length; i++) if (args[keys[i]] !== undefined && keys[i] !== "locked") l[keys[i]] = args[keys[i]];
-if (args.threeD !== undefined) l.threeDLayer = args.threeD;
-if (args.parent !== undefined) l.parent = args.parent === null ? null : aemcp.findLayer(c, args.parent);
-if (args.blendingMode) { var bm = BlendingMode[String(args.blendingMode).toUpperCase()]; if (bm === undefined) aemcp.fail("Unknown blending mode " + args.blendingMode); l.blendingMode = bm; }
-if (args.trackMatte) {
-  var tt = TrackMatteType[args.trackMatte.type];
-  if (args.trackMatte.layer !== undefined && l.setTrackMatte) l.setTrackMatte(aemcp.findLayer(c, args.trackMatte.layer), tt);
-  else if (tt === TrackMatteType.NO_TRACK_MATTE && l.removeTrackMatte) l.removeTrackMatte();
-  else l.trackMatteType = tt;
-}
-if (args.moveTo !== undefined) { if (args.moveTo <= 1) l.moveToBeginning(); else if (args.moveTo >= c.numLayers) l.moveToEnd(); else if (args.moveTo < l.index) l.moveBefore(c.layer(args.moveTo)); else if (args.moveTo > l.index) l.moveAfter(c.layer(args.moveTo)); }
-if (args.locked !== undefined) l.locked = args.locked; else if (wasLocked) l.locked = true;
-return aemcp.layerInfo(l, false);`
-  },
-  {
-    name: "ae_delete_layers",
-    title: "Delete layers",
-    description: "Delete layers from a composition.",
-    input: { comp: compRef, layers: external_exports.array(layerRef).min(1) },
-    destructive: true,
-    jsx: `
-var c = aemcp.findComp(args.comp), ls = [], names = [];
-for (var i = 0; i < args.layers.length; i++) ls.push(aemcp.findLayer(c, args.layers[i]));
-for (var j = 0; j < ls.length; j++) { names.push(ls[j].name); ls[j].locked = false; ls[j].remove(); }
-return { removed: names };`
-  },
-  {
-    name: "ae_duplicate_layer",
-    title: "Duplicate layer",
-    description: "Duplicate a layer (placed above the original), optionally renaming it.",
-    input: { comp: compRef, layer: layerRef, newName: external_exports.string().optional() },
-    jsx: `var c = aemcp.findComp(args.comp), d = aemcp.findLayer(c, args.layer).duplicate(); if (args.newName) d.name = args.newName; return aemcp.layerInfo(d, false);`
-  },
-  {
-    name: "ae_split_layer",
-    title: "Split layer",
-    description: "Split a layer at a time (like Edit > Split Layer). Returns the new layer.",
-    input: { comp: compRef, layer: layerRef, time: external_exports.number() },
-    jsx: `var c = aemcp.findComp(args.comp), l = aemcp.findLayer(c, args.layer); var d = l.duplicate(); l.outPoint = args.time; d.inPoint = args.time; return { first: aemcp.layerInfo(l, false), second: aemcp.layerInfo(d, false) };`
-  },
-  {
-    name: "ae_get_selection",
-    title: "Get selection",
-    description: "What the user has selected: project items, and in the active comp the selected layers and selected properties (with paths).",
-    input: {},
-    readOnly: true,
-    jsx: `
-var o = { items: [], comp: null, layers: [], properties: [] };
-for (var i = 0; i < app.project.selection.length; i++) o.items.push(aemcp.itemInfo(app.project.selection[i]));
-var c = app.project.activeItem;
-if (c && c instanceof CompItem) {
-  o.comp = { id: c.id, name: c.name, time: c.time };
-  for (var j = 0; j < c.selectedLayers.length; j++) o.layers.push(aemcp.layerInfo(c.selectedLayers[j], false));
-  var sp = c.selectedProperties;
-  for (var k = 0; k < sp.length; k++) {
-    var p = sp[k], path = [];
-    var q = p; while (q && q.parentProperty) { path.unshift(q.name); q = q.parentProperty; }
-    o.properties.push({ layer: q ? q.name : null, path: path.join("/"), matchName: p.matchName, isGroup: p.propertyType !== PropertyType.PROPERTY });
+var root = new Folder(args.searchFolder);
+if (!root.exists) aemcp.fail("Folder not found: " + args.searchFolder);
+var targets = [];
+if (args.items) { for (var i = 0; i < args.items.length; i++) targets.push(aemcp.findItem(args.items[i])); }
+else { for (var j = 1; j <= app.project.numItems; j++) { var it = app.project.item(j); if (it instanceof FootageItem && it.footageMissing) targets.push(it); } }
+if (!targets.length) return { relinked: [], notFound: [], message: "No missing footage" };
+// index file names in the folder tree (case-insensitive)
+var index = {}, scanned = 0, limit = args.maxFiles || 50000, truncated = false;
+function scan(folder) {
+  var list = folder.getFiles();
+  for (var k = 0; k < list.length; k++) {
+    if (scanned >= limit) { truncated = true; return; }
+    if (list[k] instanceof Folder) scan(list[k]);
+    else { scanned++; var n = "f:" + decodeURI(list[k].name).toLowerCase(); if (!index[n]) index[n] = list[k]; } // prefixed key: see aemcp notes
   }
 }
-return o;`
-  },
-  {
-    name: "ae_select_layers",
-    title: "Select layers",
-    description: "Select layers in a composition (deselects others unless add is true).",
-    input: { comp: compRef, layers: external_exports.array(layerRef), add: external_exports.boolean().optional() },
-    readOnly: true,
-    jsx: `
-var c = aemcp.findComp(args.comp);
-if (!args.add) for (var i = 1; i <= c.numLayers; i++) c.layer(i).selected = false;
-for (var j = 0; j < args.layers.length; j++) aemcp.findLayer(c, args.layers[j]).selected = true;
-return { selected: c.selectedLayers.length };`
-  },
-  {
-    name: "ae_set_text",
-    title: "Set text",
-    description: "Change the text content and/or character/paragraph style of a text layer (optionally at a time, creating a keyframe).",
-    input: { comp: compRef, layer: layerRef, text: external_exports.string().optional(), ...textStyle, time: external_exports.number().optional().describe("Set as a Source Text keyframe at this time.") },
-    jsx: `
-var c = aemcp.findComp(args.comp), l = aemcp.findLayer(c, args.layer);
-var p = l.property("ADBE Text Properties"); if (!p) aemcp.fail("Layer '" + l.name + "' is not a text layer");
-p = p.property("ADBE Text Document");
-var td = args.time !== undefined ? p.valueAtTime(args.time, false) : p.value;
-aemcp.applyText(td, args);
-if (args.time !== undefined) p.setValueAtTime(args.time, td); else if (p.numKeys) p.setValueAtTime(c.time, td); else p.setValue(td);
-return aemcp.textInfo(p.value);`
+scan(root);
+var relinked = [], notFound = [];
+for (var t = 0; t < targets.length; t++) {
+  var item = targets[t];
+  if (!(item instanceof FootageItem) || !item.file) { notFound.push({ item: item.name, reason: "not file footage" }); continue; }
+  var name = decodeURI(item.file.name).toLowerCase(), hit = index["f:" + name];
+  if (!hit) { notFound.push({ item: item.name, file: decodeURI(item.file.name) }); continue; }
+  var seq = false;
+  try { seq = !item.mainSource.isStill && /\\d+\\.(png|jpe?g|exr|tiff?|dpx|tga|psd|bmp|cin|hdr|sgi)$/i.test(name); } catch (e) {}
+  if (seq) item.replaceWithSequence(hit, false); else item.replace(hit);
+  relinked.push({ item: item.name, file: hit.fsName, sequence: seq });
+}
+return { relinked: relinked, notFound: notFound, filesScanned: scanned, truncated: truncated };`
   }
 ];
 
@@ -76414,583 +76548,209 @@ return { layer: l.name, timeRemap: true, keyframes: aemcp.keyframes(tr) };`
   }
 ];
 
-// src/tools/footage.ts
+// src/tools/layer.ts
 init_define_AEMCP_CEP_FILES();
-var interpretation = `
-function interp(it) {
-  var s = it.mainSource, o = { item: it.name, id: it.id, file: it.file ? it.file.fsName : null, missing: it.footageMissing, pixelAspect: it.pixelAspect };
-  try { o.isStill = s.isStill; } catch (e) {}
-  try { o.nativeFrameRate = aemcp.round(s.nativeFrameRate); o.conformFrameRate = aemcp.round(s.conformFrameRate); o.displayFrameRate = aemcp.round(s.displayFrameRate); } catch (e) {}
-  try { o.hasAlpha = s.hasAlpha; o.alphaMode = aemcp.enumName(AlphaMode, s.alphaMode); o.invertAlpha = s.invertAlpha; o.premulColor = s.premulColor; } catch (e) {}
-  try { o.fieldSeparation = aemcp.enumName(FieldSeparationType, s.fieldSeparationType); o.highQualityFieldSeparation = s.highQualityFieldSeparation; o.removePulldown = aemcp.enumName(PulldownPhase, s.removePulldown); } catch (e) {}
-  try { o.loop = s.loop; } catch (e) {}
-  try { o.useProxy = it.useProxy; o.proxy = it.proxySource ? (it.proxySource.file ? it.proxySource.file.fsName : "placeholder") : null; } catch (e) {}
-  return o;
-}`;
-var footageTools = [
-  {
-    name: "ae_set_footage_interpretation",
-    title: "Interpret footage",
-    description: "Read or change how footage is interpreted (File > Interpret Footage): conform frame rate, alpha (ignore/straight/premultiplied, invert, premultiplied color), field separation, pulldown removal, looping, pixel aspect ratio. With no settings it only reports the current interpretation.",
-    input: {
-      items: external_exports.array(itemRef).min(1),
-      conformFrameRate: external_exports.number().min(0).optional().describe("0 = use the file's native rate."),
-      alphaMode: external_exports.enum(["IGNORE", "STRAIGHT", "PREMULTIPLIED"]).optional(),
-      invertAlpha: external_exports.boolean().optional(),
-      premulColor: external_exports.union([external_exports.string(), external_exports.array(external_exports.number())]).optional(),
-      fieldSeparation: external_exports.enum(["OFF", "UPPER_FIELD_FIRST", "LOWER_FIELD_FIRST"]).optional(),
-      highQualityFieldSeparation: external_exports.boolean().optional(),
-      removePulldown: external_exports.enum(["OFF", "SSWWW", "SWWWS", "SWWWW_24P_ADVANCE", "WSSWW", "WSWWW_24P_ADVANCE", "WWSSW", "WWSWW_24P_ADVANCE", "WWWSS", "WWWSW_24P_ADVANCE", "WWWWS_24P_ADVANCE"]).optional(),
-      loop: external_exports.number().int().min(1).optional(),
-      pixelAspect: external_exports.number().optional()
-    },
-    jsx: `${interpretation}
-var out = [];
-for (var i = 0; i < args.items.length; i++) {
-  var it = aemcp.findItem(args.items[i]);
-  if (!(it instanceof FootageItem)) aemcp.fail("'" + it.name + "' is not footage");
-  var s = it.mainSource, skipped = [];
-  // each setting on its own: some don't apply to every file (e.g. loop or frame rate on a still)
-  var set = function (label, fn) { try { fn(); } catch (e) { skipped.push(label + ": " + e.message.replace(/^After Effects error: /, "")); } };
-  if (args.conformFrameRate !== undefined) set("conformFrameRate", function () { s.conformFrameRate = args.conformFrameRate; });
-  if (args.alphaMode) set("alphaMode", function () { s.alphaMode = AlphaMode[args.alphaMode]; });
-  if (args.invertAlpha !== undefined) set("invertAlpha", function () { s.invertAlpha = args.invertAlpha; });
-  if (args.premulColor !== undefined) set("premulColor", function () { s.premulColor = aemcp.color3(args.premulColor); });
-  if (args.fieldSeparation) set("fieldSeparation", function () { s.fieldSeparationType = FieldSeparationType[args.fieldSeparation]; });
-  if (args.highQualityFieldSeparation !== undefined) set("highQualityFieldSeparation", function () { s.highQualityFieldSeparation = args.highQualityFieldSeparation; });
-  if (args.removePulldown) set("removePulldown", function () { s.removePulldown = PulldownPhase[args.removePulldown]; });
-  if (args.loop !== undefined) set("loop", function () { s.loop = args.loop; });
-  if (args.pixelAspect !== undefined) set("pixelAspect", function () { it.pixelAspect = args.pixelAspect; });
-  var info = interp(it);
-  if (skipped.length) info.notApplied = skipped;
-  out.push(info);
-}
-return out;`
-  },
-  {
-    name: "ae_set_proxy",
-    title: "Set proxy",
-    description: "Assign a proxy file (or image sequence) to footage or a comp, switch between proxy and original, or remove the proxy.",
-    input: {
-      item: itemRef,
-      path: external_exports.string().optional().describe("Absolute path to the proxy file; omit to only toggle useProxy."),
-      sequence: external_exports.boolean().optional().describe("The proxy is an image sequence (path = first frame)."),
-      remove: external_exports.boolean().optional().describe("Remove the proxy."),
-      useProxy: external_exports.boolean().optional().describe("Use the proxy (true) or the original (false).")
-    },
-    jsx: `${interpretation}
-var it = aemcp.findItem(args.item);
-if (!(it instanceof FootageItem || it instanceof CompItem)) aemcp.fail("'" + it.name + "' is not footage or a comp");
-if (args.remove) it.setProxyToNone();
-else if (args.path) {
-  var f = new File(args.path); if (!f.exists) aemcp.fail("File not found: " + args.path);
-  if (args.sequence) it.setProxyWithSequence(f, false); else it.setProxy(f);
-}
-if (args.useProxy !== undefined) it.useProxy = args.useProxy;
-return it instanceof FootageItem ? interp(it) : { item: it.name, useProxy: it.useProxy, proxy: it.proxySource ? it.proxySource.file.fsName : null };`
-  },
-  {
-    name: "ae_relink_footage",
-    title: "Relink footage",
-    description: "Find missing footage by file name inside a folder (searched recursively) and relink it; image sequences stay sequences. By default handles every missing item; pass items to relink specific ones (also when not missing, e.g. to switch to a new folder).",
-    input: {
-      searchFolder: external_exports.string().describe("Absolute folder to search."),
-      items: external_exports.array(itemRef).optional(),
-      maxFiles: external_exports.number().int().min(100).max(5e5).optional().describe("Stop scanning after this many files (default 50000).")
-    },
-    jsx: `
-var root = new Folder(args.searchFolder);
-if (!root.exists) aemcp.fail("Folder not found: " + args.searchFolder);
-var targets = [];
-if (args.items) { for (var i = 0; i < args.items.length; i++) targets.push(aemcp.findItem(args.items[i])); }
-else { for (var j = 1; j <= app.project.numItems; j++) { var it = app.project.item(j); if (it instanceof FootageItem && it.footageMissing) targets.push(it); } }
-if (!targets.length) return { relinked: [], notFound: [], message: "No missing footage" };
-// index file names in the folder tree (case-insensitive)
-var index = {}, scanned = 0, limit = args.maxFiles || 50000, truncated = false;
-function scan(folder) {
-  var list = folder.getFiles();
-  for (var k = 0; k < list.length; k++) {
-    if (scanned >= limit) { truncated = true; return; }
-    if (list[k] instanceof Folder) scan(list[k]);
-    else { scanned++; var n = "f:" + decodeURI(list[k].name).toLowerCase(); if (!index[n]) index[n] = list[k]; } // prefixed key: see aemcp notes
-  }
-}
-scan(root);
-var relinked = [], notFound = [];
-for (var t = 0; t < targets.length; t++) {
-  var item = targets[t];
-  if (!(item instanceof FootageItem) || !item.file) { notFound.push({ item: item.name, reason: "not file footage" }); continue; }
-  var name = decodeURI(item.file.name).toLowerCase(), hit = index["f:" + name];
-  if (!hit) { notFound.push({ item: item.name, file: decodeURI(item.file.name) }); continue; }
-  var seq = false;
-  try { seq = !item.mainSource.isStill && /\\d+\\.(png|jpe?g|exr|tiff?|dpx|tga|psd|bmp|cin|hdr|sgi)$/i.test(name); } catch (e) {}
-  if (seq) item.replaceWithSequence(hit, false); else item.replace(hit);
-  relinked.push({ item: item.name, file: hit.fsName, sequence: seq });
-}
-return { relinked: relinked, notFound: notFound, filesScanned: scanned, truncated: truncated };`
-  }
-];
-
-// src/tools/text.ts
-init_define_AEMCP_CEP_FILES();
-var charStyle = external_exports.object({
-  font: external_exports.string().optional().describe("PostScript name (see ae_get_fonts)."),
+var textStyle = {
+  font: external_exports.string().optional().describe('PostScript font name, e.g. "Arial-BoldMT", "Helvetica", "Montserrat-Bold".'),
   fontSize: external_exports.number().optional(),
   fillColor: colorSchema.optional(),
   strokeColor: colorSchema.optional(),
   strokeWidth: external_exports.number().optional(),
-  applyFill: external_exports.boolean().optional(),
-  applyStroke: external_exports.boolean().optional(),
   tracking: external_exports.number().optional(),
   leading: external_exports.number().optional(),
-  baselineShift: external_exports.number().optional(),
-  horizontalScale: external_exports.number().optional().describe("Percent."),
-  verticalScale: external_exports.number().optional().describe("Percent."),
+  justification: external_exports.enum(["LEFT_JUSTIFY", "CENTER_JUSTIFY", "RIGHT_JUSTIFY", "FULL_JUSTIFY_LASTLINE_LEFT", "FULL_JUSTIFY_LASTLINE_CENTER", "FULL_JUSTIFY_LASTLINE_RIGHT", "FULL_JUSTIFY_LASTLINE_FULL"]).optional(),
   fauxBold: external_exports.boolean().optional(),
   fauxItalic: external_exports.boolean().optional(),
-  allCaps: external_exports.boolean().optional(),
-  smallCaps: external_exports.boolean().optional(),
-  superscript: external_exports.boolean().optional(),
-  subscript: external_exports.boolean().optional()
-}).describe("Character style to apply.");
-var textTools = [
+  allCaps: external_exports.boolean().optional()
+};
+var layerTools = [
   {
-    name: "ae_style_text_range",
-    title: "Style part of a text",
-    description: "Apply character styling to part of a text layer: by character range (start/end) or every occurrence of a word or phrase (match). Font, size, fill/stroke color, tracking, leading, baseline shift, scale, faux bold/italic, caps, super/subscript. Needs After Effects 24.0+.",
+    name: "ae_get_layer_info",
+    title: "Get layer info",
+    description: "Full info for one layer: switches, timing, parent, source, transform values, effects, masks count, markers, text, and every animated/expression property.",
+    input: { comp: compRef, layer: layerRef },
+    readOnly: true,
+    jsx: `var c = aemcp.findComp(args.comp); return aemcp.layerInfo(aemcp.findLayer(c, args.layer), true);`
+  },
+  {
+    name: "ae_add_layer",
+    title: "Add layer",
+    description: "Add a layer to a composition: solid, text, shape (empty, use ae_add_shape to draw), null, adjustment, camera, light, or an existing project item (footage/comp).",
     input: {
       comp: compRef,
-      layer: layerRef,
-      start: external_exports.number().int().min(0).optional().describe("First character (0-based)."),
-      end: external_exports.number().int().optional().describe("End character, exclusive (default: end of text)."),
-      match: external_exports.string().optional().describe("Style every occurrence of this text instead of a range."),
-      caseSensitive: external_exports.boolean().optional(),
-      style: charStyle,
-      time: external_exports.number().optional().describe("Apply at this time (Source Text keyframe) when the text is animated.")
+      type: external_exports.enum(["solid", "text", "shape", "null", "adjustment", "camera", "light", "item"]),
+      name: external_exports.string().optional(),
+      text: external_exports.string().optional().describe("For text layers."),
+      boxSize: external_exports.array(external_exports.number()).length(2).optional().describe("Paragraph (box) text size [w,h]; omit for point text."),
+      ...textStyle,
+      color: colorSchema.optional().describe("Solid/adjustment color, or light color."),
+      width: external_exports.number().int().optional().describe("Solid size (default comp size)."),
+      height: external_exports.number().int().optional(),
+      item: itemRef.optional().describe("For type 'item': project item to add."),
+      lightType: external_exports.enum(["PARALLEL", "SPOT", "POINT", "AMBIENT"]).optional(),
+      position: external_exports.array(external_exports.number()).min(2).max(3).optional(),
+      startTime: external_exports.number().optional(),
+      duration: external_exports.number().optional().describe("Layer duration in seconds (default comp duration)."),
+      threeD: external_exports.boolean().optional(),
+      moveToIndex: external_exports.number().int().optional().describe("Move the new layer to this 1-based index (new layers are added on top).")
     },
     jsx: `
-var c = aemcp.findComp(args.comp), l = aemcp.findLayer(c, args.layer);
-var tp = l.property("ADBE Text Properties"); if (!tp) aemcp.fail("'" + l.name + "' is not a text layer");
-var src = tp.property("ADBE Text Document");
-var td = args.time !== undefined ? src.valueAtTime(args.time, false) : src.value;
-if (typeof td.characterRange !== "function") aemcp.fail("Per-character styling needs After Effects 24.0 or newer");
-var text = td.text, ranges = [];
-if (args.match) {
-  var hay = args.caseSensitive ? text : text.toLowerCase(), needle = args.caseSensitive ? args.match : args.match.toLowerCase();
-  var at = hay.indexOf(needle);
-  while (at >= 0 && needle.length) { ranges.push([at, at + needle.length]); at = hay.indexOf(needle, at + needle.length); }
-  if (!ranges.length) aemcp.fail("'" + args.match + "' not found in the text");
-} else ranges.push([args.start || 0, args.end === undefined ? text.length : args.end]);
-var st = args.style, keys = ["font", "fontSize", "strokeWidth", "applyFill", "applyStroke", "tracking", "leading", "baselineShift", "horizontalScale", "verticalScale", "fauxBold", "fauxItalic", "allCaps", "smallCaps", "superscript", "subscript"];
-for (var r = 0; r < ranges.length; r++) {
-  var cr = td.characterRange(ranges[r][0], ranges[r][1]);
-  for (var k = 0; k < keys.length; k++) if (st[keys[k]] !== undefined) {
-    if (keys[k] === "leading") { try { cr.autoLeading = false; } catch (e) {} }
-    cr[keys[k]] = st[keys[k]];
-  }
-  if (st.fillColor !== undefined) { cr.applyFill = true; cr.fillColor = aemcp.color3(st.fillColor); }
-  if (st.strokeColor !== undefined) { cr.applyStroke = true; cr.strokeColor = aemcp.color3(st.strokeColor); }
+var c = aemcp.findComp(args.comp), L = c.layers, l, center = [c.width / 2, c.height / 2];
+switch (args.type) {
+  case "solid":
+  case "adjustment":
+    l = L.addSolid(args.color ? aemcp.color3(args.color) : (args.type === "adjustment" ? [1,1,1] : [0.5,0.5,0.5]), args.name || (args.type === "adjustment" ? "Adjustment Layer" : "Solid"), args.width || c.width, args.height || c.height, c.pixelAspect, args.duration || c.duration);
+    if (args.type === "adjustment") l.adjustmentLayer = true;
+    break;
+  case "text":
+    l = args.boxSize ? L.addBoxText(args.boxSize, args.text || "") : L.addText(args.text || "");
+    var tp = l.property("ADBE Text Properties").property("ADBE Text Document");
+    tp.setValue(aemcp.applyText(tp.value, args));
+    break;
+  case "shape": l = L.addShape(); break;
+  case "null": l = L.addNull(args.duration || c.duration); break;
+  case "camera": l = L.addCamera(args.name || "Camera", center); break;
+  case "light":
+    l = L.addLight(args.name || "Light", center);
+    if (args.lightType) l.lightType = LightType[args.lightType];
+    if (args.color) l.property("ADBE Light Options Group").property("ADBE Light Color").setValue(aemcp.color3(args.color));
+    break;
+  case "item":
+    if (args.item === undefined) aemcp.fail("type 'item' requires item");
+    l = L.add(aemcp.findItem(args.item));
+    break;
 }
-if (args.time !== undefined || src.numKeys) src.setValueAtTime(args.time !== undefined ? args.time : c.time, td); else src.setValue(td);
-return { layer: l.name, text: text, styled: ranges };`
+if (args.name && args.type !== "camera" && args.type !== "light") l.name = args.name;
+if (args.startTime !== undefined) l.startTime = args.startTime;
+if (args.duration !== undefined && args.type !== "solid" && args.type !== "adjustment" && args.type !== "null") l.outPoint = l.inPoint + args.duration;
+if (args.threeD && l.threeDLayer !== undefined) l.threeDLayer = true;
+if (args.position) l.property("ADBE Transform Group").property("ADBE Position").setValue(args.position);
+if (args.moveToIndex && args.moveToIndex > 1) l.moveAfter(c.layer(Math.min(args.moveToIndex, c.numLayers)));
+return aemcp.layerInfo(l, false);`
   },
   {
-    name: "ae_set_paragraph",
-    title: "Paragraph settings",
-    description: "Paragraph formatting of a text layer (all paragraphs or one): justification, indents, space before/after, plus paragraph text box size. Needs After Effects 24.0+ for per-paragraph settings.",
-    input: {
-      comp: compRef,
-      layer: layerRef,
-      paragraph: external_exports.number().int().min(0).optional().describe("0-based paragraph index (default: all)."),
-      justification: external_exports.enum(["LEFT_JUSTIFY", "CENTER_JUSTIFY", "RIGHT_JUSTIFY", "FULL_JUSTIFY_LASTLINE_LEFT", "FULL_JUSTIFY_LASTLINE_CENTER", "FULL_JUSTIFY_LASTLINE_RIGHT", "FULL_JUSTIFY_LASTLINE_FULL"]).optional(),
-      firstLineIndent: external_exports.number().optional(),
-      startIndent: external_exports.number().optional(),
-      endIndent: external_exports.number().optional(),
-      spaceBefore: external_exports.number().optional(),
-      spaceAfter: external_exports.number().optional(),
-      boxSize: external_exports.array(external_exports.number()).length(2).optional().describe("Paragraph (box) text only: [width, height].")
-    },
-    jsx: `
-var c = aemcp.findComp(args.comp), l = aemcp.findLayer(c, args.layer);
-var tp = l.property("ADBE Text Properties"); if (!tp) aemcp.fail("'" + l.name + "' is not a text layer");
-var src = tp.property("ADBE Text Document"), td = src.value;
-var target = td;
-if (typeof td.paragraphRange === "function") {
-  var count = td.paragraphCount || 1;
-  target = args.paragraph === undefined ? td.paragraphRange(0, count) : td.paragraphRange(args.paragraph, args.paragraph + 1);
-} else if (args.paragraph !== undefined) aemcp.fail("Per-paragraph settings need After Effects 24.0 or newer");
-if (args.justification) target.justification = ParagraphJustification[args.justification];
-var keys = ["firstLineIndent", "startIndent", "endIndent", "spaceBefore", "spaceAfter"];
-for (var i = 0; i < keys.length; i++) if (args[keys[i]] !== undefined) target[keys[i]] = args[keys[i]];
-if (args.boxSize) { if (!td.boxText) aemcp.fail("boxSize only applies to paragraph (box) text"); td.boxTextSize = args.boxSize; }
-if (src.numKeys) src.setValueAtTime(c.time, td); else src.setValue(td);
-return { layer: l.name, text: aemcp.textInfo(src.value) };`
-  },
-  {
-    name: "ae_add_text_animator",
-    title: "Add text animator",
-    description: 'Add a text animator to a text layer: the properties it changes (position, scale, rotation, opacity, fill/stroke color, tracking, blur, skew, anchor point, character offset...) and a selector (range, wiggly or expression) with its settings. Animate the selector afterwards with ae_set_keyframes on paths like "Text/Animators/Animator 1/Selectors/Range Selector 1/Offset" (use ae_get_properties to see the exact names).',
+    name: "ae_set_layer_attributes",
+    title: "Set layer attributes",
+    description: "Change layer attributes: name, switches (enabled/solo/locked/shy/3D/motion blur/adjustment/guide), timing (in/out/start/stretch), parent, blend mode, track matte, label, comment, stacking order.",
     input: {
       comp: compRef,
       layer: layerRef,
       name: external_exports.string().optional(),
-      properties: external_exports.object({
-        position: external_exports.array(external_exports.number()).min(2).max(3).optional(),
-        anchorPoint: external_exports.array(external_exports.number()).min(2).max(3).optional(),
-        scale: external_exports.array(external_exports.number()).min(2).max(3).optional(),
-        rotation: external_exports.number().optional(),
-        opacity: external_exports.number().optional(),
-        skew: external_exports.number().optional(),
-        tracking: external_exports.number().optional(),
-        lineSpacing: external_exports.array(external_exports.number()).length(2).optional(),
-        blur: external_exports.array(external_exports.number()).length(2).optional(),
-        fillColor: colorSchema.optional(),
-        fillOpacity: external_exports.number().optional(),
-        strokeColor: colorSchema.optional(),
-        strokeWidth: external_exports.number().optional(),
-        characterOffset: external_exports.number().optional()
-      }).describe("Animator properties and their values (at full selection)."),
-      selector: external_exports.object({
-        type: external_exports.enum(["range", "wiggly", "expression"]).optional().describe("Default range."),
-        start: external_exports.number().optional().describe("Percent (or index with units: index)."),
-        end: external_exports.number().optional(),
-        offset: external_exports.number().optional(),
-        units: external_exports.enum(["percentage", "index"]).optional(),
-        basedOn: external_exports.enum(["characters", "charactersExcludingSpaces", "words", "lines"]).optional(),
-        mode: external_exports.enum(["add", "subtract", "intersect", "min", "max", "difference"]).optional(),
-        shape: external_exports.enum(["square", "rampUp", "rampDown", "triangle", "round", "smooth"]).optional(),
-        smoothness: external_exports.number().optional(),
-        easeHigh: external_exports.number().optional(),
-        easeLow: external_exports.number().optional(),
-        randomizeOrder: external_exports.boolean().optional(),
-        amountExpression: external_exports.string().optional().describe('For type "expression": the Amount expression, e.g. "textIndex * 10".'),
-        maxAmount: external_exports.number().optional().describe("Wiggly: max amount %."),
-        minAmount: external_exports.number().optional(),
-        wigglesPerSecond: external_exports.number().optional()
-      }).optional()
+      enabled: external_exports.boolean().optional(),
+      audioEnabled: external_exports.boolean().optional(),
+      solo: external_exports.boolean().optional(),
+      locked: external_exports.boolean().optional(),
+      shy: external_exports.boolean().optional(),
+      threeD: external_exports.boolean().optional(),
+      motionBlur: external_exports.boolean().optional(),
+      adjustmentLayer: external_exports.boolean().optional(),
+      guideLayer: external_exports.boolean().optional(),
+      collapseTransformation: external_exports.boolean().optional(),
+      inPoint: external_exports.number().optional(),
+      outPoint: external_exports.number().optional(),
+      startTime: external_exports.number().optional(),
+      stretch: external_exports.number().optional().describe("Time stretch percent (100 = normal)."),
+      parent: external_exports.union([external_exports.number().int(), external_exports.string(), external_exports.null()]).optional().describe("Parent layer index/name, or null to unparent."),
+      blendingMode: external_exports.string().optional().describe('BlendingMode enum name, e.g. "NORMAL", "ADD", "SCREEN", "MULTIPLY", "OVERLAY".'),
+      trackMatte: external_exports.object({ layer: external_exports.union([external_exports.number().int(), external_exports.string()]).optional(), type: external_exports.enum(["NO_TRACK_MATTE", "ALPHA", "ALPHA_INVERTED", "LUMA", "LUMA_INVERTED"]) }).optional().describe("Track matte (AE 2023+: any layer; older: the layer above)."),
+      label: external_exports.number().int().min(0).max(16).optional(),
+      comment: external_exports.string().optional(),
+      moveTo: external_exports.number().int().optional().describe("New 1-based stacking index."),
+      selected: external_exports.boolean().optional()
     },
     jsx: `
 var c = aemcp.findComp(args.comp), l = aemcp.findLayer(c, args.layer);
-var tp = l.property("ADBE Text Properties"); if (!tp) aemcp.fail("'" + l.name + "' is not a text layer");
-var an = tp.property("ADBE Text Animators").addProperty("ADBE Text Animator");
-if (args.name) an.name = args.name;
-var props = an.property("ADBE Text Animator Properties"), P = args.properties || {};
-var map = { position: "ADBE Text Position 3D", anchorPoint: "ADBE Text Anchor Point 3D", scale: "ADBE Text Scale 3D", rotation: "ADBE Text Rotation",
-  opacity: "ADBE Text Opacity", skew: "ADBE Text Skew", tracking: "ADBE Text Tracking Amount", lineSpacing: "ADBE Text Line Spacing", blur: "ADBE Text Blur",
-  fillColor: "ADBE Text Fill Color", fillOpacity: "ADBE Text Fill Opacity", strokeColor: "ADBE Text Stroke Color", strokeWidth: "ADBE Text Stroke Width",
-  characterOffset: "ADBE Text Character Offset" };
-var added = [];
-for (var k in P) {
-  if (!P.hasOwnProperty(k) || P[k] === undefined) continue;
-  if (!map[k]) aemcp.fail("Unknown animator property " + k);
-  var ap = props.addProperty(map[k]);
-  var v = P[k];
-  if (k === "fillColor" || k === "strokeColor") v = aemcp.color3(v);
-  if ((k === "position" || k === "anchorPoint") && v.length === 2) v = [v[0], v[1], 0];
-  if (k === "scale" && v.length === 2) v = [v[0], v[1], 100];
-  ap.setValue(v);
-  if (k === "tracking") { try { props.property("ADBE Text Track Type").setValue(1); } catch (e) {} }
-  added.push(ap.name);
+var keys = ["name","enabled","audioEnabled","solo","locked","shy","motionBlur","adjustmentLayer","guideLayer","collapseTransformation","inPoint","outPoint","startTime","stretch","label","comment","selected"];
+var wasLocked = l.locked; if (wasLocked && args.locked !== true) l.locked = false;
+for (var i = 0; i < keys.length; i++) if (args[keys[i]] !== undefined && keys[i] !== "locked") l[keys[i]] = args[keys[i]];
+if (args.threeD !== undefined) l.threeDLayer = args.threeD;
+if (args.parent !== undefined) l.parent = args.parent === null ? null : aemcp.findLayer(c, args.parent);
+if (args.blendingMode) { var bm = BlendingMode[String(args.blendingMode).toUpperCase()]; if (bm === undefined) aemcp.fail("Unknown blending mode " + args.blendingMode); l.blendingMode = bm; }
+if (args.trackMatte) {
+  var tt = TrackMatteType[args.trackMatte.type];
+  if (args.trackMatte.layer !== undefined && l.setTrackMatte) l.setTrackMatte(aemcp.findLayer(c, args.trackMatte.layer), tt);
+  else if (tt === TrackMatteType.NO_TRACK_MATTE && l.removeTrackMatte) l.removeTrackMatte();
+  else l.trackMatteType = tt;
 }
-var S = args.selector || {}, type = S.type || "range";
-var sel = an.property("ADBE Text Selectors").addProperty(type === "wiggly" ? "ADBE Text Wiggly Selector" : (type === "expression" ? "ADBE Text Expressible Selector" : "ADBE Text Selector"));
-var adv = sel.property("ADBE Text Range Advanced");
-function setIf(group, mn, val) { if (val === undefined) return; var q = group ? group.property(mn) : null; if (!q) { log("selector property " + mn + " not available"); return; } q.setValue(val); }
-var units = { percentage: 1, index: 2 }, based = { characters: 1, charactersExcludingSpaces: 2, words: 3, lines: 4 };
-var modes = { add: 1, subtract: 2, intersect: 3, min: 4, max: 5, difference: 6 }, shapes = { square: 1, rampUp: 2, rampDown: 3, triangle: 4, round: 5, smooth: 6 };
-if (type === "range") {
-  if (S.units) setIf(adv, "ADBE Text Range Units", units[S.units]);
-  setIf(sel, "ADBE Text Percent Start", S.start);
-  setIf(sel, "ADBE Text Percent End", S.end);
-  setIf(sel, "ADBE Text Percent Offset", S.offset);
-  if (S.units === "index") { setIf(sel, "ADBE Text Index Start", S.start); setIf(sel, "ADBE Text Index End", S.end); setIf(sel, "ADBE Text Index Offset", S.offset); }
-  if (S.shape) setIf(adv, "ADBE Text Range Shape", shapes[S.shape]);
-  setIf(adv, "ADBE Text Selector Smoothness", S.smoothness);
-  setIf(adv, "ADBE Text Levels Max Ease", S.easeHigh);
-  setIf(adv, "ADBE Text Levels Min Ease", S.easeLow);
-  if (S.randomizeOrder !== undefined) setIf(adv, "ADBE Text Randomize Order", S.randomizeOrder ? 1 : 0);
-} else if (type === "wiggly") {
-  setIf(sel, "ADBE Text Wiggly Max Amount", S.maxAmount);
-  setIf(sel, "ADBE Text Wiggly Min Amount", S.minAmount);
-  setIf(sel, "ADBE Text Temporal Freq", S.wigglesPerSecond);
-} else if (S.amountExpression) {
-  sel.property("ADBE Text Expressible Amount").expression = S.amountExpression;
-}
-if (S.basedOn) setIf(adv || sel, "ADBE Text Range Type2", based[S.basedOn]); // wiggly selectors keep these at the top level
-if (S.mode) setIf(adv || sel, "ADBE Text Selector Mode", modes[S.mode]);
-return { layer: l.name, animator: an.name, properties: added, selector: sel.name, tree: aemcp.propInfo(an, { depth: 3 }) };`
-  }
-];
-var egpTools = [
-  {
-    name: "ae_essential_graphics",
-    title: "Essential Graphics",
-    description: "Work with a composition's Essential Graphics panel (Motion Graphics template): list its controllers, add a property as a controller (with a display name), and set the template name. Export the result with ae_export_mogrt.",
-    input: {
-      comp: compRef,
-      add: external_exports.array(external_exports.object({ layer: layerRef, path: external_exports.string(), name: external_exports.string() })).optional().describe("Properties to add as controllers."),
-      templateName: external_exports.string().optional()
-    },
-    jsx: `
-var c = aemcp.findComp(args.comp), added = [];
-if (args.templateName) c.motionGraphicsTemplateName = args.templateName;
-for (var i = 0; i < (args.add || []).length; i++) {
-  var a = args.add[i], p = aemcp.resolveProp(aemcp.findLayer(c, a.layer), a.path);
-  if (!p.canAddToMotionGraphicsTemplate(c)) aemcp.fail("'" + a.path + "' can't be added to the Essential Graphics panel");
-  p.addToMotionGraphicsTemplateAs(c, a.name);
-  added.push(a.name);
-}
-var names = [];
-for (var k = 0; k < c.motionGraphicsTemplateControllerCount; k++) names.push(c.getMotionGraphicsTemplateControllerName(k + 1));
-return { comp: c.name, templateName: c.motionGraphicsTemplateName, controllers: names, added: added };`
+if (args.moveTo !== undefined) { if (args.moveTo <= 1) l.moveToBeginning(); else if (args.moveTo >= c.numLayers) l.moveToEnd(); else if (args.moveTo < l.index) l.moveBefore(c.layer(args.moveTo)); else if (args.moveTo > l.index) l.moveAfter(c.layer(args.moveTo)); }
+if (args.locked !== undefined) l.locked = args.locked; else if (wasLocked) l.locked = true;
+return aemcp.layerInfo(l, false);`
   },
   {
-    name: "ae_export_mogrt",
-    title: "Export Motion Graphics template",
-    description: "Export a composition as a Motion Graphics template (.mogrt) for Premiere Pro, to a folder (default: the user's Essential Graphics templates folder).",
-    input: {
-      comp: compRef,
-      folder: external_exports.string().optional().describe("Absolute output folder (default: the Essential Graphics local templates folder)."),
-      overwrite: external_exports.boolean().optional()
-    },
-    noUndo: true,
+    name: "ae_delete_layers",
+    title: "Delete layers",
+    description: "Delete layers from a composition.",
+    input: { comp: compRef, layers: external_exports.array(layerRef).min(1) },
+    destructive: true,
+    jsx: `
+var c = aemcp.findComp(args.comp), ls = [], names = [];
+for (var i = 0; i < args.layers.length; i++) ls.push(aemcp.findLayer(c, args.layers[i]));
+for (var j = 0; j < ls.length; j++) { names.push(ls[j].name); ls[j].locked = false; ls[j].remove(); }
+return { removed: names };`
+  },
+  {
+    name: "ae_duplicate_layer",
+    title: "Duplicate layer",
+    description: "Duplicate a layer (placed above the original), optionally renaming it.",
+    input: { comp: compRef, layer: layerRef, newName: external_exports.string().optional() },
+    jsx: `var c = aemcp.findComp(args.comp), d = aemcp.findLayer(c, args.layer).duplicate(); if (args.newName) d.name = args.newName; return aemcp.layerInfo(d, false);`
+  },
+  {
+    name: "ae_split_layer",
+    title: "Split layer",
+    description: "Split a layer at a time (like Edit > Split Layer). Returns the new layer.",
+    input: { comp: compRef, layer: layerRef, time: external_exports.number() },
+    jsx: `var c = aemcp.findComp(args.comp), l = aemcp.findLayer(c, args.layer); var d = l.duplicate(); l.outPoint = args.time; d.inPoint = args.time; return { first: aemcp.layerInfo(l, false), second: aemcp.layerInfo(d, false) };`
+  },
+  {
+    name: "ae_get_selection",
+    title: "Get selection",
+    description: "What the user has selected: project items, and in the active comp the selected layers and selected properties (with paths).",
+    input: {},
+    readOnly: true,
+    jsx: `
+var o = { items: [], comp: null, layers: [], properties: [] };
+for (var i = 0; i < app.project.selection.length; i++) o.items.push(aemcp.itemInfo(app.project.selection[i]));
+var c = app.project.activeItem;
+if (c && c instanceof CompItem) {
+  o.comp = { id: c.id, name: c.name, time: c.time };
+  for (var j = 0; j < c.selectedLayers.length; j++) o.layers.push(aemcp.layerInfo(c.selectedLayers[j], false));
+  var sp = c.selectedProperties;
+  for (var k = 0; k < sp.length; k++) {
+    var p = sp[k], path = [];
+    var q = p; while (q && q.parentProperty) { path.unshift(q.name); q = q.parentProperty; }
+    o.properties.push({ layer: q ? q.name : null, path: path.join("/"), matchName: p.matchName, isGroup: p.propertyType !== PropertyType.PROPERTY });
+  }
+}
+return o;`
+  },
+  {
+    name: "ae_select_layers",
+    title: "Select layers",
+    description: "Select layers in a composition (deselects others unless add is true).",
+    input: { comp: compRef, layers: external_exports.array(layerRef), add: external_exports.boolean().optional() },
+    readOnly: true,
     jsx: `
 var c = aemcp.findComp(args.comp);
-if (!c.motionGraphicsTemplateControllerCount) log("Note: the template has no Essential Graphics controllers");
-// read everything first: After Effects invalidates the comp object during the export
-var info = { comp: c.name, templateName: c.motionGraphicsTemplateName || c.name, controllers: c.motionGraphicsTemplateControllerCount };
-var ok = args.folder ? c.exportAsMotionGraphicsTemplate(!!args.overwrite, args.folder) : c.exportAsMotionGraphicsTemplate(!!args.overwrite);
-if (!ok) aemcp.fail("Export failed (does the file exist already? pass overwrite: true)");
-info.exported = true;
-info.file = (args.folder ? args.folder : "the Essential Graphics templates folder") + "/" + info.templateName + ".mogrt";
-return info;`
-  }
-];
-var healthTools = [
+if (!args.add) for (var i = 1; i <= c.numLayers; i++) c.layer(i).selected = false;
+for (var j = 0; j < args.layers.length; j++) aemcp.findLayer(c, args.layers[j]).selected = true;
+return { selected: c.selectedLayers.length };`
+  },
   {
-    name: "ae_project_health",
-    title: "Project health check",
-    description: "Check the whole project for problems: missing footage, missing or substituted fonts, effects whose plug-in is not installed, expressions with errors, unused footage, empty comps and folders, duplicate comp names. Read-only.",
-    input: { maxLayers: external_exports.number().int().min(100).max(1e5).optional().describe("Stop scanning after this many layers (default 5000).") },
-    readOnly: true,
-    timeoutMs: 3e5,
+    name: "ae_set_text",
+    title: "Set text",
+    description: "Change the text content and/or character/paragraph style of a text layer (optionally at a time, creating a keyframe).",
+    input: { comp: compRef, layer: layerRef, text: external_exports.string().optional(), ...textStyle, time: external_exports.number().optional().describe("Set as a Source Text keyframe at this time.") },
     jsx: `
-var p = app.project, R = { missingFootage: [], missingFonts: [], missingEffects: [], expressionErrors: [], unusedFootage: [], emptyComps: [], emptyFolders: [], duplicateCompNames: [] };
-var installed = {}, all = app.effects;
-for (var e = 0; e < all.length; e++) installed["m:" + all[e].matchName] = true;
-var names = {}, layersSeen = 0, lim = args.maxLayers || 5000, truncated = false;
-// a plain function declaration: ExtendScript mishandles recursive named function expressions inside loops
-function scanExpressions(g, path, comp, layer) {
-  for (var q = 1; q <= g.numProperties; q++) {
-    var pr = g.property(q), pp = path ? path + "/" + pr.name : pr.name;
-    if (pr.propertyType === PropertyType.PROPERTY) { try { if (pr.canSetExpression && pr.expression && pr.expressionEnabled && pr.expressionError) R.expressionErrors.push({ comp: comp.name, layer: layer.name, property: pp, error: pr.expressionError }); } catch (x) {} }
-    else scanExpressions(pr, pp, comp, layer);
-  }
-}
-for (var i = 1; i <= p.numItems; i++) {
-  var it = p.item(i);
-  if (it instanceof FootageItem) {
-    if (it.footageMissing) R.missingFootage.push({ id: it.id, name: it.name, file: it.file ? it.file.fsName : null });
-    else if (it.usedIn.length === 0 && !(it.mainSource instanceof PlaceholderSource)) R.unusedFootage.push({ id: it.id, name: it.name });
-  } else if (it instanceof FolderItem) {
-    if (it.numItems === 0) R.emptyFolders.push(it.name);
-  } else if (it instanceof CompItem) {
-    var nk = "n:" + it.name; // prefixed: ExtendScript objects have built-in members (reflect, watch, toSource...)
-    names[nk] = (names[nk] || 0) + 1;
-    if (names[nk] === 2) R.duplicateCompNames.push(it.name);
-    if (it.numLayers === 0) R.emptyComps.push(it.name);
-    for (var j = 1; j <= it.numLayers; j++) {
-      if (layersSeen++ >= lim) { truncated = true; break; }
-      var L = it.layer(j), fx = L.property("ADBE Effect Parade");
-      if (fx) for (var f = 1; f <= fx.numProperties; f++) { var ef = fx.property(f); if (!installed["m:" + ef.matchName]) R.missingEffects.push({ comp: it.name, layer: L.name, effect: ef.name, matchName: ef.matchName }); }
-      scanExpressions(L, "", it, L);
-    }
-  }
-}
-try {
-  var mf = app.fonts.missingOrSubstitutedFonts;
-  for (var m = 0; m < mf.length; m++) R.missingFonts.push({ postScriptName: mf[m].postScriptName, family: mf[m].familyName, style: mf[m].styleName, substitute: mf[m].isSubstitute });
-} catch (x) { R.missingFonts = "requires After Effects 24.0+"; }
-var cap = function (a) { return a instanceof Array && a.length > 100 ? a.slice(0, 100).concat(["... " + (a.length - 100) + " more"]) : a; };
-var summary = {};
-for (var key in R) if (R.hasOwnProperty(key)) { summary[key] = R[key] instanceof Array ? R[key].length : R[key]; R[key] = cap(R[key]); }
-return { summary: summary, layersScanned: layersSeen, truncated: truncated, details: R };`
+var c = aemcp.findComp(args.comp), l = aemcp.findLayer(c, args.layer);
+var p = l.property("ADBE Text Properties"); if (!p) aemcp.fail("Layer '" + l.name + "' is not a text layer");
+p = p.property("ADBE Text Document");
+var td = args.time !== undefined ? p.valueAtTime(args.time, false) : p.value;
+aemcp.applyText(td, args);
+if (args.time !== undefined) p.setValueAtTime(args.time, td); else if (p.numKeys) p.setValueAtTime(c.time, td); else p.setValue(td);
+return aemcp.textInfo(p.value);`
   }
 ];
-
-// src/tools/renderjobs.ts
-init_define_AEMCP_CEP_FILES();
-import { spawn } from "node:child_process";
-import { createWriteStream, existsSync as existsSync4, mkdirSync as mkdirSync5 } from "node:fs";
-import { homedir as homedir5 } from "node:os";
-import { dirname as dirname5, join as join7 } from "node:path";
-var jobs = /* @__PURE__ */ new Map();
-var LOG_DIR = join7(homedir5(), ".aemcp", "renders");
-function aerenderPath(appPackage) {
-  const candidates = process.platform === "win32" ? [join7(appPackage, "aerender.exe"), join7(dirname5(appPackage), "aerender.exe"), join7(appPackage, "Support Files", "aerender.exe")] : [join7(dirname5(appPackage), "aerender"), join7(appPackage, "..", "aerender")];
-  return candidates.find((p) => existsSync4(p)) ?? null;
-}
-function view(j) {
-  const pct = j.frames ? Math.min(100, Math.round(j.frameRendered / j.frames * 100)) : null;
-  const rendering = j.tail.some((l) => /PROGRESS:.*\(\d+\)/.test(l));
-  return {
-    id: j.id,
-    comp: j.comp,
-    status: j.status,
-    // aerender starts its own copy of After Effects first, which often takes a minute or two
-    phase: j.status !== "running" ? void 0 : rendering ? "rendering" : "starting the render engine (can take a minute or two)",
-    elapsedSeconds: Math.round(((j.endedAt ? Date.parse(j.endedAt) : Date.now()) - Date.parse(j.startedAt)) / 1e3),
-    progress: j.status === "done" ? 100 : pct,
-    framesRendered: j.frameRendered,
-    totalFrames: j.frames || null,
-    output: j.output,
-    startedAt: j.startedAt,
-    endedAt: j.endedAt,
-    log: j.log,
-    lastLines: j.tail.slice(-6)
-  };
-}
-function registerRenderJobs(server) {
-  server.registerTool(
-    "ae_render_background",
-    {
-      title: "Render in background",
-      description: "Render a composition (or a render queue item) with aerender in a separate process, so After Effects stays usable. It renders the project as saved on disk: pass save:true to save the open project first (required when it has unsaved changes). Returns a job id; check progress with ae_render_jobs and cancel there.",
-      inputSchema: {
-        comp: external_exports.union([external_exports.number().int(), external_exports.string()]).optional().describe("Composition to render (id or name; default: the active comp)."),
-        rqIndex: external_exports.number().int().min(1).optional().describe("Render this render queue item with its own settings instead of a comp."),
-        output: external_exports.string().optional().describe("Absolute output path (with comp). Extension should match the output module."),
-        renderSettingsTemplate: external_exports.string().optional().describe('e.g. "Best Settings".'),
-        outputModuleTemplate: external_exports.string().optional().describe('e.g. "High Quality", "H.264 - Match Render Settings - 15 Mbps".'),
-        startFrame: external_exports.number().int().optional(),
-        endFrame: external_exports.number().int().optional(),
-        save: external_exports.boolean().optional().describe("Save the open project first (needed if it has unsaved changes).")
-      },
-      annotations: { destructiveHint: false, openWorldHint: false }
-    },
-    async (args) => {
-      try {
-        if (permissions().mode === "read-only" && args.save) return errorResult(READ_ONLY_REFUSAL);
-        if (!args.rqIndex && !args.output) return errorResult("Pass output (an absolute file path) when rendering a comp.");
-        const r = await runJsx(
-          `
-var p = app.project;
-if (!p.file) aemcp.fail("The project has never been saved. Save it first (ae_save_project with a path), then render.");
-if (p.dirty) { if (args.save) p.save(); else aemcp.fail("The project has unsaved changes; aerender renders the file on disk. Pass save:true to save first."); }
-var name = null, frames = 0;
-if (args.rqIndex) {
-  if (args.rqIndex > p.renderQueue.numItems) aemcp.fail("No render queue item " + args.rqIndex);
-  var it = p.renderQueue.item(args.rqIndex); name = it.comp.name;
-  frames = Math.round(it.timeSpanDuration / it.comp.frameDuration);
-} else {
-  var c = aemcp.findComp(args.comp); name = c.name;
-  var dupes = 0; for (var i = 1; i <= p.numItems; i++) if (p.item(i) instanceof CompItem && p.item(i).name === name) dupes++;
-  if (dupes > 1) aemcp.fail("Several comps are named '" + name + "'; aerender needs a unique name. Rename one, or use rqIndex.");
-  frames = Math.round(c.workAreaDuration / c.frameDuration);
-}
-if (args.startFrame !== undefined && args.endFrame !== undefined) frames = args.endFrame - args.startFrame + 1;
-return { project: p.file.fsName, comp: name, frames: frames, app: Folder.appPackage.fsName };`,
-          args,
-          { undoGroup: false, timeoutMs: 12e4 }
-        );
-        if (!r.ok) return formatResult(r);
-        const info = r.result;
-        const bin = aerenderPath(info.app);
-        if (!bin) return errorResult(`aerender was not found next to ${info.app}.`);
-        const cli = ["-project", info.project, "-v", "ERRORS_AND_PROGRESS"];
-        if (args.rqIndex) cli.push("-rqindex", String(args.rqIndex));
-        else cli.push("-comp", info.comp);
-        if (args.output) cli.push("-output", args.output);
-        if (args.renderSettingsTemplate) cli.push("-RStemplate", args.renderSettingsTemplate);
-        if (args.outputModuleTemplate) cli.push("-OMtemplate", args.outputModuleTemplate);
-        if (args.startFrame !== void 0) cli.push("-s", String(args.startFrame));
-        if (args.endFrame !== void 0) cli.push("-e", String(args.endFrame));
-        if (args.output) mkdirSync5(dirname5(args.output), { recursive: true });
-        mkdirSync5(LOG_DIR, { recursive: true });
-        const id = `r${Date.now().toString(36)}`;
-        const logPath = join7(LOG_DIR, `${id}.log`);
-        const logStream = createWriteStream(logPath);
-        const job = {
-          id,
-          comp: info.comp,
-          output: args.output || "(render queue item output)",
-          project: info.project,
-          status: "running",
-          startedAt: (/* @__PURE__ */ new Date()).toISOString(),
-          frames: info.frames,
-          frameRendered: 0,
-          log: logPath,
-          tail: []
-        };
-        const proc = spawn(bin, cli, { stdio: ["ignore", "pipe", "pipe"] });
-        job.proc = proc;
-        const onData = (d) => {
-          const text = d.toString();
-          logStream.write(text);
-          for (const line of text.split(/\r?\n/)) {
-            if (!line.trim()) continue;
-            const m = line.match(/PROGRESS:.*\((\d+)\)/);
-            if (m) job.frameRendered = Math.max(job.frameRendered, Number(m[1]));
-            job.tail.push(line.trim());
-            if (job.tail.length > 50) job.tail.shift();
-          }
-        };
-        proc.stdout.on("data", onData);
-        proc.stderr.on("data", onData);
-        proc.on("error", (e) => {
-          job.status = "failed";
-          job.tail.push(String(e));
-          job.endedAt = (/* @__PURE__ */ new Date()).toISOString();
-        });
-        proc.on("exit", (code) => {
-          logStream.end();
-          job.exitCode = code;
-          job.endedAt = (/* @__PURE__ */ new Date()).toISOString();
-          if (job.status === "running") job.status = code === 0 && !job.tail.some((l) => /aerender ERROR|^ERROR/i.test(l)) ? "done" : "failed";
-          job.proc = void 0;
-        });
-        jobs.set(id, job);
-        return {
-          content: [
-            {
-              type: "text",
-              text: `Background render started: job ${id} (${info.comp}, ${info.frames || "?"} frames) from ${info.project}.
-Check progress with ae_render_jobs. Log: ${logPath}`
-            }
-          ]
-        };
-      } catch (e) {
-        return errorResult(e);
-      }
-    }
-  );
-  server.registerTool(
-    "ae_render_jobs",
-    {
-      title: "Background render jobs",
-      description: "Status and progress of background renders started with ae_render_background (this session), or cancel one.",
-      inputSchema: {
-        id: external_exports.string().optional().describe("Only this job."),
-        cancel: external_exports.string().optional().describe("Cancel this job id.")
-      },
-      annotations: { readOnlyHint: true, openWorldHint: false }
-    },
-    async ({ id, cancel }) => {
-      if (cancel) {
-        const j = jobs.get(cancel);
-        if (!j) return errorResult(`No job ${cancel}`);
-        if (j.status === "running" && j.proc) {
-          j.status = "cancelled";
-          j.proc.kill();
-        }
-        return { content: [{ type: "text", text: JSON.stringify(view(j)) }] };
-      }
-      const list = [...jobs.values()].filter((j) => !id || j.id === id).map(view);
-      if (id && !list.length) return errorResult(`No job ${id}`);
-      return { content: [{ type: "text", text: list.length ? JSON.stringify(id ? list[0] : list) : "No background renders in this session." }] };
-    }
-  );
-}
 
 // src/tools/project.ts
 init_define_AEMCP_CEP_FILES();
@@ -77434,15 +77194,880 @@ return { removed: n };`
   }
 ];
 
+// src/tools/scene.ts
+init_define_AEMCP_CEP_FILES();
+var vec = external_exports.array(external_exports.number()).min(2).max(3);
+var cameraInfo = `
+function cameraInfo(c, cam) {
+  var o = cam.property("ADBE Camera Options Group"), tr = cam.property("ADBE Transform Group");
+  var zoom = o.property("ADBE Camera Zoom").value;
+  var info = { layer: cam.name, index: cam.index, type: cam.autoOrient === AutoOrientType.CAMERA_OR_POINT_OF_INTEREST ? "two-node" : "one-node",
+    zoom: aemcp.round(zoom), focalLength: aemcp.round(zoom * 36 / c.width), angleOfView: aemcp.round(2 * Math.atan(c.width / 2 / zoom) * 180 / Math.PI),
+    position: aemcp.valueOf(tr.property("ADBE Position").value), depthOfField: o.property("ADBE Camera Depth of Field").value === 1,
+    focusDistance: aemcp.round(o.property("ADBE Camera Focus Distance").value), aperture: aemcp.round(o.property("ADBE Camera Aperture").value),
+    blurLevel: o.property("ADBE Camera Blur Level").value, activeCamera: c.activeCamera === cam };
+  try { info.pointOfInterest = aemcp.valueOf(tr.property("ADBE Anchor Point").value); } catch (e) {}
+  return info;
+}`;
+var sceneTools = [
+  // ---------- 3D ----------
+  {
+    name: "ae_set_camera",
+    title: "Camera",
+    description: "Create or change a camera: one- or two-node, focal length (mm, 36 mm film) or zoom, position / point of interest, depth of field (focus distance, aperture, blur level). Without settings it reports the camera (focal length, angle of view...). Default: the comp's active camera, created if missing.",
+    input: {
+      comp: compRef,
+      layer: layerRef.optional().describe("Camera layer (default: the active camera)."),
+      create: external_exports.boolean().optional().describe("Always create a new camera."),
+      name: external_exports.string().optional(),
+      type: external_exports.enum(["one-node", "two-node"]).optional(),
+      focalLength: external_exports.number().min(1).optional().describe("Millimetres (e.g. 24, 35, 50, 85)."),
+      zoom: external_exports.number().min(1).optional().describe("Zoom in pixels (alternative to focalLength)."),
+      position: vec.optional(),
+      pointOfInterest: vec.optional(),
+      depthOfField: external_exports.boolean().optional(),
+      focusDistance: external_exports.number().optional(),
+      aperture: external_exports.number().optional().describe("Aperture in pixels."),
+      blurLevel: external_exports.number().optional().describe("Percent.")
+    },
+    jsx: `${cameraInfo}
+var c = aemcp.findComp(args.comp), cam = null;
+if (!args.create) {
+  if (args.layer !== undefined) { cam = aemcp.findLayer(c, args.layer); if (!(cam instanceof CameraLayer)) aemcp.fail("'" + cam.name + "' is not a camera"); }
+  else cam = c.activeCamera;
+}
+if (!cam) cam = c.layers.addCamera(args.name || "Camera", [c.width / 2, c.height / 2]);
+else if (args.name) cam.name = args.name;
+var o = cam.property("ADBE Camera Options Group"), tr = cam.property("ADBE Transform Group");
+if (args.type) cam.autoOrient = args.type === "two-node" ? AutoOrientType.CAMERA_OR_POINT_OF_INTEREST : AutoOrientType.NO_AUTO_ORIENT;
+if (args.focalLength !== undefined) o.property("ADBE Camera Zoom").setValue(args.focalLength * c.width / 36);
+else if (args.zoom !== undefined) o.property("ADBE Camera Zoom").setValue(args.zoom);
+if (args.position) tr.property("ADBE Position").setValue(args.position.length === 2 ? [args.position[0], args.position[1], tr.property("ADBE Position").value[2]] : args.position);
+if (args.pointOfInterest) tr.property("ADBE Anchor Point").setValue(args.pointOfInterest.length === 2 ? [args.pointOfInterest[0], args.pointOfInterest[1], 0] : args.pointOfInterest);
+if (args.depthOfField !== undefined) o.property("ADBE Camera Depth of Field").setValue(args.depthOfField ? 1 : 0);
+if (args.focusDistance !== undefined) o.property("ADBE Camera Focus Distance").setValue(args.focusDistance);
+if (args.aperture !== undefined) o.property("ADBE Camera Aperture").setValue(args.aperture);
+if (args.blurLevel !== undefined) o.property("ADBE Camera Blur Level").setValue(args.blurLevel);
+return cameraInfo(c, cam);`
+  },
+  {
+    name: "ae_set_light",
+    title: "Light",
+    description: "Create or change a light: type (parallel, spot, point, ambient, environment), color, intensity, cone angle/feather, falloff, shadows (darkness, diffusion), position and point of interest.",
+    input: {
+      comp: compRef,
+      layer: layerRef.optional().describe("Existing light (omit to create one)."),
+      name: external_exports.string().optional(),
+      type: external_exports.enum(["PARALLEL", "SPOT", "POINT", "AMBIENT", "ENVIRONMENT"]).optional(),
+      color: colorSchema.optional(),
+      intensity: external_exports.number().optional().describe("Percent."),
+      coneAngle: external_exports.number().optional(),
+      coneFeather: external_exports.number().optional(),
+      falloff: external_exports.enum(["none", "smooth", "inverseSquareClamped"]).optional(),
+      radius: external_exports.number().optional().describe("Falloff start."),
+      falloffDistance: external_exports.number().optional(),
+      castsShadows: external_exports.boolean().optional(),
+      shadowDarkness: external_exports.number().optional(),
+      shadowDiffusion: external_exports.number().optional(),
+      position: vec.optional(),
+      pointOfInterest: vec.optional()
+    },
+    jsx: `
+var c = aemcp.findComp(args.comp), L;
+if (args.layer !== undefined) { L = aemcp.findLayer(c, args.layer); if (!(L instanceof LightLayer)) aemcp.fail("'" + L.name + "' is not a light"); }
+else L = c.layers.addLight(args.name || "Light", [c.width / 2, c.height / 2]);
+if (args.name && args.layer !== undefined) L.name = args.name;
+if (args.type) { if (LightType[args.type] === undefined) aemcp.fail("Light type " + args.type + " is not available in this After Effects version"); L.lightType = LightType[args.type]; }
+var o = L.property("ADBE Light Options Group"), tr = L.property("ADBE Transform Group"), skipped = [];
+function set(mn, v) { if (v === undefined) return; var p = o.property(mn); if (!p) { skipped.push(mn); return; } try { p.setValue(v); } catch (e) { skipped.push(mn + " (" + e.message + ")"); } }
+set("ADBE Light Intensity", args.intensity);
+if (args.color !== undefined) set("ADBE Light Color", aemcp.color3(args.color));
+set("ADBE Light Cone Angle", args.coneAngle);
+set("ADBE Light Cone Feather 2", args.coneFeather);
+if (args.falloff) set("ADBE Light Falloff Type", { none: 1, smooth: 2, inverseSquareClamped: 3 }[args.falloff]);
+set("ADBE Light Falloff Start", args.radius);
+set("ADBE Light Falloff Distance", args.falloffDistance);
+if (args.castsShadows !== undefined) set("ADBE Casts Shadows", args.castsShadows ? 1 : 0);
+set("ADBE Light Shadow Darkness", args.shadowDarkness);
+set("ADBE Light Shadow Diffusion", args.shadowDiffusion);
+if (args.position) tr.property("ADBE Position").setValue(args.position.length === 2 ? [args.position[0], args.position[1], -500] : args.position);
+if (args.pointOfInterest) { try { tr.property("ADBE Anchor Point").setValue(args.pointOfInterest.length === 2 ? [args.pointOfInterest[0], args.pointOfInterest[1], 0] : args.pointOfInterest); } catch (e) { skipped.push("pointOfInterest (" + e.message + ")"); } }
+var out = { layer: L.name, type: aemcp.enumName(LightType, L.lightType), options: aemcp.propInfo(o, { depth: 1 }) };
+if (skipped.length) out.notApplied = skipped;
+return out;`
+  },
+  {
+    name: "ae_set_material",
+    title: "3D material options",
+    description: "Make layers 3D and set their Material Options: cast/accept shadows, accept lights, appears in reflections, ambient, diffuse, specular, shininess, metal, reflection, glossiness, transparency, index of refraction, light transmission. Also lists the comp's 3D renderers.",
+    input: {
+      comp: compRef,
+      layers: external_exports.array(layerRef).min(1),
+      threeD: external_exports.boolean().optional().describe("Default true."),
+      castsShadows: external_exports.enum(["off", "on", "only"]).optional(),
+      acceptsShadows: external_exports.enum(["off", "on", "only"]).optional(),
+      acceptsLights: external_exports.boolean().optional(),
+      appearsInReflections: external_exports.enum(["off", "on", "only"]).optional(),
+      ambient: external_exports.number().optional(),
+      diffuse: external_exports.number().optional(),
+      specular: external_exports.number().optional(),
+      shininess: external_exports.number().optional(),
+      metal: external_exports.number().optional(),
+      reflection: external_exports.number().optional(),
+      glossiness: external_exports.number().optional(),
+      transparency: external_exports.number().optional(),
+      indexOfRefraction: external_exports.number().optional(),
+      lightTransmission: external_exports.number().optional()
+    },
+    jsx: `
+var c = aemcp.findComp(args.comp), done = [];
+var tri = { off: 0, on: 1, only: 2 };
+var map = { ambient: "ADBE Ambient Coefficient", diffuse: "ADBE Diffuse Coefficient", specular: "ADBE Specular Coefficient", shininess: "ADBE Shininess Coefficient",
+  metal: "ADBE Metal Coefficient", reflection: "ADBE Reflection Coefficient", glossiness: "ADBE Glossiness Coefficient", transparency: "ADBE Transparency Coefficient",
+  indexOfRefraction: "ADBE Index of Refraction", lightTransmission: "ADBE Light Transmission" };
+for (var i = 0; i < args.layers.length; i++) {
+  var L = aemcp.findLayer(c, args.layers[i]);
+  if (args.threeD !== false) { if (L.threeDLayer === undefined) aemcp.fail("'" + L.name + "' can't be a 3D layer"); L.threeDLayer = true; }
+  var m = L.property("ADBE Material Options Group"); if (!m) aemcp.fail("'" + L.name + "' has no material options");
+  if (args.castsShadows) m.property("ADBE Casts Shadows").setValue(tri[args.castsShadows]);
+  if (args.acceptsShadows) m.property("ADBE Accepts Shadows").setValue(tri[args.acceptsShadows]);
+  if (args.acceptsLights !== undefined) m.property("ADBE Accepts Lights").setValue(args.acceptsLights ? 1 : 0);
+  if (args.appearsInReflections) { var ar = m.property("ADBE Appears in Reflections"); if (ar) ar.setValue(tri[args.appearsInReflections]); }
+  for (var k in map) if (map.hasOwnProperty(k) && args[k] !== undefined) { var p = m.property(map[k]); if (p) p.setValue(args[k]); else log(k + " is not available in this version"); }
+  done.push(L.name);
+}
+return { layers: done, renderer: c.renderer, availableRenderers: c.renderers, material: aemcp.propInfo(aemcp.findLayer(c, args.layers[0]).property("ADBE Material Options Group"), { depth: 1 }) };`
+  },
+  // ---------- audio ----------
+  {
+    name: "ae_audio_to_keyframes",
+    title: "Audio to keyframes",
+    description: 'Run Animation > Keyframe Assistant > Convert Audio to Keyframes on a layer with audio: adds an "Audio Amplitude" null with Left, Right and Both Channels sliders keyed every frame, ready to drive animation with expressions.',
+    input: { comp: compRef, layer: layerRef },
+    jsx: `
+var c = aemcp.findComp(args.comp), L = aemcp.findLayer(c, args.layer);
+if (!L.hasAudio) aemcp.fail("'" + L.name + "' has no audio");
+c.openInViewer();
+for (var i = 1; i <= c.numLayers; i++) c.layer(i).selected = false;
+L.selected = true;
+var before = c.numLayers;
+app.executeCommand(app.findMenuCommandId("Convert Audio to Keyframes"));
+if (c.numLayers === before) aemcp.fail("Convert Audio to Keyframes did not run (is the comp open and the layer's audio enabled?)");
+var amp = c.layer(1), fx = amp.property("ADBE Effect Parade"), out = { layer: amp.name, sliders: [] };
+for (var j = 1; j <= fx.numProperties; j++) { var s = fx.property(j).property(1); out.sliders.push({ name: fx.property(j).name, keyframes: s.numKeys, path: "Effects/" + fx.property(j).name + "/Slider" }); }
+out.hint = 'Use in an expression: thisComp.layer("' + amp.name + '").effect("Both Channels")("Slider")';
+return out;`
+  },
+  {
+    name: "ae_audio_markers",
+    title: "Markers from audio",
+    description: "Find beats/peaks in a layer's audio (via Convert Audio to Keyframes) and add markers at them on the comp or the layer. threshold = fraction of the loudest level (default 0.6), minGap = seconds between markers (default 0.25).",
+    input: {
+      comp: compRef,
+      layer: layerRef,
+      threshold: external_exports.number().min(0.05).max(1).optional(),
+      minGap: external_exports.number().min(0.01).optional(),
+      channel: external_exports.enum(["both", "left", "right"]).optional(),
+      target: external_exports.enum(["comp", "layer"]).optional().describe("Where to add the markers (default comp)."),
+      keepAmplitudeLayer: external_exports.boolean().optional(),
+      maxMarkers: external_exports.number().int().min(1).max(2e3).optional().describe("Default 300.")
+    },
+    jsx: `
+var c = aemcp.findComp(args.comp), L = aemcp.findLayer(c, args.layer);
+if (!L.hasAudio) aemcp.fail("'" + L.name + "' has no audio");
+c.openInViewer();
+for (var i = 1; i <= c.numLayers; i++) c.layer(i).selected = false;
+L.selected = true;
+var before = c.numLayers;
+app.executeCommand(app.findMenuCommandId("Convert Audio to Keyframes"));
+if (c.numLayers === before) aemcp.fail("Convert Audio to Keyframes did not run");
+var amp = c.layer(1), fx = amp.property("ADBE Effect Parade");
+var chName = { both: "Both Channels", left: "Left Channel", right: "Right Channel" }[args.channel || "both"];
+var sl = fx.property(chName).property(1), n = sl.numKeys, vals = [], times = [], max = 0;
+for (var k = 1; k <= n; k++) { var v = sl.keyValue(k); vals.push(v); times.push(sl.keyTime(k)); if (v > max) max = v; }
+var thr = (args.threshold || 0.6) * max, gap = args.minGap || 0.25, lim = args.maxMarkers || 300, beats = [], last = -1e9;
+for (var q = 1; q < n - 1; q++) {
+  if (vals[q] >= thr && vals[q] >= vals[q - 1] && vals[q] > vals[q + 1] && times[q] - last >= gap) { beats.push({ time: aemcp.round(times[q]), level: aemcp.round(vals[q] / max) }); last = times[q]; if (beats.length >= lim) break; }
+}
+if (!args.keepAmplitudeLayer) { var src = amp.source; amp.remove(); try { if (src && src.usedIn.length === 0) src.remove(); } catch (e) {} } // also the null's solid
+var mp = args.target === "layer" ? L.property("ADBE Marker") : c.markerProperty;
+for (var b = 0; b < beats.length; b++) { var m = new MarkerValue("beat " + (b + 1)); mp.setValueAtTime(beats[b].time, m); }
+return { markers: beats.length, on: args.target === "layer" ? L.name : c.name, peakLevel: aemcp.round(max), beats: beats.slice(0, 50) };`
+  },
+  // ---------- expressions ----------
+  {
+    name: "ae_check_expression",
+    title: "Check expression",
+    description: "Try an expression on a property WITHOUT keeping it: reports After Effects' error (if any) and the values it produces at a few times, then restores the property exactly as it was. Use before ae_set_expression.",
+    input: {
+      comp: compRef,
+      layer: layerRef,
+      path: propPath,
+      expression: external_exports.string(),
+      times: external_exports.array(external_exports.number()).max(20).optional().describe("Times to evaluate (default: start, current time, end).")
+    },
+    readOnly: true,
+    tempItems: true,
+    jsx: `
+var c = aemcp.findComp(args.comp), l = aemcp.findLayer(c, args.layer), p = aemcp.resolveProp(l, args.path);
+if (!p.canSetExpression) aemcp.fail("'" + p.name + "' can't have an expression");
+var oldExpr = p.expression, oldEnabled = p.expressionEnabled, out = {};
+try {
+  p.expression = args.expression;
+  out.error = p.expressionError || null;
+  if (!out.error) {
+    var ts = args.times || [0, c.time, c.duration - c.frameDuration], vals = [];
+    for (var i = 0; i < ts.length; i++) { try { vals.push({ time: aemcp.round(ts[i]), value: aemcp.valueOf(p.valueAtTime(ts[i], false)) }); } catch (e) { out.error = e.message; break; } }
+    out.values = vals;
+    if (!out.error && p.expressionError) out.error = p.expressionError;
+  }
+} finally {
+  p.expression = oldExpr;
+  if (oldExpr) { try { p.expressionEnabled = oldEnabled; } catch (e) {} }
+}
+out.ok = !out.error;
+out.property = p.name;
+return out;`
+  },
+  {
+    name: "ae_replace_in_expressions",
+    title: "Find & replace in expressions",
+    description: "Find and replace text in every expression of the project (or the given comps), e.g. after renaming a layer or comp. dryRun lists the matches without changing anything. Reports expressions that have errors after the change.",
+    input: {
+      find: external_exports.string().min(1),
+      replace: external_exports.string(),
+      regex: external_exports.boolean().optional().describe("Treat find as a regular expression."),
+      caseSensitive: external_exports.boolean().optional().describe("Default true."),
+      comps: external_exports.array(external_exports.union([external_exports.number().int(), external_exports.string()])).optional().describe("Only these comps (default: all)."),
+      dryRun: external_exports.boolean().optional()
+    },
+    jsx: `
+var flags = "g" + (args.caseSensitive === false ? "i" : "");
+var esc = function (t) { return t.replace(/[.*+?^$()|[\\]{}\\\\]/g, "\\\\$&"); };
+var re = new RegExp(args.regex ? args.find : esc(args.find), flags);
+var comps = [];
+if (args.comps) { for (var i = 0; i < args.comps.length; i++) comps.push(aemcp.findComp(args.comps[i])); }
+else for (var j = 1; j <= app.project.numItems; j++) if (app.project.item(j) instanceof CompItem) comps.push(app.project.item(j));
+var hits = [], errors = [];
+function walk(g, comp, layer, path) {
+  for (var q = 1; q <= g.numProperties; q++) {
+    var p = g.property(q), pp = path ? path + "/" + p.name : p.name;
+    if (p.propertyType !== PropertyType.PROPERTY) { walk(p, comp, layer, pp); continue; }
+    var ex = ""; try { ex = p.canSetExpression ? p.expression : ""; } catch (e) {}
+    if (!ex) continue;
+    re.lastIndex = 0;
+    if (!re.test(ex)) continue;
+    re.lastIndex = 0;
+    var next = ex.replace(re, args.replace);
+    hits.push({ comp: comp.name, layer: layer.name, property: pp, before: ex.length > 160 ? ex.substr(0, 157) + "..." : ex, after: next.length > 160 ? next.substr(0, 157) + "..." : next });
+    if (!args.dryRun) { p.expression = next; if (p.expressionError) errors.push({ comp: comp.name, layer: layer.name, property: pp, error: p.expressionError }); }
+  }
+}
+for (var k = 0; k < comps.length; k++) for (var m = 1; m <= comps[k].numLayers; m++) walk(comps[k].layer(m), comps[k], comps[k].layer(m), "");
+return { dryRun: !!args.dryRun, matches: hits.length, changed: args.dryRun ? 0 : hits.length, errorsAfter: errors, details: hits.slice(0, 100) };`
+  },
+  // ---------- color ----------
+  {
+    name: "ae_color_settings",
+    title: "Color settings",
+    description: "Read or change the project's color management: color engine (Adobe or OCIO), working space, bit depth, linear blending, linearize working space, scene-referred compensation, OCIO config and working/display color spaces. listProfiles returns the available working spaces.",
+    input: {
+      bitsPerChannel: external_exports.union([external_exports.literal(8), external_exports.literal(16), external_exports.literal(32)]).optional(),
+      workingSpace: external_exports.string().optional().describe('Adobe engine: e.g. "sRGB IEC61966-2.1", "Rec.709 Gamma 2.4", "None".'),
+      linearBlending: external_exports.boolean().optional(),
+      linearizeWorkingSpace: external_exports.boolean().optional(),
+      compensateForSceneReferredProfiles: external_exports.boolean().optional(),
+      colorManagementSystem: external_exports.enum(["adobe", "ocio"]).optional(),
+      ocioConfigurationFile: external_exports.string().optional(),
+      workingColorSpace: external_exports.string().optional().describe("OCIO working color space."),
+      displayColorSpace: external_exports.string().optional().describe("OCIO display color space."),
+      listProfiles: external_exports.boolean().optional()
+    },
+    jsx: `
+var P = app.project, skipped = [];
+function set(k, v) { if (v === undefined) return; try { P[k] = v; } catch (e) { skipped.push(k + ": " + e.message.replace(/^After Effects error: /, "")); } }
+if (args.colorManagementSystem) set("colorManagementSystem", args.colorManagementSystem === "ocio" ? 1 : 0);
+set("ocioConfigurationFile", args.ocioConfigurationFile);
+set("bitsPerChannel", args.bitsPerChannel);
+set("workingSpace", args.workingSpace);
+set("linearBlending", args.linearBlending);
+set("linearizeWorkingSpace", args.linearizeWorkingSpace);
+set("compensateForSceneReferredProfiles", args.compensateForSceneReferredProfiles);
+set("workingColorSpace", args.workingColorSpace);
+set("displayColorSpace", args.displayColorSpace);
+var o = {};
+var keys = ["colorManagementSystem", "bitsPerChannel", "workingSpace", "workingGamma", "linearBlending", "linearizeWorkingSpace", "compensateForSceneReferredProfiles", "ocioConfigurationFile", "workingColorSpace", "displayColorSpace"];
+for (var i = 0; i < keys.length; i++) { try { o[keys[i]] = P[keys[i]]; } catch (e) {} }
+if (o.colorManagementSystem !== undefined) o.colorManagementSystem = o.colorManagementSystem === 1 ? "ocio" : "adobe";
+if (args.listProfiles) { try { o.availableWorkingSpaces = P.listColorProfiles(); } catch (e) {} }
+if (skipped.length) o.notApplied = skipped;
+return o;`
+  }
+];
+
+// src/tools/text.ts
+init_define_AEMCP_CEP_FILES();
+var charStyle = external_exports.object({
+  font: external_exports.string().optional().describe("PostScript name (see ae_get_fonts)."),
+  fontSize: external_exports.number().optional(),
+  fillColor: colorSchema.optional(),
+  strokeColor: colorSchema.optional(),
+  strokeWidth: external_exports.number().optional(),
+  applyFill: external_exports.boolean().optional(),
+  applyStroke: external_exports.boolean().optional(),
+  tracking: external_exports.number().optional(),
+  leading: external_exports.number().optional(),
+  baselineShift: external_exports.number().optional(),
+  horizontalScale: external_exports.number().optional().describe("Percent."),
+  verticalScale: external_exports.number().optional().describe("Percent."),
+  fauxBold: external_exports.boolean().optional(),
+  fauxItalic: external_exports.boolean().optional(),
+  allCaps: external_exports.boolean().optional(),
+  smallCaps: external_exports.boolean().optional(),
+  superscript: external_exports.boolean().optional(),
+  subscript: external_exports.boolean().optional()
+}).describe("Character style to apply.");
+var textTools = [
+  {
+    name: "ae_style_text_range",
+    title: "Style part of a text",
+    description: "Apply character styling to part of a text layer: by character range (start/end) or every occurrence of a word or phrase (match). Font, size, fill/stroke color, tracking, leading, baseline shift, scale, faux bold/italic, caps, super/subscript. Needs After Effects 24.0+.",
+    input: {
+      comp: compRef,
+      layer: layerRef,
+      start: external_exports.number().int().min(0).optional().describe("First character (0-based)."),
+      end: external_exports.number().int().optional().describe("End character, exclusive (default: end of text)."),
+      match: external_exports.string().optional().describe("Style every occurrence of this text instead of a range."),
+      caseSensitive: external_exports.boolean().optional(),
+      style: charStyle,
+      time: external_exports.number().optional().describe("Apply at this time (Source Text keyframe) when the text is animated.")
+    },
+    jsx: `
+var c = aemcp.findComp(args.comp), l = aemcp.findLayer(c, args.layer);
+var tp = l.property("ADBE Text Properties"); if (!tp) aemcp.fail("'" + l.name + "' is not a text layer");
+var src = tp.property("ADBE Text Document");
+var td = args.time !== undefined ? src.valueAtTime(args.time, false) : src.value;
+if (typeof td.characterRange !== "function") aemcp.fail("Per-character styling needs After Effects 24.0 or newer");
+var text = td.text, ranges = [];
+if (args.match) {
+  var hay = args.caseSensitive ? text : text.toLowerCase(), needle = args.caseSensitive ? args.match : args.match.toLowerCase();
+  var at = hay.indexOf(needle);
+  while (at >= 0 && needle.length) { ranges.push([at, at + needle.length]); at = hay.indexOf(needle, at + needle.length); }
+  if (!ranges.length) aemcp.fail("'" + args.match + "' not found in the text");
+} else ranges.push([args.start || 0, args.end === undefined ? text.length : args.end]);
+var st = args.style, keys = ["font", "fontSize", "strokeWidth", "applyFill", "applyStroke", "tracking", "leading", "baselineShift", "horizontalScale", "verticalScale", "fauxBold", "fauxItalic", "allCaps", "smallCaps", "superscript", "subscript"];
+for (var r = 0; r < ranges.length; r++) {
+  var cr = td.characterRange(ranges[r][0], ranges[r][1]);
+  for (var k = 0; k < keys.length; k++) if (st[keys[k]] !== undefined) {
+    if (keys[k] === "leading") { try { cr.autoLeading = false; } catch (e) {} }
+    cr[keys[k]] = st[keys[k]];
+  }
+  if (st.fillColor !== undefined) { cr.applyFill = true; cr.fillColor = aemcp.color3(st.fillColor); }
+  if (st.strokeColor !== undefined) { cr.applyStroke = true; cr.strokeColor = aemcp.color3(st.strokeColor); }
+}
+if (args.time !== undefined || src.numKeys) src.setValueAtTime(args.time !== undefined ? args.time : c.time, td); else src.setValue(td);
+return { layer: l.name, text: text, styled: ranges };`
+  },
+  {
+    name: "ae_set_paragraph",
+    title: "Paragraph settings",
+    description: "Paragraph formatting of a text layer (all paragraphs or one): justification, indents, space before/after, plus paragraph text box size. Needs After Effects 24.0+ for per-paragraph settings.",
+    input: {
+      comp: compRef,
+      layer: layerRef,
+      paragraph: external_exports.number().int().min(0).optional().describe("0-based paragraph index (default: all)."),
+      justification: external_exports.enum(["LEFT_JUSTIFY", "CENTER_JUSTIFY", "RIGHT_JUSTIFY", "FULL_JUSTIFY_LASTLINE_LEFT", "FULL_JUSTIFY_LASTLINE_CENTER", "FULL_JUSTIFY_LASTLINE_RIGHT", "FULL_JUSTIFY_LASTLINE_FULL"]).optional(),
+      firstLineIndent: external_exports.number().optional(),
+      startIndent: external_exports.number().optional(),
+      endIndent: external_exports.number().optional(),
+      spaceBefore: external_exports.number().optional(),
+      spaceAfter: external_exports.number().optional(),
+      boxSize: external_exports.array(external_exports.number()).length(2).optional().describe("Paragraph (box) text only: [width, height].")
+    },
+    jsx: `
+var c = aemcp.findComp(args.comp), l = aemcp.findLayer(c, args.layer);
+var tp = l.property("ADBE Text Properties"); if (!tp) aemcp.fail("'" + l.name + "' is not a text layer");
+var src = tp.property("ADBE Text Document"), td = src.value;
+var target = td;
+if (typeof td.paragraphRange === "function") {
+  var count = td.paragraphCount || 1;
+  target = args.paragraph === undefined ? td.paragraphRange(0, count) : td.paragraphRange(args.paragraph, args.paragraph + 1);
+} else if (args.paragraph !== undefined) aemcp.fail("Per-paragraph settings need After Effects 24.0 or newer");
+if (args.justification) target.justification = ParagraphJustification[args.justification];
+var keys = ["firstLineIndent", "startIndent", "endIndent", "spaceBefore", "spaceAfter"];
+for (var i = 0; i < keys.length; i++) if (args[keys[i]] !== undefined) target[keys[i]] = args[keys[i]];
+if (args.boxSize) { if (!td.boxText) aemcp.fail("boxSize only applies to paragraph (box) text"); td.boxTextSize = args.boxSize; }
+if (src.numKeys) src.setValueAtTime(c.time, td); else src.setValue(td);
+return { layer: l.name, text: aemcp.textInfo(src.value) };`
+  },
+  {
+    name: "ae_add_text_animator",
+    title: "Add text animator",
+    description: 'Add a text animator to a text layer: the properties it changes (position, scale, rotation, opacity, fill/stroke color, tracking, blur, skew, anchor point, character offset...) and a selector (range, wiggly or expression) with its settings. Animate the selector afterwards with ae_set_keyframes on paths like "Text/Animators/Animator 1/Selectors/Range Selector 1/Offset" (use ae_get_properties to see the exact names).',
+    input: {
+      comp: compRef,
+      layer: layerRef,
+      name: external_exports.string().optional(),
+      properties: external_exports.object({
+        position: external_exports.array(external_exports.number()).min(2).max(3).optional(),
+        anchorPoint: external_exports.array(external_exports.number()).min(2).max(3).optional(),
+        scale: external_exports.array(external_exports.number()).min(2).max(3).optional(),
+        rotation: external_exports.number().optional(),
+        opacity: external_exports.number().optional(),
+        skew: external_exports.number().optional(),
+        tracking: external_exports.number().optional(),
+        lineSpacing: external_exports.array(external_exports.number()).length(2).optional(),
+        blur: external_exports.array(external_exports.number()).length(2).optional(),
+        fillColor: colorSchema.optional(),
+        fillOpacity: external_exports.number().optional(),
+        strokeColor: colorSchema.optional(),
+        strokeWidth: external_exports.number().optional(),
+        characterOffset: external_exports.number().optional()
+      }).describe("Animator properties and their values (at full selection)."),
+      selector: external_exports.object({
+        type: external_exports.enum(["range", "wiggly", "expression"]).optional().describe("Default range."),
+        start: external_exports.number().optional().describe("Percent (or index with units: index)."),
+        end: external_exports.number().optional(),
+        offset: external_exports.number().optional(),
+        units: external_exports.enum(["percentage", "index"]).optional(),
+        basedOn: external_exports.enum(["characters", "charactersExcludingSpaces", "words", "lines"]).optional(),
+        mode: external_exports.enum(["add", "subtract", "intersect", "min", "max", "difference"]).optional(),
+        shape: external_exports.enum(["square", "rampUp", "rampDown", "triangle", "round", "smooth"]).optional(),
+        smoothness: external_exports.number().optional(),
+        easeHigh: external_exports.number().optional(),
+        easeLow: external_exports.number().optional(),
+        randomizeOrder: external_exports.boolean().optional(),
+        amountExpression: external_exports.string().optional().describe('For type "expression": the Amount expression, e.g. "textIndex * 10".'),
+        maxAmount: external_exports.number().optional().describe("Wiggly: max amount %."),
+        minAmount: external_exports.number().optional(),
+        wigglesPerSecond: external_exports.number().optional()
+      }).optional()
+    },
+    jsx: `
+var c = aemcp.findComp(args.comp), l = aemcp.findLayer(c, args.layer);
+var tp = l.property("ADBE Text Properties"); if (!tp) aemcp.fail("'" + l.name + "' is not a text layer");
+var an = tp.property("ADBE Text Animators").addProperty("ADBE Text Animator");
+if (args.name) an.name = args.name;
+var props = an.property("ADBE Text Animator Properties"), P = args.properties || {};
+var map = { position: "ADBE Text Position 3D", anchorPoint: "ADBE Text Anchor Point 3D", scale: "ADBE Text Scale 3D", rotation: "ADBE Text Rotation",
+  opacity: "ADBE Text Opacity", skew: "ADBE Text Skew", tracking: "ADBE Text Tracking Amount", lineSpacing: "ADBE Text Line Spacing", blur: "ADBE Text Blur",
+  fillColor: "ADBE Text Fill Color", fillOpacity: "ADBE Text Fill Opacity", strokeColor: "ADBE Text Stroke Color", strokeWidth: "ADBE Text Stroke Width",
+  characterOffset: "ADBE Text Character Offset" };
+var added = [];
+for (var k in P) {
+  if (!P.hasOwnProperty(k) || P[k] === undefined) continue;
+  if (!map[k]) aemcp.fail("Unknown animator property " + k);
+  var ap = props.addProperty(map[k]);
+  var v = P[k];
+  if (k === "fillColor" || k === "strokeColor") v = aemcp.color3(v);
+  if ((k === "position" || k === "anchorPoint") && v.length === 2) v = [v[0], v[1], 0];
+  if (k === "scale" && v.length === 2) v = [v[0], v[1], 100];
+  ap.setValue(v);
+  if (k === "tracking") { try { props.property("ADBE Text Track Type").setValue(1); } catch (e) {} }
+  added.push(ap.name);
+}
+var S = args.selector || {}, type = S.type || "range";
+var sel = an.property("ADBE Text Selectors").addProperty(type === "wiggly" ? "ADBE Text Wiggly Selector" : (type === "expression" ? "ADBE Text Expressible Selector" : "ADBE Text Selector"));
+var adv = sel.property("ADBE Text Range Advanced");
+function setIf(group, mn, val) { if (val === undefined) return; var q = group ? group.property(mn) : null; if (!q) { log("selector property " + mn + " not available"); return; } q.setValue(val); }
+var units = { percentage: 1, index: 2 }, based = { characters: 1, charactersExcludingSpaces: 2, words: 3, lines: 4 };
+var modes = { add: 1, subtract: 2, intersect: 3, min: 4, max: 5, difference: 6 }, shapes = { square: 1, rampUp: 2, rampDown: 3, triangle: 4, round: 5, smooth: 6 };
+if (type === "range") {
+  if (S.units) setIf(adv, "ADBE Text Range Units", units[S.units]);
+  setIf(sel, "ADBE Text Percent Start", S.start);
+  setIf(sel, "ADBE Text Percent End", S.end);
+  setIf(sel, "ADBE Text Percent Offset", S.offset);
+  if (S.units === "index") { setIf(sel, "ADBE Text Index Start", S.start); setIf(sel, "ADBE Text Index End", S.end); setIf(sel, "ADBE Text Index Offset", S.offset); }
+  if (S.shape) setIf(adv, "ADBE Text Range Shape", shapes[S.shape]);
+  setIf(adv, "ADBE Text Selector Smoothness", S.smoothness);
+  setIf(adv, "ADBE Text Levels Max Ease", S.easeHigh);
+  setIf(adv, "ADBE Text Levels Min Ease", S.easeLow);
+  if (S.randomizeOrder !== undefined) setIf(adv, "ADBE Text Randomize Order", S.randomizeOrder ? 1 : 0);
+} else if (type === "wiggly") {
+  setIf(sel, "ADBE Text Wiggly Max Amount", S.maxAmount);
+  setIf(sel, "ADBE Text Wiggly Min Amount", S.minAmount);
+  setIf(sel, "ADBE Text Temporal Freq", S.wigglesPerSecond);
+} else if (S.amountExpression) {
+  sel.property("ADBE Text Expressible Amount").expression = S.amountExpression;
+}
+if (S.basedOn) setIf(adv || sel, "ADBE Text Range Type2", based[S.basedOn]); // wiggly selectors keep these at the top level
+if (S.mode) setIf(adv || sel, "ADBE Text Selector Mode", modes[S.mode]);
+return { layer: l.name, animator: an.name, properties: added, selector: sel.name, tree: aemcp.propInfo(an, { depth: 3 }) };`
+  }
+];
+var egpTools = [
+  {
+    name: "ae_essential_graphics",
+    title: "Essential Graphics",
+    description: "Work with a composition's Essential Graphics panel (Motion Graphics template): list its controllers, add a property as a controller (with a display name), and set the template name. Export the result with ae_export_mogrt.",
+    input: {
+      comp: compRef,
+      add: external_exports.array(external_exports.object({ layer: layerRef, path: external_exports.string(), name: external_exports.string() })).optional().describe("Properties to add as controllers."),
+      templateName: external_exports.string().optional()
+    },
+    jsx: `
+var c = aemcp.findComp(args.comp), added = [];
+if (args.templateName) c.motionGraphicsTemplateName = args.templateName;
+for (var i = 0; i < (args.add || []).length; i++) {
+  var a = args.add[i], p = aemcp.resolveProp(aemcp.findLayer(c, a.layer), a.path);
+  if (!p.canAddToMotionGraphicsTemplate(c)) aemcp.fail("'" + a.path + "' can't be added to the Essential Graphics panel");
+  p.addToMotionGraphicsTemplateAs(c, a.name);
+  added.push(a.name);
+}
+var names = [];
+for (var k = 0; k < c.motionGraphicsTemplateControllerCount; k++) names.push(c.getMotionGraphicsTemplateControllerName(k + 1));
+return { comp: c.name, templateName: c.motionGraphicsTemplateName, controllers: names, added: added };`
+  },
+  {
+    name: "ae_export_mogrt",
+    title: "Export Motion Graphics template",
+    description: "Export a composition as a Motion Graphics template (.mogrt) for Premiere Pro, to a folder (default: the user's Essential Graphics templates folder).",
+    input: {
+      comp: compRef,
+      folder: external_exports.string().optional().describe("Absolute output folder (default: the Essential Graphics local templates folder)."),
+      overwrite: external_exports.boolean().optional()
+    },
+    noUndo: true,
+    jsx: `
+var c = aemcp.findComp(args.comp);
+if (!c.motionGraphicsTemplateControllerCount) log("Note: the template has no Essential Graphics controllers");
+// read everything first: After Effects invalidates the comp object during the export
+var info = { comp: c.name, templateName: c.motionGraphicsTemplateName || c.name, controllers: c.motionGraphicsTemplateControllerCount };
+var ok = args.folder ? c.exportAsMotionGraphicsTemplate(!!args.overwrite, args.folder) : c.exportAsMotionGraphicsTemplate(!!args.overwrite);
+if (!ok) aemcp.fail("Export failed (does the file exist already? pass overwrite: true)");
+info.exported = true;
+info.file = (args.folder ? args.folder : "the Essential Graphics templates folder") + "/" + info.templateName + ".mogrt";
+return info;`
+  }
+];
+var healthTools = [
+  {
+    name: "ae_project_health",
+    title: "Project health check",
+    description: "Check the whole project for problems: missing footage, missing or substituted fonts, effects whose plug-in is not installed, expressions with errors, unused footage, empty comps and folders, duplicate comp names. Read-only.",
+    input: { maxLayers: external_exports.number().int().min(100).max(1e5).optional().describe("Stop scanning after this many layers (default 5000).") },
+    readOnly: true,
+    timeoutMs: 3e5,
+    jsx: `
+var p = app.project, R = { missingFootage: [], missingFonts: [], missingEffects: [], expressionErrors: [], unusedFootage: [], emptyComps: [], emptyFolders: [], duplicateCompNames: [] };
+var installed = {}, all = app.effects;
+for (var e = 0; e < all.length; e++) installed["m:" + all[e].matchName] = true;
+var names = {}, layersSeen = 0, lim = args.maxLayers || 5000, truncated = false;
+// a plain function declaration: ExtendScript mishandles recursive named function expressions inside loops
+function scanExpressions(g, path, comp, layer) {
+  for (var q = 1; q <= g.numProperties; q++) {
+    var pr = g.property(q), pp = path ? path + "/" + pr.name : pr.name;
+    if (pr.propertyType === PropertyType.PROPERTY) { try { if (pr.canSetExpression && pr.expression && pr.expressionEnabled && pr.expressionError) R.expressionErrors.push({ comp: comp.name, layer: layer.name, property: pp, error: pr.expressionError }); } catch (x) {} }
+    else scanExpressions(pr, pp, comp, layer);
+  }
+}
+for (var i = 1; i <= p.numItems; i++) {
+  var it = p.item(i);
+  if (it instanceof FootageItem) {
+    if (it.footageMissing) R.missingFootage.push({ id: it.id, name: it.name, file: it.file ? it.file.fsName : null });
+    else if (it.usedIn.length === 0 && !(it.mainSource instanceof PlaceholderSource)) R.unusedFootage.push({ id: it.id, name: it.name });
+  } else if (it instanceof FolderItem) {
+    if (it.numItems === 0) R.emptyFolders.push(it.name);
+  } else if (it instanceof CompItem) {
+    var nk = "n:" + it.name; // prefixed: ExtendScript objects have built-in members (reflect, watch, toSource...)
+    names[nk] = (names[nk] || 0) + 1;
+    if (names[nk] === 2) R.duplicateCompNames.push(it.name);
+    if (it.numLayers === 0) R.emptyComps.push(it.name);
+    for (var j = 1; j <= it.numLayers; j++) {
+      if (layersSeen++ >= lim) { truncated = true; break; }
+      var L = it.layer(j), fx = L.property("ADBE Effect Parade");
+      if (fx) for (var f = 1; f <= fx.numProperties; f++) { var ef = fx.property(f); if (!installed["m:" + ef.matchName]) R.missingEffects.push({ comp: it.name, layer: L.name, effect: ef.name, matchName: ef.matchName }); }
+      scanExpressions(L, "", it, L);
+    }
+  }
+}
+try {
+  var mf = app.fonts.missingOrSubstitutedFonts;
+  for (var m = 0; m < mf.length; m++) R.missingFonts.push({ postScriptName: mf[m].postScriptName, family: mf[m].familyName, style: mf[m].styleName, substitute: mf[m].isSubstitute });
+} catch (x) { R.missingFonts = "requires After Effects 24.0+"; }
+var cap = function (a) { return a instanceof Array && a.length > 100 ? a.slice(0, 100).concat(["... " + (a.length - 100) + " more"]) : a; };
+var summary = {};
+for (var key in R) if (R.hasOwnProperty(key)) { summary[key] = R[key] instanceof Array ? R[key].length : R[key]; R[key] = cap(R[key]); }
+return { summary: summary, layersScanned: layersSeen, truncated: truncated, details: R };`
+  }
+];
+
+// src/tools/all.ts
+var ALL_JSX_TOOLS = [
+  ...projectTools,
+  ...compTools,
+  ...layerTools,
+  ...propertyTools,
+  ...effectTools,
+  ...renderTools,
+  ...appTools,
+  ...inspectTools,
+  ...keyframeTools,
+  ...footageTools,
+  ...textTools,
+  ...egpTools,
+  ...healthTools,
+  ...sceneTools
+];
+
+// src/tools/workflow.ts
+var CHECKPOINTS = join8(homedir6(), ".aemcp", "checkpoints");
+var MAX_CHECKPOINTS = 50;
+function projectDir(projectPath) {
+  const name = basename(projectPath, extname(projectPath)).replace(/[^\w.-]+/g, "_").slice(0, 60);
+  return join8(CHECKPOINTS, `${name}-${createHash2("sha1").update(projectPath).digest("hex").slice(0, 8)}`);
+}
+function readIndex(dir) {
+  try {
+    return JSON.parse(readFileSync7(join8(dir, "index.json"), "utf8"));
+  } catch {
+    return [];
+  }
+}
+var stamp = () => (/* @__PURE__ */ new Date()).toISOString().replace(/[:T]/g, "-").replace(/\..+$/, "");
+async function saveCheckpoint(label) {
+  const r = await runJsx(
+    `var p = app.project;
+if (!p.file) aemcp.fail("The project has never been saved, so there is nothing to checkpoint yet. Save it first (ae_save_project with a path).");
+p.save();
+return p.file.fsName;`,
+    {},
+    { undoGroup: false, timeoutMs: 3e5 }
+  );
+  if (!r.ok) throw new Error(r.error?.message || "could not save the project");
+  const project = String(r.result);
+  const dir = projectDir(project);
+  mkdirSync6(dir, { recursive: true });
+  const id = stamp();
+  const file2 = join8(dir, `${id}${label ? "-" + label.replace(/[^\w.-]+/g, "_").slice(0, 40) : ""}.aep`);
+  copyFileSync2(project, file2);
+  const index = readIndex(dir);
+  index.push({ id, at: (/* @__PURE__ */ new Date()).toISOString(), label, file: file2, project });
+  while (index.length > MAX_CHECKPOINTS) {
+    const old = index.shift();
+    try {
+      unlinkSync2(old.file);
+    } catch {
+    }
+  }
+  writeFileSync4(join8(dir, "index.json"), JSON.stringify(index, null, 2));
+  return index[index.length - 1];
+}
+var SCRIPT_EXT = /\.(jsx|jsxbin|js)$/i;
+function scanScripts(root, origin, depth = 2, out = []) {
+  let entries = [];
+  try {
+    entries = readdirSync3(root);
+  } catch {
+    return out;
+  }
+  for (const name of entries) {
+    const p = join8(root, name);
+    let st;
+    try {
+      st = statSync2(p);
+    } catch {
+      continue;
+    }
+    if (st.isDirectory()) {
+      if (depth > 0 && !/^\(.*\)$/.test(name)) scanScripts(p, origin === "After Effects" && name === "ScriptUI Panels" ? "ScriptUI Panels" : origin, depth - 1, out);
+      continue;
+    }
+    if (!SCRIPT_EXT.test(name)) continue;
+    let description;
+    if (/\.jsx?$/i.test(name) && st.size < 2e6) {
+      const head = readFileSync7(p, "utf8").slice(0, 2e3);
+      const m = head.match(/\/\*+([\s\S]*?)\*\//) || head.match(/((?:^\s*\/\/.*\n?){1,6})/m);
+      if (m) description = m[1].replace(/^\s*(\*|\/\/)\s?/gm, "").replace(/\s+/g, " ").trim().slice(0, 200) || void 0;
+    }
+    out.push({ name: name.replace(SCRIPT_EXT, ""), path: p, origin, folder: basename(dirname6(p)), kind: origin === "ScriptUI Panels" ? "panel (opens a window)" : "script", description, sizeKB: Math.round(st.size / 1024) });
+  }
+  return out;
+}
+function registerWorkflowTools(server) {
+  const batchable = new Map(ALL_JSX_TOOLS.filter((t) => !t.noUndo).map((t) => [t.name, t]));
+  server.registerTool(
+    "ae_batch",
+    {
+      title: "Batch edits",
+      description: 'Run many steps in ONE call: each step is a tool with its arguments (any project/comp/layer/property/keyframe/effect/text/footage tool) or {tool: "ae_run_script", args: {code}}. All steps form a single undo step and return one change report. Atomic by default: if any step fails, everything is undone and you get the error of the failing step. Use it for repetitive or multi-part edits (e.g. style 30 layers, build a scene) to save round trips.',
+      inputSchema: {
+        steps: external_exports.array(external_exports.object({ tool: external_exports.string(), args: external_exports.record(external_exports.string(), external_exports.any()).optional() })).min(1).max(200),
+        atomic: external_exports.boolean().optional().describe("Undo everything if a step fails (default true). false = keep successful steps and continue."),
+        name: external_exports.string().optional().describe('Undo step name shown in After Effects (default "AE MCP Batch").'),
+        checkpoint: external_exports.boolean().optional().describe("Save a project checkpoint before running (see ae_checkpoint)."),
+        verbose: external_exports.boolean().optional().describe("Return each step's full result (default: short summaries).")
+      },
+      annotations: { destructiveHint: true, openWorldHint: false }
+    },
+    async ({ steps, atomic, name, checkpoint, verbose }) => {
+      try {
+        const perm = permissions();
+        const bodies = [];
+        const stepArgs = [];
+        let edits = false;
+        for (const [i, s] of steps.entries()) {
+          if (s.tool === "ae_run_script") {
+            const code = String(s.args?.code ?? "");
+            if (!perm.allowShell && usesShell(code)) return errorResult(`Step ${i + 1}: ${SHELL_REFUSAL}`);
+            const t = transpileUserCode(code);
+            if (t.syntaxError && !t.transpiled) return errorResult(`Step ${i + 1} (ae_run_script) has a syntax error: ${t.syntaxError}`);
+            bodies.push(evalBody(t.source));
+            stepArgs.push(s.args?.args ?? {});
+            edits = true;
+            continue;
+          }
+          const tool = batchable.get(s.tool);
+          if (!tool) return errorResult(`Step ${i + 1}: "${s.tool}" can't be used in a batch (unknown, or it can't be part of an undo step such as open/save project or undo).`);
+          if (!tool.readOnly && !tool.tempItems) edits = true;
+          bodies.push(tool.jsx);
+          stepArgs.push(s.args ?? {});
+        }
+        if (edits && perm.mode === "read-only") return errorResult(READ_ONLY_REFUSAL);
+        let cp = "";
+        if (checkpoint) cp = `Checkpoint saved first: ${(await saveCheckpoint("before-batch")).file}
+`;
+        const isAtomic = atomic !== false;
+        const body = "var __steps = [\n" + bodies.map((b) => `function (args, log) {
+${b}
+}`).join(",\n") + `
+], __out = [], __failed = -1;
+for (var __i = 0; __i < __steps.length; __i++) {
+  try { __out.push({ ok: true, result: aemcp.serialize(__steps[__i](args.stepArgs[__i], log), 2) }); }
+  catch (e) { __out.push({ ok: false, error: e.message || String(e), line: e.aemcpUser ? undefined : e.line }); if (__failed < 0) __failed = __i; if (args.atomic) break; }
+}
+return { steps: __out, failed: __failed };`;
+        const scope = [...new Set(steps.map((s) => s.args?.comp).filter((c) => c !== void 0 && c !== null))];
+        const r = await runJsx(body, { stepArgs, atomic: isAtomic }, {
+          undoGroup: name || "AE MCP Batch",
+          timeoutMs: 6e5,
+          depth: 6,
+          report: loadConfig().changeReport === false ? void 0 : scope.length ? scope : reportScope({}),
+          bridge: edits && perm.mode === "ask" ? { approval: { tool: `Batch (${steps.length} steps)`, summary: steps.map((s, i) => `${i + 1}. ${s.tool} ${approvalSummary(s.tool, s.args).slice(0, 300)}`).join("\n") } } : void 0
+        });
+        if (!r.ok) return formatResult(r);
+        const res = r.result;
+        const lines = res.steps.map((s, i) => {
+          if (!s.ok) return `${i + 1}. ${steps[i].tool}: FAILED: ${s.error}${s.line ? ` (line ${s.line})` : ""}`;
+          const txt = s.result === void 0 || s.result === null ? "ok" : JSON.stringify(s.result);
+          return `${i + 1}. ${steps[i].tool}: ${verbose ? txt : txt.length > 160 ? txt.slice(0, 157) + "..." : txt}`;
+        });
+        const changes = formatChanges(r.changes);
+        if (res.failed >= 0 && isAtomic) {
+          await evalRaw("app.executeCommand(16); 'undone'", 6e4);
+          return {
+            isError: true,
+            content: [
+              {
+                type: "text",
+                text: `${cp}Batch stopped at step ${res.failed + 1} of ${steps.length} and was rolled back (nothing changed).
+${lines.join("\n")}` + (changes && changes !== "Changes: none" ? `
+
+Rolled back:
+${changes}` : "")
+              }
+            ]
+          };
+        }
+        const head = res.failed >= 0 ? `Batch finished with errors (atomic: false, successful steps were kept).` : `Batch done: ${steps.length} steps in one undo step.`;
+        return { content: [{ type: "text", text: `${cp}${head}
+${lines.join("\n")}${changes ? `
+
+${changes}` : ""}` }] };
+      } catch (e) {
+        return errorResult(e);
+      }
+    }
+  );
+  server.registerTool(
+    "ae_checkpoint",
+    {
+      title: "Project checkpoints",
+      description: "Safety copies of the project: save (saves the open project, then keeps a timestamped copy), list the checkpoints of this project, or restore one (opens it as a NEW file next to the original; the original file is never overwritten). Use before large or risky changes.",
+      inputSchema: {
+        action: external_exports.enum(["save", "list", "restore"]),
+        label: external_exports.string().optional().describe("Short label for a new checkpoint."),
+        id: external_exports.string().optional().describe("Checkpoint id to restore (from list)."),
+        discardChanges: external_exports.boolean().optional().describe("Restore even if the open project has unsaved changes.")
+      },
+      annotations: { destructiveHint: false, openWorldHint: false }
+    },
+    async ({ action, label, id, discardChanges }) => {
+      try {
+        if (action === "save") {
+          if (permissions().mode === "read-only") return errorResult(READ_ONLY_REFUSAL);
+          const c = await saveCheckpoint(label);
+          return { content: [{ type: "text", text: `Checkpoint ${c.id}${c.label ? ` (${c.label})` : ""} saved: ${c.file}` }] };
+        }
+        const r = await runJsx("return app.project.file ? app.project.file.fsName : null;", {}, { undoGroup: false });
+        const project = r.result;
+        if (!project) return errorResult("The open project has never been saved, so it has no checkpoints.");
+        const index = readIndex(projectDir(project));
+        if (action === "list") {
+          if (!index.length) return { content: [{ type: "text", text: `No checkpoints yet for ${project}.` }] };
+          return { content: [{ type: "text", text: JSON.stringify({ project, checkpoints: index.map(({ id: id2, at, label: label2, file: file2 }) => ({ id: id2, at, label: label2, file: file2 })).reverse() }) }] };
+        }
+        if (permissions().mode === "read-only") return errorResult(READ_ONLY_REFUSAL);
+        const cp = id ? index.find((c) => c.id === id) : index[index.length - 1];
+        if (!cp || !existsSync5(cp.file)) return errorResult(`Checkpoint ${id ?? "(latest)"} not found. Use action "list".`);
+        const dirty = await runJsx("return app.project.dirty;", {}, { undoGroup: false });
+        if (dirty.result === true && !discardChanges)
+          return errorResult("The open project has unsaved changes. Save it (or checkpoint it) first, or pass discardChanges: true.");
+        const target = join8(dirname6(project), `${basename(project, extname(project))} (restored ${cp.id}).aep`);
+        copyFileSync2(cp.file, target);
+        const o = await runJsx(`app.open(new File(args.path)); return app.project.file.fsName;`, { path: target }, { undoGroup: false, timeoutMs: 3e5 });
+        if (!o.ok) return formatResult(o);
+        return { content: [{ type: "text", text: `Restored checkpoint ${cp.id}${cp.label ? ` (${cp.label})` : ""} as a new file and opened it: ${target}
+The original project file was not changed.` }] };
+      } catch (e) {
+        return errorResult(e);
+      }
+    }
+  );
+  server.registerTool(
+    "ae_list_scripts",
+    {
+      title: "List scripts",
+      description: `List the user's own After Effects scripts: AE's Scripts folder (and ScriptUI Panels) plus folders configured as "scriptFolders" in ~/.aemcp/config.json, with each script's description from its header comment. Run one with ae_run_script_file.`,
+      inputSchema: { nameContains: external_exports.string().optional() },
+      annotations: { readOnlyHint: true, openWorldHint: false }
+    },
+    async ({ nameContains }) => {
+      try {
+        const r = await runJsx("return Folder.appPackage.parent.fsName;", {}, { undoGroup: false });
+        if (!r.ok) return formatResult(r);
+        const aeRoot = String(r.result);
+        const aeScripts = [join8(aeRoot, "Scripts"), join8(aeRoot, "Support Files", "Scripts")].find((p) => existsSync5(p));
+        const folders = [];
+        if (aeScripts) folders.push([aeScripts, "After Effects"]);
+        for (const f of loadConfig().scriptFolders ?? []) folders.push([f.replace(/^~(?=\/|\\|$)/, homedir6()), "your folder"]);
+        let list = folders.flatMap(([dir, origin]) => scanScripts(dir, origin));
+        list = list.filter((s) => !/[\\/](Startup|Shutdown)$/.test(dirname6(s.path)));
+        if (nameContains) list = list.filter((s) => s.name.toLowerCase().includes(nameContains.toLowerCase()));
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({ folders: folders.map(([d, o]) => ({ folder: d, origin: o, exists: existsSync5(d) })), scripts: list }) + (folders.length < 2 ? '\n\nTip: add your own folders with "scriptFolders": ["/path/to/scripts"] in ~/.aemcp/config.json.' : "")
+            }
+          ]
+        };
+      } catch (e) {
+        return errorResult(e);
+      }
+    }
+  );
+}
+
 // src/tools/profile.ts
 init_define_AEMCP_CEP_FILES();
 
 // src/activity.ts
 init_define_AEMCP_CEP_FILES();
-import { appendFileSync, existsSync as existsSync5, mkdirSync as mkdirSync6, readFileSync as readFileSync7, renameSync, statSync as statSync2 } from "node:fs";
-import { homedir as homedir6 } from "node:os";
-import { join as join8 } from "node:path";
-var ACTIVITY_FILE = join8(homedir6(), ".aemcp", "activity.jsonl");
+import { appendFileSync, existsSync as existsSync6, mkdirSync as mkdirSync7, readFileSync as readFileSync8, renameSync, statSync as statSync3 } from "node:fs";
+import { homedir as homedir7 } from "node:os";
+import { join as join9 } from "node:path";
+var ACTIVITY_FILE = join9(homedir7(), ".aemcp", "activity.jsonl");
 var MAX_BYTES = 5 * 1024 * 1024;
 function trimArgs(args) {
   const json3 = JSON.stringify(args ?? {});
@@ -77452,15 +78077,15 @@ function trimArgs(args) {
 function logActivity(e) {
   if (process.env.AEMCP_NO_ACTIVITY_LOG) return;
   try {
-    mkdirSync6(join8(homedir6(), ".aemcp"), { recursive: true });
-    if (existsSync5(ACTIVITY_FILE) && statSync2(ACTIVITY_FILE).size > MAX_BYTES) renameSync(ACTIVITY_FILE, ACTIVITY_FILE + ".1");
+    mkdirSync7(join9(homedir7(), ".aemcp"), { recursive: true });
+    if (existsSync6(ACTIVITY_FILE) && statSync3(ACTIVITY_FILE).size > MAX_BYTES) renameSync(ACTIVITY_FILE, ACTIVITY_FILE + ".1");
     appendFileSync(ACTIVITY_FILE, JSON.stringify({ ...e, args: trimArgs(e.args) }) + "\n");
   } catch {
   }
 }
 function readActivity(limit = 50) {
   try {
-    const lines = readFileSync7(ACTIVITY_FILE, "utf8").trim().split("\n");
+    const lines = readFileSync8(ACTIVITY_FILE, "utf8").trim().split("\n");
     return lines.slice(-limit).map((l) => JSON.parse(l)).reverse();
   } catch {
     return [];
@@ -77493,7 +78118,12 @@ var CORE_TOOLS = /* @__PURE__ */ new Set([
   "ae_set_expression",
   "ae_apply_effect",
   "ae_get_effect_params",
-  "ae_undo"
+  "ae_undo",
+  // workflow: batches, safety copies, the user's own scripts
+  "ae_batch",
+  "ae_checkpoint",
+  "ae_list_scripts",
+  "ae_run_script_file"
 ]);
 function resolveProfile(argv = process.argv) {
   const i = argv.indexOf("--tools");
@@ -77537,7 +78167,7 @@ function applyProfile(server, profile) {
 // src/cli/chatgpt.ts
 init_define_AEMCP_CEP_FILES();
 import { spawn as spawn2 } from "node:child_process";
-import { existsSync as existsSync6 } from "node:fs";
+import { existsSync as existsSync7 } from "node:fs";
 import { fileURLToPath } from "node:url";
 function chatgpt(argv) {
   ensureConfig();
@@ -77572,7 +78202,7 @@ Keep this window open while you use it. Press Ctrl+C to stop.
 `);
   console.log(dim("Tip: the ChatGPT desktop app does not need this; 1. Install connects it directly (Settings > Plugins).\n"));
   if (argv.includes("--local")) return announce(`http://127.0.0.1:${port}`);
-  const cloudflared = which("cloudflared") || (isWin ? null : ["/opt/homebrew/bin/cloudflared", "/usr/local/bin/cloudflared"].find((p) => existsSync6(p)) ?? null);
+  const cloudflared = which("cloudflared") || (isWin ? null : ["/opt/homebrew/bin/cloudflared", "/usr/local/bin/cloudflared"].find((p) => existsSync7(p)) ?? null);
   const ngrok = which("ngrok");
   let shown = false;
   if (cloudflared) {
@@ -77617,8 +78247,8 @@ The server is running locally at http://127.0.0.1:${port}/mcp (token in ~/.aemcp
 init_define_AEMCP_CEP_FILES();
 import { spawnSync as spawnSync3 } from "node:child_process";
 import { arch, release } from "node:os";
-import { join as join9 } from "node:path";
-import { existsSync as existsSync7, readFileSync as readFileSync8 } from "node:fs";
+import { join as join10 } from "node:path";
+import { existsSync as existsSync8, readFileSync as readFileSync9 } from "node:fs";
 function debugMode() {
   return CSXS_VERSIONS.map((v) => {
     const r = isWin ? spawnSync3("reg", ["query", `HKCU\\Software\\Adobe\\CSXS.${v}`, "/v", "PlayerDebugMode"], { encoding: "utf8" }) : isMac ? spawnSync3("defaults", ["read", `com.adobe.CSXS.${v}`, "PlayerDebugMode"], { encoding: "utf8" }) : null;
@@ -77629,7 +78259,7 @@ function clientEntry(file2) {
   const data = readJson(file2, null);
   const e = data?.mcpServers?.[SERVER_NAME];
   if (!e) return data ? "no entry" : "not found";
-  return `${e.command} ${(e.args || []).join(" ")}${e.command && !existsSync7(e.command) ? "  (COMMAND MISSING)" : ""}`;
+  return `${e.command} ${(e.args || []).join(" ")}${e.command && !existsSync8(e.command) ? "  (COMMAND MISSING)" : ""}`;
 }
 async function diagnostics() {
   const L = ["### AE MCP diagnostics", `time: ${(/* @__PURE__ */ new Date()).toISOString()}`];
@@ -77638,19 +78268,19 @@ async function diagnostics() {
   const cfg = readJson(CONFIG_FILE, null);
   if (cfg) L.push(`config: ${JSON.stringify({ ...cfg, token: cfg.token ? `<set, ${cfg.token.length} chars>` : "MISSING" })}`);
   else L.push(`config: MISSING (${CONFIG_FILE})`);
-  L.push(`installed server: ${existsSync7(INSTALLED_SERVER) ? INSTALLED_SERVER : "not installed (fine when using the .mcpb)"}`);
-  L.push(`extension: ${extensionDir()} \xB7 ${existsSync7(join9(extensionDir(), "CSXS", "manifest.xml")) ? `hash ${installedExtensionHash()} (bundled ${"e0b574ec0cdd"})` : "MISSING"}`);
+  L.push(`installed server: ${existsSync8(INSTALLED_SERVER) ? INSTALLED_SERVER : "not installed (fine when using the .mcpb)"}`);
+  L.push(`extension: ${extensionDir()} \xB7 ${existsSync8(join10(extensionDir(), "CSXS", "manifest.xml")) ? `hash ${installedExtensionHash()} (bundled ${"e0b574ec0cdd"})` : "MISSING"}`);
   L.push(`PlayerDebugMode: ${debugMode()}`);
   L.push(`Claude Desktop: ${clientEntry(claudeDesktopConfig())}`);
   L.push(`Claude Code: ${clientEntry(claudeCodeConfig())}`);
   L.push(`Cursor: ${clientEntry(cursorConfig())}`);
   let codex = "not found";
   try {
-    codex = readFileSync8(codexConfig(), "utf8").includes(`[mcp_servers.${SERVER_NAME}]`) ? "entry present" : "no entry";
+    codex = readFileSync9(codexConfig(), "utf8").includes(`[mcp_servers.${SERVER_NAME}]`) ? "entry present" : "no entry";
   } catch {
   }
   L.push(`ChatGPT desktop / Codex (${codexConfig()}): ${codex}`);
-  L.push(`bridge status file: ${JSON.stringify(readJson(join9(AEMCP_DIR, "bridge-status.json"), null))}`);
+  L.push(`bridge status file: ${JSON.stringify(readJson(join10(AEMCP_DIR, "bridge-status.json"), null))}`);
   const u = knownUpdate();
   L.push(`update: ${u ? `latest v${u.latest}${u.updateAvailable ? " (UPDATE AVAILABLE)" : ""}` : "unknown"}`);
   try {
@@ -77670,12 +78300,12 @@ async function diagnostics() {
 // src/cli/install.ts
 init_define_AEMCP_CEP_FILES();
 import { spawn as spawn3, spawnSync as spawnSync4 } from "node:child_process";
-import { chmodSync, copyFileSync as copyFileSync2, existsSync as existsSync8, mkdirSync as mkdirSync7, readdirSync as readdirSync3, readFileSync as readFileSync9, writeFileSync as writeFileSync4 } from "node:fs";
-import { dirname as dirname6, join as join10 } from "node:path";
+import { chmodSync, copyFileSync as copyFileSync3, existsSync as existsSync9, mkdirSync as mkdirSync8, readdirSync as readdirSync4, readFileSync as readFileSync10, writeFileSync as writeFileSync5 } from "node:fs";
+import { dirname as dirname7, join as join11 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 function mcpbInstalled() {
   try {
-    return readdirSync3(join10(claudeDesktopDir(), "Claude Extensions")).some((n) => /after-effects/i.test(n) && !n.endsWith(".json"));
+    return readdirSync4(join11(claudeDesktopDir(), "Claude Extensions")).some((n) => /after-effects/i.test(n) && !n.endsWith(".json"));
   } catch {
     return false;
   }
@@ -77701,7 +78331,7 @@ async function quitClaudeDesktop() {
 }
 function startClaudeDesktop() {
   if (isMac) spawnSync4("open", ["-a", "Claude"]);
-  else if (isWin && existsSync8(claudeDesktopExe())) spawn3(claudeDesktopExe(), [], { detached: true, stdio: "ignore" }).unref();
+  else if (isWin && existsSync9(claudeDesktopExe())) spawn3(claudeDesktopExe(), [], { detached: true, stdio: "ignore" }).unref();
 }
 async function install(argv) {
   const flags = new Set(argv);
@@ -77712,8 +78342,8 @@ After Effects MCP installer v${VERSION}`));
   if (!isMac && !isWin) warn("After Effects only runs on macOS and Windows; continuing anyway.");
   step("1/4  Installing the MCP server");
   const self2 = fileURLToPath2(import.meta.url);
-  mkdirSync7(dirname6(INSTALLED_SERVER), { recursive: true });
-  if (self2 !== INSTALLED_SERVER) copyFileSync2(self2, INSTALLED_SERVER);
+  mkdirSync8(dirname7(INSTALLED_SERVER), { recursive: true });
+  if (self2 !== INSTALLED_SERVER) copyFileSync3(self2, INSTALLED_SERVER);
   if (!isWin) chmodSync(INSTALLED_SERVER, 493);
   ok(`Server: ${INSTALLED_SERVER}`);
   ensureConfig();
@@ -77753,10 +78383,10 @@ After Effects MCP installer v${VERSION}`));
     if (mcpbInstalled()) {
       ok("Claude Desktop: already connected through the AE MCP extension (.mcpb)");
       registered.push("Claude Desktop");
-    } else if (existsSync8(claudeDesktopDir())) {
+    } else if (existsSync9(claudeDesktopDir())) {
       const cfg = readJson(claudeDesktopConfig(), {});
       const cur = cfg.mcpServers?.[SERVER_NAME];
-      const already = !!cur && cur.args?.[0] === INSTALLED_SERVER && typeof cur.command === "string" && existsSync8(cur.command);
+      const already = !!cur && cur.args?.[0] === INSTALLED_SERVER && typeof cur.command === "string" && existsSync9(cur.command);
       if (!already && claudeDesktopRunning()) {
         console.log("  Claude Desktop is open. It must be closed while it is connected, then it reopens.");
         if (await ask("Restart Claude Desktop now?", true)) {
@@ -77784,18 +78414,18 @@ After Effects MCP installer v${VERSION}`));
       } catch (e) {
         warn(`Claude Code: ${String(e.stderr || e.message).split("\n")[0]}`);
       }
-    } else if (existsSync8(claudeCodeConfig())) addJson("Claude Code", claudeCodeConfig(), { type: "stdio", ...entry, env: {} });
+    } else if (existsSync9(claudeCodeConfig())) addJson("Claude Code", claudeCodeConfig(), { type: "stdio", ...entry, env: {} });
     else console.log(dim("  - Claude Code not installed (skipped)"));
   }
-  if (want("cursor") && existsSync8(dirname6(cursorConfig()))) addJson("Cursor", cursorConfig());
-  if (want("codex") && (existsSync8(dirname6(codexConfig())) || chatgptDesktopInstalled())) {
+  if (want("cursor") && existsSync9(dirname7(cursorConfig()))) addJson("Cursor", cursorConfig());
+  if (want("codex") && (existsSync9(dirname7(codexConfig())) || chatgptDesktopInstalled())) {
     try {
       const file2 = codexConfig();
-      mkdirSync7(dirname6(file2), { recursive: true });
-      const text = existsSync8(file2) ? readFileSync9(file2, "utf8") : "";
-      if (existsSync8(file2) && !existsSync8(file2 + ".aemcp.bak")) copyFileSync2(file2, file2 + ".aemcp.bak");
+      mkdirSync8(dirname7(file2), { recursive: true });
+      const text = existsSync9(file2) ? readFileSync10(file2, "utf8") : "";
+      if (existsSync9(file2) && !existsSync9(file2 + ".aemcp.bak")) copyFileSync3(file2, file2 + ".aemcp.bak");
       const rest = removeCodexBlock(text).trim();
-      writeFileSync4(file2, (rest ? rest + "\n\n" : "") + codexBlock(nodePath, INSTALLED_SERVER));
+      writeFileSync5(file2, (rest ? rest + "\n\n" : "") + codexBlock(nodePath, INSTALLED_SERVER));
       ok("ChatGPT desktop / Codex");
       registered.push("ChatGPT desktop");
     } catch (e) {
@@ -77822,15 +78452,15 @@ ${registered.includes("ChatGPT desktop") ? "  ChatGPT desktop app: restart it; a
 
 // src/cli/selftest.ts
 init_define_AEMCP_CEP_FILES();
-import { existsSync as existsSync10, mkdirSync as mkdirSync9, readFileSync as readFileSync10, statSync as statSync4, unlinkSync as unlinkSync3 } from "node:fs";
-import { join as join12 } from "node:path";
+import { existsSync as existsSync11, mkdirSync as mkdirSync10, readFileSync as readFileSync11, statSync as statSync5, unlinkSync as unlinkSync4 } from "node:fs";
+import { join as join13 } from "node:path";
 
 // src/cli/fulltest.ts
 init_define_AEMCP_CEP_FILES();
-import { existsSync as existsSync9, mkdirSync as mkdirSync8, statSync as statSync3, unlinkSync as unlinkSync2, writeFileSync as writeFileSync5 } from "node:fs";
-import { homedir as homedir7 } from "node:os";
-import { join as join11 } from "node:path";
-var ALL = [...projectTools, ...compTools, ...layerTools, ...propertyTools, ...effectTools, ...renderTools, ...appTools, ...inspectTools, ...keyframeTools, ...footageTools, ...textTools, ...egpTools, ...healthTools];
+import { existsSync as existsSync10, mkdirSync as mkdirSync9, statSync as statSync4, unlinkSync as unlinkSync3, writeFileSync as writeFileSync6 } from "node:fs";
+import { homedir as homedir8 } from "node:os";
+import { join as join12 } from "node:path";
+var ALL = ALL_JSX_TOOLS;
 var C = "__aemcp_fulltest";
 async function fullSelftest() {
   console.log(bold(`
@@ -77851,9 +78481,9 @@ Full self-test: every major tool against this After Effects (temporary comps, re
 `);
   const start = await runJsx("var m = 0; for (var i = 1; i <= app.project.numItems; i++) m = Math.max(m, app.project.item(i).id); return { maxId: m, rq: app.project.renderQueue.numItems };", {}, { undoGroup: false });
   const { maxId, rq } = start.result;
-  const tmpDir = join11(homedir7(), ".aemcp", "tmp");
-  mkdirSync8(tmpDir, { recursive: true });
-  const frame = join11(tmpDir, `fulltest_${Date.now()}.png`);
+  const tmpDir = join12(homedir8(), ".aemcp", "tmp");
+  mkdirSync9(tmpDir, { recursive: true });
+  const frame = join12(tmpDir, `fulltest_${Date.now()}.png`);
   const steps = [
     { name: "create comp", tool: "ae_create_comp", args: { name: C, width: 1280, height: 720, duration: 4, frameRate: 25 } },
     { name: "solid layer", tool: "ae_add_layer", args: { comp: C, type: "solid", name: "BG", color: "#20304a" } },
@@ -77880,11 +78510,17 @@ Full self-test: every major tool against this After Effects (temporary comps, re
     { name: "precompose", tool: "ae_precompose", args: { comp: C, layers: ["Dot"], name: `${C}_pre` } },
     { name: "time remap", tool: "ae_set_time_remap", args: { comp: C, layer: `${C}_pre`, freezeAt: 0.5 } },
     { name: "essential graphics", tool: "ae_essential_graphics", args: { comp: C, add: [{ layer: "BG", path: "Transform/Opacity", name: "BG Opacity" }] }, needs: "essentialGraphics" },
-    { name: "render queue add", tool: "ae_add_to_render_queue", args: { comp: C, outputPath: join11(tmpDir, "fulltest.mov") } },
+    { name: "render queue add", tool: "ae_add_to_render_queue", args: { comp: C, outputPath: join12(tmpDir, "fulltest.mov") } },
     { name: "render settings", tool: "ae_set_render_settings", args: { renderSettings: { Quality: "Draft" } }, needs: "renderSettingsApi" },
     { name: "project health", tool: "ae_project_health", args: {} },
+    { name: "camera", tool: "ae_set_camera", args: { comp: C, focalLength: 50, type: "two-node", depthOfField: true } },
+    { name: "light", tool: "ae_set_light", args: { comp: C, type: "SPOT", intensity: 120, castsShadows: true } },
+    { name: "3D material", tool: "ae_set_material", args: { comp: C, layers: ["BG"], castsShadows: "on", specular: 30 } },
+    { name: "check expression", tool: "ae_check_expression", args: { comp: C, layer: "BG", path: "Transform/Opacity", expression: "50 + 50 * Math.sin(time)" }, check: (r) => r.result?.ok ? null : `expression reported an error: ${r.result?.error}` },
+    { name: "replace in expressions (dry run)", tool: "ae_replace_in_expressions", args: { find: "time", replace: "time", comps: [C], dryRun: true } },
+    { name: "color settings", tool: "ae_color_settings", args: { listProfiles: true } },
     { name: "system info", tool: "ae_system_info", args: {} },
-    { name: "frame preview", jsx: RENDER_FRAME_JSX, args: { comp: C, time: 1, outputPath: frame, tmpDir }, check: () => existsSync9(frame) && statSync3(frame).size > 0 ? null : "no PNG written" },
+    { name: "frame preview", jsx: RENDER_FRAME_JSX, args: { comp: C, time: 1, outputPath: frame, tmpDir }, check: () => existsSync10(frame) && statSync4(frame).size > 0 ? null : "no PNG written" },
     { name: "contact sheet", jsx: CONTACT_SHEET_JSX, args: { comp: C, frames: 4, tmpDir } },
     {
       name: "modern JavaScript",
@@ -77923,14 +78559,14 @@ return p.numItems;`,
     { undoGroup: "AE MCP self-test cleanup" }
   );
   try {
-    unlinkSync2(frame);
+    unlinkSync3(frame);
   } catch {
   }
   const failed = results.filter((r) => !r.ok);
-  const dir = join11(homedir7(), ".aemcp", "compat");
-  mkdirSync8(dir, { recursive: true });
-  const file2 = join11(dir, `after-effects-${appVersion.replace(/[^\w.]+/g, "_")}.json`);
-  writeFileSync5(file2, JSON.stringify({ at: (/* @__PURE__ */ new Date()).toISOString(), server: VERSION, appVersion, os, platform: process.platform, features, results }, null, 2));
+  const dir = join12(homedir8(), ".aemcp", "compat");
+  mkdirSync9(dir, { recursive: true });
+  const file2 = join12(dir, `after-effects-${appVersion.replace(/[^\w.]+/g, "_")}.json`);
+  writeFileSync6(file2, JSON.stringify({ at: (/* @__PURE__ */ new Date()).toISOString(), server: VERSION, appVersion, os, platform: process.platform, features, results }, null, 2));
   console.log(
     failed.length ? `
 ${red(bold(`${failed.length} of ${results.length} steps failed`))} on After Effects ${appVersion}.` : `
@@ -77959,10 +78595,10 @@ After Effects MCP self-test v${VERSION}`));
     if (msg) warn(msg);
     else if (u?.latest) ok(`Up to date (latest release v${u.latest})`);
   }
-  if (existsSync10(CONFIG_FILE) && loadConfig().token) ok(`Config ${CONFIG_FILE}`);
+  if (existsSync11(CONFIG_FILE) && loadConfig().token) ok(`Config ${CONFIG_FILE}`);
   else bad(`No config at ${CONFIG_FILE}. Run the installer.`);
   const hash2 = installedExtensionHash();
-  if (!existsSync10(join12(extensionDir(), "CSXS", "manifest.xml"))) bad(`After Effects extension missing at ${extensionDir()}. Run the installer.`);
+  if (!existsSync11(join13(extensionDir(), "CSXS", "manifest.xml"))) bad(`After Effects extension missing at ${extensionDir()}. Run the installer.`);
   else if (hash2 !== "e0b574ec0cdd") warn(`Extension at ${extensionDir()} is a different version (${hash2 ?? "unknown"} vs ${"e0b574ec0cdd"}). Re-run the installer.`);
   else ok("After Effects extension installed");
   const offVersions = CSXS_VERSIONS.filter((v) => {
@@ -77974,7 +78610,7 @@ After Effects MCP self-test v${VERSION}`));
   const desktop = readJson(claudeDesktopConfig(), null);
   if (desktop?.mcpServers?.[SERVER_NAME]) {
     const cmd = desktop.mcpServers[SERVER_NAME].command;
-    if (cmd && !existsSync10(cmd)) bad(`Claude Desktop points to a Node that no longer exists: ${cmd}. Re-run the installer.`);
+    if (cmd && !existsSync11(cmd)) bad(`Claude Desktop points to a Node that no longer exists: ${cmd}. Re-run the installer.`);
     else ok("Claude Desktop configured");
   } else console.log("  - Claude Desktop config has no after-effects entry (fine if you use the .mcpb extension or another app)");
   console.log("");
@@ -77983,8 +78619,8 @@ After Effects MCP self-test v${VERSION}`));
     h = await health();
   } catch (e) {
     bad(`Bridge not reachable on 127.0.0.1:${loadConfig().bridgePort}. Is After Effects running? (restart it after installing)`);
-    const statusFile = join12(AEMCP_DIR, "bridge-status.json");
-    if (existsSync10(statusFile)) {
+    const statusFile = join13(AEMCP_DIR, "bridge-status.json");
+    if (existsSync11(statusFile)) {
       const st = readJson(statusFile, {});
       console.log(`    last bridge status: ${st.listening ? "listening" : "not listening"}${st.error ? " - " + st.error : ""} (${st.at})`);
     }
@@ -78004,9 +78640,9 @@ After Effects MCP self-test v${VERSION}`));
   ok(`ExtendScript works: After Effects ${info.result.version} on ${info.result.os}`);
   if (info.result.canWrite === false)
     warn("'Allow Scripts to Write Files and Access Network' is OFF. Previews still work; scripts that write files themselves (File.write, exports) or use the network need it: AE Settings > Scripting & Expressions.");
-  const tmpDir = join12(AEMCP_DIR, "tmp");
-  mkdirSync9(tmpDir, { recursive: true });
-  const png = join12(tmpDir, `selftest_${Date.now()}.png`);
+  const tmpDir = join13(AEMCP_DIR, "tmp");
+  mkdirSync10(tmpDir, { recursive: true });
+  const png = join13(tmpDir, `selftest_${Date.now()}.png`);
   const job = await runJsx(
     `var c = app.project.items.addComp("__aemcp_selftest", 640, 360, 1, 2, 30);
 var t = c.layers.addText("AE MCP OK");
@@ -78030,12 +78666,12 @@ return r;`,
     if (r.keys === 2 && r.effect === "ADBE Drop Shadow" && !r.exprError) ok("Created a comp, text layer, keyframes, effect and expression (then removed it)");
     else bad(`Unexpected test result: ${JSON.stringify(r)}`);
     {
-      for (let i = 0; i < 50 && !(existsSync10(png) && statSync4(png).size > 0); i++) await sleep(100);
-      if (existsSync10(png) && statSync4(png).size > 0) {
-        const sig = readFileSync10(png).subarray(1, 4).toString();
+      for (let i = 0; i < 50 && !(existsSync11(png) && statSync5(png).size > 0); i++) await sleep(100);
+      if (existsSync11(png) && statSync5(png).size > 0) {
+        const sig = readFileSync11(png).subarray(1, 4).toString();
         sig === "PNG" ? ok("Rendered a frame preview") : bad("Frame preview is not a valid PNG");
         try {
-          unlinkSync3(png);
+          unlinkSync4(png);
         } catch {
         }
       } else bad(`Frame preview was not written to ${png}`);
@@ -78062,18 +78698,18 @@ ${red(bold(`${failures} problem(s) found.`))} See README > Troubleshooting.`);
 
 // src/cli/uninstall.ts
 init_define_AEMCP_CEP_FILES();
-import { existsSync as existsSync11, readdirSync as readdirSync4, readFileSync as readFileSync11, rmSync as rmSync2, writeFileSync as writeFileSync6 } from "node:fs";
-import { join as join13 } from "node:path";
+import { existsSync as existsSync12, readdirSync as readdirSync5, readFileSync as readFileSync12, rmSync as rmSync2, writeFileSync as writeFileSync7 } from "node:fs";
+import { join as join14 } from "node:path";
 function uninstall(argv) {
   console.log(bold("\nAfter Effects MCP uninstaller\n"));
   const keepConfig = argv.includes("--keep-config");
-  if (existsSync11(extensionDir())) {
+  if (existsSync12(extensionDir())) {
     rmSync2(extensionDir(), { recursive: true, force: true });
     ok(`Removed the After Effects extension`);
   }
-  if (existsSync11(AEMCP_DIR)) {
-    for (const name of readdirSync4(AEMCP_DIR))
-      if (name !== "node" && !(keepConfig && name === "config.json")) rmSync2(join13(AEMCP_DIR, name), { recursive: true, force: true });
+  if (existsSync12(AEMCP_DIR)) {
+    for (const name of readdirSync5(AEMCP_DIR))
+      if (name !== "node" && !(keepConfig && name === "config.json")) rmSync2(join14(AEMCP_DIR, name), { recursive: true, force: true });
   }
   ok(keepConfig ? "Removed the server (kept ~/.aemcp/config.json)" : `Removed ${AEMCP_DIR}`);
   for (const [label, file2] of [["Claude Desktop", claudeDesktopConfig()], ["Cursor", cursorConfig()], ["Claude Code", claudeCodeConfig()]]) {
@@ -78092,11 +78728,11 @@ function uninstall(argv) {
     } catch {
     }
   }
-  if (existsSync11(codexConfig())) {
-    const t = readFileSync11(codexConfig(), "utf8");
+  if (existsSync12(codexConfig())) {
+    const t = readFileSync12(codexConfig(), "utf8");
     const n = removeCodexBlock(t);
     if (n !== t) {
-      writeFileSync6(codexConfig(), n.trimEnd() + "\n");
+      writeFileSync7(codexConfig(), n.trimEnd() + "\n");
       ok("Removed from Codex");
     }
   }
@@ -78112,8 +78748,9 @@ function createMcpServer() {
   const server = new McpServer({ name: "after-effects", title: "Adobe After Effects", version: VERSION }, { instructions });
   applyProfile(server, profile);
   registerCoreTools(server);
-  registerJsxTools(server, [...projectTools, ...compTools, ...layerTools, ...propertyTools, ...effectTools, ...renderTools, ...appTools, ...inspectTools, ...keyframeTools, ...footageTools, ...textTools, ...egpTools, ...healthTools]);
+  registerJsxTools(server, ALL_JSX_TOOLS);
   registerRenderJobs(server);
+  registerWorkflowTools(server);
   server.registerResource(
     "extendscript-cheatsheet",
     "aemcp://docs/extendscript",

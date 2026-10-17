@@ -150,6 +150,7 @@ export function formatChanges(ch: Changes | undefined): string | null {
   for (const [op, type, name, extra] of ch.items) {
     if (op === "+") lines.push(`+ ${type} "${name}"${type === "comp" && extra !== undefined ? ` (${extra} layers)` : ""}`);
     else if (op === "-") lines.push(`- ${type} "${name}"`);
+    else if (type === "project") lines.push(`~ project settings: ${extra}`);
     else lines.push(`~ ${type} "${name}": ${extra}`);
   }
   for (const [op, comp, layer, extra] of ch.layers) {

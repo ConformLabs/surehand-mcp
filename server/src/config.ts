@@ -18,6 +18,8 @@ export interface AemcpConfig {
   permissions?: { mode?: string; allowShell?: boolean };
   /** preferred After Effects instance when several run: "2026", "26.5" or a bridge port */
   instance?: string;
+  /** extra folders with the user's own scripts, listed by ae_list_scripts */
+  scriptFolders?: string[];
 }
 
 export function configPath(): string {
@@ -41,5 +43,6 @@ export function loadConfig(): AemcpConfig {
     changeReport: file.changeReport,
     permissions: file.permissions,
     instance: file.instance,
+    scriptFolders: file.scriptFolders,
   };
 }

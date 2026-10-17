@@ -32,6 +32,11 @@ export const CORE_TOOLS = new Set([
   "ae_apply_effect",
   "ae_get_effect_params",
   "ae_undo",
+  // workflow: batches, safety copies, the user's own scripts
+  "ae_batch",
+  "ae_checkpoint",
+  "ae_list_scripts",
+  "ae_run_script_file",
 ]);
 
 export interface ToolProfile {

@@ -1,0 +1,290 @@
+// Professional workflow: batch edits (one undo step, all or nothing), project checkpoints,
+// and the user's own script library.
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { createHash } from "node:crypto";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { basename, dirname, extname, join } from "node:path";
+import { z } from "zod";
+import { evalRaw } from "../bridge.js";
+import { loadConfig } from "../config.js";
+import { evalBody, formatChanges, runJsx } from "../jsx.js";
+import { approvalSummary, permissions, READ_ONLY_REFUSAL, SHELL_REFUSAL, usesShell } from "../permissions.js";
+import { transpileUserCode } from "../transpile.js";
+import { ALL_JSX_TOOLS } from "./all.js";
+import { errorResult, formatResult, reportScope } from "./registry.js";
+
+// ---------- checkpoints ----------
+
+const CHECKPOINTS = join(homedir(), ".aemcp", "checkpoints");
+const MAX_CHECKPOINTS = 50;
+
+interface Checkpoint { id: string; at: string; label?: string; file: string; project: string }
+
+function projectDir(projectPath: string) {
+  const name = basename(projectPath, extname(projectPath)).replace(/[^\w.-]+/g, "_").slice(0, 60);
+  return join(CHECKPOINTS, `${name}-${createHash("sha1").update(projectPath).digest("hex").slice(0, 8)}`);
+}
+
+function readIndex(dir: string): Checkpoint[] {
+  try {
+    return JSON.parse(readFileSync(join(dir, "index.json"), "utf8"));
+  } catch {
+    return [];
+  }
+}
+
+const stamp = () => new Date().toISOString().replace(/[:T]/g, "-").replace(/\..+$/, "");
+
+/** Save the open project and copy it into the checkpoint folder. */
+export async function saveCheckpoint(label?: string): Promise<Checkpoint> {
+  const r = await runJsx(
+    `var p = app.project;
+if (!p.file) aemcp.fail("The project has never been saved, so there is nothing to checkpoint yet. Save it first (ae_save_project with a path).");
+p.save();
+return p.file.fsName;`,
+    {},
+    { undoGroup: false, timeoutMs: 300_000 },
+  );
+  if (!r.ok) throw new Error(r.error?.message || "could not save the project");
+  const project = String(r.result);
+  const dir = projectDir(project);
+  mkdirSync(dir, { recursive: true });
+  const id = stamp();
+  const file = join(dir, `${id}${label ? "-" + label.replace(/[^\w.-]+/g, "_").slice(0, 40) : ""}.aep`);
+  copyFileSync(project, file);
+  const index = readIndex(dir);
+  index.push({ id, at: new Date().toISOString(), label, file, project });
+  while (index.length > MAX_CHECKPOINTS) {
+    const old = index.shift()!;
+    try {
+      unlinkSync(old.file);
+    } catch {}
+  }
+  writeFileSync(join(dir, "index.json"), JSON.stringify(index, null, 2));
+  return index[index.length - 1];
+}
+
+// ---------- user scripts ----------
+
+const SCRIPT_EXT = /\.(jsx|jsxbin|js)$/i;
+
+function scanScripts(root: string, origin: string, depth = 2, out: any[] = []) {
+  let entries: string[] = [];
+  try {
+    entries = readdirSync(root);
+  } catch {
+    return out;
+  }
+  for (const name of entries) {
+    const p = join(root, name);
+    let st;
+    try {
+      st = statSync(p);
+    } catch {
+      continue;
+    }
+    if (st.isDirectory()) {
+      // AE's own "(support)" / "(instructional)" folders hold helpers, not scripts to run
+      if (depth > 0 && !/^\(.*\)$/.test(name)) scanScripts(p, origin === "After Effects" && name === "ScriptUI Panels" ? "ScriptUI Panels" : origin, depth - 1, out);
+      continue;
+    }
+    if (!SCRIPT_EXT.test(name)) continue;
+    let description: string | undefined;
+    if (/\.jsx?$/i.test(name) && st.size < 2_000_000) {
+      // first comment block as a description
+      const head = readFileSync(p, "utf8").slice(0, 2000);
+      const m = head.match(/\/\*+([\s\S]*?)\*\//) || head.match(/((?:^\s*\/\/.*\n?){1,6})/m);
+      if (m) description = m[1].replace(/^\s*(\*|\/\/)\s?/gm, "").replace(/\s+/g, " ").trim().slice(0, 200) || undefined;
+    }
+    out.push({ name: name.replace(SCRIPT_EXT, ""), path: p, origin, folder: basename(dirname(p)), kind: origin === "ScriptUI Panels" ? "panel (opens a window)" : "script", description, sizeKB: Math.round(st.size / 1024) });
+  }
+  return out;
+}
+
+export function registerWorkflowTools(server: McpServer) {
+  // ---------- batch ----------
+  const batchable = new Map(ALL_JSX_TOOLS.filter((t) => !t.noUndo).map((t) => [t.name, t]));
+  server.registerTool(
+    "ae_batch",
+    {
+      title: "Batch edits",
+      description:
+        "Run many steps in ONE call: each step is a tool with its arguments (any project/comp/layer/property/keyframe/effect/text/footage tool) " +
+        "or {tool: \"ae_run_script\", args: {code}}. All steps form a single undo step and return one change report. " +
+        "Atomic by default: if any step fails, everything is undone and you get the error of the failing step. " +
+        "Use it for repetitive or multi-part edits (e.g. style 30 layers, build a scene) to save round trips.",
+      inputSchema: {
+        steps: z.array(z.object({ tool: z.string(), args: z.record(z.string(), z.any()).optional() })).min(1).max(200),
+        atomic: z.boolean().optional().describe("Undo everything if a step fails (default true). false = keep successful steps and continue."),
+        name: z.string().optional().describe('Undo step name shown in After Effects (default "AE MCP Batch").'),
+        checkpoint: z.boolean().optional().describe("Save a project checkpoint before running (see ae_checkpoint)."),
+        verbose: z.boolean().optional().describe("Return each step's full result (default: short summaries)."),
+      },
+      annotations: { destructiveHint: true, openWorldHint: false },
+    },
+    async ({ steps, atomic, name, checkpoint, verbose }) => {
+      try {
+        const perm = permissions();
+        const bodies: string[] = [];
+        const stepArgs: unknown[] = [];
+        let edits = false;
+        for (const [i, s] of steps.entries()) {
+          if (s.tool === "ae_run_script") {
+            const code = String(s.args?.code ?? "");
+            if (!perm.allowShell && usesShell(code)) return errorResult(`Step ${i + 1}: ${SHELL_REFUSAL}`);
+            const t = transpileUserCode(code);
+            if (t.syntaxError && !t.transpiled) return errorResult(`Step ${i + 1} (ae_run_script) has a syntax error: ${t.syntaxError}`);
+            bodies.push(evalBody(t.source));
+            stepArgs.push(s.args?.args ?? {});
+            edits = true;
+            continue;
+          }
+          const tool = batchable.get(s.tool);
+          if (!tool) return errorResult(`Step ${i + 1}: "${s.tool}" can't be used in a batch (unknown, or it can't be part of an undo step such as open/save project or undo).`);
+          if (!tool.readOnly && !tool.tempItems) edits = true;
+          bodies.push(tool.jsx);
+          stepArgs.push(s.args ?? {});
+        }
+        if (edits && perm.mode === "read-only") return errorResult(READ_ONLY_REFUSAL);
+        let cp = "";
+        if (checkpoint) cp = `Checkpoint saved first: ${(await saveCheckpoint("before-batch")).file}\n`;
+
+        const isAtomic = atomic !== false;
+        const body =
+          "var __steps = [\n" +
+          bodies.map((b) => `function (args, log) {\n${b}\n}`).join(",\n") +
+          `\n], __out = [], __failed = -1;
+for (var __i = 0; __i < __steps.length; __i++) {
+  try { __out.push({ ok: true, result: aemcp.serialize(__steps[__i](args.stepArgs[__i], log), 2) }); }
+  catch (e) { __out.push({ ok: false, error: e.message || String(e), line: e.aemcpUser ? undefined : e.line }); if (__failed < 0) __failed = __i; if (args.atomic) break; }
+}
+return { steps: __out, failed: __failed };`;
+        const scope = [...new Set(steps.map((s) => s.args?.comp).filter((c) => c !== undefined && c !== null))];
+        const r = await runJsx(body, { stepArgs, atomic: isAtomic }, {
+          undoGroup: name || "AE MCP Batch",
+          timeoutMs: 600_000,
+          depth: 6,
+          report: loadConfig().changeReport === false ? undefined : scope.length ? scope : reportScope({}),
+          bridge: edits && perm.mode === "ask" ? { approval: { tool: `Batch (${steps.length} steps)`, summary: steps.map((s, i) => `${i + 1}. ${s.tool} ${approvalSummary(s.tool, s.args).slice(0, 300)}`).join("\n") } } : undefined,
+        });
+        if (!r.ok) return formatResult(r);
+        const res = r.result as { steps: { ok: boolean; result?: unknown; error?: string; line?: number }[]; failed: number };
+        const lines = res.steps.map((s, i) => {
+          if (!s.ok) return `${i + 1}. ${steps[i].tool}: FAILED: ${s.error}${s.line ? ` (line ${s.line})` : ""}`;
+          const txt = s.result === undefined || s.result === null ? "ok" : JSON.stringify(s.result);
+          return `${i + 1}. ${steps[i].tool}: ${verbose ? txt : txt.length > 160 ? txt.slice(0, 157) + "..." : txt}`;
+        });
+        const changes = formatChanges(r.changes);
+        if (res.failed >= 0 && isAtomic) {
+          await evalRaw("app.executeCommand(16); 'undone'", 60_000); // Edit > Undo: reverts the whole batch
+          return {
+            isError: true,
+            content: [
+              {
+                type: "text",
+                text: `${cp}Batch stopped at step ${res.failed + 1} of ${steps.length} and was rolled back (nothing changed).\n${lines.join("\n")}` +
+                  (changes && changes !== "Changes: none" ? `\n\nRolled back:\n${changes}` : ""),
+              },
+            ],
+          };
+        }
+        const head = res.failed >= 0 ? `Batch finished with errors (atomic: false, successful steps were kept).` : `Batch done: ${steps.length} steps in one undo step.`;
+        return { content: [{ type: "text", text: `${cp}${head}\n${lines.join("\n")}${changes ? `\n\n${changes}` : ""}` }] };
+      } catch (e) {
+        return errorResult(e);
+      }
+    },
+  );
+
+  // ---------- checkpoints ----------
+  server.registerTool(
+    "ae_checkpoint",
+    {
+      title: "Project checkpoints",
+      description:
+        "Safety copies of the project: save (saves the open project, then keeps a timestamped copy), list the checkpoints of this project, " +
+        "or restore one (opens it as a NEW file next to the original; the original file is never overwritten). Use before large or risky changes.",
+      inputSchema: {
+        action: z.enum(["save", "list", "restore"]),
+        label: z.string().optional().describe("Short label for a new checkpoint."),
+        id: z.string().optional().describe("Checkpoint id to restore (from list)."),
+        discardChanges: z.boolean().optional().describe("Restore even if the open project has unsaved changes."),
+      },
+      annotations: { destructiveHint: false, openWorldHint: false },
+    },
+    async ({ action, label, id, discardChanges }) => {
+      try {
+        if (action === "save") {
+          if (permissions().mode === "read-only") return errorResult(READ_ONLY_REFUSAL);
+          const c = await saveCheckpoint(label);
+          return { content: [{ type: "text", text: `Checkpoint ${c.id}${c.label ? ` (${c.label})` : ""} saved: ${c.file}` }] };
+        }
+        const r = await runJsx("return app.project.file ? app.project.file.fsName : null;", {}, { undoGroup: false });
+        const project = r.result as string | null;
+        if (!project) return errorResult("The open project has never been saved, so it has no checkpoints.");
+        const index = readIndex(projectDir(project));
+        if (action === "list") {
+          if (!index.length) return { content: [{ type: "text", text: `No checkpoints yet for ${project}.` }] };
+          return { content: [{ type: "text", text: JSON.stringify({ project, checkpoints: index.map(({ id, at, label, file }) => ({ id, at, label, file })).reverse() }) }] };
+        }
+        if (permissions().mode === "read-only") return errorResult(READ_ONLY_REFUSAL);
+        const cp = id ? index.find((c) => c.id === id) : index[index.length - 1];
+        if (!cp || !existsSync(cp.file)) return errorResult(`Checkpoint ${id ?? "(latest)"} not found. Use action "list".`);
+        // check before copying, so a refused restore leaves no file behind
+        const dirty = await runJsx("return app.project.dirty;", {}, { undoGroup: false });
+        if (dirty.result === true && !discardChanges)
+          return errorResult("The open project has unsaved changes. Save it (or checkpoint it) first, or pass discardChanges: true.");
+        const target = join(dirname(project), `${basename(project, extname(project))} (restored ${cp.id}).aep`);
+        copyFileSync(cp.file, target);
+        const o = await runJsx(`app.open(new File(args.path)); return app.project.file.fsName;`, { path: target }, { undoGroup: false, timeoutMs: 300_000 });
+        if (!o.ok) return formatResult(o);
+        return { content: [{ type: "text", text: `Restored checkpoint ${cp.id}${cp.label ? ` (${cp.label})` : ""} as a new file and opened it: ${target}\nThe original project file was not changed.` }] };
+      } catch (e) {
+        return errorResult(e);
+      }
+    },
+  );
+
+  // ---------- user scripts ----------
+  server.registerTool(
+    "ae_list_scripts",
+    {
+      title: "List scripts",
+      description:
+        "List the user's own After Effects scripts: AE's Scripts folder (and ScriptUI Panels) plus folders configured as \"scriptFolders\" " +
+        "in ~/.aemcp/config.json, with each script's description from its header comment. Run one with ae_run_script_file.",
+      inputSchema: { nameContains: z.string().optional() },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    async ({ nameContains }) => {
+      try {
+        const r = await runJsx("return Folder.appPackage.parent.fsName;", {}, { undoGroup: false });
+        if (!r.ok) return formatResult(r);
+        const aeRoot = String(r.result);
+        const aeScripts = [join(aeRoot, "Scripts"), join(aeRoot, "Support Files", "Scripts")].find((p) => existsSync(p));
+        const folders: [string, string][] = [];
+        if (aeScripts) folders.push([aeScripts, "After Effects"]);
+        for (const f of loadConfig().scriptFolders ?? []) folders.push([f.replace(/^~(?=\/|\\|$)/, homedir()), "your folder"]);
+        let list = folders.flatMap(([dir, origin]) => scanScripts(dir, origin));
+        // skip AE's startup/shutdown hooks: they are not meant to be run by hand
+        list = list.filter((s) => !/[\\/](Startup|Shutdown)$/.test(dirname(s.path)));
+        if (nameContains) list = list.filter((s) => s.name.toLowerCase().includes(nameContains.toLowerCase()));
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({ folders: folders.map(([d, o]) => ({ folder: d, origin: o, exists: existsSync(d) })), scripts: list }) +
+                (folders.length < 2 ? '\n\nTip: add your own folders with "scriptFolders": ["/path/to/scripts"] in ~/.aemcp/config.json.' : ""),
+            },
+          ],
+        };
+      } catch (e) {
+        return errorResult(e);
+      }
+    },
+  );
+}
+
+// exported for tests
+export const _internal = { projectDir, scanScripts };

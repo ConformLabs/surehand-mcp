@@ -520,35 +520,48 @@ aemcp = (function () {
 
   // ---------- change report ----------
   // Snapshots before/after a tool call and a diff of them. Items are always compared; layers and
-  // property values only for the comps in scope (the active comp and comps named in the call),
+  // property values only for the comps in scope (the comp named in the call, else the active comp),
   // with a budget on property reads so very large comps stay fast.
-  var PROP_BUDGET = 25000;
-  function brief(v) {
-    if (v === null || v === undefined) return "none";
-    if (typeof v === "number") return String(Math.round(v * 100) / 100);
-    if (typeof v === "string") return v.length > 40 ? '"' + v.substr(0, 37) + '..."' : '"' + v + '"';
-    if (typeof v === "boolean") return v ? "on" : "off";
-    if (v instanceof Array) {
-      if (v.length > 4) return "[" + v.length + " values]";
-      var a = []; for (var i = 0; i < v.length; i++) a.push(brief(v[i])); return "[" + a.join(",") + "]";
-    }
-    if (v.text !== undefined) return brief(v.text);
-    if (v.vertices) return "path(" + v.vertices.length + " points)";
-    return "{...}";
+  // Everything is stored as one compact string per item / layer / property: ExtendScript's garbage
+  // collector slows down sharply with many small objects (thousands of {..} per snapshot cost ~1s).
+  var PROP_BUDGET = 25000, SEP = "\u0001", PSEP = "\u0002";
+  // typed encoding of a value, so the report can show it readably: n=number b=boolean a=array s=string j=JSON
+  function enc(v) {
+    if (v === null || v === undefined) return "j";
+    var t = typeof v;
+    if (t === "number") return "n" + v;
+    if (t === "boolean") return v ? "b1" : "b0";
+    if (t === "string") return "s" + v;
+    if (v instanceof Array) return "a" + v.join(",");
+    return "j" + A.stringify(A.valueOf(v));
   }
+  function show(e) {
+    if (e === undefined) return "none";
+    var t = e.charAt(0), b = e.substr(1);
+    if (t === "n") return String(Math.round(Number(b) * 100) / 100);
+    if (t === "b") return b === "1" ? "on" : "off";
+    if (t === "s") return b.length > 40 ? '"' + b.substr(0, 37) + '..."' : '"' + b + '"';
+    if (t === "a") { var parts = b.split(","); if (parts.length > 4) return "[" + parts.length + " values]"; for (var i = 0; i < parts.length; i++) parts[i] = String(Math.round(Number(parts[i]) * 100) / 100); return "[" + parts.join(",") + "]"; }
+    if (!b) return "none";
+    var cut = b.indexOf("\u0003"); if (cut >= 0) b = b.substr(0, cut);
+    try { var o = JSON.parse(b); if (o && o.text !== undefined) return show("s" + o.text); if (o && o.vertices) return "path(" + o.vertices.length + " points)"; } catch (x) {}
+    return b.length > 40 ? b.substr(0, 37) + "..." : b;
+  }
+  // the plain text of an encoded string field (names): no quotes, no truncation
+  function raw(e) { return e && e.charAt(0) === "s" ? e.substr(1) : show(e); }
   function keySig(p) {
     var n = p.numKeys; if (!n) return "";
     var s = n + ":";
     var lim = Math.min(n, 40);
-    for (var k = 1; k <= lim; k++) { var kv; try { kv = p.keyValue(k); } catch (e) { kv = "?"; } s += A.round(p.keyTime(k)) + "=" + A.stringify(A.valueOf(kv)) + ";"; }
+    for (var k = 1; k <= lim; k++) { var kv; try { kv = p.keyValue(k); } catch (e) { kv = "?"; } s += A.round(p.keyTime(k)) + "=" + enc(kv) + ";"; }
     return s;
   }
-  function layerSig(L) {
-    var o = [L.name, A.round(L.inPoint), A.round(L.outPoint), A.round(L.startTime), L.stretch, L.parent ? (L.parent.id || L.parent.index) : 0, L.enabled, L.solo, L.locked, L.shy, L.label];
-    try { o.push(L.threeDLayer, L.blendingMode, L.trackMatteType, L.adjustmentLayer, L.motionBlur, L.guideLayer, L.audioEnabled); } catch (e) {}
-    return o;
-  }
   var LAYER_FIELDS = ["name", "in", "out", "start", "stretch", "parent", "enabled", "solo", "locked", "shy", "label", "3D", "blend mode", "track matte", "adjustment", "motion blur", "guide", "audio"];
+  function layerSig(L) {
+    var o = [enc(L.name), enc(A.round(L.inPoint)), enc(A.round(L.outPoint)), enc(A.round(L.startTime)), enc(L.stretch), enc(L.parent ? L.parent.name : "none"), enc(L.enabled), enc(L.solo), enc(L.locked), enc(L.shy), enc(L.label)];
+    try { o.push(enc(L.threeDLayer), enc(A.enumName(BlendingMode, L.blendingMode)), enc(A.enumName(TrackMatteType, L.trackMatteType)), enc(L.adjustmentLayer), enc(L.motionBlur), enc(L.guideLayer), enc(L.audioEnabled)); } catch (e) {}
+    return o.join(SEP);
+  }
   function layerKey(L) { return L.id !== undefined ? "L" + L.id : "i" + L.index + ":" + L.name; }
   // Per-character style fingerprint (AE 24+): catches styling applied to part of a text.
   A.textStyleSig = function (td) {
@@ -576,13 +589,9 @@ aemcp = (function () {
           // expression-heavy comps. The expression text is compared already, so use the value before
           // the expression (cheap) for those properties.
           var raw; try { raw = ex ? p.valueAtTime(budget.time, true) : p.value; } catch (e) { continue; }
-          // cheap fingerprints for the common cases (numbers, arrays); full JSON only for the rest
-          var v = raw, vs;
-          if (typeof raw === "number" || typeof raw === "boolean") vs = String(raw);
-          else if (raw instanceof Array) vs = raw.join(",");
-          else { v = A.valueOf(raw); vs = A.stringify(v); if (p.propertyValueType === PropertyValueType.TEXT_DOCUMENT) vs += A.textStyleSig(raw); }
-          var nk = p.numKeys;
-          out[pp] = { s: vs + "|" + (nk ? keySig(p) : "") + "|" + ex, v: v, k: nk, e: ex };
+          var ve = enc(raw);
+          if (p.propertyValueType === PropertyValueType.TEXT_DOCUMENT) ve += "\u0003" + A.textStyleSig(raw); // style after a separator: show() ignores it
+          out[pp] = ve + PSEP + (p.numKeys ? keySig(p) : "") + PSEP + ex;
         } else {
           if (p.propertyType === PropertyType.INDEXED_GROUP || depth < 3) {
             var en = ""; try { if (p.canSetEnabled) en = p.enabled ? "on" : "off"; } catch (e) {}
@@ -594,105 +603,135 @@ aemcp = (function () {
     }
     walk(L, "", 0);
   }
-  function snapComp(c, deep, budget) {
-    var o = { id: c.id, name: c.name, layers: {}, order: [], deep: deep };
+  function snapComp(c, budget) {
+    var o = { name: c.name, layers: {}, order: [] };
     budget.time = c.time;
     for (var i = 1; i <= c.numLayers; i++) {
       var L = c.layer(i), k = layerKey(L);
-      var e = { name: L.name, index: i, sig: layerSig(L) };
-      if (deep) { e.props = {}; e.groups = {}; snapProps(L, e.props, e.groups, budget); }
+      var e = { sig: layerSig(L), props: {}, groups: {} };
+      snapProps(L, e.props, e.groups, budget);
       o.layers[k] = e; o.order.push(k);
     }
     if (budget.over) o.partial = true;
     return o;
   }
-  // [label, value] pairs, so the report can name exactly what changed for any item type
+  // [kind, ...encoded fields]; field labels per kind below
+  var ITEM_FIELDS = {
+    comp: ["name", "folder", "label", "comment", "width", "height", "duration", "frame rate", "pixel aspect", "background", "work area start", "work area duration", "layers", "proxy", "use proxy"],
+    solid: ["name", "folder", "label", "comment", "file", "width", "height", "color", "proxy", "use proxy"],
+    footage: ["name", "folder", "label", "comment", "file", "width", "height", "frame rate", "alpha", "loop", "fields", "pixel aspect", "proxy", "use proxy"],
+    other: ["name", "folder", "label", "comment"]
+  };
+  function proxyOf(it) { try { return it.proxySource ? (it.proxySource.file ? it.proxySource.file.fsName : "placeholder") : ""; } catch (e) { return ""; } }
   function itemSig(it) {
-    var s = [["name", it.name], ["folder", it.parentFolder ? it.parentFolder.name : ""], ["label", it.label], ["comment", it.comment]];
-    try { if (it instanceof CompItem) s.push(["width", it.width], ["height", it.height], ["duration", A.round(it.duration)], ["frame rate", A.round(it.frameRate)], ["pixel aspect", it.pixelAspect], ["background", A.stringify(it.bgColor)], ["work area start", A.round(it.workAreaStart)], ["work area duration", A.round(it.workAreaDuration)], ["layers", it.numLayers]); } catch (e) {}
+    var type = A.itemType(it), kind = type === "comp" ? "comp" : (type === "solid" ? "solid" : (it instanceof FootageItem ? "footage" : "other"));
+    var s = [type, kind, enc(it.name), enc(it.parentFolder ? it.parentFolder.name : ""), enc(it.label), enc(it.comment)];
     try {
-      if (it instanceof FootageItem) {
-        s.push(["file", it.file ? it.file.fsName : ""], ["width", it.width], ["height", it.height]);
-        var ms = it.mainSource;
-        if (ms instanceof SolidSource) s.push(["color", A.stringify(ms.color)]);
-        else { try { s.push(["frame rate", A.round(ms.conformFrameRate)], ["alpha", A.enumName(AlphaMode, ms.alphaMode)], ["loop", ms.loop], ["fields", A.enumName(FieldSeparationType, ms.fieldSeparationType)], ["pixel aspect", it.pixelAspect]); } catch (e) {} }
+      if (kind === "comp") s.push(enc(it.width), enc(it.height), enc(A.round(it.duration)), enc(A.round(it.frameRate)), enc(it.pixelAspect), enc(it.bgColor), enc(A.round(it.workAreaStart)), enc(A.round(it.workAreaDuration)), enc(it.numLayers), enc(proxyOf(it)), enc(it.useProxy));
+      else if (kind === "solid") s.push(enc(it.file ? it.file.fsName : ""), enc(it.width), enc(it.height), enc(it.mainSource.color), enc(proxyOf(it)), enc(it.useProxy));
+      else if (kind === "footage") {
+        var ms = it.mainSource, fr = "", al = "", lp = "", fs = "";
+        try { fr = A.round(ms.conformFrameRate); al = A.enumName(AlphaMode, ms.alphaMode); lp = ms.loop; fs = A.enumName(FieldSeparationType, ms.fieldSeparationType); } catch (e) {}
+        s.push(enc(it.file ? it.file.fsName : ""), enc(it.width), enc(it.height), enc(fr), enc(al), enc(lp), enc(fs), enc(it.pixelAspect), enc(proxyOf(it)), enc(it.useProxy));
       }
     } catch (e) {}
-    try { if (it instanceof CompItem || it instanceof FootageItem) s.push(["proxy", it.proxySource ? (it.proxySource.file ? it.proxySource.file.fsName : "placeholder") : ""], ["use proxy", it.useProxy]); } catch (e) {}
-    return s;
+    return s.join(SEP);
+  }
+  // project-wide settings (color management, bit depth, expression engine...)
+  var PROJECT_FIELDS = ["bit depth", "working space", "linear blending", "linearize working space", "scene-referred compensation", "color engine", "OCIO config", "OCIO working space", "OCIO display space", "expression engine", "time display"];
+  function projectSig(p) {
+    var g = function (k) { try { return p[k]; } catch (e) { return ""; } };
+    return [enc(g("bitsPerChannel")), enc(g("workingSpace")), enc(g("linearBlending")), enc(g("linearizeWorkingSpace")), enc(g("compensateForSceneReferredProfiles")),
+      enc(g("colorManagementSystem") === 1 ? "OCIO" : "Adobe"), enc(g("ocioConfigurationFile")), enc(g("workingColorSpace")), enc(g("displayColorSpace")), enc(g("expressionEngine")), enc(g("timeDisplayType"))].join(SEP);
   }
   A.snapshot = function (scopeRefs) {
-    var p = app.project, snap = { items: {}, comps: {} }, budget = { n: PROP_BUDGET, over: false };
-    for (var i = 1; i <= p.numItems; i++) { var it = p.item(i); snap.items[it.id] = { name: it.name, type: A.itemType(it), sig: itemSig(it), layers: it instanceof CompItem ? it.numLayers : undefined }; }
+    var p = app.project, snap = { items: {}, comps: {}, project: projectSig(p) }, budget = { n: PROP_BUDGET, over: false };
+    for (var i = 1; i <= p.numItems; i++) { var it = p.item(i); snap.items["i" + it.id] = itemSig(it); }
     var ids = {};
     // a call that names a comp is compared there only; otherwise the active comp is compared
     // (so editing a small comp doesn't pay for snapshotting a huge active comp)
-    if (!scopeRefs.length) { try { if (p.activeItem instanceof CompItem) ids[p.activeItem.id] = true; } catch (e) {} }
+    if (!scopeRefs.length) { try { if (p.activeItem instanceof CompItem) ids["c" + p.activeItem.id] = true; } catch (e) {} }
     for (var r = 0; r < scopeRefs.length; r++) {
-      if (scopeRefs[r] === "*") { for (var ai = 1; ai <= p.numItems; ai++) if (p.item(ai) instanceof CompItem) ids[p.item(ai).id] = true; continue; } // every comp
-      try { ids[A.findComp(scopeRefs[r]).id] = true; } catch (e) {}
+      if (scopeRefs[r] === "*") { for (var ai = 1; ai <= p.numItems; ai++) if (p.item(ai) instanceof CompItem) ids["c" + p.item(ai).id] = true; continue; } // every comp
+      try { ids["c" + A.findComp(scopeRefs[r]).id] = true; } catch (e) {}
     }
-    for (var id in ids) { var c = p.itemByID(Number(id)); if (c) snap.comps[id] = snapComp(c, true, budget); }
+    for (var id in ids) { if (!ids.hasOwnProperty(id)) continue; var c = p.itemByID(Number(id.substr(1))); if (c) snap.comps[id] = snapComp(c, budget); }
     return snap;
   };
   A.diff = function (a, b) {
     var ch = { items: [], layers: [], props: [], scope: [], partial: false }, MAX = 80, n = 0;
     function add(list, v) { if (n++ < MAX) list.push(v); else ch.truncated = true; }
-    for (var id in b.items) {
-      var x = b.items[id], y = a.items[id];
-      if (!y) { add(ch.items, ["+", x.type, x.name, x.layers]); continue; }
-      var d = [], ys = {};
-      for (var f0 = 0; f0 < y.sig.length; f0++) ys[y.sig[f0][0]] = y.sig[f0][1];
-      for (var f = 0; f < x.sig.length; f++) { var lab = x.sig[f][0]; if (A.stringify(x.sig[f][1]) !== A.stringify(ys[lab])) d.push(lab + " " + brief(ys[lab]) + " -> " + brief(x.sig[f][1])); }
-      if (d.length) add(ch.items, ["~", x.type, x.name, d.join("; ")]);
+    if (a.project !== undefined && a.project !== b.project) {
+      var pa0 = a.project.split(SEP), pb0 = b.project.split(SEP), pd = [];
+      for (var pi = 0; pi < pb0.length; pi++) if (pa0[pi] !== pb0[pi]) pd.push(PROJECT_FIELDS[pi] + " " + show(pa0[pi]) + " -> " + show(pb0[pi]));
+      if (pd.length) add(ch.items, ["~", "project", "settings", pd.join("; ")]);
     }
-    for (var id2 in a.items) if (!b.items[id2]) add(ch.items, ["-", a.items[id2].type, a.items[id2].name]);
+    for (var id in b.items) {
+      if (!b.items.hasOwnProperty(id)) continue;
+      var xb = b.items[id], xa = a.items[id], fb = xb.split(SEP);
+      if (xa === undefined) { add(ch.items, ["+", fb[0], raw(fb[2]), fb[1] === "comp" ? Number(fb[14].substr(1)) : undefined]); continue; }
+      if (xa === xb) continue;
+      var fa = xa.split(SEP), labels = ITEM_FIELDS[fb[1]] || ITEM_FIELDS.other, d = [];
+      for (var f = 2; f < fb.length; f++) if (fa[f] !== fb[f]) d.push(labels[f - 2] + " " + show(fa[f]) + " -> " + show(fb[f]));
+      if (d.length) add(ch.items, ["~", fb[0], raw(fb[2]), d.join("; ")]);
+    }
+    for (var id2 in a.items) if (a.items.hasOwnProperty(id2) && b.items[id2] === undefined) { var fr = a.items[id2].split(SEP); add(ch.items, ["-", fr[0], raw(fr[2])]); }
     for (var cid in b.comps) {
+      if (!b.comps.hasOwnProperty(cid)) continue;
       var cb = b.comps[cid], ca = a.comps[cid];
       if (!ca) continue; // comp entered the scope during the call (e.g. newly opened): reported as an item
       ch.scope.push(cb.name);
       if (ca.partial || cb.partial) ch.partial = true;
       for (var k in cb.layers) {
-        var lb = cb.layers[k], la = ca.layers[k];
-        if (!la) { add(ch.layers, ["+", cb.name, lb.name]); continue; }
-        var ld = [];
-        for (var g = 0; g < lb.sig.length; g++) if (A.stringify(lb.sig[g]) !== A.stringify(la.sig[g])) ld.push(LAYER_FIELDS[g] + " " + brief(la.sig[g]) + " -> " + brief(lb.sig[g]));
-        if (la.index !== lb.index) ld.push("order " + la.index + " -> " + lb.index);
-        if (ld.length) add(ch.layers, ["~", cb.name, lb.name, ld.join("; ")]);
-        if (la.props && lb.props) {
-          // added/removed groups (effects, masks, shape groups...): report only the outermost one
-          var addedG = [], removedG = [];
-          for (var gp in lb.groups) {
-            if (la.groups[gp] === undefined) addedG.push(gp);
-            else if (la.groups[gp] !== lb.groups[gp]) add(ch.props, ["~", lb.name, gp, "enabled " + la.groups[gp] + " -> " + lb.groups[gp]]);
+        if (!cb.layers.hasOwnProperty(k)) continue;
+        var lb = cb.layers[k], la = ca.layers[k], lbs = lb.sig.split(SEP), lname = raw(lbs[0]);
+        if (!la) { add(ch.layers, ["+", cb.name, lname]); continue; }
+        if (la.sig !== lb.sig) {
+          var las = la.sig.split(SEP), ld = [];
+          for (var g = 0; g < lbs.length; g++) if (las[g] !== lbs[g]) ld.push(LAYER_FIELDS[g] + " " + show(las[g]) + " -> " + show(lbs[g]));
+          if (ld.length) add(ch.layers, ["~", cb.name, lname, ld.join("; ")]);
+        }
+        // added/removed groups (effects, masks, shape groups...): report only the outermost one
+        var addedG = [], removedG = [];
+        for (var gp in lb.groups) {
+          if (!lb.groups.hasOwnProperty(gp)) continue;
+          if (la.groups[gp] === undefined) addedG.push(gp);
+          else if (la.groups[gp] !== lb.groups[gp]) add(ch.props, ["~", lname, gp, "enabled " + la.groups[gp] + " -> " + lb.groups[gp]]);
+        }
+        for (var gq in la.groups) if (la.groups.hasOwnProperty(gq) && lb.groups[gq] === undefined) removedG.push(gq);
+        var outermost = function (list) {
+          list.sort();
+          var keep = [];
+          for (var q = 0; q < list.length; q++) {
+            var inner = false;
+            for (var z = 0; z < keep.length; z++) if (list[q].indexOf(keep[z] + "/") === 0) { inner = true; break; }
+            if (!inner) keep.push(list[q]);
           }
-          for (var gq in la.groups) if (lb.groups[gq] === undefined) removedG.push(gq);
-          var outermost = function (list) {
-            list.sort();
-            var keep = [];
-            for (var q = 0; q < list.length; q++) {
-              var inner = false;
-              for (var z = 0; z < keep.length; z++) if (list[q].indexOf(keep[z] + "/") === 0) { inner = true; break; }
-              if (!inner) keep.push(list[q]);
-            }
-            return keep;
-          };
-          addedG = outermost(addedG); removedG = outermost(removedG);
-          for (var ga = 0; ga < addedG.length; ga++) add(ch.props, ["+", lb.name, addedG[ga]]);
-          for (var gr = 0; gr < removedG.length; gr++) add(ch.props, ["-", lb.name, removedG[gr]]);
-          for (var pp in lb.props) {
-            var pb = lb.props[pp], pa = la.props[pp];
-            if (!pa || pa.s === pb.s) continue;
-            var parts = [];
-            if (A.stringify(pa.v) !== A.stringify(pb.v)) parts.push(brief(pa.v) + " -> " + brief(pb.v));
-            if (pa.k !== pb.k) parts.push("keyframes " + pa.k + " -> " + pb.k); else if (pb.k && pa.s.split("|")[1] !== pb.s.split("|")[1]) parts.push("keyframes changed");
-            if (pa.e !== pb.e) parts.push(!pa.e ? "expression added" : (!pb.e ? "expression removed" : "expression changed"));
-            if (!parts.length) parts.push("changed");
-            add(ch.props, ["~", lb.name, pp, parts.join(", ")]);
-          }
+          return keep;
+        };
+        addedG = outermost(addedG); removedG = outermost(removedG);
+        for (var ga = 0; ga < addedG.length; ga++) add(ch.props, ["+", lname, addedG[ga]]);
+        for (var gr = 0; gr < removedG.length; gr++) add(ch.props, ["-", lname, removedG[gr]]);
+        for (var pp in lb.props) {
+          if (!lb.props.hasOwnProperty(pp)) continue;
+          var sb = lb.props[pp], sa = la.props[pp];
+          if (sa === undefined || sa === sb) continue;
+          var pa = sa.split(PSEP), pb = sb.split(PSEP), parts = [];
+          if (pa[0] !== pb[0]) { var va = show(pa[0]), vb = show(pb[0]); parts.push(va === vb ? "formatting changed" : va + " -> " + vb); }
+          var ka = parseInt(pa[1], 10) || 0, kb = parseInt(pb[1], 10) || 0;
+          if (ka !== kb) parts.push("keyframes " + ka + " -> " + kb); else if (kb && pa[1] !== pb[1]) parts.push("keyframes changed");
+          var ea = pa.slice(2).join(PSEP), eb = pb.slice(2).join(PSEP);
+          if (ea !== eb) parts.push(!ea ? "expression added" : (!eb ? "expression removed" : "expression changed"));
+          if (!parts.length) parts.push("changed");
+          add(ch.props, ["~", lname, pp, parts.join(", ")]);
         }
       }
-      for (var k2 in ca.layers) if (!cb.layers[k2]) add(ch.layers, ["-", cb.name, ca.layers[k2].name]);
+      for (var k2 in ca.layers) if (ca.layers.hasOwnProperty(k2) && !cb.layers[k2]) add(ch.layers, ["-", cb.name, raw(ca.layers[k2].sig.split(SEP)[0])]);
+      // stacking order of the layers that exist before and after
+      var oa = [], ob = [];
+      for (var x = 0; x < ca.order.length; x++) if (cb.layers[ca.order[x]]) oa.push(ca.order[x]);
+      for (var y = 0; y < cb.order.length; y++) if (ca.layers[cb.order[y]]) ob.push(cb.order[y]);
+      if (oa.join(",") !== ob.join(",")) add(ch.layers, ["~", cb.name, "(stacking order)", "layers were reordered"]);
     }
     return ch;
   };

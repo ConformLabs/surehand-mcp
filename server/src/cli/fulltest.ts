@@ -7,21 +7,11 @@ import { CAPABILITIES_JSX, FEATURE_NOTES } from "../capabilities.js";
 import { VERSION } from "../config.js";
 import { evalBody, runJsx, type RunResult } from "../jsx.js";
 import { transpileUserCode } from "../transpile.js";
-import { appTools } from "../tools/app.js";
-import { compTools } from "../tools/comp.js";
+import { ALL_JSX_TOOLS } from "../tools/all.js";
 import { CONTACT_SHEET_JSX, RENDER_FRAME_JSX } from "../tools/core.js";
-import { effectTools } from "../tools/effects.js";
-import { footageTools } from "../tools/footage.js";
-import { inspectTools } from "../tools/inspect.js";
-import { keyframeTools } from "../tools/keyframes.js";
-import { layerTools } from "../tools/layer.js";
-import { projectTools } from "../tools/project.js";
-import { propertyTools } from "../tools/property.js";
-import { renderTools } from "../tools/render.js";
-import { egpTools, healthTools, textTools } from "../tools/text.js";
 import { bold, fail, green, ok, red, warn } from "./util.js";
 
-const ALL = [...projectTools, ...compTools, ...layerTools, ...propertyTools, ...effectTools, ...renderTools, ...appTools, ...inspectTools, ...keyframeTools, ...footageTools, ...textTools, ...egpTools, ...healthTools];
+const ALL = ALL_JSX_TOOLS;
 const C = "__aemcp_fulltest";
 
 interface Step { name: string; tool?: string; args?: Record<string, unknown>; jsx?: string; needs?: string; check?: (r: RunResult) => string | null }
@@ -76,6 +66,12 @@ export async function fullSelftest(): Promise<number> {
     { name: "render queue add", tool: "ae_add_to_render_queue", args: { comp: C, outputPath: join(tmpDir, "fulltest.mov") } },
     { name: "render settings", tool: "ae_set_render_settings", args: { renderSettings: { Quality: "Draft" } }, needs: "renderSettingsApi" },
     { name: "project health", tool: "ae_project_health", args: {} },
+    { name: "camera", tool: "ae_set_camera", args: { comp: C, focalLength: 50, type: "two-node", depthOfField: true } },
+    { name: "light", tool: "ae_set_light", args: { comp: C, type: "SPOT", intensity: 120, castsShadows: true } },
+    { name: "3D material", tool: "ae_set_material", args: { comp: C, layers: ["BG"], castsShadows: "on", specular: 30 } },
+    { name: "check expression", tool: "ae_check_expression", args: { comp: C, layer: "BG", path: "Transform/Opacity", expression: "50 + 50 * Math.sin(time)" }, check: (r) => ((r.result as any)?.ok ? null : `expression reported an error: ${(r.result as any)?.error}`) },
+    { name: "replace in expressions (dry run)", tool: "ae_replace_in_expressions", args: { find: "time", replace: "time", comps: [C], dryRun: true } },
+    { name: "color settings", tool: "ae_color_settings", args: { listProfiles: true } },
     { name: "system info", tool: "ae_system_info", args: {} },
     { name: "frame preview", jsx: RENDER_FRAME_JSX, args: { comp: C, time: 1, outputPath: frame, tmpDir }, check: () => (existsSync(frame) && statSync(frame).size > 0 ? null : "no PNG written") },
     { name: "contact sheet", jsx: CONTACT_SHEET_JSX, args: { comp: C, frames: 4, tmpDir } },
