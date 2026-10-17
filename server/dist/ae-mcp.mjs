@@ -8533,8 +8533,8 @@ After Effects MCP installer v${VERSION}`));
   ${registered.length ? `Connected: ${registered.join(", ")}. Restart ${registered.filter((r) => r !== "Claude Desktop" || !restartClaude).join(", ") || "nothing else"} if open.` : "No AI apps were found to connect."}
 
   Try asking Claude: ${bold('"Check After Effects is connected, then make a 1080p comp with an animated title."')}
-  Check the installation any time with ${bold("Test Installation")} (in the ${isWin ? "Windows" : "Mac"} folder).
-  ChatGPT: run ${bold("Connect ChatGPT")} from the same folder.
+  Check the installation any time with ${bold("2. Test Installation")} (in the ${isWin ? "Windows" : "Mac"} folder).
+  ChatGPT: run ${bold("3. Connect ChatGPT")} from the same folder.
 
   Other MCP apps can use:  command ${nodePath}
                            args    ["${INSTALLED_SERVER}"]

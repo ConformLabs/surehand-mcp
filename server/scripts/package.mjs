@@ -70,10 +70,10 @@ rmSync(STAGE, { recursive: true, force: true });
 
 // launchers: one per command and platform, all calling the scripts in "Support files"
 const LAUNCHERS = [
-  ["Install", "install", "Installs AE MCP and connects your AI apps."],
-  ["Test Installation", "selftest", "Checks that AE MCP is installed and can talk to After Effects."],
-  ["Connect ChatGPT", "chatgpt", "Connects ChatGPT (local server + secure tunnel). Keep the window open while you use it."],
-  ["Uninstall", "uninstall", "Removes AE MCP."],
+  ["1. Install", "install", "Installs AE MCP and connects your AI apps."],
+  ["2. Test Installation", "selftest", "Checks that AE MCP is installed and can talk to After Effects."],
+  ["3. Connect ChatGPT", "chatgpt", "Connects ChatGPT (local server + secure tunnel). Keep the window open while you use it."],
+  ["4. Uninstall", "uninstall", "Removes AE MCP."],
 ];
 for (const [name, cmd, desc] of LAUNCHERS) {
   const mac = join(DIRS.mac, `${name}.command`);

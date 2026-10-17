@@ -16,31 +16,34 @@ Pick ONE way to install:
 
 >> Mac (any AI app, including ChatGPT)?  Open the folder "2. Mac"
 -----------------------------------------------------------------
-1. Double-click  Install
+1. Double-click  "1. Install"
 2. Restart After Effects (once).
 3. In Claude, ask: "Check After Effects is connected."
+   Optional: double-click "2. Test Installation" with After Effects open.
 
 
 >> Windows (any AI app, including ChatGPT)?  Open the folder "3. Windows"
 -------------------------------------------------------------------------
-1. Double-click  Install
+1. Double-click  "1. Install"
 2. Restart After Effects (once).
 3. In Claude, ask: "Check After Effects is connected."
+   Optional: double-click "2. Test Installation" with After Effects open.
 
 Node.js is downloaded automatically if your computer doesn't have it.
 If Claude Desktop is open during the install, the installer offers to restart it.
 
 
-OTHER BUTTONS (in the Mac and Windows folders)
-----------------------------------------------
-Test Installation   Run with After Effects open: every line should show a check mark.
-                    It makes a temporary comp and removes it; your project is not changed.
-Connect ChatGPT     Connects ChatGPT. Follow the instructions it shows and keep the window open.
-Uninstall           Removes everything.
-                    (If you used AE-MCP.mcpb, also remove it in Claude Desktop >
-                    Settings > Extensions.)
+WHAT THE NUMBERED FILES DO (in the Mac and Windows folders)
+-----------------------------------------------------------
+1. Install             Installs everything and connects your AI apps.
+2. Test Installation   Run with After Effects open: every line should show a check mark.
+                       It makes a temporary comp and removes it; your project is not changed.
+3. Connect ChatGPT     Optional. Connects ChatGPT; follow the instructions it shows and
+                       keep the window open while you use it.
+4. Uninstall           Removes everything. (If you used AE-MCP.mcpb, also remove it in
+                       Claude Desktop > Settings > Extensions.)
 
-The "Support files" folder is used by the buttons above; you don't need to open it.
+The "Support files" folder is used by the files above; you don't need to open it.
 
 
 IF YOUR COMPUTER BLOCKS THE FILES
