@@ -16,10 +16,27 @@ return out;`,
   {
     name: "ae_get_comp_info",
     title: "Get composition info",
-    description: "Composition settings plus a summary of every layer (index, id, name, type, timing, parent, switches).",
-    input: { comp: compRef, includeLayers: z.boolean().optional().describe("Default true.") },
+    description:
+      "Composition settings plus a summary of its layers (index, id, name, type, timing, parent, switches). " +
+      "Large comps are paged: use layerOffset/layerLimit (see totalLayers / nextLayerOffset in the result).",
+    input: {
+      comp: compRef,
+      includeLayers: z.boolean().optional().describe("Default true."),
+      layerOffset: z.number().int().min(0).optional().describe("Skip this many layers (default 0)."),
+      layerLimit: z.number().int().min(1).max(1000).optional().describe("Max layers to return (default 150)."),
+    },
     readOnly: true,
-    jsx: `var c = aemcp.findComp(args.comp); var o = aemcp.compInfo(c, args.includeLayers !== false); o.markers = aemcp.markers(c.markerProperty); return o;`,
+    jsx: `
+var c = aemcp.findComp(args.comp), o = aemcp.compInfo(c, false);
+o.markers = aemcp.markers(c.markerProperty);
+if (args.includeLayers !== false) {
+  var off = args.layerOffset || 0, lim = args.layerLimit || 150, end = Math.min(c.numLayers, off + lim);
+  o.layers = [];
+  for (var i = off + 1; i <= end; i++) o.layers.push(aemcp.layerInfo(c.layer(i), false));
+  o.totalLayers = c.numLayers;
+  if (end < c.numLayers) o.nextLayerOffset = end;
+}
+return o;`,
   },
   {
     name: "ae_create_comp",

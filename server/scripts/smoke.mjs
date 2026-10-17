@@ -24,7 +24,7 @@ async function call(name, args = {}, expectError = false) {
 const { tools } = await client.listTools();
 console.log(`${tools.length} tools`);
 // remember the project state, so cleanup only ever touches items created by this test
-const before = await client.callTool({ name: "ae_run_script", arguments: { undoGroup: "", code: "var m = 0; for (var i = 1; i <= app.project.numItems; i++) m = Math.max(m, app.project.item(i).id); return { n: app.project.numItems, maxId: m };" } });
+const before = await client.callTool({ name: "ae_run_script", arguments: { undoGroup: "", report: false, code: "var m = 0; for (var i = 1; i <= app.project.numItems; i++) m = Math.max(m, app.project.item(i).id); return { n: app.project.numItems, maxId: m };" } });
 const { n: itemsBefore, maxId } = JSON.parse(before.content[0].text);
 await call("ae_status");
 await call("ae_run_script", { code: "return app.project.numItems + 1;" });
@@ -60,6 +60,13 @@ await call("ae_find_properties", { query: "opacity" });
 await call("ae_find_properties", { onlyExpressions: true });
 await call("ae_get_effect_params", { effect: "ADBE Drop Shadow" });
 await call("ae_get_effect_params", { effect: "Drop Shadow", layer: "Hello After Effects" }); // AE renames text layers to their text
+await call("ae_get_layer_bounds", {});
+await call("ae_get_comp_map", {});
+await call("ae_sample_pixels", { points: [[960, 540], [5, 5]] });
+await call("ae_render_frame", { region: [760, 340, 400, 400], background: "checkerboard", maxSize: 512 });
+await call("ae_render_frame", { layers: [1], compareWith: { time: 0 }, maxSize: 512 });
+await call("ae_run_script", { code: "const names = [];\nfor (let i = 1; i <= app.project.activeItem.numLayers; i++) names.push(app.project.activeItem.layer(i).name);\nreturn names.filter((n) => n.length > 2).map((n) => n.toUpperCase()) ?? [];" });
+await call("ae_run_script", { code: "const x = 1;\nreturn app.project.item(0).name;" }, true);
 const sheet = await call("ae_render_contact_sheet", { frames: 6, columns: 3, width: 1200 });
 const sheetImg = sheet.content.find((c) => c.type === "image");
 if (sheetImg) writeFileSync(new URL("./smoke-sheet.png", import.meta.url), Buffer.from(sheetImg.data, "base64"));
@@ -81,7 +88,7 @@ await call("ae_status");
 await call("ae_get_layer_info", { layer: "does not exist" }, true);
 await call("ae_get_scripting_guide");
 // clean up everything we created
-const cleanup = await client.callTool({ name: "ae_run_script", arguments: { undoGroup: "AE MCP smoke cleanup", code: `
+const cleanup = await client.callTool({ name: "ae_run_script", arguments: { undoGroup: "AE MCP smoke cleanup", report: false, code: `
 var p = app.project, gone = [];
 for (var i = p.numItems; i >= 1; i--) {
   var it = p.item(i);

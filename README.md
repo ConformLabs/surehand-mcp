@@ -3,9 +3,10 @@
 [![CI](https://github.com/ronyitzhaki/after-effects-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/ronyitzhaki/after-effects-mcp/actions/workflows/ci.yml)
 
 Connect **Claude** (Desktop / Code), **ChatGPT** (desktop app or web), Cursor, Codex, or any MCP client to **Adobe After Effects**.
-The AI can run any ExtendScript (JSX) inside After Effects, read information back, and use up to 61 ready-made tools
-for projects, comps, layers, keyframes, expressions, effects, shapes, masks, rendering, and previews it can *see*:
-single frames and contact sheets that show the motion over time.
+The AI can run any script inside After Effects (modern JavaScript, converted for AE's ExtendScript engine automatically),
+read information back, and use up to 64 ready-made tools for projects, comps, layers, keyframes, expressions, effects,
+shapes, masks and rendering. It can *see* and *measure* its work (frames, contact sheets, zoomed regions, difference
+images, exact layer bounds, pixel colors), and every edit returns an exact list of what changed in the project.
 
 ```
 Claude / ChatGPT ──MCP──> ae-mcp server (Node) ──localhost──> AE MCP bridge (extension inside After Effects) ──> ExtendScript
@@ -138,25 +139,29 @@ To rotate the token, delete `token` from `~/.aemcp/config.json` and re-run the i
 
 | Tool | |
 |---|---|
-| `ae_run_script` | Run ExtendScript code; `return` a value to get it back as JSON. Errors come back with line numbers; `log()` output is returned. One undo step per call. |
+| `ae_run_script` | Run JavaScript in After Effects; `return` a value to get it back as JSON. Modern syntax (let/const, arrows, template strings, destructuring, classes, `?.`, `??`, `for...of`) and common built-ins (`map`, `filter`, `Object.keys`, `JSON`...) work: the code is converted for AE's ES3 engine with Babel, keeping line numbers. Errors come back with the failing line, the code around it, and a hint. `log()` output is returned. One undo step per call. |
 | `ae_run_script_file` | Run a `.jsx` / `.jsxbin` file from disk with arguments. |
 | `ae_get_scripting_guide` | ExtendScript cheat sheet for the model (also an MCP resource `aemcp://docs/extendscript`). |
 
 **Tool profiles.** Every tool description is sent to the AI in every chat, so by default only a **core set of
-20 tools** is enabled (about 6k tokens instead of 14k for all 61); everything else is still possible through
+22 tools** is enabled (about 7k tokens instead of 16k for all 64); everything else is still possible through
 `ae_run_script`. Switch to **Full** in After Effects (**Window > Extensions > AE MCP > AI tools**), in Claude Desktop's
 extension settings ("Enable all tools") for the `.mcpb`, or with `"toolProfile": "full"` in `~/.aemcp/config.json`, then
 restart the AI app. Advanced: `"toolProfile": "core,ae_import_files,ae_render_queue_start"` adds single tools.
 
 Core set: `ae_status`, `ae_run_script`, `ae_get_scripting_guide`, `ae_render_frame`, `ae_render_contact_sheet`,
 `ae_get_project_info`, `ae_get_comp_info`, `ae_get_layer_info`, `ae_get_selection`, `ae_get_properties`,
-`ae_find_properties`, `ae_create_comp`, `ae_add_layer`, `ae_add_shape`, `ae_set_property`, `ae_set_keyframes`,
+`ae_find_properties`, `ae_get_layer_bounds`, `ae_get_comp_map`, `ae_create_comp`, `ae_add_layer`, `ae_add_shape`, `ae_set_property`, `ae_set_keyframes`,
 `ae_set_expression`, `ae_apply_effect`, `ae_get_effect_params`, `ae_undo`.
 
 **All tools (Full profile):**
 
-- **Seeing the result:** `ae_render_frame` (one frame as an image), `ae_render_contact_sheet` (a grid of frames across
-  time, labelled with time and frame number, to judge motion and easing)
+- **Seeing the result:** `ae_render_frame` (a frame as an image; options: zoom into a region, render only some layers,
+  transparency on a checkerboard or a color, difference image against another time or comp), `ae_render_contact_sheet`
+  (a grid of frames across time, labelled with time and frame number, to judge motion and easing)
+- **Measuring:** `ae_get_layer_bounds` (exact on-screen boxes after transforms, parenting, 3D and camera; in-frame and
+  action/title-safe checks), `ae_sample_pixels` (rendered RGBA/hex at points), `ae_get_comp_map` (nested precomps,
+  parenting, track mattes, expression references)
 - **Status & app:** `ae_status`, `ae_system_info`, `ae_execute_menu_command`, `ae_undo`, `ae_redo`, `ae_purge`, `ae_get_fonts`, `ae_reload_helpers`
 - **Project:** `ae_get_project_info`, `ae_list_items`, `ae_get_item_info`, `ae_import_files`, `ae_create_folder`, `ae_move_items`, `ae_rename_item`, `ae_remove_items`, `ae_replace_footage`, `ae_save_project`, `ae_open_project`, `ae_new_project`
 - **Compositions:** `ae_list_comps`, `ae_get_comp_info`, `ae_create_comp`, `ae_set_comp_settings`, `ae_duplicate_comp`, `ae_open_comp`, `ae_precompose`, `ae_add_comp_marker`
@@ -167,6 +172,25 @@ Core set: `ae_status`, `ae_run_script`, `ae_get_scripting_guide`, `ae_render_fra
 
 Comps can be referenced by id, name, or omitted for the active comp; layers by 1-based index or name; properties by
 paths like `"Transform/Position"` or `"Effects/Gaussian Blur/Blurriness"` (display names or match names).
+
+### Change report
+
+Every call that edits the project ends with a **Changes** list, computed by After Effects itself (a snapshot before
+and after the call), for example:
+
+```
+Changes (layers/properties compared in: Main):
++ layer "Headline" in "Main"
+~ layer "Plate" in "Main": name "Plate" -> "Background"; locked off -> on
++ Headline > Effects/Glow
+~ Headline > Transform/Opacity: 100 -> 0, expression added
+~ Headline > Transform/Position: [640,360] -> [640,800], keyframes 0 -> 2
+```
+
+Project items are always compared; layers, properties, keyframes, expressions, effects and masks are compared in the
+active comp and any comp named in the call. If a script fails halfway, the report lists what it had already changed.
+`ae_undo` reports what was reverted. On very large comps (tens of thousands of properties) this adds up to about a
+second per edit; turn it off with `"changeReport": false` in `~/.aemcp/config.json`, or per script with `report: false`.
 
 ### Example prompts
 

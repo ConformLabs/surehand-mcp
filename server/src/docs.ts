@@ -1,19 +1,29 @@
 export const INSTRUCTIONS = `This server controls a running Adobe After Effects instance through ExtendScript.
-- Start with ae_status to confirm the connection, then ae_get_project_info / ae_get_comp_info to understand the project.
+- Start with ae_status to confirm the connection, then ae_get_project_info / ae_get_comp_info (and ae_get_comp_map for
+  nested precomps, parenting and expression links) to understand the project.
 - Prefer the specific tools (ae_create_comp, ae_add_layer, ae_set_keyframes, ae_apply_effect...) for common edits; use ae_run_script for anything else - the full AE scripting API is available.
 - Use ae_get_properties to discover property paths/match names before setting values.
-- After visual changes, use ae_render_frame to look at the result.
+- After visual changes, look at the result: ae_render_frame (one frame; can zoom a region, solo layers, show alpha, diff),
+  ae_render_contact_sheet (motion over time). Check layout numerically with ae_get_layer_bounds.
+- Every edit returns a "Changes" list of exactly what changed in the project; use it to confirm the edit did what you meant.
 - Every tool call is one undo step; ae_undo reverts it.
 - Read the resource aemcp://docs/extendscript before writing non-trivial ExtendScript.`;
 
 export const EXTENDSCRIPT_DOC = `# After Effects ExtendScript cheat sheet (for ae_run_script)
 
-## Language rules (ExtendScript = ECMAScript 3)
-- \`var\` only (no let/const), no arrow functions, no template literals, no destructuring, no classes.
-- No Array.prototype.map/filter/forEach/indexOf, no Object.keys, no JSON - write for-loops; use \`aemcp.stringify(obj)\`.
+## Language
+- Write normal modern JavaScript: let/const, arrow functions, template strings, destructuring, spread, classes,
+  ?. and ??, for...of, map/filter/forEach/find/includes, Object.keys/entries/assign, JSON. ae_run_script converts it
+  for After Effects' ExtendScript engine (ES3) automatically and keeps line numbers.
+- Not available: async/await, Promise, Map/Set/WeakMap, generators, Symbol, getters/setters, regex lookbehind/named groups.
 - Your code is a function body: \`return\` a value to get it back. \`args\` holds the JSON args, \`log(...)\` adds log lines.
 - AE collections are **1-based**: app.project.item(i), comp.layer(i), group.property(i). JS arrays are 0-based.
 - Times are in seconds. Colors are [r,g,b] floats 0-1 (aemcp.color("#ff8800") converts).
+- Use index loops or for...of over arrays, not for...in (polyfilled methods are enumerable in ES3).
+- Only with transpile:false or ae_run_script_file (raw ExtendScript): use var/function only, put parentheses around
+  nested ?: (ExtendScript evaluates a ? b : c ? d : e left-to-right), and don't use reserved words such as short, int,
+  char, float, class as names.
+- Edits report what changed (items, layers, properties, keyframes, expressions, effects) after every call.
 
 ## Helpers (global \`aemcp\`)
 aemcp.findComp(idOrName|"active"), aemcp.findLayer(comp, indexOrName), aemcp.findItem(idOrName),

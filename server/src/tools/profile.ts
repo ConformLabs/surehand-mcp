@@ -18,6 +18,8 @@ export const CORE_TOOLS = new Set([
   "ae_get_selection",
   "ae_get_properties",
   "ae_find_properties",
+  "ae_get_layer_bounds",
+  "ae_get_comp_map",
   // common edits
   "ae_create_comp",
   "ae_add_layer",

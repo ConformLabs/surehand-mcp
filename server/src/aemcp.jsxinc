@@ -1,6 +1,85 @@
 // aemcp helper library — loaded once into the After Effects ExtendScript engine
 // by the MCP server (sent over the bridge whenever the version check fails).
 // ES3 only: no let/const, arrow functions, Array.prototype.map, JSON, etc.
+// ---------- ES5+ runtime polyfills ----------
+// AE's ExtendScript engine is ES3. Modern syntax in user scripts is transpiled by the server;
+// these add the built-ins that transpiled (and hand-written) code expects. Each is only added
+// if missing. Note: ES3 can't make them non-enumerable, so use index loops (or for...of, which
+// is transpiled to one) rather than for...in over arrays.
+(function () {
+  var AP = Array.prototype, SP = String.prototype, OP = Object;
+  function def(o, name, fn) { if (typeof o[name] !== "function") o[name] = fn; }
+  function toInt(n) { n = Number(n); return isNaN(n) ? 0 : (n < 0 ? Math.ceil(n) : Math.floor(n)); }
+  def(AP, "forEach", function (f, t) { for (var i = 0, n = this.length; i < n; i++) if (i in this) f.call(t, this[i], i, this); });
+  def(AP, "map", function (f, t) { var r = new Array(this.length); for (var i = 0, n = this.length; i < n; i++) if (i in this) r[i] = f.call(t, this[i], i, this); return r; });
+  def(AP, "filter", function (f, t) { var r = []; for (var i = 0, n = this.length; i < n; i++) if (i in this && f.call(t, this[i], i, this)) r.push(this[i]); return r; });
+  def(AP, "some", function (f, t) { for (var i = 0, n = this.length; i < n; i++) if (i in this && f.call(t, this[i], i, this)) return true; return false; });
+  def(AP, "every", function (f, t) { for (var i = 0, n = this.length; i < n; i++) if (i in this && !f.call(t, this[i], i, this)) return false; return true; });
+  def(AP, "reduce", function (f, acc) {
+    var i = 0, n = this.length;
+    if (arguments.length < 2) { while (i < n && !(i in this)) i++; if (i >= n) throw new TypeError("Reduce of empty array with no initial value"); acc = this[i++]; }
+    for (; i < n; i++) if (i in this) acc = f(acc, this[i], i, this);
+    return acc;
+  });
+  def(AP, "reduceRight", function (f, acc) {
+    var i = this.length - 1;
+    if (arguments.length < 2) { while (i >= 0 && !(i in this)) i--; if (i < 0) throw new TypeError("Reduce of empty array with no initial value"); acc = this[i--]; }
+    for (; i >= 0; i--) if (i in this) acc = f(acc, this[i], i, this);
+    return acc;
+  });
+  def(AP, "indexOf", function (x, from) { var n = this.length, i = toInt(from || 0); if (i < 0) i = Math.max(0, n + i); for (; i < n; i++) if (this[i] === x) return i; return -1; });
+  def(AP, "lastIndexOf", function (x, from) { var n = this.length, i = arguments.length > 1 ? toInt(from) : n - 1; if (i < 0) i = n + i; for (i = Math.min(i, n - 1); i >= 0; i--) if (this[i] === x) return i; return -1; });
+  def(AP, "find", function (f, t) { for (var i = 0, n = this.length; i < n; i++) if (f.call(t, this[i], i, this)) return this[i]; return undefined; });
+  def(AP, "findIndex", function (f, t) { for (var i = 0, n = this.length; i < n; i++) if (f.call(t, this[i], i, this)) return i; return -1; });
+  def(AP, "findLast", function (f, t) { for (var i = this.length - 1; i >= 0; i--) if (f.call(t, this[i], i, this)) return this[i]; return undefined; });
+  def(AP, "includes", function (x) { for (var i = 0, n = this.length; i < n; i++) if (this[i] === x || (x !== x && this[i] !== this[i])) return true; return false; });
+  def(AP, "fill", function (v, s, e) { var n = this.length, i = toInt(s || 0), end = e === undefined ? n : toInt(e); if (i < 0) i += n; if (end < 0) end += n; for (; i < end; i++) this[i] = v; return this; });
+  def(AP, "flat", function (d) { d = d === undefined ? 1 : toInt(d); var r = []; (function walk(a, k) { for (var i = 0; i < a.length; i++) { if (a[i] instanceof Array && k > 0) walk(a[i], k - 1); else r.push(a[i]); } })(this, d); return r; });
+  def(Array, "isArray", function (a) { return a instanceof Array; });
+  def(Array, "from", function (src, f, t) { var r = []; if (src == null) return r; var n = src.length >>> 0; for (var i = 0; i < n; i++) { var v = typeof src === "string" ? src.charAt(i) : src[i]; r.push(f ? f.call(t, v, i) : v); } return r; });
+  def(Array, "of", function () { return AP.slice.call(arguments); });
+  def(OP, "keys", function (o) { var r = []; for (var k in o) if (OP.prototype.hasOwnProperty.call(o, k)) r.push(k); return r; });
+  def(OP, "values", function (o) { var r = []; for (var k in o) if (OP.prototype.hasOwnProperty.call(o, k)) r.push(o[k]); return r; });
+  def(OP, "entries", function (o) { var r = []; for (var k in o) if (OP.prototype.hasOwnProperty.call(o, k)) r.push([k, o[k]]); return r; });
+  def(OP, "fromEntries", function (es) { var o = {}; for (var i = 0; i < es.length; i++) o[es[i][0]] = es[i][1]; return o; });
+  def(OP, "assign", function (t) { for (var i = 1; i < arguments.length; i++) { var s = arguments[i]; if (s != null) for (var k in s) if (OP.prototype.hasOwnProperty.call(s, k)) t[k] = s[k]; } return t; });
+  def(OP, "create", function (proto, props) { function F() {} F.prototype = proto; var o = new F(); if (props) OP.defineProperties(o, props); return o; });
+  // ES3 has no real property descriptors: keep the value (accessors are not supported)
+  def(OP, "defineProperty", function (o, k, d) { if (d && "value" in d) o[k] = d.value; else if (d && d.get) { try { o[k] = d.get.call(o); } catch (e) {} } return o; });
+  def(OP, "defineProperties", function (o, ds) { for (var k in ds) if (OP.prototype.hasOwnProperty.call(ds, k)) OP.defineProperty(o, k, ds[k]); return o; });
+  def(OP, "getPrototypeOf", function (o) { return o.__proto__; });
+  def(OP, "setPrototypeOf", function (o, p) { o.__proto__ = p; return o; });
+  def(OP, "freeze", function (o) { return o; });
+  def(OP, "is", function (a, b) { return a === b ? a !== 0 || 1 / a === 1 / b : a !== a && b !== b; });
+  def(SP, "trim", function () { return String(this).replace(/^\s+|\s+$/g, ""); });
+  def(SP, "trimStart", function () { return String(this).replace(/^\s+/, ""); });
+  def(SP, "trimEnd", function () { return String(this).replace(/\s+$/, ""); });
+  def(SP, "startsWith", function (s, p) { p = p || 0; return String(this).substr(p, String(s).length) === String(s); });
+  def(SP, "endsWith", function (s, e) { var t = String(this); e = e === undefined ? t.length : e; s = String(s); return t.substring(e - s.length, e) === s; });
+  def(SP, "includes", function (s, p) { return String(this).indexOf(s, p || 0) !== -1; });
+  def(SP, "repeat", function (n) { var r = "", t = String(this); for (var i = 0; i < n; i++) r += t; return r; });
+  def(SP, "padStart", function (n, f) { var t = String(this); f = f === undefined ? " " : String(f); while (t.length < n) t = f + t; return t.length > n ? t.substr(t.length - n) : t; });
+  def(SP, "padEnd", function (n, f) { var t = String(this); f = f === undefined ? " " : String(f); while (t.length < n) t += f; return t.substr(0, n); });
+  def(SP, "replaceAll", function (a, b) { return String(this).split(a).join(b); });
+  def(SP, "at", function (i) { var t = String(this); i = toInt(i); return t.charAt(i < 0 ? t.length + i : i); });
+  def(AP, "at", function (i) { i = toInt(i); return this[i < 0 ? this.length + i : i]; });
+  def(Number, "isFinite", function (n) { return typeof n === "number" && isFinite(n); });
+  def(Number, "isNaN", function (n) { return typeof n === "number" && n !== n; });
+  def(Number, "isInteger", function (n) { return typeof n === "number" && isFinite(n) && Math.floor(n) === n; });
+  def(Number, "parseFloat", parseFloat);
+  def(Number, "parseInt", parseInt);
+  def(Math, "sign", function (x) { x = Number(x); return x > 0 ? 1 : (x < 0 ? -1 : x); });
+  def(Math, "trunc", function (x) { return x < 0 ? Math.ceil(x) : Math.floor(x); });
+  def(Math, "hypot", function () { var s = 0; for (var i = 0; i < arguments.length; i++) s += arguments[i] * arguments[i]; return Math.sqrt(s); });
+  def(Math, "log10", function (x) { return Math.log(x) / Math.LN10; });
+  def(Math, "log2", function (x) { return Math.log(x) / Math.LN2; });
+  def(Date, "now", function () { return new Date().getTime(); });
+  def(Function.prototype, "bind", function (t) {
+    var f = this, pre = AP.slice.call(arguments, 1);
+    return function () { return f.apply(t, pre.concat(AP.slice.call(arguments))); };
+  });
+})();
+
 aemcp = (function () {
   var A = {};
   A.version = "__AEMCP_VERSION__";
@@ -402,6 +481,154 @@ aemcp = (function () {
     return a;
   };
 
+  // ---------- change report ----------
+  // Snapshots before/after a tool call and a diff of them. Items are always compared; layers and
+  // property values only for the comps in scope (the active comp and comps named in the call),
+  // with a budget on property reads so very large comps stay fast.
+  var PROP_BUDGET = 25000;
+  function brief(v) {
+    if (v === null || v === undefined) return "none";
+    if (typeof v === "number") return String(Math.round(v * 100) / 100);
+    if (typeof v === "string") return v.length > 40 ? '"' + v.substr(0, 37) + '..."' : '"' + v + '"';
+    if (typeof v === "boolean") return v ? "on" : "off";
+    if (v instanceof Array) {
+      if (v.length > 4) return "[" + v.length + " values]";
+      var a = []; for (var i = 0; i < v.length; i++) a.push(brief(v[i])); return "[" + a.join(",") + "]";
+    }
+    if (v.text !== undefined) return brief(v.text);
+    if (v.vertices) return "path(" + v.vertices.length + " points)";
+    return "{...}";
+  }
+  function keySig(p) {
+    var n = p.numKeys; if (!n) return "";
+    var s = n + ":";
+    var lim = Math.min(n, 40);
+    for (var k = 1; k <= lim; k++) { var kv; try { kv = p.keyValue(k); } catch (e) { kv = "?"; } s += A.round(p.keyTime(k)) + "=" + A.stringify(A.valueOf(kv)) + ";"; }
+    return s;
+  }
+  function layerSig(L) {
+    var o = [L.name, A.round(L.inPoint), A.round(L.outPoint), A.round(L.startTime), L.stretch, L.parent ? (L.parent.id || L.parent.index) : 0, L.enabled, L.solo, L.locked, L.shy, L.label];
+    try { o.push(L.threeDLayer, L.blendingMode, L.trackMatteType, L.adjustmentLayer, L.motionBlur, L.guideLayer, L.audioEnabled); } catch (e) {}
+    return o;
+  }
+  var LAYER_FIELDS = ["name", "in", "out", "start", "stretch", "parent", "enabled", "solo", "locked", "shy", "label", "3D", "blend mode", "track matte", "adjustment", "motion blur", "guide", "audio"];
+  function layerKey(L) { return L.id !== undefined ? "L" + L.id : "i" + L.index + ":" + L.name; }
+  function snapProps(L, out, groups, budget) {
+    function walk(g, path, depth) {
+      for (var i = 1; i <= g.numProperties; i++) {
+        if (budget.n <= 0) { budget.over = true; return; }
+        var p = g.property(i), pp = path ? path + "/" + p.name : p.name;
+        budget.n--;
+        if (p.propertyType === PropertyType.PROPERTY) {
+          if (p.propertyValueType === PropertyValueType.NO_VALUE) continue;
+          var raw; try { raw = p.value; } catch (e) { continue; }
+          // cheap fingerprints for the common cases (numbers, arrays); full JSON only for the rest
+          var v = raw, vs;
+          if (typeof raw === "number" || typeof raw === "boolean") vs = String(raw);
+          else if (raw instanceof Array) vs = raw.join(",");
+          else { v = A.valueOf(raw); vs = A.stringify(v); }
+          var ex = ""; try { if (p.canSetExpression && p.expression) ex = (p.expressionEnabled ? "" : "(off)") + p.expression; } catch (e) {}
+          var nk = p.numKeys;
+          out[pp] = { s: vs + "|" + (nk ? keySig(p) : "") + "|" + ex, v: v, k: nk, e: ex };
+        } else {
+          if (p.propertyType === PropertyType.INDEXED_GROUP || depth < 3) {
+            var en = ""; try { if (p.canSetEnabled) en = p.enabled ? "on" : "off"; } catch (e) {}
+            if (path) groups[pp] = en;
+          }
+          walk(p, pp, depth + 1);
+        }
+      }
+    }
+    walk(L, "", 0);
+  }
+  function snapComp(c, deep, budget) {
+    var o = { id: c.id, name: c.name, layers: {}, order: [], deep: deep };
+    for (var i = 1; i <= c.numLayers; i++) {
+      var L = c.layer(i), k = layerKey(L);
+      var e = { name: L.name, index: i, sig: layerSig(L) };
+      if (deep) { e.props = {}; e.groups = {}; snapProps(L, e.props, e.groups, budget); }
+      o.layers[k] = e; o.order.push(k);
+    }
+    if (budget.over) o.partial = true;
+    return o;
+  }
+  function itemSig(it) {
+    var s = [it.name, it.parentFolder ? it.parentFolder.id : 0, it.label, it.comment];
+    try { if (it instanceof CompItem) s.push(it.width, it.height, A.round(it.duration), A.round(it.frameRate), it.pixelAspect, A.stringify(it.bgColor), A.round(it.workAreaStart), A.round(it.workAreaDuration), it.numLayers); } catch (e) {}
+    try { if (it instanceof FootageItem) { s.push(it.file ? it.file.fsName : "", it.width, it.height); if (it.mainSource instanceof SolidSource) s.push(A.stringify(it.mainSource.color)); } } catch (e) {}
+    return s;
+  }
+  var ITEM_FIELDS = ["name", "folder", "label", "comment", "width", "height", "duration", "frame rate", "pixel aspect", "background", "work area start", "work area duration", "layers"];
+  A.snapshot = function (scopeRefs) {
+    var p = app.project, snap = { items: {}, comps: {} }, budget = { n: PROP_BUDGET, over: false };
+    for (var i = 1; i <= p.numItems; i++) { var it = p.item(i); snap.items[it.id] = { name: it.name, type: A.itemType(it), sig: itemSig(it), layers: it instanceof CompItem ? it.numLayers : undefined }; }
+    var ids = {};
+    try { if (p.activeItem instanceof CompItem) ids[p.activeItem.id] = true; } catch (e) {}
+    for (var r = 0; r < scopeRefs.length; r++) { try { ids[A.findComp(scopeRefs[r]).id] = true; } catch (e) {} }
+    for (var id in ids) { var c = p.itemByID(Number(id)); if (c) snap.comps[id] = snapComp(c, true, budget); }
+    return snap;
+  };
+  A.diff = function (a, b) {
+    var ch = { items: [], layers: [], props: [], scope: [], partial: false }, MAX = 80, n = 0;
+    function add(list, v) { if (n++ < MAX) list.push(v); else ch.truncated = true; }
+    for (var id in b.items) {
+      var x = b.items[id], y = a.items[id];
+      if (!y) { add(ch.items, ["+", x.type, x.name, x.layers]); continue; }
+      var d = [];
+      for (var f = 0; f < x.sig.length; f++) if (A.stringify(x.sig[f]) !== A.stringify(y.sig[f])) d.push(ITEM_FIELDS[f] + " " + brief(y.sig[f]) + " -> " + brief(x.sig[f]));
+      if (d.length) add(ch.items, ["~", x.type, x.name, d.join("; ")]);
+    }
+    for (var id2 in a.items) if (!b.items[id2]) add(ch.items, ["-", a.items[id2].type, a.items[id2].name]);
+    for (var cid in b.comps) {
+      var cb = b.comps[cid], ca = a.comps[cid];
+      if (!ca) continue; // comp entered the scope during the call (e.g. newly opened): reported as an item
+      ch.scope.push(cb.name);
+      if (ca.partial || cb.partial) ch.partial = true;
+      for (var k in cb.layers) {
+        var lb = cb.layers[k], la = ca.layers[k];
+        if (!la) { add(ch.layers, ["+", cb.name, lb.name]); continue; }
+        var ld = [];
+        for (var g = 0; g < lb.sig.length; g++) if (A.stringify(lb.sig[g]) !== A.stringify(la.sig[g])) ld.push(LAYER_FIELDS[g] + " " + brief(la.sig[g]) + " -> " + brief(lb.sig[g]));
+        if (la.index !== lb.index) ld.push("order " + la.index + " -> " + lb.index);
+        if (ld.length) add(ch.layers, ["~", cb.name, lb.name, ld.join("; ")]);
+        if (la.props && lb.props) {
+          // added/removed groups (effects, masks, shape groups...): report only the outermost one
+          var addedG = [], removedG = [];
+          for (var gp in lb.groups) {
+            if (la.groups[gp] === undefined) addedG.push(gp);
+            else if (la.groups[gp] !== lb.groups[gp]) add(ch.props, ["~", lb.name, gp, "enabled " + la.groups[gp] + " -> " + lb.groups[gp]]);
+          }
+          for (var gq in la.groups) if (lb.groups[gq] === undefined) removedG.push(gq);
+          var outermost = function (list) {
+            list.sort();
+            var keep = [];
+            for (var q = 0; q < list.length; q++) {
+              var inner = false;
+              for (var z = 0; z < keep.length; z++) if (list[q].indexOf(keep[z] + "/") === 0) { inner = true; break; }
+              if (!inner) keep.push(list[q]);
+            }
+            return keep;
+          };
+          addedG = outermost(addedG); removedG = outermost(removedG);
+          for (var ga = 0; ga < addedG.length; ga++) add(ch.props, ["+", lb.name, addedG[ga]]);
+          for (var gr = 0; gr < removedG.length; gr++) add(ch.props, ["-", lb.name, removedG[gr]]);
+          for (var pp in lb.props) {
+            var pb = lb.props[pp], pa = la.props[pp];
+            if (!pa || pa.s === pb.s) continue;
+            var parts = [];
+            if (A.stringify(pa.v) !== A.stringify(pb.v)) parts.push(brief(pa.v) + " -> " + brief(pb.v));
+            if (pa.k !== pb.k) parts.push("keyframes " + pa.k + " -> " + pb.k); else if (pb.k && pa.s.split("|")[1] !== pb.s.split("|")[1]) parts.push("keyframes changed");
+            if (pa.e !== pb.e) parts.push(!pa.e ? "expression added" : (!pb.e ? "expression removed" : "expression changed"));
+            if (!parts.length) parts.push("changed");
+            add(ch.props, ["~", lb.name, pp, parts.join(", ")]);
+          }
+        }
+      }
+      for (var k2 in ca.layers) if (!cb.layers[k2]) add(ch.layers, ["-", cb.name, ca.layers[k2].name]);
+    }
+    return ch;
+  };
+
   // ---------- runner ----------
   A.run = function (fn, args, opts) {
     opts = opts || {};
@@ -416,10 +643,15 @@ aemcp = (function () {
     try {
       if (opts.suppressDialogs !== false) { try { app.beginSuppressDialogs(); } catch (e) {} }
       if (undo) app.beginUndoGroup(opts.undoGroup || "AE MCP");
+      var before = null;
+      if (opts.report) { try { before = A.snapshot(opts.report); } catch (e) { before = null; } }
       var r = fn(args || {}, log);
       res = { ok: true, result: opts.raw ? r : A.serialize(r, opts.depth || 4), logs: logs };
+      if (before) { try { res.changes = A.diff(before, A.snapshot(opts.report)); } catch (e) { res.changes = { error: e.message }; } }
     } catch (e) {
       res = { ok: false, error: { message: e.message || String(e), name: e.name, line: e.line, user: !!e.aemcpUser }, logs: logs };
+      // a failed script may have changed things before it stopped: report those too
+      if (before) { try { res.changes = A.diff(before, A.snapshot(opts.report)); } catch (e2) {} }
     } finally {
       if (undo) { try { app.endUndoGroup(); } catch (e) {} }
       if (opts.suppressDialogs !== false) { try { app.endSuppressDialogs(false); } catch (e) {} }
@@ -429,4 +661,16 @@ aemcp = (function () {
 
   return A;
 })();
+// JSON for scripts (AE's ExtendScript has no JSON object)
+if (typeof JSON === "undefined" || !JSON.stringify) {
+  JSON = {
+    stringify: function (v) { return aemcp.stringify(v); },
+    parse: function (s) {
+      s = String(s);
+      // only data: reject anything that could run code
+      if (/[^,:{}\[\]0-9.\-+Eaeflnr-u \n\r\t]/.test(s.replace(/"(\\.|[^"\\])*"/g, ""))) throw new SyntaxError("JSON.parse: invalid JSON");
+      return eval("(" + s + ")");
+    }
+  };
+}
 "aemcp loaded " + aemcp.version;

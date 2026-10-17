@@ -12,6 +12,8 @@ export interface AemcpConfig {
   toolProfile?: string;
   /** set to false to disable the GitHub update check */
   updateCheck?: boolean;
+  /** set to false to turn off the change report after edits */
+  changeReport?: boolean;
 }
 
 export function configPath(): string {
@@ -32,5 +34,6 @@ export function loadConfig(): AemcpConfig {
     httpPort: Number(process.env.AEMCP_HTTP_PORT || file.httpPort || 8766),
     toolProfile: file.toolProfile,
     updateCheck: file.updateCheck,
+    changeReport: file.changeReport,
   };
 }

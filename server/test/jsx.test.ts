@@ -7,8 +7,9 @@ import { propertyTools } from "../src/tools/property.js";
 import { effectTools } from "../src/tools/effects.js";
 import { renderTools } from "../src/tools/render.js";
 import { appTools } from "../src/tools/app.js";
+import { inspectTools } from "../src/tools/inspect.js";
 
-const allTools = [...projectTools, ...compTools, ...layerTools, ...propertyTools, ...effectTools, ...renderTools, ...appTools];
+const allTools = [...projectTools, ...compTools, ...layerTools, ...propertyTools, ...effectTools, ...renderTools, ...appTools, ...inspectTools];
 
 /** Rough ES3 lint: things ExtendScript cannot parse. */
 function es3Problems(src: string): string[] {
@@ -19,6 +20,11 @@ function es3Problems(src: string): string[] {
   if (/`/.test(stripped)) probs.push("template literal");
   if (/\.(map|filter|forEach|reduce|includes|indexOf)\(/.test(stripped) && /\.(map|filter|forEach|reduce|includes)\(/.test(stripped)) probs.push("ES5 array method");
   if (/\bJSON\./.test(stripped)) probs.push("JSON object");
+  // ES3 reserves these (ExtendScript fails with e.g. "Expected: (" on `function short(...)`)
+  const reserved = "abstract|boolean|byte|char|class|const|debugger|double|enum|export|extends|final|float|goto|implements|import|int|interface|long|native|package|private|protected|public|short|static|super|synchronized|throws|transient|volatile";
+  const decl = new RegExp(`\\b(?:var|function)\\s+(${reserved})\\b|[(,]\\s*(${reserved})\\s*[,)]|\\.(${reserved})\\b(?!\\s*:)|(?<![.\\w])(${reserved})\\s*\\(`);
+  const m = stripped.match(decl);
+  if (m) probs.push(`reserved word: ${m[1] || m[2] || m[3] || m[4]}`);
   return probs;
 }
 
@@ -74,7 +80,8 @@ describe("ExtendScript sources", () => {
   });
 
   it("helper library is ES3", () => {
-    expect(es3Problems(helperSource)).toEqual([]);
+    // the library itself defines the JSON polyfill, so allow JSON references there
+    expect(es3Problems(helperSource).filter((p) => p !== "JSON object")).toEqual([]);
   });
 
   it("tool names are unique", () => {
@@ -122,5 +129,134 @@ describe("tool profiles", () => {
     const names = new Set(allTools.map((t) => t.name));
     for (const n of ["ae_status", "ae_run_script", "ae_get_scripting_guide", "ae_render_frame", "ae_render_contact_sheet"]) names.add(n);
     for (const t of CORE_TOOLS) expect(names.has(t), t).toBe(true);
+  });
+});
+
+describe("modern JavaScript support", () => {
+  const sample = `
+const items = [1, 2, 3, 4];
+const doubled = items.filter((n) => n % 2 === 0).map((n) => n * 2);
+const { a = 5, ...rest } = args;
+const label = \`total \${doubled.reduce((s, n) => s + n, 0)}\`;
+class Box { constructor(w, h = 2) { this.w = w; this.h = h; } area() { return this.w * this.h; } }
+let sum = 0;
+for (const n of items) sum += n;
+const maybe = args.missing?.deep ?? "fallback";
+return { doubled, a, rest, label, area: new Box(3).area(), sum, maybe, spread: [...items, 5], obj: { ...rest, x: 1 } };`;
+
+  it("converts modern syntax to ES3-style code that keeps working", async () => {
+    const { transpileUserCode } = await import("../src/transpile.js");
+    const t = transpileUserCode(sample);
+    expect(t.transpiled).toBe(true);
+    const stripped = t.source.replace(/"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'/g, '""');
+    expect(/\b(let|const)\s/.test(stripped)).toBe(false);
+    expect(/=>/.test(stripped)).toBe(false);
+    expect(/`/.test(stripped)).toBe(false);
+    expect(/\?\.|\?\?/.test(stripped)).toBe(false);
+    expect(/\bclass\s/.test(stripped)).toBe(false);
+    const fn = (0, eval)(t.source);
+    expect(fn({ a: 1, b: 2, c: 3 }, () => {})).toEqual({
+      doubled: [4, 8], a: 1, rest: { b: 2, c: 3 }, label: "total 12", area: 6, sum: 10, maybe: "fallback",
+      spread: [1, 2, 3, 4, 5], obj: { b: 2, c: 3, x: 1 },
+    });
+  });
+
+  it("keeps line numbers aligned with the original code", async () => {
+    const { transpileUserCode } = await import("../src/transpile.js");
+    const code = "const a = 1;\nconst b = 2;\nnull.boom();";
+    const t = transpileUserCode(code);
+    // the user's line 3 is still line 3 of the source AE evaluates
+    expect(t.source.split("\n")[2]).toContain("boom");
+  });
+
+  it("reports syntax errors with Babel's code frame and passes ExtendScript-only code through", async () => {
+    const { transpileUserCode } = await import("../src/transpile.js");
+    const bad = transpileUserCode("const x = ;\nreturn x;");
+    expect(bad.transpiled).toBe(false);
+    expect(bad.syntaxError).toMatch(/Unexpected token/);
+    expect(transpileUserCode('#include "lib.jsx"\nreturn 1;').transpiled).toBe(false);
+    expect(transpileUserCode("return 1;", false).transpiled).toBe(false);
+  });
+
+  it("formats code excerpts and hints", async () => {
+    const { codeExcerpt, errorHint } = await import("../src/jsx.js");
+    expect(codeExcerpt("a\nb\nc\nd\ne", 3)).toBe("  1 | a\n  2 | b\n> 3 | c\n  4 | d\n  5 | e");
+    expect(errorHint("After Effects error: Object is invalid")).toMatch(/no longer exists/);
+    expect(errorHint("index out of range")).toMatch(/1-based/);
+  });
+});
+
+describe("helper loader", () => {
+  it("defines aemcp globally when evaluated inside the loader function", async () => {
+    const { helperLoader } = await import("../src/jsx.js");
+    const g: any = globalThis as any;
+    const saved = { aemcp: g.aemcp, $: g.$, app: g.app };
+    g.$ = { global: {} };
+    g.app = {};
+    try {
+      expect((0, eval)(helperLoader)).toMatch(/^aemcp loaded test-/);
+      expect(typeof g.aemcp.run).toBe("function");
+    } finally {
+      g.aemcp = saved.aemcp; g.$ = saved.$; g.app = saved.app;
+    }
+  });
+});
+
+/**
+ * ExtendScript parses chained conditionals left-associatively: `a ? x : b ? y : z` runs as
+ * `(a ? x : b) ? y : z`. Any conditional nested in another one must be parenthesized.
+ */
+function unparenthesizedNestedTernaries(ast: any, src: string): string[] {
+  const found: string[] = [];
+  const visit = (node: any) => {
+    if (!node || typeof node.type !== "string") return;
+    if (node.type === "ConditionalExpression") {
+      for (const k of ["test", "consequent", "alternate"]) {
+        if (node[k]?.type === "ConditionalExpression") found.push(src.slice(node.start, Math.min(node.end, node.start + 90)));
+      }
+    }
+    for (const key of Object.keys(node)) {
+      const v = node[key];
+      if (Array.isArray(v)) v.forEach(visit);
+      else if (v && typeof v === "object" && typeof v.type === "string") visit(v);
+    }
+  };
+  visit(ast);
+  return found;
+}
+
+describe("strict ES3 parse (what After Effects' engine accepts)", () => {
+  const parseES3 = async (src: string) => {
+    const { parse } = await import("acorn");
+    const ast = parse(src, { ecmaVersion: 3, sourceType: "script", allowReserved: false, preserveParens: true } as any);
+    expect(unparenthesizedNestedTernaries(ast, src), "nested ?: must be parenthesized for ExtendScript").toEqual([]);
+  };
+  it("helper library", async () => {
+    const { helperSource } = await import("../src/jsx.js");
+    await parseES3(helperSource);
+  });
+  it("loader and wrapper", async () => {
+    const { helperLoader, wrapBody } = await import("../src/jsx.js");
+    await parseES3(helperLoader);
+    await parseES3(wrapBody("return 1;", { a: 1 }));
+  });
+  for (const t of allTools) {
+    it(`tool ${t.name}`, async () => {
+      await parseES3(`(function(args, log){${t.jsx}\n})`);
+    });
+  }
+  it("preview tools (frame, contact sheet)", async () => {
+    const { RENDER_FRAME_JSX, CONTACT_SHEET_JSX } = await import("../src/tools/core.js");
+    await parseES3(`(function(args, log){${RENDER_FRAME_JSX}\n})`);
+    await parseES3(`(function(args, log){${CONTACT_SHEET_JSX}\n})`);
+  });
+  it("transpiled modern code", async () => {
+    const { transpileUserCode } = await import("../src/transpile.js");
+    const t = transpileUserCode("const a = [1, 2].map((x) => x * 2);\nclass K { m() { return a?.[0] ?? 0; } }\nconst { p = 1, ...r } = args;\nreturn [...a, new K().m(), p, r];");
+    await parseES3(t.source);
+    // chained conditionals / nullish chains, as AI-written code often has them
+    const n = transpileUserCode("const v = args.a ? 1 : args.b ? 2 : 3;\nconst w = args.x?.y ?? args.z?.q ?? 0;\nreturn [v, w];");
+    await parseES3(n.source);
+    expect((0, eval)(n.source)({ b: true, z: { q: 7 } }, () => {})).toEqual([2, 7]);
   });
 });

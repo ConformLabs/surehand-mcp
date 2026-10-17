@@ -10,6 +10,7 @@ import { compTools } from "./tools/comp.js";
 import { registerCoreTools } from "./tools/core.js";
 import { effectTools } from "./tools/effects.js";
 import { layerTools } from "./tools/layer.js";
+import { inspectTools } from "./tools/inspect.js";
 import { projectTools } from "./tools/project.js";
 import { propertyTools } from "./tools/property.js";
 import { registerJsxTools } from "./tools/registry.js";
@@ -29,7 +30,7 @@ export function createMcpServer(): McpServer {
   const server = new McpServer({ name: "after-effects", title: "Adobe After Effects", version: VERSION }, { instructions });
   applyProfile(server, profile);
   registerCoreTools(server);
-  registerJsxTools(server, [...projectTools, ...compTools, ...layerTools, ...propertyTools, ...effectTools, ...renderTools, ...appTools]);
+  registerJsxTools(server, [...projectTools, ...compTools, ...layerTools, ...propertyTools, ...effectTools, ...renderTools, ...appTools, ...inspectTools]);
   server.registerResource(
     "extendscript-cheatsheet",
     "aemcp://docs/extendscript",

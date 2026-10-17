@@ -2,7 +2,8 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { BridgeError } from "../bridge.js";
-import { runJsx, type RunResult } from "../jsx.js";
+import { loadConfig } from "../config.js";
+import { formatChanges, runJsx, type RunResult } from "../jsx.js";
 
 export interface JsxTool {
   name: string;
@@ -17,6 +18,8 @@ export interface JsxTool {
   noUndo?: boolean;
   /** Read-only for the user, but creates and removes temporary items: wrap them in one undo step. */
   tempItems?: boolean;
+  /** Include a change report (default: for every tool that edits, i.e. not readOnly / noUndo). */
+  report?: boolean;
   timeoutMs?: number;
 }
 
@@ -40,15 +43,40 @@ export const colorSchema = z
   .describe('Color as "#rrggbb" or [r,g,b] (0-1 or 0-255).');
 export const anyValue = z.any().describe("Value: number, array ([x,y] / [x,y,z] / color), string for text, or object for text style / shape path.");
 
-export function formatResult(r: RunResult): CallToolResult {
+/** Keep a single result well below what AI apps accept (~25k tokens); say how to get the rest. */
+export const MAX_RESULT_CHARS = 60_000;
+export function capText(text: string): string {
+  if (text.length <= MAX_RESULT_CHARS) return text;
+  return (
+    text.slice(0, MAX_RESULT_CHARS) +
+    `\n\n[Result truncated: ${text.length.toLocaleString("en-US")} characters, showing the first ${MAX_RESULT_CHARS.toLocaleString("en-US")}. ` +
+    "Ask for less: use offset/limit, a smaller depth, a filter, or return only the fields you need from ae_run_script.]"
+  );
+}
+
+/** quietNoChanges: leave out "Changes: none" (e.g. for scripts that only read). */
+export function formatResult(r: RunResult, opts: { quietNoChanges?: boolean } = {}): CallToolResult {
   const logs = r.logs?.length ? `\n\nlog output:\n${r.logs.join("\n")}` : "";
   if (!r.ok) {
     const e = r.error!;
     const where = e.line && !e.user ? ` (line ${e.line})` : "";
-    return { isError: true, content: [{ type: "text", text: `${e.name && !e.user ? e.name + ": " : ""}${e.message}${where}${logs}` }] };
+    const changes = formatChanges(r.changes);
+    const changed = changes && changes !== "Changes: none" ? `\n\nThe call failed, but these changes were already made (one undo step reverts them):\n${changes}` : "";
+    return { isError: true, content: [{ type: "text", text: `${e.name && !e.user ? e.name + ": " : ""}${e.message}${where}${logs}${changed}` }] };
   }
-  const text = r.result === undefined || r.result === null ? "OK (no return value)" : typeof r.result === "string" ? r.result : JSON.stringify(r.result, null, 2);
-  return { content: [{ type: "text", text: text + logs }] };
+  // compact JSON: indentation can cost a third of the tokens of a result
+  const text = r.result === undefined || r.result === null ? "OK (no return value)" : typeof r.result === "string" ? r.result : JSON.stringify(r.result);
+  let changes = formatChanges(r.changes);
+  if (opts.quietNoChanges && changes === "Changes: none") changes = null;
+  return { content: [{ type: "text", text: capText(text) + logs + (changes ? `\n\n${capText(changes)}` : "") }] };
+}
+
+/** Change reports are on unless "changeReport": false in ~/.aemcp/config.json. */
+export function reportScope(args: Record<string, unknown> | undefined): unknown[] | undefined {
+  if (loadConfig().changeReport === false) return undefined;
+  const refs: unknown[] = [];
+  if (args && args.comp !== undefined && args.comp !== null) refs.push(args.comp);
+  return refs;
 }
 
 export function errorResult(e: unknown): CallToolResult {
@@ -69,7 +97,14 @@ export function registerJsxTools(server: McpServer, tools: JsxTool[]) {
       async (args: Record<string, unknown>) => {
         try {
           const timeoutMs = typeof args.timeoutSeconds === "number" ? args.timeoutSeconds * 1000 : t.timeoutMs;
-          return formatResult(await runJsx(t.jsx, args, { undoGroup: t.tempItems ? "AE MCP " + t.title : t.readOnly || t.noUndo ? false : t.title, timeoutMs }));
+          const wantsReport = t.report ?? (!t.readOnly && !t.noUndo);
+          return formatResult(
+            await runJsx(t.jsx, args, {
+              undoGroup: t.tempItems ? "AE MCP " + t.title : t.readOnly || t.noUndo ? false : t.title,
+              timeoutMs,
+              report: wantsReport ? reportScope(args) : undefined,
+            }),
+          );
         } catch (e) {
           return errorResult(e);
         }

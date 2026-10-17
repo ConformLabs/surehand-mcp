@@ -20,7 +20,7 @@ beforeAll(async () => {
       const { script } = JSON.parse(b);
       calls.push(script);
       let result: string;
-      if (script.startsWith("// aemcp helper")) {
+      if (script.includes("return 'aemcp loaded '")) {
         helpersLoaded = true;
         result = "aemcp loaded test";
       } else if (!helpersLoaded) result = "__AEMCP_NEED_HELPERS__";

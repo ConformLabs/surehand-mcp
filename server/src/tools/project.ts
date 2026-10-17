@@ -18,20 +18,25 @@ export const projectTools: JsxTool[] = [
       type: z.enum(["comp", "footage", "solid", "folder", "placeholder"]).optional().describe("Only items of this type."),
       nameContains: z.string().optional().describe("Case-insensitive name filter."),
       folder: itemRef.optional().describe("Only direct children of this folder."),
-      limit: z.number().int().min(1).max(5000).optional().describe("Max items (default 500)."),
+      limit: z.number().int().min(1).max(5000).optional().describe("Max items (default 300)."),
+      offset: z.number().int().min(0).optional().describe("Skip this many matching items (paging; see nextOffset)."),
     },
     readOnly: true,
     jsx: `
-var p = app.project, out = [], lim = args.limit || 500, f = args.folder !== undefined ? aemcp.findItem(args.folder) : null;
-var q = args.nameContains ? String(args.nameContains).toLowerCase() : null;
-for (var i = 1; i <= p.numItems && out.length < lim; i++) {
+var p = app.project, out = [], lim = args.limit || 300, skip = args.offset || 0, matched = 0, f = args.folder !== undefined ? aemcp.findItem(args.folder) : null;
+var q = args.nameContains ? String(args.nameContains).toLowerCase() : null, more = false;
+for (var i = 1; i <= p.numItems; i++) {
   var it = p.item(i);
   if (args.type && aemcp.itemType(it) !== args.type) continue;
   if (q && it.name.toLowerCase().indexOf(q) < 0) continue;
   if (f && it.parentFolder !== f) continue;
+  if (matched++ < skip) continue;
+  if (out.length >= lim) { more = true; break; }
   out.push(aemcp.itemInfo(it));
 }
-return { total: p.numItems, returned: out.length, items: out };`,
+var r = { totalInProject: p.numItems, returned: out.length, items: out };
+if (more) r.nextOffset = skip + out.length;
+return r;`,
   },
   {
     name: "ae_get_item_info",

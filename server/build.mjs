@@ -26,13 +26,18 @@ await build({
   target: "node18",
   outfile: "dist/ae-mcp.mjs",
   loader: { ".jsxinc": "text" },
+  // Babel (modern JS -> ExtendScript) is the biggest dependency: use its minified build
+  alias: { "@babel/standalone": "@babel/standalone/babel.min.js" },
   define: {
     __AEMCP_VERSION__: JSON.stringify(pkg.version),
     __AEMCP_CEP_FILES__: JSON.stringify(cepFiles),
     __AEMCP_CEP_HASH__: JSON.stringify(cepHash),
   },
   banner: {
-    js: "#!/usr/bin/env node\nimport { createRequire as __aemcpCreateRequire } from 'module'; const require = __aemcpCreateRequire(import.meta.url);",
+    js:
+      "#!/usr/bin/env node\nimport { createRequire as __aemcpCreateRequire } from 'module'; const require = __aemcpCreateRequire(import.meta.url);\n" +
+      // Babel probes globalThis.localStorage, which makes Node 25+ print an ExperimentalWarning into the AI apps' logs
+      "try { Object.defineProperty(globalThis, 'localStorage', { value: undefined, configurable: true, writable: true }); } catch {}",
   },
   legalComments: "none",
 });

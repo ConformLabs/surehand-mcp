@@ -8,10 +8,139 @@ import { health } from "../bridge.js";
 import { lastSetup } from "../cli/setup.js";
 import { checkForUpdate, updateMessage } from "../update.js";
 import { VERSION } from "../config.js";
-import { ensureHelpers, runJsx, userCodeBody } from "../jsx.js";
-import { compRef, errorResult, formatResult } from "./registry.js";
+import { codeExcerpt, ensureHelpers, errorHint, evalBody, runJsx } from "../jsx.js";
+import { transpileUserCode } from "../transpile.js";
+import { compRef, errorResult, formatResult, layerRef, reportScope } from "./registry.js";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// ExtendScript bodies of the preview tools (exported so tests can check them)
+export const RENDER_FRAME_JSX = `
+var c = aemcp.findComp(args.comp);
+var t = args.time === undefined ? c.time : args.time;
+var max = args.maxSize || 1280, par = c.pixelAspect;
+var reg = args.region || [0, 0, c.width, c.height];
+if (reg[2] <= 0 || reg[3] <= 0) aemcp.fail("region width and height must be positive");
+var dispW = reg[2] * par, fit = max / Math.max(dispW, reg[3]);
+var zoom = args.region ? Math.min(8, fit) : Math.min(1, fit);
+var W = Math.max(4, Math.round(dispW * zoom)), H = Math.max(4, Math.round(reg[3] * zoom));
+var tmp = app.project.items.addComp("__aemcp_preview", W, H, 1, c.duration, c.frameRate);
+var restore = [], info = null;
+try {
+  // a difference image needs an opaque black base, or "identical" areas show as transparent
+  var bgSpec = args.background || (args.compareWith ? "#000000" : null);
+  if (bgSpec) {
+    var bg = tmp.layers.addShape(), bv = bg.property("ADBE Root Vectors Group").addProperty("ADBE Vector Group").property("ADBE Vectors Group");
+    bv.addProperty("ADBE Vector Shape - Rect").property("ADBE Vector Rect Size").setValue([W, H]);
+    var checker = String(bgSpec).toLowerCase() === "checkerboard";
+    bv.addProperty("ADBE Vector Graphic - Fill").property("ADBE Vector Fill Color").setValue(checker ? [0.8, 0.8, 0.8] : aemcp.color3(bgSpec));
+    bg.property("ADBE Transform Group").property("ADBE Position").setValue([W / 2, H / 2]);
+    if (checker) {
+      var cb = bg.property("ADBE Effect Parade").addProperty("ADBE Checkerboard");
+      try { cb.property("Width").setValue(Math.max(4, Math.round(Math.max(W, H) / 64))); cb.property("Color").setValue([0.6, 0.6, 0.6]); } catch (e) {}
+    }
+  }
+  // only some layers: hide the others for the render (restored in finally)
+  if (args.layers && args.layers.length) {
+    var keep = {};
+    for (var i = 0; i < args.layers.length; i++) keep[aemcp.findLayer(c, args.layers[i]).index] = true;
+    for (var j = 1; j <= c.numLayers; j++) {
+      var L = c.layer(j);
+      if (keep[j] || !L.enabled) continue;
+      var wasLocked = L.locked; if (wasLocked) L.locked = false;
+      L.enabled = false; restore.push([L, wasLocked]);
+      if (wasLocked) L.locked = true;
+    }
+  }
+  var place = function (src, srcTime) { // (a function declaration inside a block isn't valid ES3)
+    var l = tmp.layers.add(src);
+    var tr = l.property("ADBE Transform Group");
+    tr.property("ADBE Anchor Point").setValue([reg[0] + reg[2] / 2, reg[1] + reg[3] / 2]);
+    tr.property("ADBE Position").setValue([W / 2, H / 2]);
+    tr.property("ADBE Scale").setValue([zoom * 100, zoom * 100, 100]);
+    l.startTime = t - srcTime;
+    return l;
+  };
+  place(c, t);
+  var cmp = null;
+  if (args.compareWith) {
+    var c2 = args.compareWith.comp !== undefined ? aemcp.findComp(args.compareWith.comp) : c;
+    var t2 = args.compareWith.time === undefined ? t : args.compareWith.time;
+    var l2 = place(c2, t2);
+    l2.blendingMode = BlendingMode.DIFFERENCE;
+    cmp = { comp: c2.name, time: t2 };
+  }
+  var f = new File(args.outputPath || (args.tmpDir + "/aemcp_frame_" + new Date().getTime() + ".png"));
+  if (f.exists) f.remove();
+  tmp.saveFrameToPng(t, f);
+  var waited = 0; while (!f.exists && waited < 10000) { $.sleep(50); waited += 50; }
+  $.sleep(100);
+  info = { path: f.fsName, width: W, height: H, time: t, comp: c.name, zoom: aemcp.round(zoom), region: args.region || null, compare: cmp };
+} finally {
+  // never leave anything behind, even if rendering fails
+  for (var k = 0; k < restore.length; k++) { try { var R = restore[k][0]; if (restore[k][1]) R.locked = false; R.enabled = true; if (restore[k][1]) R.locked = true; } catch (e) {} }
+  try { tmp.remove(); } catch (e) {}
+}
+return info;`;
+
+export const CONTACT_SHEET_JSX = `
+var c = aemcp.findComp(args.comp);
+var fd = c.frameDuration, times = [];
+if (args.times) { for (var k = 0; k < args.times.length; k++) times.push(args.times[k]); }
+else {
+  var n = args.frames || 9;
+  var t0 = args.start !== undefined ? args.start : c.workAreaStart;
+  var t1 = args.end !== undefined ? args.end : c.workAreaStart + c.workAreaDuration;
+  if (t1 <= t0) aemcp.fail("end must be after start");
+  var last = Math.max(t0, t1 - fd);
+  for (var i = 0; i < n; i++) times.push(t0 + (last - t0) * i / (n - 1));
+}
+for (var q = 0; q < times.length; q++) times[q] = Math.max(0, Math.min(c.duration - fd, Math.round(times[q] / fd) * fd));
+var count = times.length;
+var cols = args.columns || Math.ceil(Math.sqrt(count)), rows = Math.ceil(count / cols);
+var W = args.width || 1600, gap = 8, labelH = 26;
+var cellW = Math.floor((W - gap * (cols + 1)) / cols);
+var cellH = Math.round(cellW * c.height / (c.width * c.pixelAspect));
+var H = rows * (cellH + labelH + gap) + gap;
+var sheet = app.project.items.addComp("__aemcp_contact_sheet", W, H, 1, 1, c.frameRate);
+try {
+  // opaque dark background (a shape layer, so no solid is left in the project)
+  var bg = sheet.layers.addShape();
+  var bgv = bg.property("ADBE Root Vectors Group").addProperty("ADBE Vector Group").property("ADBE Vectors Group");
+  bgv.addProperty("ADBE Vector Shape - Rect").property("ADBE Vector Rect Size").setValue([W, H]);
+  bgv.addProperty("ADBE Vector Graphic - Fill").property("ADBE Vector Fill Color").setValue([0.09, 0.09, 0.1]);
+  bg.property("ADBE Transform Group").property("ADBE Position").setValue([W / 2, H / 2]);
+  var sc = cellW / (c.width * c.pixelAspect) * 100;
+  for (var j = 0; j < count; j++) {
+    var col = j % cols, row = Math.floor(j / cols);
+    var x0 = gap + col * (cellW + gap), y0 = gap + row * (cellH + labelH + gap);
+    var l = sheet.layers.add(c);
+    l.startTime = -times[j];
+    var tr = l.property("ADBE Transform Group");
+    tr.property("ADBE Anchor Point").setValue([c.width / 2, c.height / 2]);
+    tr.property("ADBE Scale").setValue([sc, sc, 100]);
+    tr.property("ADBE Position").setValue([x0 + cellW / 2, y0 + cellH / 2]);
+    var t = sheet.layers.addText((Math.round(times[j] * 100) / 100) + "s  \u00b7  f" + Math.round(times[j] / fd));
+    var src = t.property("ADBE Text Properties").property("ADBE Text Document"), td = src.value;
+    try { td.font = "ArialMT"; } catch (e) {}
+    td.fontSize = 15; td.applyFill = true; td.fillColor = [0.85, 0.85, 0.85]; td.applyStroke = false;
+    try { td.fauxBold = false; td.fauxItalic = false; td.allCaps = false; td.tracking = 0; } catch (e) {}
+    td.justification = ParagraphJustification.CENTER_JUSTIFY;
+    src.setValue(td);
+    // center the label under its cell using its real bounds (independent of AE's last-used text settings)
+    var rc = t.sourceRectAtTime(0, false), ttr = t.property("ADBE Transform Group");
+    ttr.property("ADBE Anchor Point").setValue([rc.left + rc.width / 2, rc.top + rc.height / 2]);
+    ttr.property("ADBE Position").setValue([x0 + cellW / 2, y0 + cellH + labelH / 2]);
+    t.moveToBeginning();
+  }
+  var f = new File(args.outputPath || (args.tmpDir + "/aemcp_sheet_" + new Date().getTime() + ".png"));
+  if (f.exists) f.remove();
+  sheet.saveFrameToPng(0, f);
+  var waited = 0; while (!f.exists && waited < 20000) { $.sleep(50); waited += 50; }
+  $.sleep(150);
+  var r = { path: f.fsName, comp: c.name, times: times, columns: cols, rows: rows, width: W, height: H };
+} finally { sheet.remove(); }
+return r;`;
 
 /**
  * Run a JSX body that saves a PNG (it receives args.tmpDir and returns {path, ...}),
@@ -52,32 +181,53 @@ export function registerCoreTools(server: McpServer) {
     {
       title: "Run ExtendScript",
       description:
-        "Execute ExtendScript (JSX, ES3 JavaScript) inside After Effects and return the result. This is the most powerful tool: " +
+        "Execute JavaScript inside After Effects (its ExtendScript scripting API) and return the result. This is the most powerful tool: " +
         "anything in the After Effects scripting API is available (app, app.project, CompItem, layers, properties, render queue, File/Folder, system.callSystem...).\n" +
         "- The code runs as the body of a function: use `return value` to send data back. Returned AE objects (comps, layers, properties, items) are summarized to JSON automatically.\n" +
         "- `args` (the JSON you pass in `args`) and `log(...)` are available; log output is returned too.\n" +
+        "- Modern JavaScript is fine: let/const, arrow functions, template strings, destructuring, spread, classes, ?. and ??, for...of, " +
+        "plus map/filter/forEach/find/includes, Object.keys/assign and JSON (converted for AE automatically). Not available: async/await, Promise, Map/Set, generators.\n" +
         "- The `aemcp` helper library is available: aemcp.findComp(idOrName), aemcp.findLayer(comp, indexOrName), aemcp.findItem(ref), " +
         "aemcp.resolveProp(layer, 'Transform/Position'), aemcp.color('#ff0000'), aemcp.compInfo(comp, true), aemcp.layerInfo(layer, true), aemcp.propInfo(prop, {depth:2}), aemcp.projectInfo().\n" +
-        "- ES3 only: use var (not let/const), no arrow functions, no template strings, no Array.map/forEach/filter, no JSON object (use aemcp.stringify).\n" +
         "- Collections are 1-based: app.project.item(1), comp.layer(1), prop.property(1).\n" +
-        "- The whole script is one undo step. Read the 'aemcp://docs/extendscript' resource for an API cheat sheet.",
+        "- The whole script is one undo step. Errors come back with the failing line and code around it. ae_get_scripting_guide has an API cheat sheet.",
       inputSchema: {
-        code: z.string().describe("ExtendScript source; function body, use `return` to return data."),
+        code: z.string().describe("JavaScript source; a function body, use `return` to return data."),
         args: z.record(z.string(), z.any()).optional().describe("JSON object exposed to the script as `args`."),
         undoGroup: z.string().optional().describe('Undo step name (default "AE MCP Script"). Pass "" to skip the undo group.'),
         depth: z.number().int().min(0).max(8).optional().describe("How deep to serialize the returned value (default 4)."),
         timeoutSeconds: z.number().min(1).max(3600).optional().describe("Max seconds to wait for the result (default 120)."),
+        transpile: z.boolean().optional().describe("Convert modern JS for ExtendScript (default true). Set false to send the code exactly as written."),
+        report: z.boolean().optional().describe("List what the script changed in the project (default true). Set false for read-only queries on huge projects."),
       },
       annotations: { destructiveHint: true, openWorldHint: false },
     },
-    async ({ code, args, undoGroup, depth, timeoutSeconds }) => {
+    async ({ code, args, undoGroup, depth, timeoutSeconds, transpile, report }) => {
       try {
-        const r = await runJsx(userCodeBody(code), args ?? {}, {
+        const t = transpileUserCode(code, transpile !== false);
+        const r = await runJsx(evalBody(t.source), args ?? {}, {
           undoGroup: undoGroup === "" ? false : undoGroup || "AE MCP Script",
           depth,
           timeoutMs: (timeoutSeconds ?? 120) * 1000,
+          report: report === false ? undefined : reportScope(args),
         });
-        return formatResult(r);
+        if (!r.ok && r.error) {
+          // AE rejected code that wasn't valid JavaScript either: Babel's message is far clearer
+          if (t.syntaxError && /does not have a value|syntax|expected|illegal|unterminated/i.test(r.error.message)) {
+            return { isError: true, content: [{ type: "text", text: `Syntax error: ${t.syntaxError}` }] };
+          }
+          const extra: string[] = [];
+          if (r.error.line && !r.error.user) {
+            const ex = codeExcerpt(code, r.error.line);
+            if (ex) extra.push(ex);
+          }
+          const hint = errorHint(r.error.message);
+          if (hint) extra.push(`Hint: ${hint}`);
+          const out = formatResult(r, { quietNoChanges: true });
+          if (extra.length) out.content.push({ type: "text", text: extra.join("\n\n") });
+          return out;
+        }
+        return formatResult(r, { quietNoChanges: true });
       } catch (e) {
         return errorResult(e);
       }
@@ -172,60 +322,43 @@ export function registerCoreTools(server: McpServer) {
     {
       title: "Preview frame",
       description:
-        "Render a single frame of a composition to PNG and return it as an image, so you can SEE the result of your changes. " +
-        "Large comps are downscaled to maxSize. Optionally also keep the PNG at outputPath.",
+        "Render a frame of a composition and return it as an image, so you can SEE the result. Inspection options: zoom into a region, " +
+        "render only some layers, show transparency on a checkerboard or a color, and compare against another time or comp as a difference image " +
+        "(black = identical). Large frames are downscaled to maxSize.",
       inputSchema: {
         comp: compRef,
         time: z.number().optional().describe("Time in seconds (default: the comp's current time)."),
         maxSize: z.number().int().min(64).max(4096).optional().describe("Longest side in pixels of the returned image (default 1280)."),
+        region: z.array(z.number()).length(4).optional().describe("Zoom into [x, y, width, height] in comp pixels (scaled up to maxSize, at most 8x)."),
+        layers: z.array(layerRef).optional().describe("Render only these layers (others are hidden for the render and restored)."),
+        background: z.string().optional().describe('"checkerboard" to show transparency, or a color like "#808080" behind the comp.'),
+        compareWith: z
+          .object({ comp: z.union([z.number().int(), z.string()]).optional(), time: z.number().optional() })
+          .optional()
+          .describe("Difference image against another time and/or comp (black where identical)."),
         outputPath: z.string().optional().describe("Optional absolute path to also save the PNG to."),
       },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    async ({ comp, time, maxSize, outputPath }) => {
+    async (args) => {
       try {
-        const body = `
-var c = aemcp.findComp(args.comp);
-var t = args.time === undefined ? c.time : args.time;
-var max = args.maxSize || 1280;
-var target = c, tmp = null;
-var scale = Math.min(1, max / Math.max(c.width, c.height));
-if (scale < 1) {
-  var w = Math.max(4, Math.round(c.width * scale)), h = Math.max(4, Math.round(c.height * scale));
-  tmp = app.project.items.addComp("__aemcp_preview", w, h, 1, c.duration, c.frameRate);
-  tmp.displayStartTime = c.displayStartTime;
-  var l = tmp.layers.add(c);
-  l.property("ADBE Transform Group").property("ADBE Scale").setValue([scale * 100 * c.pixelAspect, scale * 100, 100]);
-  l.property("ADBE Transform Group").property("ADBE Position").setValue([w / 2, h / 2]);
-  l.property("ADBE Transform Group").property("ADBE Anchor Point").setValue([c.width / 2, c.height / 2]);
-  target = tmp;
-}
-try {
-  var f = new File(args.outputPath || (args.tmpDir + "/aemcp_frame_" + new Date().getTime() + ".png"));
-  if (f.exists) f.remove();
-  target.saveFrameToPng(t, f);
-  var info = { path: f.fsName, width: target.width, height: target.height, time: t, comp: c.name };
-  var waited = 0; while (!f.exists && waited < 10000) { $.sleep(50); waited += 50; }
-  if (tmp) $.sleep(100);
-} finally {
-  // never leave the temporary comp behind, even if rendering fails
-  if (tmp) try { tmp.remove(); } catch (e) {}
-}
-return info;`;
-        const out = await renderPng(body, { comp, time, maxSize, outputPath });
+        const body = RENDER_FRAME_JSX;
+        const out = await renderPng(body, args);
         if ("error" in out) return out.error;
         const { info, data } = out;
-        return {
-          content: [
-            { type: "image", data, mimeType: "image/png" },
-            { type: "text", text: `Frame of "${info.comp}" at ${info.time}s (${info.width}x${info.height})${outputPath ? ` saved to ${info.path}` : ""}` },
-          ],
-        };
+        const parts = [`Frame of "${info.comp}" at ${info.time}s (${info.width}x${info.height}`];
+        if (info.region) parts.push(`, region ${info.region.join(",")} at ${info.zoom}x`);
+        parts.push(")");
+        if (args.layers?.length) parts.push(`, only layers ${args.layers.join(", ")}`);
+        if (info.compare) parts.push(`; difference vs "${info.compare.comp}" at ${info.compare.time}s (black = identical)`);
+        if (args.outputPath) parts.push(`; saved to ${info.path}`);
+        return { content: [{ type: "image", data, mimeType: "image/png" }, { type: "text", text: parts.join("") }] };
       } catch (e) {
         return errorResult(e);
       }
     },
   );
+
 
   server.registerTool(
     "ae_render_contact_sheet",
@@ -248,64 +381,7 @@ return info;`;
     },
     async (args) => {
       try {
-        const body = `
-var c = aemcp.findComp(args.comp);
-var fd = c.frameDuration, times = [];
-if (args.times) { for (var k = 0; k < args.times.length; k++) times.push(args.times[k]); }
-else {
-  var n = args.frames || 9;
-  var t0 = args.start !== undefined ? args.start : c.workAreaStart;
-  var t1 = args.end !== undefined ? args.end : c.workAreaStart + c.workAreaDuration;
-  if (t1 <= t0) aemcp.fail("end must be after start");
-  var last = Math.max(t0, t1 - fd);
-  for (var i = 0; i < n; i++) times.push(t0 + (last - t0) * i / (n - 1));
-}
-for (var q = 0; q < times.length; q++) times[q] = Math.max(0, Math.min(c.duration - fd, Math.round(times[q] / fd) * fd));
-var count = times.length;
-var cols = args.columns || Math.ceil(Math.sqrt(count)), rows = Math.ceil(count / cols);
-var W = args.width || 1600, gap = 8, labelH = 26;
-var cellW = Math.floor((W - gap * (cols + 1)) / cols);
-var cellH = Math.round(cellW * c.height / (c.width * c.pixelAspect));
-var H = rows * (cellH + labelH + gap) + gap;
-var sheet = app.project.items.addComp("__aemcp_contact_sheet", W, H, 1, 1, c.frameRate);
-try {
-  // opaque dark background (a shape layer, so no solid is left in the project)
-  var bg = sheet.layers.addShape();
-  var bgv = bg.property("ADBE Root Vectors Group").addProperty("ADBE Vector Group").property("ADBE Vectors Group");
-  bgv.addProperty("ADBE Vector Shape - Rect").property("ADBE Vector Rect Size").setValue([W, H]);
-  bgv.addProperty("ADBE Vector Graphic - Fill").property("ADBE Vector Fill Color").setValue([0.09, 0.09, 0.1]);
-  bg.property("ADBE Transform Group").property("ADBE Position").setValue([W / 2, H / 2]);
-  var sc = cellW / (c.width * c.pixelAspect) * 100;
-  for (var j = 0; j < count; j++) {
-    var col = j % cols, row = Math.floor(j / cols);
-    var x0 = gap + col * (cellW + gap), y0 = gap + row * (cellH + labelH + gap);
-    var l = sheet.layers.add(c);
-    l.startTime = -times[j];
-    var tr = l.property("ADBE Transform Group");
-    tr.property("ADBE Anchor Point").setValue([c.width / 2, c.height / 2]);
-    tr.property("ADBE Scale").setValue([sc, sc, 100]);
-    tr.property("ADBE Position").setValue([x0 + cellW / 2, y0 + cellH / 2]);
-    var t = sheet.layers.addText((Math.round(times[j] * 100) / 100) + "s  \u00b7  f" + Math.round(times[j] / fd));
-    var src = t.property("ADBE Text Properties").property("ADBE Text Document"), td = src.value;
-    try { td.font = "ArialMT"; } catch (e) {}
-    td.fontSize = 15; td.applyFill = true; td.fillColor = [0.85, 0.85, 0.85]; td.applyStroke = false;
-    try { td.fauxBold = false; td.fauxItalic = false; td.allCaps = false; td.tracking = 0; } catch (e) {}
-    td.justification = ParagraphJustification.CENTER_JUSTIFY;
-    src.setValue(td);
-    // center the label under its cell using its real bounds (independent of AE's last-used text settings)
-    var rc = t.sourceRectAtTime(0, false), ttr = t.property("ADBE Transform Group");
-    ttr.property("ADBE Anchor Point").setValue([rc.left + rc.width / 2, rc.top + rc.height / 2]);
-    ttr.property("ADBE Position").setValue([x0 + cellW / 2, y0 + cellH + labelH / 2]);
-    t.moveToBeginning();
-  }
-  var f = new File(args.outputPath || (args.tmpDir + "/aemcp_sheet_" + new Date().getTime() + ".png"));
-  if (f.exists) f.remove();
-  sheet.saveFrameToPng(0, f);
-  var waited = 0; while (!f.exists && waited < 20000) { $.sleep(50); waited += 50; }
-  $.sleep(150);
-  var r = { path: f.fsName, comp: c.name, times: times, columns: cols, rows: rows, width: W, height: H };
-} finally { sheet.remove(); }
-return r;`;
+        const body = CONTACT_SHEET_JSX;
         const out = await renderPng(body, args);
         if ("error" in out) return out.error;
         const { info, data } = out;
