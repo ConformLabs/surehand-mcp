@@ -163,7 +163,7 @@ export async function install(argv: string[]) {
   step("4/4  Done!");
   console.log(`
   ${bold("Restart After Effects")} if it is open. The connection starts automatically with it.
-  ${registered.length ? `Connected: ${registered.join(", ")}. Restart ${registered.filter((r) => r !== "Claude Desktop" || !restartClaude).join(", ") || "nothing else"} if open.` : "No AI apps were found to connect."}
+  ${registered.length ? `Connected: ${registered.join(", ")}. Restart ${registered.filter((r) => r !== "Claude Desktop" || !restartClaude).join(", ") || "nothing else"} if open.` : flags.has("--skip-clients") ? "AI apps were left as they are (--skip-clients)." : "No AI apps were found to connect."}
 
   Try asking Claude: ${bold('"Check After Effects is connected, then make a 1080p comp with an animated title."')}
   Check the installation any time with ${bold("2. Test Installation")} (in the ${isWin ? "Windows" : "Mac"} folder).
