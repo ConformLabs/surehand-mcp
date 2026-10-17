@@ -1,9 +1,10 @@
 // Cuts a release in one go:
-//   version bump -> sign the AE extension -> check (types, tests, build) -> Windows test ->
+//   version bump -> sign the AE extension -> check (types, tests, build) -> Mac + Windows tests ->
 //   package -> commit + push -> wait for CI -> GitHub release with the zip, .mcpb and server file.
 //
 //   npm run release -- 1.3.2 --notes notes.md
-//   options: --skip-windows   don't run the Windows test (scripts/test-windows.mjs)
+//   options: --skip-mac       don't run the Mac test (scripts/test-mac.mjs: needs After Effects open here)
+//            --skip-windows   don't run the Windows test (scripts/test-windows.mjs)
 //            --draft          create the GitHub release as a draft
 //
 // Stops at the first failure. Nothing is pushed until everything local has passed; if CI then
@@ -41,7 +42,7 @@ const newer = (a, b) => {
 
 // --- preflight: everything that can be checked before changing anything ---
 step("checks before starting");
-if (!version || !notes) die("usage: npm run release -- <x.y.z> --notes <notes.md> [--skip-windows] [--draft]");
+if (!version || !notes) die("usage: npm run release -- <x.y.z> --notes <notes.md> [--skip-mac] [--skip-windows] [--draft]");
 if (!existsSync(notes)) die(`notes file not found: ${notes}`);
 const pkg = JSON.parse(readFileSync(join(SERVER, "package.json"), "utf8"));
 if (!newer(version, pkg.version)) die(`${version} is not newer than the current ${pkg.version}`);
@@ -61,6 +62,11 @@ run("npm", ["run", "sign"]);
 
 step("check: types, tests, build");
 run("npm", ["run", "check"]);
+
+if (!flag("--skip-mac")) {
+  step("Mac");
+  run(process.execPath, [join(SERVER, "scripts", "test-mac.mjs")]);
+}
 
 if (!flag("--skip-windows")) {
   step("Windows");

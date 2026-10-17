@@ -16,6 +16,7 @@
     "start": "node dist/ae-mcp.mjs",
     "package": "node scripts/package.mjs",
     "sign": "node scripts/sign-extension.mjs",
+    "test:mac": "node scripts/test-mac.mjs",
     "test:windows": "node scripts/test-windows.mjs",
     "release": "node scripts/release.mjs",
     "check": "tsc --noEmit && vitest run && node build.mjs"

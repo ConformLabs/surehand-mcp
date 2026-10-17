@@ -308,7 +308,8 @@ server/              MCP server (TypeScript) -> bundled into server/dist/ae-mcp.
   scripts/smoke.mjs    end-to-end test against a running After Effects
   scripts/package.mjs  builds the shareable release folder, zip and .mcpb
   scripts/release.mjs  cuts a release: version, sign, check, Windows test, package, CI, GitHub release
-  scripts/test-windows.mjs  installs the build on a Windows PC over SSH and runs the full self-test
+  scripts/test-mac.mjs      installs the build on this Mac and runs the full self-test on each open After Effects
+  scripts/test-windows.mjs  the same on a Windows PC over SSH
   scripts/sign-extension.mjs  signs the After Effects extension
   scripts/ci-check.mjs assertions for the CI install / uninstall dry runs
 extension/           After Effects extension (signed): invisible bridge (auto-starts) + status panel
@@ -328,7 +329,8 @@ node scripts/smoke.mjs   # live test: needs After Effects running with the bridg
 npm run package          # -> ../dist-zip/AE-MCP/ (launchers, server, AE-MCP.mcpb) + zip
 npm run sign             # re-sign the After Effects extension after changing extension/ or the version
                          # (needs the certificate in ~/.aemcp-signing; see scripts/sign-extension.mjs)
-npm run test:windows     # install this build on the Windows PC over SSH and run the full self-test
+npm run test:mac         # install this build here and run the full self-test on each open After Effects
+npm run test:windows     # the same on the Windows PC over SSH
 npm run release -- 1.4.0 --notes notes.md   # everything above, then commit, CI and the GitHub release
 ```
 
