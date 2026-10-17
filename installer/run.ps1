@@ -52,14 +52,29 @@ if (-not $node) {
     Write-Host "The downloaded Node.js failed its checksum check; aborting."
     exit 1
   }
+  Write-Host "Unpacking Node.js (this can take a minute)..."
   Expand-Archive -Path $zip -DestinationPath $tmp -Force
+  $extracted = Get-ChildItem -Path $tmp -Directory | Where-Object { Test-Path (Join-Path $_.FullName "node.exe") } | Select-Object -First 1
+  if (-not $extracted) {
+    Write-Host "Could not find node.exe in the downloaded archive; aborting."
+    exit 1
+  }
   if (Test-Path $privateNode) { Remove-Item -Recurse -Force $privateNode }
-  Move-Item (Join-Path $tmp ([IO.Path]::GetFileNameWithoutExtension($file))) $privateNode
-  Remove-Item -Recurse -Force $tmp
+  # Move-Item does not create missing parent folders (%USERPROFILE%\.aemcp may not exist yet)
+  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $privateNode) | Out-Null
+  try {
+    Move-Item -Path $extracted.FullName -Destination $privateNode
+  } catch {
+    # e.g. TEMP on another drive: fall back to copying
+    Copy-Item -Recurse -Path $extracted.FullName -Destination $privateNode
+  }
+  Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $tmp
   $node = Join-Path $privateNode "node.exe"
   Write-Host "Node.js $(& $node --version) installed to $privateNode"
 }
 
+# Don't let Windows PowerShell 5.1 turn the server's normal stderr messages into terminating errors
+$ErrorActionPreference = "Continue"
 & $node $server @args
 $status = $LASTEXITCODE
 # The private Node can only be deleted after it has finished running the uninstaller.
