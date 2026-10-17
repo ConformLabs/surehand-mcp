@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <ExtensionManifest xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     ExtensionBundleId="com.aemcp"
-    ExtensionBundleVersion="1.0.0"
+    ExtensionBundleVersion="__AEMCP_VERSION__"
     ExtensionBundleName="AE MCP"
     Version="9.0">
   <ExtensionList>
-    <Extension Id="com.aemcp.bridge" Version="1.0.0" />
-    <Extension Id="com.aemcp.panel" Version="1.0.0" />
+    <Extension Id="com.aemcp.bridge" Version="__AEMCP_VERSION__" />
+    <Extension Id="com.aemcp.panel" Version="__AEMCP_VERSION__" />
   </ExtensionList>
   <ExecutionEnvironment>
     <HostList>

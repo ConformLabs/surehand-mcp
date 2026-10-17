@@ -15,6 +15,15 @@ describe("extension signature", () => {
     expect(r.problems).toEqual([]);
   });
 
+  it("stamps the release version into the manifest (what ZXP installers and Adobe show)", () => {
+    const manifest = readCepFiles(version)["CSXS/manifest.xml"];
+    expect(manifest).toContain(`ExtensionBundleVersion="${version}"`);
+    expect(manifest.match(/<Extension Id="[^"]+" Version="([^"]+)"/g)).toEqual([
+      `<Extension Id="com.aemcp.bridge" Version="${version}"`,
+      `<Extension Id="com.aemcp.panel" Version="${version}"`,
+    ]);
+  });
+
   it("detects changed, extra and missing files", () => {
     const files = readCepFiles(version);
     expect(checkSignature({ ...files, "js/panel.js": files["js/panel.js"] + " " }).problems).toEqual(["js/panel.js changed since it was signed"]);
