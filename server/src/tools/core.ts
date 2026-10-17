@@ -4,6 +4,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
 import { health } from "../bridge.js";
+import { lastSetup } from "../cli/setup.js";
 import { VERSION } from "../config.js";
 import { ensureHelpers, runJsx, userCodeBody } from "../jsx.js";
 import { compRef, errorResult, formatResult } from "./registry.js";
@@ -102,6 +103,8 @@ export function registerCoreTools(server: McpServer) {
               "Ask the user to enable it: After Effects > Settings > Scripting & Expressions (Windows: Edit > Preferences > Scripting & Expressions).",
           });
         out.content.unshift({ type: "text", text: `Connected to After Effects bridge v${h.version} (MCP server v${VERSION}).` });
+        if (lastSetup?.extensionUpdated)
+          out.content.push({ type: "text", text: "Note: the After Effects extension was updated on disk; ask the user to restart After Effects when convenient to load the new version." });
         return out;
       } catch (e) {
         return errorResult(e);

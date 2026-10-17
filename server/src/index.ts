@@ -14,6 +14,7 @@ import { projectTools } from "./tools/project.js";
 import { propertyTools } from "./tools/property.js";
 import { registerJsxTools } from "./tools/registry.js";
 import { renderTools } from "./tools/render.js";
+import { ensureAeSetup } from "./cli/setup.js";
 
 export function createMcpServer(): McpServer {
   const server = new McpServer({ name: "after-effects", title: "Adobe After Effects", version: VERSION }, { instructions: INSTRUCTIONS });
@@ -113,19 +114,57 @@ function startHttp() {
   });
 }
 
-async function main() {
-  if (process.argv.includes("--version")) return void console.log(VERSION);
-  if (process.argv.includes("--help")) {
-    console.log(`ae-mcp v${VERSION} - MCP server for Adobe After Effects
+const HELP = `ae-mcp v${VERSION} - MCP server for Adobe After Effects
 
 Usage:
-  ae-mcp                 stdio transport (Claude Desktop, Claude Code, Cursor...)
+  ae-mcp                 run the MCP server over stdio (Claude Desktop, Claude Code, Cursor...)
   ae-mcp --http [--port 8766] [--host 127.0.0.1] [--no-auth]
-                         Streamable HTTP transport at /mcp (ChatGPT via a tunnel)
+                         run over Streamable HTTP at /mcp (ChatGPT via a tunnel)
+  ae-mcp install [--skip-clients] [--no-claude-desktop|--no-claude-code|--no-cursor|--no-codex]
+                         install the server + After Effects extension and connect AI apps
+  ae-mcp uninstall [--keep-config]
+  ae-mcp selftest        check the installation and the connection to After Effects
+  ae-mcp chatgpt [--local]
+                         HTTP server + public tunnel for ChatGPT
+  ae-mcp setup           only install/update the After Effects extension and config
 
-Config: ~/.aemcp/config.json  (env: AEMCP_CONFIG, AEMCP_BRIDGE_PORT, AEMCP_TOKEN, AEMCP_HTTP_PORT, AEMCP_HTTP_TOKEN)`);
-    return;
+Config: ~/.aemcp/config.json  (env: AEMCP_CONFIG, AEMCP_BRIDGE_PORT, AEMCP_TOKEN, AEMCP_HTTP_PORT, AEMCP_HTTP_TOKEN)`;
+
+/** Make sure the After Effects side is installed/up to date (cheap no-op when it already is). */
+function autoSetup() {
+  if (process.env.AEMCP_NO_AUTOSETUP) return;
+  try {
+    const r = ensureAeSetup();
+    if (r.extensionInstalled) console.error(`[ae-mcp] After Effects extension ${r.extensionUpdated ? "updated" : "installed"}; restart After Effects to load it.`);
+    if (r.errors.length) console.error(`[ae-mcp] setup problems: ${r.errors.join("; ")}`);
+  } catch (e) {
+    console.error("[ae-mcp] setup failed:", e);
   }
+}
+
+async function main() {
+  const cmd = process.argv[2];
+  const rest = process.argv.slice(3);
+  if (process.argv.includes("--version")) return void console.log(VERSION);
+  if (process.argv.includes("--help") || cmd === "help") return void console.log(HELP);
+  switch (cmd) {
+    case "install":
+      return (await import("./cli/install.js")).install(rest);
+    case "uninstall":
+      return (await import("./cli/uninstall.js")).uninstall(rest);
+    case "selftest":
+    case "test":
+      process.exitCode = await (await import("./cli/selftest.js")).selftest();
+      return;
+    case "chatgpt":
+      return (await import("./cli/chatgpt.js")).chatgpt(rest);
+    case "setup": {
+      const r = ensureAeSetup({ forceExtension: rest.includes("--force") });
+      console.log(JSON.stringify(r, null, 2));
+      return;
+    }
+  }
+  autoSetup();
   if (process.argv.includes("--http")) return startHttp();
   const server = createMcpServer();
   await server.connect(new StdioServerTransport());

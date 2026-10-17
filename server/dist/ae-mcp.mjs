@@ -6,6 +6,14 @@ var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __esm = (fn, res, err) => function __init() {
+  if (err) throw err[0];
+  try {
+    return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+  } catch (e) {
+    throw err = [e], e;
+  }
+};
 var __commonJS = (cb, mod) => function __require() {
   try {
     return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
@@ -34,10 +42,244 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 
+// <define:__AEMCP_CEP_FILES__>
+var define_AEMCP_CEP_FILES_default;
+var init_define_AEMCP_CEP_FILES = __esm({
+  "<define:__AEMCP_CEP_FILES__>"() {
+    define_AEMCP_CEP_FILES_default = { "CSXS/manifest.xml": '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n<ExtensionManifest xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n    ExtensionBundleId="com.aemcp"\n    ExtensionBundleVersion="1.0.0"\n    ExtensionBundleName="AE MCP"\n    Version="9.0">\n  <ExtensionList>\n    <Extension Id="com.aemcp.bridge" Version="1.0.0" />\n    <Extension Id="com.aemcp.panel" Version="1.0.0" />\n  </ExtensionList>\n  <ExecutionEnvironment>\n    <HostList>\n      <Host Name="AEFT" Version="[16.0,99.9]" />\n    </HostList>\n    <LocaleList>\n      <Locale Code="All" />\n    </LocaleList>\n    <RequiredRuntimeList>\n      <RequiredRuntime Name="CSXS" Version="9.0" />\n    </RequiredRuntimeList>\n  </ExecutionEnvironment>\n  <DispatchInfoList>\n    <!-- Invisible background extension: starts with After Effects and runs the local bridge server. -->\n    <Extension Id="com.aemcp.bridge">\n      <DispatchInfo>\n        <Resources>\n          <MainPath>./bridge.html</MainPath>\n          <CEFCommandLine>\n            <Parameter>--enable-nodejs</Parameter>\n            <Parameter>--mixed-context</Parameter>\n          </CEFCommandLine>\n        </Resources>\n        <Lifecycle>\n          <AutoVisible>false</AutoVisible>\n          <StartOn>\n            <Event>com.adobe.csxs.events.ApplicationInitialized</Event>\n            <Event>applicationActivate</Event>\n          </StartOn>\n        </Lifecycle>\n        <UI>\n          <Type>Custom</Type>\n          <Geometry>\n            <Size><Height>1</Height><Width>1</Width></Size>\n          </Geometry>\n        </UI>\n      </DispatchInfo>\n    </Extension>\n    <!-- Status panel: Window > Extensions > AE MCP -->\n    <Extension Id="com.aemcp.panel">\n      <DispatchInfo>\n        <Resources>\n          <MainPath>./index.html</MainPath>\n          <CEFCommandLine>\n            <Parameter>--enable-nodejs</Parameter>\n            <Parameter>--mixed-context</Parameter>\n          </CEFCommandLine>\n        </Resources>\n        <Lifecycle>\n          <AutoVisible>true</AutoVisible>\n        </Lifecycle>\n        <UI>\n          <Type>Panel</Type>\n          <Menu>AE MCP</Menu>\n          <Geometry>\n            <Size><Height>420</Height><Width>320</Width></Size>\n            <MinSize><Height>200</Height><Width>240</Width></MinSize>\n          </Geometry>\n        </UI>\n      </DispatchInfo>\n    </Extension>\n  </DispatchInfoList>\n</ExtensionManifest>\n', "bridge.html": '<!DOCTYPE html>\n<html>\n<head><meta charset="utf-8"><title>AE MCP Bridge</title></head>\n<body>\n<script src="js/bridge-core.js"></script>\n<script>AEMCPBridge.start();</script>\n</body>\n</html>\n', "css/panel.css": ':root { --bg: #232323; --fg: #d6d6d6; --muted: #8a8a8a; --ok: #3fb950; --bad: #f85149; --warn: #d29922; --line: #3a3a3a; }\n* { box-sizing: border-box; }\nbody { margin: 0; padding: 10px; background: var(--bg); color: var(--fg); font: 12px -apple-system, "Segoe UI", sans-serif; }\nheader { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }\n#title { font-weight: 600; font-size: 13px; }\n.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--warn); flex: none; }\n.dot.ok { background: var(--ok); } .dot.bad { background: var(--bad); }\n.muted { color: var(--muted); }\n.row { display: flex; gap: 6px; margin-bottom: 10px; }\nbutton { background: #3a3a3a; color: var(--fg); border: 1px solid #4a4a4a; border-radius: 4px; padding: 4px 10px; cursor: pointer; font: inherit; }\nbutton:hover { background: #454545; }\n.label { text-transform: uppercase; font-size: 10px; letter-spacing: .05em; color: var(--muted); margin-bottom: 4px; }\nul { list-style: none; padding: 0; margin: 0; }\nli { border-top: 1px solid var(--line); padding: 4px 0; word-break: break-all; }\nli .t { color: var(--muted); margin-right: 6px; }\nli.err .s { color: var(--bad); } li.ok .s { color: var(--ok); }\nfooter { margin-top: 10px; font-size: 10px; }\n', "index.html": '<!DOCTYPE html>\n<html>\n<head>\n  <meta charset="utf-8">\n  <title>AE MCP</title>\n  <link rel="stylesheet" href="css/panel.css">\n</head>\n<body>\n  <header>\n    <span id="dot" class="dot"></span>\n    <div>\n      <div id="title">AE MCP</div>\n      <div id="sub" class="muted">checking\u2026</div>\n    </div>\n  </header>\n  <section class="row">\n    <button id="test">Test</button>\n    <button id="refresh">Refresh</button>\n  </section>\n  <section>\n    <div class="label">Recent calls</div>\n    <ul id="log"><li class="muted">No calls yet</li></ul>\n  </section>\n  <footer class="muted" id="foot"></footer>\n  <script src="js/bridge-core.js"></script>\n  <script src="js/panel.js"></script>\n</body>\n</html>\n', "js/bridge-core.js": `/* AE MCP bridge: a tiny HTTP server inside After Effects (CEP + Node) that evaluates
+ * ExtendScript sent by the ae-mcp server. Binds to 127.0.0.1 only and requires the
+ * shared token from ~/.aemcp/config.json. */
+(function (global) {
+  "use strict";
+  var nodeRequire = typeof require !== "undefined" ? require : global.cep_node && global.cep_node.require;
+  var http = nodeRequire("http");
+  var fs = nodeRequire("fs");
+  var os = nodeRequire("os");
+  var path = nodeRequire("path");
+  var crypto = nodeRequire("crypto");
+
+  var VERSION = "1.0.0";
+  var CONFIG_DIR = path.join(os.homedir(), ".aemcp");
+  var CONFIG_FILE = path.join(CONFIG_DIR, "config.json");
+  var STATUS_FILE = path.join(CONFIG_DIR, "bridge-status.json");
+
+  function loadConfig() {
+    var cfg = {};
+    try { cfg = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf8")); } catch (e) {}
+    var changed = false;
+    if (!cfg.token) { cfg.token = crypto.randomBytes(24).toString("hex"); changed = true; }
+    if (!cfg.bridgePort) { cfg.bridgePort = 8765; changed = true; }
+    if (!cfg.httpPort) { cfg.httpPort = 8766; changed = true; }
+    if (changed) {
+      try { fs.mkdirSync(CONFIG_DIR, { recursive: true }); fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2)); } catch (e) {}
+    }
+    return cfg;
+  }
+
+  function hostInfo() {
+    try {
+      var env = JSON.parse(global.__adobe_cep__.getHostEnvironment());
+      return { appName: env.appName, appVersion: env.appVersion };
+    } catch (e) { return {}; }
+  }
+
+  function evalScript(script, cb) {
+    global.__adobe_cep__.evalScript(script, function (r) { cb(r); });
+  }
+
+  var state = { started: false, listening: false, error: null, port: null, busy: false, queue: [], log: [], startedAt: null };
+
+  function addLog(entry) {
+    state.log.unshift(entry);
+    if (state.log.length > 50) state.log.length = 50;
+  }
+
+  function writeStatus() {
+    try {
+      fs.writeFileSync(STATUS_FILE, JSON.stringify({ listening: state.listening, port: state.port, error: state.error, pid: process.pid, host: hostInfo(), version: VERSION, at: new Date().toISOString() }, null, 2));
+    } catch (e) {}
+  }
+
+  // ExtendScript is single threaded: run one script at a time.
+  function pump() {
+    if (state.busy || !state.queue.length) return;
+    var job = state.queue.shift();
+    if (job.cancelled) return pump();
+    state.busy = true;
+    var t0 = Date.now();
+    evalScript(job.script, function (result) {
+      state.busy = false;
+      var ms = Date.now() - t0;
+      var ok = result !== "EvalScript error." && result.indexOf('{"ok":false') !== 0;
+      addLog({ at: new Date().toISOString(), ms: ms, ok: ok, size: job.script.length, preview: String(result).slice(0, 160) });
+      job.done(result);
+      pump();
+    });
+  }
+
+  function send(res, status, obj) {
+    res.writeHead(status, { "content-type": "application/json" });
+    res.end(JSON.stringify(obj));
+  }
+
+  function authorized(req, token) {
+    var h = String(req.headers.authorization || "").replace(/^Bearer\\s+/i, "");
+    if (!h || h.length !== token.length) return false;
+    try { return crypto.timingSafeEqual(Buffer.from(h), Buffer.from(token)); } catch (e) { return false; }
+  }
+
+  function start() {
+    if (state.started) return state;
+    state.started = true;
+    var cfg = loadConfig();
+    state.port = cfg.bridgePort;
+
+    var server = http.createServer(function (req, res) {
+      // Reject browser-originated requests (DNS-rebinding / CSRF protection)
+      if (req.headers.origin) return send(res, 403, { ok: false, error: "forbidden" });
+      var token = loadConfig().token;
+      if (req.method === "GET" && req.url === "/health") {
+        return send(res, 200, { ok: true, name: "aemcp-bridge", version: VERSION, host: hostInfo(), busy: state.busy, queue: state.queue.length, authorized: authorized(req, token) });
+      }
+      if (!authorized(req, token)) return send(res, 401, { ok: false, error: "unauthorized" });
+      if (req.method === "GET" && req.url === "/log") return send(res, 200, { ok: true, log: state.log });
+      if (req.method === "POST" && req.url === "/eval") {
+        var chunks = [];
+        req.on("data", function (c) { chunks.push(c); });
+        req.on("end", function () {
+          var body;
+          try { body = JSON.parse(Buffer.concat(chunks).toString("utf8")); } catch (e) { return send(res, 400, { ok: false, error: "invalid JSON" }); }
+          if (!body || typeof body.script !== "string") return send(res, 400, { ok: false, error: "missing script" });
+          var finished = false;
+          var job = {
+            script: body.script,
+            done: function (result) {
+              if (finished) return;
+              finished = true;
+              clearTimeout(timer);
+              send(res, 200, { ok: true, result: result });
+            },
+          };
+          var timeoutMs = Math.max(1000, Math.min(Number(body.timeoutMs) || 120000, 24 * 3600 * 1000));
+          var timer = setTimeout(function () {
+            if (finished) return;
+            finished = true;
+            job.cancelled = true; // drop it if it has not started yet
+            send(res, 504, { ok: false, error: "Timed out after " + timeoutMs + "ms waiting for After Effects (it may be busy, rendering, or showing a dialog)." });
+          }, timeoutMs);
+          // client went away before we answered: don't run it if it is still queued
+          res.on("close", function () { if (!finished) { job.cancelled = true; } });
+          state.queue.push(job);
+          pump();
+        });
+        return;
+      }
+      send(res, 404, { ok: false, error: "not found" });
+    });
+
+    server.on("error", function (e) {
+      state.listening = false;
+      state.error = e.code === "EADDRINUSE"
+        ? "Port " + state.port + " is already in use (another After Effects instance running the bridge?)"
+        : String(e.message || e);
+      writeStatus();
+    });
+    server.listen(state.port, "127.0.0.1", function () {
+      state.listening = true;
+      state.error = null;
+      state.startedAt = new Date().toISOString();
+      writeStatus();
+    });
+    state.server = server;
+    return state;
+  }
+
+  global.AEMCPBridge = { start: start, state: state, loadConfig: loadConfig, hostInfo: hostInfo, VERSION: VERSION, CONFIG_FILE: CONFIG_FILE };
+})(window);
+`, "js/panel.js": `/* Status panel. If the background bridge extension isn't running (some hosts don't honour
+ * StartOn for invisible extensions), the panel starts the bridge itself. */
+(function () {
+  "use strict";
+  var http = require("http");
+  var $ = function (id) { return document.getElementById(id); };
+
+  function call(method, path, body, cb) {
+    var cfg = AEMCPBridge.loadConfig();
+    var data = body ? JSON.stringify(body) : null;
+    var req = http.request({ host: "127.0.0.1", port: cfg.bridgePort, path: path, method: method,
+      headers: { authorization: "Bearer " + cfg.token, "content-type": "application/json" } }, function (res) {
+      var chunks = [];
+      res.on("data", function (c) { chunks.push(c); });
+      res.on("end", function () { try { cb(null, JSON.parse(Buffer.concat(chunks).toString("utf8"))); } catch (e) { cb(e); } });
+    });
+    req.on("error", function (e) { cb(e); });
+    req.setTimeout(path === "/eval" ? 30000 : 3000, function () { req.destroy(new Error("timeout")); });
+    if (data) req.write(data);
+    req.end();
+  }
+
+  function setStatus(kind, text) {
+    $("dot").className = "dot " + kind;
+    $("sub").textContent = text;
+  }
+
+  function renderLog(log) {
+    var ul = $("log");
+    ul.innerHTML = "";
+    if (!log || !log.length) { ul.innerHTML = '<li class="muted">No calls yet</li>'; return; }
+    log.slice(0, 20).forEach(function (e) {
+      var li = document.createElement("li");
+      li.className = e.ok ? "ok" : "err";
+      var t = new Date(e.at);
+      li.innerHTML = '<span class="t"></span><span class="s"></span> <span class="p"></span>';
+      li.querySelector(".t").textContent = t.toLocaleTimeString() + " \xB7 " + e.ms + "ms";
+      li.querySelector(".s").textContent = e.ok ? "ok" : "error";
+      li.querySelector(".p").textContent = e.preview;
+      ul.appendChild(li);
+    });
+  }
+
+  var triedStart = false;
+  function refresh() {
+    call("GET", "/health", null, function (err, h) {
+      if (err) {
+        if (!triedStart) {
+          triedStart = true;
+          AEMCPBridge.start();
+          setTimeout(refresh, 500);
+          return;
+        }
+        var st = AEMCPBridge.state;
+        setStatus("bad", st.error || "Bridge not running: " + err.message);
+        return;
+      }
+      if (!h.authorized) { setStatus("bad", "Token mismatch: re-run the installer"); return; }
+      var cfg = AEMCPBridge.loadConfig();
+      setStatus("ok", "Listening on 127.0.0.1:" + cfg.bridgePort + (h.busy ? " \xB7 busy" : "") + (h.queue ? " \xB7 queue " + h.queue : ""));
+      call("GET", "/log", null, function (e2, r) { if (!e2) renderLog(r.log); });
+    });
+  }
+
+  $("refresh").onclick = refresh;
+  $("test").onclick = function () {
+    call("POST", "/eval", { script: "'After Effects ' + app.version", timeoutMs: 10000 }, function (err, r) {
+      alert(err ? "Error: " + err.message : r.ok ? "Bridge OK\\n" + r.result : "Error: " + r.error);
+      refresh();
+    });
+  };
+  $("foot").textContent = "Bridge v" + AEMCPBridge.VERSION + " \xB7 config: " + AEMCPBridge.CONFIG_FILE;
+  refresh();
+  setInterval(refresh, 3000);
+})();
+` };
+  }
+});
+
 // node_modules/ajv/dist/compile/codegen/code.js
 var require_code = __commonJS({
   "node_modules/ajv/dist/compile/codegen/code.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.regexpCode = exports.getEsmExportName = exports.getProperty = exports.safeStringify = exports.stringify = exports.strConcat = exports.addCodeArg = exports.str = exports._ = exports.nil = exports._Code = exports.Name = exports.IDENTIFIER = exports._CodeOrName = void 0;
     var _CodeOrName = class {
@@ -192,6 +434,7 @@ var require_code = __commonJS({
 var require_scope = __commonJS({
   "node_modules/ajv/dist/compile/codegen/scope.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.ValueScope = exports.ValueScopeName = exports.Scope = exports.varKinds = exports.UsedValueState = void 0;
     var code_1 = require_code();
@@ -337,6 +580,7 @@ var require_scope = __commonJS({
 var require_codegen = __commonJS({
   "node_modules/ajv/dist/compile/codegen/index.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.or = exports.and = exports.not = exports.CodeGen = exports.operators = exports.varKinds = exports.ValueScopeName = exports.ValueScope = exports.Scope = exports.Name = exports.regexpCode = exports.stringify = exports.getProperty = exports.nil = exports.strConcat = exports.str = exports._ = void 0;
     var code_1 = require_code();
@@ -1057,6 +1301,7 @@ var require_codegen = __commonJS({
 var require_util = __commonJS({
   "node_modules/ajv/dist/compile/util.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.checkStrictMode = exports.getErrorPath = exports.Type = exports.useFunc = exports.setEvaluated = exports.evaluatedPropsToName = exports.mergeEvaluated = exports.eachItem = exports.unescapeJsonPointer = exports.escapeJsonPointer = exports.escapeFragment = exports.unescapeFragment = exports.schemaRefOrVal = exports.schemaHasRulesButRef = exports.schemaHasRules = exports.checkUnknownRules = exports.alwaysValidSchema = exports.toHash = void 0;
     var codegen_1 = require_codegen();
@@ -1224,6 +1469,7 @@ var require_util = __commonJS({
 var require_names = __commonJS({
   "node_modules/ajv/dist/compile/names.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
     var names = {
@@ -1263,6 +1509,7 @@ var require_names = __commonJS({
 var require_errors = __commonJS({
   "node_modules/ajv/dist/compile/errors.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.extendErrors = exports.resetErrorsCount = exports.reportExtraError = exports.reportError = exports.keyword$DataError = exports.keywordError = void 0;
     var codegen_1 = require_codegen();
@@ -1385,6 +1632,7 @@ var require_errors = __commonJS({
 var require_boolSchema = __commonJS({
   "node_modules/ajv/dist/compile/validate/boolSchema.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.boolOrEmptySchema = exports.topBoolOrEmptySchema = void 0;
     var errors_1 = require_errors();
@@ -1436,6 +1684,7 @@ var require_boolSchema = __commonJS({
 var require_rules = __commonJS({
   "node_modules/ajv/dist/compile/rules.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.getRules = exports.isJSONType = void 0;
     var _jsonTypes = ["string", "number", "integer", "boolean", "null", "object", "array"];
@@ -1467,6 +1716,7 @@ var require_rules = __commonJS({
 var require_applicability = __commonJS({
   "node_modules/ajv/dist/compile/validate/applicability.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.shouldUseRule = exports.shouldUseGroup = exports.schemaHasRulesForType = void 0;
     function schemaHasRulesForType({ schema, self }, type) {
@@ -1490,6 +1740,7 @@ var require_applicability = __commonJS({
 var require_dataType = __commonJS({
   "node_modules/ajv/dist/compile/validate/dataType.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.reportTypeError = exports.checkDataTypes = exports.checkDataType = exports.coerceAndCheckDataType = exports.getJSONTypes = exports.getSchemaTypes = exports.DataType = void 0;
     var rules_1 = require_rules();
@@ -1674,6 +1925,7 @@ var require_dataType = __commonJS({
 var require_defaults = __commonJS({
   "node_modules/ajv/dist/compile/validate/defaults.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.assignDefaults = void 0;
     var codegen_1 = require_codegen();
@@ -1711,6 +1963,7 @@ var require_defaults = __commonJS({
 var require_code2 = __commonJS({
   "node_modules/ajv/dist/vocabularies/code.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.validateUnion = exports.validateArray = exports.usePattern = exports.callValidateCode = exports.schemaProperties = exports.allSchemaProperties = exports.noPropertyInData = exports.propertyInData = exports.isOwnProperty = exports.hasPropFunc = exports.reportMissingProp = exports.checkMissingProp = exports.checkReportMissingProp = void 0;
     var codegen_1 = require_codegen();
@@ -1844,6 +2097,7 @@ var require_code2 = __commonJS({
 var require_keyword = __commonJS({
   "node_modules/ajv/dist/compile/validate/keyword.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.validateKeywordUsage = exports.validSchemaType = exports.funcKeywordCode = exports.macroKeywordCode = void 0;
     var codegen_1 = require_codegen();
@@ -1962,6 +2216,7 @@ var require_keyword = __commonJS({
 var require_subschema = __commonJS({
   "node_modules/ajv/dist/compile/validate/subschema.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.extendSubschemaMode = exports.extendSubschemaData = exports.getSubschema = void 0;
     var codegen_1 = require_codegen();
@@ -2045,6 +2300,7 @@ var require_subschema = __commonJS({
 var require_fast_deep_equal = __commonJS({
   "node_modules/fast-deep-equal/index.js"(exports, module) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     module.exports = function equal(a, b) {
       if (a === b) return true;
       if (a && b && typeof a == "object" && typeof b == "object") {
@@ -2080,6 +2336,7 @@ var require_fast_deep_equal = __commonJS({
 var require_json_schema_traverse = __commonJS({
   "node_modules/json-schema-traverse/index.js"(exports, module) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     var traverse = module.exports = function(schema, opts, cb) {
       if (typeof opts == "function") {
         cb = opts;
@@ -2168,6 +2425,7 @@ var require_json_schema_traverse = __commonJS({
 var require_resolve = __commonJS({
   "node_modules/ajv/dist/compile/resolve.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.getSchemaRefs = exports.resolveUrl = exports.normalizeId = exports._getFullPath = exports.getFullPath = exports.inlineRef = void 0;
     var util_1 = require_util();
@@ -2324,6 +2582,7 @@ var require_resolve = __commonJS({
 var require_validate = __commonJS({
   "node_modules/ajv/dist/compile/validate/index.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.getData = exports.KeywordCxt = exports.validateFunctionCode = void 0;
     var boolSchema_1 = require_boolSchema();
@@ -2832,6 +3091,7 @@ var require_validate = __commonJS({
 var require_validation_error = __commonJS({
   "node_modules/ajv/dist/runtime/validation_error.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     var ValidationError = class extends Error {
       constructor(errors) {
@@ -2848,6 +3108,7 @@ var require_validation_error = __commonJS({
 var require_ref_error = __commonJS({
   "node_modules/ajv/dist/compile/ref_error.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     var resolve_1 = require_resolve();
     var MissingRefError = class extends Error {
@@ -2865,6 +3126,7 @@ var require_ref_error = __commonJS({
 var require_compile = __commonJS({
   "node_modules/ajv/dist/compile/index.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.resolveSchema = exports.getCompilingSchema = exports.resolveRef = exports.compileSchema = exports.SchemaEnv = void 0;
     var codegen_1 = require_codegen();
@@ -3108,6 +3370,7 @@ var require_data = __commonJS({
 var require_utils = __commonJS({
   "node_modules/fast-uri/lib/utils.js"(exports, module) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     var isUUID = RegExp.prototype.test.bind(/^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/iu);
     var isIPv4 = RegExp.prototype.test.bind(/^(?:(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)$/u);
     var isPort = RegExp.prototype.test.bind(/^\d*$/u);
@@ -3610,6 +3873,7 @@ var require_utils = __commonJS({
 var require_schemes = __commonJS({
   "node_modules/fast-uri/lib/schemes.js"(exports, module) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     var { isUUID } = require_utils();
     var URN_REG = /^([\da-z][\d\-a-z]{0,31}):((?:[\w!$'()*+,\-./:;=@]|%[\da-f]{2})+)$/iu;
     var supportedSchemeNames = (
@@ -3821,6 +4085,7 @@ var require_schemes = __commonJS({
 var require_fast_uri = __commonJS({
   "node_modules/fast-uri/index.js"(exports, module) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     var { normalizeIPv6, removeDotSegments, recomposeAuthority, normalizePercentEncoding, normalizePathEncoding, serializePathEncoding, normalizeQueryFragmentEncoding, encodeQuery, encodeFragment, reescapeHostDelimiters, isIPv4, nonSimpleDomain } = require_utils();
     var { SCHEMES, getSchemeHandler } = require_schemes();
     var VALID_SCHEME = /^[A-Za-z][A-Za-z0-9+.-]*$/u;
@@ -4227,6 +4492,7 @@ var require_fast_uri = __commonJS({
 var require_uri = __commonJS({
   "node_modules/ajv/dist/runtime/uri.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     var uri = require_fast_uri();
     uri.code = 'require("ajv/dist/runtime/uri").default';
@@ -4238,6 +4504,7 @@ var require_uri = __commonJS({
 var require_core = __commonJS({
   "node_modules/ajv/dist/core.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.CodeGen = exports.Name = exports.nil = exports.stringify = exports.str = exports._ = exports.KeywordCxt = void 0;
     var validate_1 = require_validate();
@@ -4849,6 +5116,7 @@ var require_core = __commonJS({
 var require_id = __commonJS({
   "node_modules/ajv/dist/vocabularies/core/id.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     var def = {
       keyword: "id",
@@ -4864,6 +5132,7 @@ var require_id = __commonJS({
 var require_ref = __commonJS({
   "node_modules/ajv/dist/vocabularies/core/ref.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.callRef = exports.getValidate = void 0;
     var ref_error_1 = require_ref_error();
@@ -4986,6 +5255,7 @@ var require_ref = __commonJS({
 var require_core2 = __commonJS({
   "node_modules/ajv/dist/vocabularies/core/index.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     var id_1 = require_id();
     var ref_1 = require_ref();
@@ -5007,6 +5277,7 @@ var require_core2 = __commonJS({
 var require_limitNumber = __commonJS({
   "node_modules/ajv/dist/vocabularies/validation/limitNumber.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
     var ops = codegen_1.operators;
@@ -5039,6 +5310,7 @@ var require_limitNumber = __commonJS({
 var require_multipleOf = __commonJS({
   "node_modules/ajv/dist/vocabularies/validation/multipleOf.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
     var error62 = {
@@ -5067,6 +5339,7 @@ var require_multipleOf = __commonJS({
 var require_ucs2length = __commonJS({
   "node_modules/ajv/dist/runtime/ucs2length.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     function ucs2length(str) {
       const len = str.length;
@@ -5093,6 +5366,7 @@ var require_ucs2length = __commonJS({
 var require_limitLength = __commonJS({
   "node_modules/ajv/dist/vocabularies/validation/limitLength.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
     var util_1 = require_util();
@@ -5125,6 +5399,7 @@ var require_limitLength = __commonJS({
 var require_pattern = __commonJS({
   "node_modules/ajv/dist/vocabularies/validation/pattern.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     var code_1 = require_code2();
     var util_1 = require_util();
@@ -5162,6 +5437,7 @@ var require_pattern = __commonJS({
 var require_limitProperties = __commonJS({
   "node_modules/ajv/dist/vocabularies/validation/limitProperties.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
     var error62 = {
@@ -5191,6 +5467,7 @@ var require_limitProperties = __commonJS({
 var require_required = __commonJS({
   "node_modules/ajv/dist/vocabularies/validation/required.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     var code_1 = require_code2();
     var codegen_1 = require_codegen();
@@ -5273,6 +5550,7 @@ var require_required = __commonJS({
 var require_limitItems = __commonJS({
   "node_modules/ajv/dist/vocabularies/validation/limitItems.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
     var error62 = {
@@ -5302,6 +5580,7 @@ var require_limitItems = __commonJS({
 var require_equal = __commonJS({
   "node_modules/ajv/dist/runtime/equal.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     var equal = require_fast_deep_equal();
     equal.code = 'require("ajv/dist/runtime/equal").default';
@@ -5313,6 +5592,7 @@ var require_equal = __commonJS({
 var require_uniqueItems = __commonJS({
   "node_modules/ajv/dist/vocabularies/validation/uniqueItems.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     var dataType_1 = require_dataType();
     var codegen_1 = require_codegen();
@@ -5380,6 +5660,7 @@ var require_uniqueItems = __commonJS({
 var require_const = __commonJS({
   "node_modules/ajv/dist/vocabularies/validation/const.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
     var util_1 = require_util();
@@ -5409,6 +5690,7 @@ var require_const = __commonJS({
 var require_enum = __commonJS({
   "node_modules/ajv/dist/vocabularies/validation/enum.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
     var util_1 = require_util();
@@ -5458,6 +5740,7 @@ var require_enum = __commonJS({
 var require_validation = __commonJS({
   "node_modules/ajv/dist/vocabularies/validation/index.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     var limitNumber_1 = require_limitNumber();
     var multipleOf_1 = require_multipleOf();
@@ -5496,6 +5779,7 @@ var require_validation = __commonJS({
 var require_additionalItems = __commonJS({
   "node_modules/ajv/dist/vocabularies/applicator/additionalItems.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.validateAdditionalItems = void 0;
     var codegen_1 = require_codegen();
@@ -5549,6 +5833,7 @@ var require_additionalItems = __commonJS({
 var require_items = __commonJS({
   "node_modules/ajv/dist/vocabularies/applicator/items.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.validateTuple = void 0;
     var codegen_1 = require_codegen();
@@ -5606,6 +5891,7 @@ var require_items = __commonJS({
 var require_prefixItems = __commonJS({
   "node_modules/ajv/dist/vocabularies/applicator/prefixItems.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     var items_1 = require_items();
     var def = {
@@ -5623,6 +5909,7 @@ var require_prefixItems = __commonJS({
 var require_items2020 = __commonJS({
   "node_modules/ajv/dist/vocabularies/applicator/items2020.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
     var util_1 = require_util();
@@ -5658,6 +5945,7 @@ var require_items2020 = __commonJS({
 var require_contains = __commonJS({
   "node_modules/ajv/dist/vocabularies/applicator/contains.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
     var util_1 = require_util();
@@ -5752,6 +6040,7 @@ var require_contains = __commonJS({
 var require_dependencies = __commonJS({
   "node_modules/ajv/dist/vocabularies/applicator/dependencies.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.validateSchemaDeps = exports.validatePropertyDeps = exports.error = void 0;
     var codegen_1 = require_codegen();
@@ -5846,6 +6135,7 @@ var require_dependencies = __commonJS({
 var require_propertyNames = __commonJS({
   "node_modules/ajv/dist/vocabularies/applicator/propertyNames.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
     var util_1 = require_util();
@@ -5889,6 +6179,7 @@ var require_propertyNames = __commonJS({
 var require_additionalProperties = __commonJS({
   "node_modules/ajv/dist/vocabularies/applicator/additionalProperties.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     var code_1 = require_code2();
     var codegen_1 = require_codegen();
@@ -5995,6 +6286,7 @@ var require_additionalProperties = __commonJS({
 var require_properties = __commonJS({
   "node_modules/ajv/dist/vocabularies/applicator/properties.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     var validate_1 = require_validate();
     var code_1 = require_code2();
@@ -6053,6 +6345,7 @@ var require_properties = __commonJS({
 var require_patternProperties = __commonJS({
   "node_modules/ajv/dist/vocabularies/applicator/patternProperties.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     var code_1 = require_code2();
     var codegen_1 = require_codegen();
@@ -6127,6 +6420,7 @@ var require_patternProperties = __commonJS({
 var require_not = __commonJS({
   "node_modules/ajv/dist/vocabularies/applicator/not.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     var util_1 = require_util();
     var def = {
@@ -6158,6 +6452,7 @@ var require_not = __commonJS({
 var require_anyOf = __commonJS({
   "node_modules/ajv/dist/vocabularies/applicator/anyOf.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     var code_1 = require_code2();
     var def = {
@@ -6175,6 +6470,7 @@ var require_anyOf = __commonJS({
 var require_oneOf = __commonJS({
   "node_modules/ajv/dist/vocabularies/applicator/oneOf.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
     var util_1 = require_util();
@@ -6233,6 +6529,7 @@ var require_oneOf = __commonJS({
 var require_allOf = __commonJS({
   "node_modules/ajv/dist/vocabularies/applicator/allOf.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     var util_1 = require_util();
     var def = {
@@ -6260,6 +6557,7 @@ var require_allOf = __commonJS({
 var require_if = __commonJS({
   "node_modules/ajv/dist/vocabularies/applicator/if.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
     var util_1 = require_util();
@@ -6329,6 +6627,7 @@ var require_if = __commonJS({
 var require_thenElse = __commonJS({
   "node_modules/ajv/dist/vocabularies/applicator/thenElse.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     var util_1 = require_util();
     var def = {
@@ -6347,6 +6646,7 @@ var require_thenElse = __commonJS({
 var require_applicator = __commonJS({
   "node_modules/ajv/dist/vocabularies/applicator/index.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     var additionalItems_1 = require_additionalItems();
     var prefixItems_1 = require_prefixItems();
@@ -6395,6 +6695,7 @@ var require_applicator = __commonJS({
 var require_format = __commonJS({
   "node_modules/ajv/dist/vocabularies/format/format.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
     var error62 = {
@@ -6485,6 +6786,7 @@ var require_format = __commonJS({
 var require_format2 = __commonJS({
   "node_modules/ajv/dist/vocabularies/format/index.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     var format_1 = require_format();
     var format = [format_1.default];
@@ -6496,6 +6798,7 @@ var require_format2 = __commonJS({
 var require_metadata = __commonJS({
   "node_modules/ajv/dist/vocabularies/metadata.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.contentVocabulary = exports.metadataVocabulary = void 0;
     exports.metadataVocabulary = [
@@ -6519,6 +6822,7 @@ var require_metadata = __commonJS({
 var require_draft7 = __commonJS({
   "node_modules/ajv/dist/vocabularies/draft7.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     var core_1 = require_core2();
     var validation_1 = require_validation();
@@ -6541,6 +6845,7 @@ var require_draft7 = __commonJS({
 var require_types = __commonJS({
   "node_modules/ajv/dist/vocabularies/discriminator/types.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.DiscrError = void 0;
     var DiscrError;
@@ -6555,6 +6860,7 @@ var require_types = __commonJS({
 var require_discriminator = __commonJS({
   "node_modules/ajv/dist/vocabularies/discriminator/index.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
     var types_1 = require_types();
@@ -6817,6 +7123,7 @@ var require_json_schema_draft_07 = __commonJS({
 var require_ajv = __commonJS({
   "node_modules/ajv/dist/ajv.js"(exports, module) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.MissingRefError = exports.ValidationError = exports.CodeGen = exports.Name = exports.nil = exports.stringify = exports.str = exports._ = exports.KeywordCxt = exports.Ajv = void 0;
     var core_1 = require_core();
@@ -6887,6 +7194,7 @@ var require_ajv = __commonJS({
 var require_formats = __commonJS({
   "node_modules/ajv-formats/dist/formats.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.formatNames = exports.fastFormats = exports.fullFormats = void 0;
     function fmtDef(validate2, compare) {
@@ -7090,6 +7398,7 @@ var require_formats = __commonJS({
 var require_limit = __commonJS({
   "node_modules/ajv-formats/dist/limit.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.formatLimitDefinition = void 0;
     var ajv_1 = require_ajv();
@@ -7162,6 +7471,7 @@ var require_limit = __commonJS({
 var require_dist = __commonJS({
   "node_modules/ajv-formats/dist/index.js"(exports, module) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     Object.defineProperty(exports, "__esModule", { value: true });
     var formats_1 = require_formats();
     var limit_1 = require_limit();
@@ -7204,6 +7514,7 @@ var require_dist = __commonJS({
 var require_content_type = __commonJS({
   "node_modules/content-type/index.js"(exports) {
     "use strict";
+    init_define_AEMCP_CEP_FILES();
     var PARAM_REGEXP = /; *([!#$%&'*+.^_`|~0-9A-Za-z-]+) *= *("(?:[\u000b\u0020\u0021\u0023-\u005b\u005d-\u007e\u0080-\u00ff]|\\[\u000b\u0020-\u00ff])*"|[!#$%&'*+.^_`|~0-9A-Za-z-]+) */g;
     var TEXT_REGEXP = /^[\u000b\u0020-\u007e\u0080-\u00ff]+$/;
     var TOKEN_REGEXP = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
@@ -7304,7 +7615,1233 @@ var require_content_type = __commonJS({
   }
 });
 
+// src/config.ts
+import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+function configPath() {
+  return process.env.AEMCP_CONFIG || join(homedir(), ".aemcp", "config.json");
+}
+function loadConfig() {
+  let file2 = {};
+  try {
+    file2 = JSON.parse(readFileSync(configPath(), "utf8"));
+  } catch {
+  }
+  return {
+    bridgePort: Number(process.env.AEMCP_BRIDGE_PORT || file2.bridgePort || 8765),
+    token: process.env.AEMCP_TOKEN || file2.token || "",
+    httpPort: Number(process.env.AEMCP_HTTP_PORT || file2.httpPort || 8766)
+  };
+}
+var VERSION;
+var init_config = __esm({
+  "src/config.ts"() {
+    "use strict";
+    init_define_AEMCP_CEP_FILES();
+    VERSION = "1.0.0";
+  }
+});
+
+// src/cli/util.ts
+import { execFileSync, spawnSync } from "node:child_process";
+import { copyFileSync, existsSync, mkdirSync, readFileSync as readFileSync2, writeFileSync } from "node:fs";
+import { homedir as homedir2, platform } from "node:os";
+import { dirname, join as join2 } from "node:path";
+import { createInterface } from "node:readline";
+function readJson(file2, fallback) {
+  try {
+    return JSON.parse(readFileSync2(file2, "utf8"));
+  } catch {
+    return fallback;
+  }
+}
+function writeJsonWithBackup(file2, data) {
+  mkdirSync(dirname(file2), { recursive: true });
+  if (existsSync(file2) && !existsSync(file2 + ".aemcp.bak")) copyFileSync(file2, file2 + ".aemcp.bak");
+  writeFileSync(file2, JSON.stringify(data, null, 2) + "\n");
+}
+function which(cmd) {
+  const r = spawnSync(isWin ? "where" : "which", [cmd], { encoding: "utf8" });
+  if (r.status === 0) return r.stdout.split(/\r?\n/).find(Boolean)?.trim() || null;
+  return null;
+}
+function run(cmd, args) {
+  return execFileSync(cmd, args, { stdio: "pipe", encoding: "utf8", shell: isWin && /\.(cmd|bat)$/i.test(cmd) });
+}
+function stableNodePath() {
+  if (process.execPath.startsWith(join2(AEMCP_DIR, "node"))) return process.execPath;
+  const onPath = which("node");
+  return onPath && existsSync(onPath) ? onPath : process.execPath;
+}
+function findClaudeCli() {
+  const found = which("claude");
+  if (found) return found;
+  const candidates = isWin ? [join2(APPDATA, "npm", "claude.cmd"), join2(HOME, ".local", "bin", "claude.exe")] : [join2(HOME, ".local", "bin", "claude"), join2(HOME, ".claude", "local", "claude"), "/opt/homebrew/bin/claude", "/usr/local/bin/claude"];
+  return candidates.find((c) => existsSync(c)) || null;
+}
+async function ask(question, def = true) {
+  if (!process.stdin.isTTY) return false;
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  const a = await new Promise((r) => rl.question(`  ${question} ${def ? "[Y/n]" : "[y/N]"} `, r));
+  rl.close();
+  return a.trim() === "" ? def : /^y/i.test(a.trim());
+}
+function removeCodexBlock(text) {
+  return text.replace(new RegExp(`\\n?${CODEX_START}[\\s\\S]*?${CODEX_END}\\n?`, "g"), "\n");
+}
+function codexBlock(nodePath, serverFile) {
+  const q = (s) => JSON.stringify(s);
+  return `${CODEX_START}
+[mcp_servers.${SERVER_NAME}]
+command = ${q(nodePath)}
+args = [${q(serverFile)}]
+startup_timeout_sec = 20
+tool_timeout_sec = 600
+${CODEX_END}
+`;
+}
+var isMac, isWin, HOME, AEMCP_DIR, CONFIG_FILE, INSTALLED_SERVER, SERVER_NAME, EXTENSION_ID, CSXS_VERSIONS, APPDATA, LOCALAPPDATA, cepExtensionsDir, extensionDir, claudeDesktopDir, claudeDesktopConfig, claudeCodeConfig, cursorConfig, codexConfig, claudeDesktopExe, useColor, color, green, yellow, red, bold, dim, ok, warn, fail, step, sleep, CODEX_START, CODEX_END;
+var init_util = __esm({
+  "src/cli/util.ts"() {
+    "use strict";
+    init_define_AEMCP_CEP_FILES();
+    isMac = platform() === "darwin";
+    isWin = platform() === "win32";
+    HOME = homedir2();
+    AEMCP_DIR = join2(HOME, ".aemcp");
+    CONFIG_FILE = join2(AEMCP_DIR, "config.json");
+    INSTALLED_SERVER = join2(AEMCP_DIR, "server", "ae-mcp.mjs");
+    SERVER_NAME = "after-effects";
+    EXTENSION_ID = "com.aemcp";
+    CSXS_VERSIONS = [9, 10, 11, 12, 13, 14];
+    APPDATA = process.env.APPDATA || join2(HOME, "AppData", "Roaming");
+    LOCALAPPDATA = process.env.LOCALAPPDATA || join2(HOME, "AppData", "Local");
+    cepExtensionsDir = () => isWin ? join2(APPDATA, "Adobe", "CEP", "extensions") : join2(HOME, "Library", "Application Support", "Adobe", "CEP", "extensions");
+    extensionDir = () => join2(cepExtensionsDir(), EXTENSION_ID);
+    claudeDesktopDir = () => isWin ? join2(APPDATA, "Claude") : join2(HOME, "Library", "Application Support", "Claude");
+    claudeDesktopConfig = () => join2(claudeDesktopDir(), "claude_desktop_config.json");
+    claudeCodeConfig = () => join2(HOME, ".claude.json");
+    cursorConfig = () => join2(HOME, ".cursor", "mcp.json");
+    codexConfig = () => join2(HOME, ".codex", "config.toml");
+    claudeDesktopExe = () => join2(LOCALAPPDATA, "AnthropicClaude", "claude.exe");
+    useColor = process.stdout.isTTY || isWin;
+    color = (c) => (s) => useColor ? `\x1B[${c}m${s}\x1B[0m` : s;
+    green = color(32);
+    yellow = color(33);
+    red = color(31);
+    bold = color(1);
+    dim = color(2);
+    ok = (m) => console.log(`  ${green("\u2714")} ${m}`);
+    warn = (m) => console.log(`  ${yellow("!")} ${m}`);
+    fail = (m) => console.log(`  ${red("\u2716")} ${m}`);
+    step = (m) => console.log(`
+${bold(m)}`);
+    sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    CODEX_START = "# >>> ae-mcp >>>";
+    CODEX_END = "# <<< ae-mcp <<<";
+  }
+});
+
+// src/cli/setup.ts
+import { spawnSync as spawnSync2 } from "node:child_process";
+import { randomBytes } from "node:crypto";
+import { existsSync as existsSync2, mkdirSync as mkdirSync2, readFileSync as readFileSync3, rmSync, writeFileSync as writeFileSync2 } from "node:fs";
+import { dirname as dirname2, join as join3 } from "node:path";
+function ensureConfig() {
+  const cfg = readJson(CONFIG_FILE, {});
+  if (cfg.token && cfg.bridgePort && cfg.httpPort) return false;
+  cfg.token ||= randomBytes(24).toString("hex");
+  cfg.bridgePort ||= 8765;
+  cfg.httpPort ||= 8766;
+  mkdirSync2(AEMCP_DIR, { recursive: true });
+  writeFileSync2(CONFIG_FILE, JSON.stringify(cfg, null, 2) + "\n", { mode: 384 });
+  return true;
+}
+function installedExtensionHash() {
+  try {
+    return readFileSync3(join3(extensionDir(), HASH_FILE), "utf8").trim();
+  } catch {
+    return null;
+  }
+}
+function ensureExtension(force = false) {
+  const dir = extensionDir();
+  const current = installedExtensionHash();
+  if (!force && current === "b0fa4965a9f3" && existsSync2(join3(dir, "CSXS", "manifest.xml"))) return { installed: false, updated: false };
+  const updated = existsSync2(dir);
+  rmSync(dir, { recursive: true, force: true });
+  for (const [rel, content] of Object.entries(define_AEMCP_CEP_FILES_default)) {
+    const p = join3(dir, ...rel.split("/"));
+    mkdirSync2(dirname2(p), { recursive: true });
+    writeFileSync2(p, content);
+  }
+  writeFileSync2(join3(dir, HASH_FILE), "b0fa4965a9f3");
+  return { installed: true, updated };
+}
+function debugModeOn(v) {
+  if (isMac) {
+    const r = spawnSync2("defaults", ["read", `com.adobe.CSXS.${v}`, "PlayerDebugMode"], { encoding: "utf8" });
+    return r.status === 0 && r.stdout.trim() === "1";
+  }
+  if (isWin) {
+    const r = spawnSync2("reg", ["query", `HKCU\\Software\\Adobe\\CSXS.${v}`, "/v", "PlayerDebugMode"], { encoding: "utf8" });
+    return r.status === 0 && /PlayerDebugMode\s+REG_SZ\s+1/.test(r.stdout);
+  }
+  return true;
+}
+function ensureDebugMode() {
+  let changed = false;
+  for (const v of CSXS_VERSIONS) {
+    if (debugModeOn(v)) continue;
+    const r = isWin ? spawnSync2("reg", ["add", `HKCU\\Software\\Adobe\\CSXS.${v}`, "/v", "PlayerDebugMode", "/t", "REG_SZ", "/d", "1", "/f"]) : spawnSync2("defaults", ["write", `com.adobe.CSXS.${v}`, "PlayerDebugMode", "1"]);
+    if (r.status !== 0) throw new Error(`could not enable PlayerDebugMode for CSXS.${v}`);
+    changed = true;
+  }
+  return changed;
+}
+function ensureAeSetup(opts = {}) {
+  const res = { extensionInstalled: false, extensionUpdated: false, debugModeChanged: false, configCreated: false, errors: [] };
+  try {
+    res.configCreated = ensureConfig();
+  } catch (e) {
+    res.errors.push(`config: ${e.message}`);
+  }
+  try {
+    const r = ensureExtension(opts.forceExtension);
+    res.extensionInstalled = r.installed;
+    res.extensionUpdated = r.updated;
+  } catch (e) {
+    res.errors.push(`extension: ${e.message}`);
+  }
+  try {
+    res.debugModeChanged = ensureDebugMode();
+  } catch (e) {
+    res.errors.push(`PlayerDebugMode: ${e.message}`);
+  }
+  lastSetup = res;
+  return res;
+}
+function setupHint() {
+  if (lastSetup && (lastSetup.extensionInstalled || lastSetup.debugModeChanged))
+    return " The After Effects extension was just installed/updated: please restart After Effects once to load it.";
+  return "";
+}
+var HASH_FILE, lastSetup;
+var init_setup = __esm({
+  "src/cli/setup.ts"() {
+    "use strict";
+    init_define_AEMCP_CEP_FILES();
+    init_util();
+    HASH_FILE = ".aemcp-hash";
+    lastSetup = null;
+  }
+});
+
+// src/bridge.ts
+async function request(path, init = {}) {
+  const cfg = loadConfig();
+  const ctrl = new AbortController();
+  const timeoutMs = init.timeoutMs ?? 3e4;
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  let res;
+  try {
+    res = await fetch(`http://127.0.0.1:${cfg.bridgePort}${path}`, {
+      ...init,
+      signal: ctrl.signal,
+      headers: { "content-type": "application/json", authorization: `Bearer ${cfg.token}`, ...init.headers || {} }
+    });
+  } catch (e) {
+    if (e?.name === "AbortError")
+      throw new BridgeError(
+        `After Effects did not respond within ${Math.round(timeoutMs / 1e3)}s. The script may still be running (ExtendScript cannot be interrupted), or AE is blocked by a modal dialog. Check After Effects.`,
+        "TIMEOUT"
+      );
+    throw new BridgeError(NOT_RUNNING_HELP + setupHint(), "NOT_RUNNING");
+  } finally {
+    clearTimeout(timer);
+  }
+  const body = await res.json().catch(() => ({}));
+  if (res.status === 401) throw new BridgeError("Bridge rejected the token. Re-run the installer so server and AE share ~/.aemcp/config.json, then restart AE.", "AUTH");
+  if (!res.ok || body.ok === false) throw new BridgeError(body.error || `Bridge error HTTP ${res.status}`, "BRIDGE");
+  return body;
+}
+async function health() {
+  return request("/health", { method: "GET", timeoutMs: 3e3 });
+}
+async function evalRaw(script, timeoutMs = 12e4) {
+  const body = await request("/eval", { method: "POST", body: JSON.stringify({ script, timeoutMs }), timeoutMs: timeoutMs + 5e3 });
+  return String(body.result ?? "");
+}
+var BridgeError, NOT_RUNNING_HELP;
+var init_bridge = __esm({
+  "src/bridge.ts"() {
+    "use strict";
+    init_define_AEMCP_CEP_FILES();
+    init_config();
+    init_setup();
+    BridgeError = class extends Error {
+      constructor(message, code) {
+        super(message);
+        this.code = code;
+      }
+      code;
+    };
+    NOT_RUNNING_HELP = "Cannot reach After Effects. Make sure After Effects is running and the AE MCP bridge is loaded (it starts automatically with AE after install; you can also open Window > Extensions > AE MCP to check its status). If you just installed, restart After Effects.";
+  }
+});
+
+// src/aemcp.jsxinc
+var aemcp_default;
+var init_aemcp = __esm({
+  "src/aemcp.jsxinc"() {
+    aemcp_default = `// aemcp helper library \u2014 loaded once into the After Effects ExtendScript engine
+// by the MCP server (sent over the bridge whenever the version check fails).
+// ES3 only: no let/const, arrow functions, Array.prototype.map, JSON, etc.
+aemcp = (function () {
+  var A = {};
+  A.version = "__AEMCP_VERSION__";
+
+  // ---------- JSON ----------
+  function quote(s) {
+    return '"' + String(s).replace(/[\\\\"\\u0000-\\u001f\\u2028\\u2029]/g, function (c) {
+      switch (c) {
+        case '"': return '\\\\"';
+        case "\\\\": return "\\\\\\\\";
+        case "\\n": return "\\\\n";
+        case "\\r": return "\\\\r";
+        case "\\t": return "\\\\t";
+        case "\\b": return "\\\\b";
+        case "\\f": return "\\\\f";
+      }
+      var h = c.charCodeAt(0).toString(16);
+      return "\\\\u" + "0000".substr(h.length) + h;
+    }) + '"';
+  }
+  A.stringify = function (v) {
+    if (v === null || v === undefined) return "null";
+    var t = typeof v;
+    if (t === "number") return isFinite(v) ? String(v) : "null";
+    if (t === "boolean") return v ? "true" : "false";
+    if (t === "string") return quote(v);
+    if (v instanceof Array) {
+      var parts = [];
+      for (var i = 0; i < v.length; i++) parts.push(A.stringify(v[i]));
+      return "[" + parts.join(",") + "]";
+    }
+    if (t === "object") {
+      var out = [];
+      for (var k in v) {
+        if (!v.hasOwnProperty(k)) continue;
+        var val = v[k];
+        if (typeof val === "function" || val === undefined) continue;
+        out.push(quote(k) + ":" + A.stringify(val));
+      }
+      return "{" + out.join(",") + "}";
+    }
+    return "null";
+  };
+
+  // ---------- small utils ----------
+  A.round = function (n) { return typeof n === "number" ? Math.round(n * 10000) / 10000 : n; };
+  function isAE(name) { try { return typeof $.global[name] !== "undefined"; } catch (e) { return false; } }
+  function inst(v, ctor) { try { return isAE(ctor) && v instanceof $.global[ctor]; } catch (e) { return false; } }
+  A.fail = function (msg) { var e = new Error(msg); e.aemcpUser = true; throw e; };
+
+  // ---------- finders ----------
+  // ref: number (item id) | string (name) | "active" | undefined (=active)
+  A.findItem = function (ref) {
+    var p = app.project;
+    if (ref === undefined || ref === null || ref === "active") {
+      if (!p.activeItem) A.fail("No active item. Open/select a composition or pass an id/name.");
+      return p.activeItem;
+    }
+    if (typeof ref === "number") {
+      var it = p.itemByID(ref);
+      if (!it) A.fail("No project item with id " + ref);
+      return it;
+    }
+    for (var i = 1; i <= p.numItems; i++) if (p.item(i).name === ref) return p.item(i);
+    A.fail("No project item named '" + ref + "'");
+  };
+  A.findComp = function (ref) {
+    if (ref === undefined || ref === null || ref === "active") {
+      var a = app.project.activeItem;
+      if (a && a instanceof CompItem) return a;
+      // fall back to the comp open in the viewer
+      try { if (app.activeViewer && app.activeViewer.type === ViewerType.VIEWER_COMPOSITION) { app.activeViewer.setActive(); a = app.project.activeItem; if (a instanceof CompItem) return a; } } catch (e) {}
+      A.fail("No active composition. Open a comp or pass compId / compName.");
+    }
+    var it = A.findItem(ref);
+    if (!(it instanceof CompItem)) A.fail("Item '" + it.name + "' is not a composition");
+    return it;
+  };
+  // ref: number (1-based index) | string (name) | {id:n}
+  A.findLayer = function (comp, ref) {
+    if (ref === undefined || ref === null) {
+      if (comp.selectedLayers.length) return comp.selectedLayers[0];
+      A.fail("No layer specified and none selected");
+    }
+    if (typeof ref === "number") {
+      if (ref < 1 || ref > comp.numLayers) A.fail("Layer index " + ref + " out of range 1-" + comp.numLayers);
+      return comp.layer(ref);
+    }
+    if (typeof ref === "object" && ref.id !== undefined) {
+      for (var i = 1; i <= comp.numLayers; i++) if (comp.layer(i).id === ref.id) return comp.layer(i);
+      A.fail("No layer with id " + ref.id);
+    }
+    var l = comp.layer(String(ref));
+    if (!l) A.fail("No layer named '" + ref + "' in comp '" + comp.name + "'");
+    return l;
+  };
+  // path: "Transform/Position" | ["ADBE Transform Group","ADBE Position"] | "Effects/Gaussian Blur/Blurriness"
+  // Each segment may be a display name, match name, or 1-based index.
+  A.resolveProp = function (layer, path) {
+    var segs = path instanceof Array ? path : String(path).split("/");
+    var cur = layer;
+    for (var i = 0; i < segs.length; i++) {
+      var s = segs[i];
+      if (s === "" || s === undefined) continue;
+      var next = null;
+      if (typeof s === "number" || /^\\d+$/.test(s)) next = cur.property(Number(s));
+      else {
+        try { next = cur.property(s); } catch (e) { next = null; }
+        if (!next && String(s).toLowerCase() === "effects") next = cur.property("ADBE Effect Parade");
+        if (!next && cur.numProperties) {
+          var low = String(s).toLowerCase();
+          for (var j = 1; j <= cur.numProperties; j++) {
+            var c = cur.property(j);
+            if (c.name.toLowerCase() === low || c.matchName.toLowerCase() === low) { next = c; break; }
+          }
+        }
+      }
+      if (!next) A.fail("Property '" + s + "' not found under '" + (cur.name || "layer") + "' (path " + segs.join("/") + ")");
+      cur = next;
+    }
+    return cur;
+  };
+
+  // ---------- serializers ----------
+  A.itemType = function (it) {
+    if (it instanceof CompItem) return "comp";
+    if (it instanceof FolderItem) return "folder";
+    if (it instanceof FootageItem) {
+      try {
+        if (it.mainSource instanceof SolidSource) return "solid";
+        if (it.mainSource instanceof PlaceholderSource) return "placeholder";
+      } catch (e) {}
+      return "footage";
+    }
+    return "item";
+  };
+  A.itemInfo = function (it) {
+    var o = { id: it.id, name: it.name, type: A.itemType(it), parentFolder: it.parentFolder ? it.parentFolder.name : null, comment: it.comment, label: it.label };
+    if (it instanceof CompItem || it instanceof FootageItem) {
+      o.width = it.width; o.height = it.height; o.duration = A.round(it.duration); o.pixelAspect = it.pixelAspect;
+      o.hasVideo = it.hasVideo; o.hasAudio = it.hasAudio;
+      try { o.frameRate = A.round(it.frameRate); } catch (e) {}
+    }
+    if (it instanceof CompItem) { o.numLayers = it.numLayers; o.bgColor = it.bgColor; o.workAreaStart = A.round(it.workAreaStart); o.workAreaDuration = A.round(it.workAreaDuration); o.displayStartTime = A.round(it.displayStartTime); }
+    if (it instanceof FootageItem) {
+      try { o.file = it.file ? it.file.fsName : null; } catch (e) {}
+      try { o.isStill = it.mainSource.isStill; } catch (e) {}
+      try { if (it.mainSource instanceof SolidSource) o.color = it.mainSource.color; } catch (e) {}
+      o.footageMissing = it.footageMissing;
+    }
+    if (it instanceof FolderItem) o.numItems = it.numItems;
+    return o;
+  };
+  A.layerType = function (l) {
+    if (inst(l, "TextLayer")) return "text";
+    if (inst(l, "ShapeLayer")) return "shape";
+    if (inst(l, "CameraLayer")) return "camera";
+    if (inst(l, "LightLayer")) return "light";
+    if (inst(l, "AVLayer")) {
+      if (l.nullLayer) return "null";
+      if (l.adjustmentLayer) return "adjustment";
+      try { if (l.source instanceof CompItem) return "precomp"; } catch (e) {}
+      try { if (l.source.mainSource instanceof SolidSource) return "solid"; } catch (e) {}
+      return "footage";
+    }
+    return "layer";
+  };
+  A.layerInfo = function (l, detail) {
+    var o = { index: l.index, id: l.id, name: l.name, type: A.layerType(l), enabled: l.enabled, solo: l.solo, locked: l.locked, shy: l.shy,
+      inPoint: A.round(l.inPoint), outPoint: A.round(l.outPoint), startTime: A.round(l.startTime), stretch: l.stretch, label: l.label,
+      parent: l.parent ? l.parent.index : null, selected: l.selected, comment: l.comment };
+    if (inst(l, "AVLayer")) {
+      o.threeD = l.threeDLayer; o.blendingMode = A.enumName(BlendingMode, l.blendingMode);
+      o.trackMatteType = A.enumName(TrackMatteType, l.trackMatteType); o.audioEnabled = l.audioEnabled;
+      o.adjustmentLayer = l.adjustmentLayer; o.motionBlur = l.motionBlur; o.collapseTransformation = l.collapseTransformation;
+      try { if (l.source) o.source = { id: l.source.id, name: l.source.name, type: A.itemType(l.source) }; } catch (e) {}
+    }
+    if (detail) {
+      var tr = l.property("ADBE Transform Group");
+      o.transform = {};
+      for (var i = 1; i <= tr.numProperties; i++) {
+        var p = tr.property(i);
+        try { if (p.propertyValueType !== PropertyValueType.NO_VALUE) o.transform[p.name] = A.valueOf(p.value); } catch (e) {}
+      }
+      o.effects = [];
+      var fx = l.property("ADBE Effect Parade");
+      if (fx) for (var j = 1; j <= fx.numProperties; j++) o.effects.push({ index: j, name: fx.property(j).name, matchName: fx.property(j).matchName, enabled: fx.property(j).enabled });
+      var masks = l.property("ADBE Mask Parade");
+      o.numMasks = masks ? masks.numProperties : 0;
+      o.markers = A.markers(l.property("ADBE Marker"));
+      if (inst(l, "TextLayer")) o.text = A.textInfo(l.property("ADBE Text Properties").property("ADBE Text Document").value);
+      o.animated = A.animatedProps(l);
+    }
+    return o;
+  };
+  A.compInfo = function (c, withLayers) {
+    var o = A.itemInfo(c);
+    o.time = A.round(c.time); o.frameDuration = A.round(c.frameDuration); o.motionBlur = c.motionBlur; o.renderer = c.renderer;
+    try { o.activeCamera = c.activeCamera ? c.activeCamera.name : null; } catch (e) {}
+    if (withLayers) { o.layers = []; for (var i = 1; i <= c.numLayers; i++) o.layers.push(A.layerInfo(c.layer(i), false)); }
+    return o;
+  };
+  A.textInfo = function (td) {
+    var o = { text: td.text };
+    var keys = ["font", "fontSize", "fillColor", "strokeColor", "strokeWidth", "applyFill", "applyStroke", "tracking", "leading", "fauxBold", "fauxItalic", "allCaps", "boxText", "pointText"];
+    for (var i = 0; i < keys.length; i++) { try { var v = td[keys[i]]; if (v !== undefined) o[keys[i]] = A.valueOf(v); } catch (e) {} }
+    try { o.justification = A.enumName(ParagraphJustification, td.justification); } catch (e) {}
+    try { if (td.boxText) o.boxTextSize = td.boxTextSize; } catch (e) {}
+    return o;
+  };
+  A.enumName = function (en, val) {
+    for (var k in en) { try { if (en[k] === val) return k; } catch (e) {} }
+    return val;
+  };
+  A.markers = function (mp) {
+    var out = [];
+    if (!mp) return out;
+    for (var i = 1; i <= mp.numKeys; i++) {
+      var m = mp.keyValue(i);
+      out.push({ time: A.round(mp.keyTime(i)), comment: m.comment, duration: A.round(m.duration), chapter: m.chapter, url: m.url });
+    }
+    return out;
+  };
+  A.valueOf = function (v) {
+    if (v === null || v === undefined) return null;
+    if (typeof v === "number") return A.round(v);
+    if (v instanceof Array) { var a = []; for (var i = 0; i < v.length; i++) a.push(A.valueOf(v[i])); return a; }
+    if (inst(v, "TextDocument")) return A.textInfo(v);
+    if (inst(v, "Shape")) return { vertices: v.vertices, inTangents: v.inTangents, outTangents: v.outTangents, closed: v.closed };
+    if (inst(v, "MarkerValue")) return { comment: v.comment, duration: v.duration };
+    return v;
+  };
+  A.animatedProps = function (layer) {
+    var out = [];
+    function walk(g, path) {
+      for (var i = 1; i <= g.numProperties; i++) {
+        var p = g.property(i), pp = path + "/" + p.name;
+        if (p.propertyType === PropertyType.PROPERTY) {
+          var e = false; try { e = p.canSetExpression && p.expressionEnabled; } catch (x) {}
+          if (p.numKeys > 0 || e) out.push({ path: pp.substr(1), numKeys: p.numKeys, expression: e ? p.expression : undefined });
+        } else walk(p, pp);
+      }
+    }
+    try { walk(layer, ""); } catch (e) {}
+    return out;
+  };
+  A.propInfo = function (p, opts) {
+    opts = opts || {};
+    var o = { name: p.name, matchName: p.matchName, propertyIndex: p.propertyIndex };
+    if (p.propertyType === PropertyType.PROPERTY) {
+      o.kind = "property";
+      o.valueType = A.enumName(PropertyValueType, p.propertyValueType);
+      try { if (p.propertyValueType !== PropertyValueType.NO_VALUE) o.value = A.valueOf(p.value); } catch (e) {}
+      o.numKeys = p.numKeys;
+      try { o.canSetExpression = p.canSetExpression; if (p.expression) { o.expression = p.expression; o.expressionEnabled = p.expressionEnabled; o.expressionError = p.expressionError; } } catch (e) {}
+      try { if (p.hasMin) o.min = p.minValue; if (p.hasMax) o.max = p.maxValue; } catch (e) {}
+      try { o.unitsText = p.unitsText; } catch (e) {}
+      if (opts.keyframes && p.numKeys) o.keyframes = A.keyframes(p);
+    } else {
+      o.kind = p.propertyType === PropertyType.INDEXED_GROUP ? "indexedGroup" : "group";
+      o.numProperties = p.numProperties;
+      try { if (p.canSetEnabled) o.enabled = p.enabled; } catch (e) {}
+      var depth = opts.depth === undefined ? 1 : opts.depth;
+      if (depth > 0) {
+        o.children = [];
+        for (var i = 1; i <= p.numProperties; i++) {
+          var c = p.property(i);
+          if (!opts.includeHidden) { try { if (c.propertyType === PropertyType.PROPERTY && c.propertyValueType === PropertyValueType.NO_VALUE) continue; } catch (e) {} }
+          o.children.push(A.propInfo(c, { depth: depth - 1, keyframes: opts.keyframes, includeHidden: opts.includeHidden }));
+        }
+      }
+    }
+    return o;
+  };
+  A.keyframes = function (p) {
+    var ks = [];
+    for (var k = 1; k <= p.numKeys; k++) {
+      var kf = { index: k, time: A.round(p.keyTime(k)), value: A.valueOf(p.keyValue(k)) };
+      try { kf.inInterpolation = A.enumName(KeyframeInterpolationType, p.keyInInterpolationType(k)); kf.outInterpolation = A.enumName(KeyframeInterpolationType, p.keyOutInterpolationType(k)); } catch (e) {}
+      try {
+        var ie = p.keyInTemporalEase(k), oe = p.keyOutTemporalEase(k);
+        kf.easeIn = []; kf.easeOut = [];
+        for (var d = 0; d < ie.length; d++) { kf.easeIn.push({ speed: A.round(ie[d].speed), influence: A.round(ie[d].influence) }); kf.easeOut.push({ speed: A.round(oe[d].speed), influence: A.round(oe[d].influence) }); }
+      } catch (e) {}
+      ks.push(kf);
+    }
+    return ks;
+  };
+
+  // Generic serializer for arbitrary return values of user scripts.
+  // \`depth\` limits how far AE objects (comps, layers, properties) are expanded;
+  // plain arrays/objects are copied as-is up to a nesting guard.
+  A.serialize = function (v, depth, nest) {
+    if (depth === undefined) depth = 4;
+    nest = nest || 0;
+    if (v === null || v === undefined) return null;
+    var t = typeof v;
+    if (t === "number" || t === "string" || t === "boolean") return v;
+    if (t === "function") return "[function]";
+    if (nest > 30) return "[too deep]";
+    try {
+      if (v instanceof CompItem) return A.compInfo(v, depth > 1);
+      if (inst(v, "Item")) return A.itemInfo(v);
+      if (inst(v, "Layer")) return A.layerInfo(v, depth > 2);
+      if (inst(v, "PropertyBase")) return A.propInfo(v, { depth: depth > 2 ? 1 : 0 });
+      if (inst(v, "Project")) return A.projectInfo();
+      if (inst(v, "File") || inst(v, "Folder")) return v.fsName;
+      if (inst(v, "TextDocument") || inst(v, "Shape") || inst(v, "MarkerValue")) return A.valueOf(v);
+      if (inst(v, "KeyframeEase")) return { speed: A.round(v.speed), influence: A.round(v.influence) };
+      if (inst(v, "RenderQueueItem")) return { comp: v.comp.name, status: A.enumName(RQItemStatus, v.status) };
+      if (inst(v, "Collection") || inst(v, "ItemCollection") || inst(v, "LayerCollection")) {
+        if (depth <= 0) return "[collection of " + v.length + "]";
+        var c = []; for (var ci = 1; ci <= v.length; ci++) c.push(A.serialize(v[ci], depth - 1, nest + 1)); return c;
+      }
+    } catch (e) {}
+    if (v instanceof Array) {
+      var a = [], n = Math.min(v.length, 2000);
+      for (var i = 0; i < n; i++) a.push(A.serialize(v[i], depth, nest + 1));
+      if (v.length > n) a.push("... " + (v.length - n) + " more");
+      return a;
+    }
+    var isPlain = false;
+    try { isPlain = v.constructor === Object; } catch (e) {}
+    if (!isPlain && depth <= 0) return "[" + (v.reflect ? v.reflect.name : "object") + "]";
+    var o = {};
+    for (var k in v) { try { if (typeof v[k] !== "function") o[k] = A.serialize(v[k], isPlain ? depth : depth - 1, nest + 1); } catch (e) {} }
+    return o;
+  };
+
+  A.projectInfo = function () {
+    var p = app.project, counts = { comp: 0, footage: 0, folder: 0, solid: 0, placeholder: 0 };
+    for (var i = 1; i <= p.numItems; i++) { var t = A.itemType(p.item(i)); counts[t] = (counts[t] || 0) + 1; }
+    var o = { file: p.file ? p.file.fsName : null, name: p.file ? p.file.name : "Untitled", dirty: p.dirty, numItems: p.numItems, counts: counts,
+      bitsPerChannel: p.bitsPerChannel, renderQueueItems: p.renderQueue.numItems };
+    try { o.frameRate = A.round(p.frameRate); } catch (e) {}
+    try { o.workingSpace = p.workingSpace; } catch (e) {}
+    try { o.expressionEngine = p.expressionEngine; } catch (e) {}
+    var a = p.activeItem;
+    o.activeItem = a ? { id: a.id, name: a.name, type: A.itemType(a) } : null;
+    return o;
+  };
+
+  // ---------- value helpers used by tools ----------
+  A.toAEValue = function (prop, v) {
+    if (prop.propertyValueType === PropertyValueType.TEXT_DOCUMENT) {
+      var td = prop.value;
+      if (typeof v === "string") { td.text = v; return td; }
+      A.applyText(td, v); return td;
+    }
+    if (prop.propertyValueType === PropertyValueType.SHAPE && v && v.vertices) {
+      var s = new Shape(); s.vertices = v.vertices; if (v.inTangents) s.inTangents = v.inTangents; if (v.outTangents) s.outTangents = v.outTangents; s.closed = v.closed !== false; return s;
+    }
+    if (prop.propertyValueType === PropertyValueType.COLOR) return A.color(v);
+    return v;
+  };
+  // Accepts [r,g,b], [r,g,b,a] (0-1 or 0-255) or "#rrggbb".
+  A.color = function (v) {
+    if (typeof v === "string") {
+      var h = v.replace("#", "");
+      if (h.length === 3) h = h.charAt(0) + h.charAt(0) + h.charAt(1) + h.charAt(1) + h.charAt(2) + h.charAt(2);
+      return [parseInt(h.substr(0, 2), 16) / 255, parseInt(h.substr(2, 2), 16) / 255, parseInt(h.substr(4, 2), 16) / 255, 1];
+    }
+    if (v instanceof Array) {
+      var big = false; for (var i = 0; i < v.length; i++) if (v[i] > 1) big = true;
+      var c = []; for (var j = 0; j < v.length; j++) c.push(big ? v[j] / 255 : v[j]);
+      if (c.length === 3) c.push(1);
+      return c;
+    }
+    return v;
+  };
+  A.color3 = function (v) { var c = A.color(v); return [c[0], c[1], c[2]]; };
+  A.applyText = function (td, o) {
+    if (o.text !== undefined) td.text = o.text;
+    if (o.font !== undefined) td.font = o.font;
+    if (o.fontSize !== undefined) td.fontSize = o.fontSize;
+    if (o.fillColor !== undefined) { td.applyFill = true; td.fillColor = A.color3(o.fillColor); }
+    if (o.strokeColor !== undefined) { td.applyStroke = true; td.strokeColor = A.color3(o.strokeColor); }
+    if (o.strokeWidth !== undefined) td.strokeWidth = o.strokeWidth;
+    if (o.tracking !== undefined) td.tracking = o.tracking;
+    if (o.leading !== undefined) { try { td.autoLeading = false; } catch (e) {} td.leading = o.leading; }
+    if (o.fauxBold !== undefined) td.fauxBold = o.fauxBold;
+    if (o.fauxItalic !== undefined) td.fauxItalic = o.fauxItalic;
+    if (o.allCaps !== undefined) td.allCaps = o.allCaps;
+    if (o.justification !== undefined) td.justification = ParagraphJustification[String(o.justification).toUpperCase()] || td.justification;
+    return td;
+  };
+  A.interp = function (name) {
+    if (!name) return null;
+    var m = { linear: KeyframeInterpolationType.LINEAR, bezier: KeyframeInterpolationType.BEZIER, hold: KeyframeInterpolationType.HOLD };
+    return m[String(name).toLowerCase()] || null;
+  };
+  // ease: {speed, influence} or number (influence %, speed 0) applied to every dimension
+  A.easeArr = function (prop, e) {
+    var dims = 1;
+    if (prop.propertyValueType === PropertyValueType.TwoD) dims = 2;
+    else if (prop.propertyValueType === PropertyValueType.ThreeD) dims = 3;
+    var sp = typeof e === "number" ? 0 : (e.speed || 0), inf = typeof e === "number" ? e : (e.influence || 33.333);
+    var a = []; for (var i = 0; i < dims; i++) a.push(new KeyframeEase(sp, Math.max(0.1, Math.min(100, inf))));
+    return a;
+  };
+
+  // ---------- runner ----------
+  A.run = function (fn, args, opts) {
+    opts = opts || {};
+    var logs = [];
+    function log() {
+      var parts = [];
+      for (var i = 0; i < arguments.length; i++) { var a = arguments[i]; parts.push(typeof a === "string" ? a : A.stringify(A.serialize(a, 2))); }
+      logs.push(parts.join(" "));
+    }
+    var undo = opts.undoGroup !== false && opts.undoGroup !== "";
+    var res;
+    try {
+      if (opts.suppressDialogs !== false) { try { app.beginSuppressDialogs(); } catch (e) {} }
+      if (undo) app.beginUndoGroup(opts.undoGroup || "AE MCP");
+      var r = fn(args || {}, log);
+      res = { ok: true, result: opts.raw ? r : A.serialize(r, opts.depth || 4), logs: logs };
+    } catch (e) {
+      res = { ok: false, error: { message: e.message || String(e), name: e.name, line: e.line, user: !!e.aemcpUser }, logs: logs };
+    } finally {
+      if (undo) { try { app.endUndoGroup(); } catch (e) {} }
+      if (opts.suppressDialogs !== false) { try { app.endSuppressDialogs(false); } catch (e) {} }
+    }
+    return A.stringify(res);
+  };
+
+  return A;
+})();
+"aemcp loaded " + aemcp.version;
+`;
+  }
+});
+
+// src/jsx.ts
+import { createHash } from "node:crypto";
+function toJsLiteral(v) {
+  return (JSON.stringify(v ?? null) ?? "null").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
+}
+function wrapBody(body, args, opts = {}) {
+  const runOpts = { undoGroup: opts.undoGroup === void 0 ? "AE MCP" : opts.undoGroup, depth: opts.depth };
+  return `(function(){
+if (typeof aemcp === 'undefined' || aemcp.version !== ${toJsLiteral(HELPER_VERSION)}) return ${toJsLiteral(NEED_HELPERS)};
+return aemcp.run(function(args, log){
+` + body + `
+}, ${toJsLiteral(args ?? {})}, ${toJsLiteral(runOpts)});
+})()`;
+}
+function userCodeBody(code) {
+  return `var __fn = eval(${toJsLiteral("(function(args, log){" + code + "\n})")});
+return __fn(args, log);`;
+}
+function parseResult(raw) {
+  if (raw === "EvalScript error.")
+    return { ok: false, logs: [], error: { message: "ExtendScript could not evaluate the script (EvalScript error). This usually means a syntax error outside the user code wrapper." } };
+  try {
+    const r = JSON.parse(raw);
+    if (r && typeof r === "object" && "ok" in r) return { logs: [], ...r };
+    return { ok: true, result: r, logs: [] };
+  } catch {
+    return { ok: true, result: raw, logs: [] };
+  }
+}
+async function ensureHelpers() {
+  const r = await evalRaw(helperSource, 3e4);
+  if (!r.startsWith("aemcp loaded")) throw new Error("Failed to load aemcp helpers into After Effects: " + r);
+}
+async function runJsx(body, args = {}, opts = {}) {
+  const script = wrapBody(body, args, opts);
+  let raw = await evalRaw(script, opts.timeoutMs);
+  if (raw === NEED_HELPERS) {
+    await ensureHelpers();
+    raw = await evalRaw(script, opts.timeoutMs);
+  }
+  return parseResult(raw);
+}
+var NEED_HELPERS, HELPER_VERSION, helperSource;
+var init_jsx = __esm({
+  "src/jsx.ts"() {
+    "use strict";
+    init_define_AEMCP_CEP_FILES();
+    init_aemcp();
+    init_config();
+    init_bridge();
+    NEED_HELPERS = "__AEMCP_NEED_HELPERS__";
+    HELPER_VERSION = `${VERSION}-${createHash("sha1").update(aemcp_default).digest("hex").slice(0, 10)}`;
+    helperSource = aemcp_default.replace("__AEMCP_VERSION__", HELPER_VERSION);
+  }
+});
+
+// src/cli/install.ts
+var install_exports = {};
+__export(install_exports, {
+  install: () => install
+});
+import { spawn, spawnSync as spawnSync3 } from "node:child_process";
+import { chmodSync, copyFileSync as copyFileSync2, existsSync as existsSync4, mkdirSync as mkdirSync4, readdirSync, readFileSync as readFileSync5, writeFileSync as writeFileSync3 } from "node:fs";
+import { dirname as dirname3, join as join5 } from "node:path";
+import { fileURLToPath } from "node:url";
+function mcpbInstalled() {
+  try {
+    return readdirSync(join5(claudeDesktopDir(), "Claude Extensions")).some((n) => /after-effects/i.test(n) && !n.endsWith(".json"));
+  } catch {
+    return false;
+  }
+}
+function claudeDesktopRunning() {
+  if (isMac)
+    return (spawnSync3("ps", ["-axo", "comm="], { encoding: "utf8" }).stdout || "").split("\n").some((l) => l.trim().endsWith(".app/Contents/MacOS/Claude"));
+  if (isWin) return (spawnSync3("tasklist", ["/FI", "IMAGENAME eq claude.exe", "/NH"], { encoding: "utf8" }).stdout || "").toLowerCase().includes("claude.exe");
+  return false;
+}
+async function quitClaudeDesktop() {
+  if (isMac) spawnSync3("osascript", ["-e", 'tell application "Claude" to quit']);
+  else if (isWin) spawnSync3("taskkill", ["/IM", "claude.exe", "/T"]);
+  for (let i = 0; i < 40; i++) {
+    if (!claudeDesktopRunning()) return true;
+    await sleep(500);
+  }
+  if (isWin) {
+    spawnSync3("taskkill", ["/IM", "claude.exe", "/T", "/F"]);
+    await sleep(1e3);
+  }
+  return !claudeDesktopRunning();
+}
+function startClaudeDesktop() {
+  if (isMac) spawnSync3("open", ["-a", "Claude"]);
+  else if (isWin && existsSync4(claudeDesktopExe())) spawn(claudeDesktopExe(), [], { detached: true, stdio: "ignore" }).unref();
+}
+async function install(argv) {
+  const flags = new Set(argv);
+  const want = (name) => !flags.has("--skip-clients") && !flags.has(`--no-${name}`);
+  console.log(bold(`
+After Effects MCP installer v${VERSION}`));
+  console.log(dim(`${process.platform} \xB7 node ${process.version}`));
+  if (!isMac && !isWin) warn("After Effects only runs on macOS and Windows; continuing anyway.");
+  step("1/4  Installing the MCP server");
+  const self = fileURLToPath(import.meta.url);
+  mkdirSync4(dirname3(INSTALLED_SERVER), { recursive: true });
+  if (self !== INSTALLED_SERVER) copyFileSync2(self, INSTALLED_SERVER);
+  if (!isWin) chmodSync(INSTALLED_SERVER, 493);
+  ok(`Server: ${INSTALLED_SERVER}`);
+  ensureConfig();
+  ok(`Config: ${CONFIG_FILE}`);
+  step("2/4  Installing the After Effects extension");
+  try {
+    ensureExtension(true);
+    ok(`Extension: ${extensionDir()}`);
+  } catch (e) {
+    fail(`Could not install the extension: ${e.message}`);
+    process.exit(1);
+  }
+  try {
+    ensureDebugMode();
+    ok(`Unsigned extensions enabled (PlayerDebugMode, CSXS ${CSXS_VERSIONS[0]}-${CSXS_VERSIONS.at(-1)})`);
+  } catch (e) {
+    warn(`${e.message}. The extension will not load until PlayerDebugMode is enabled (see README > Troubleshooting).`);
+  }
+  step("3/4  Connecting AI apps");
+  const nodePath = stableNodePath();
+  const entry = { command: nodePath, args: [INSTALLED_SERVER] };
+  const registered = [];
+  const addJson = (label, file2, value = entry) => {
+    try {
+      const data = readJson(file2, {});
+      data.mcpServers ||= {};
+      data.mcpServers[SERVER_NAME] = value;
+      writeJsonWithBackup(file2, data);
+      ok(`${label}`);
+      registered.push(label);
+    } catch (e) {
+      warn(`${label}: could not update ${file2}: ${e.message}`);
+    }
+  };
+  let restartClaude = false;
+  if (want("claude-desktop")) {
+    if (mcpbInstalled()) {
+      ok("Claude Desktop: already connected through the AE MCP extension (.mcpb)");
+      registered.push("Claude Desktop");
+    } else if (existsSync4(claudeDesktopDir())) {
+      const cfg = readJson(claudeDesktopConfig(), {});
+      const cur = cfg.mcpServers?.[SERVER_NAME];
+      const already = !!cur && cur.args?.[0] === INSTALLED_SERVER && typeof cur.command === "string" && existsSync4(cur.command);
+      if (!already && claudeDesktopRunning()) {
+        console.log("  Claude Desktop is open. It must be closed while it is connected, then it reopens.");
+        if (await ask("Restart Claude Desktop now?", true)) {
+          if (await quitClaudeDesktop()) restartClaude = true;
+          else warn("Could not close Claude Desktop. Quit it manually and run the installer again.");
+        } else warn("Quit Claude Desktop (Cmd+Q / tray > Quit) and run this installer again, or the setting may be lost.");
+      }
+      if (already) {
+        ok("Claude Desktop (already connected)");
+        registered.push("Claude Desktop");
+      } else addJson("Claude Desktop", claudeDesktopConfig());
+    } else console.log(dim("  - Claude Desktop not installed (skipped)"));
+  }
+  if (want("claude-code")) {
+    const claude = findClaudeCli();
+    if (claude) {
+      try {
+        try {
+          run(claude, ["mcp", "remove", SERVER_NAME, "--scope", "user"]);
+        } catch {
+        }
+        run(claude, ["mcp", "add", "--scope", "user", SERVER_NAME, "--", nodePath, INSTALLED_SERVER]);
+        ok("Claude Code");
+        registered.push("Claude Code");
+      } catch (e) {
+        warn(`Claude Code: ${String(e.stderr || e.message).split("\n")[0]}`);
+      }
+    } else if (existsSync4(claudeCodeConfig())) addJson("Claude Code", claudeCodeConfig(), { type: "stdio", ...entry, env: {} });
+    else console.log(dim("  - Claude Code not installed (skipped)"));
+  }
+  if (want("cursor") && existsSync4(dirname3(cursorConfig()))) addJson("Cursor", cursorConfig());
+  if (want("codex") && existsSync4(dirname3(codexConfig()))) {
+    try {
+      const file2 = codexConfig();
+      const text = existsSync4(file2) ? readFileSync5(file2, "utf8") : "";
+      if (existsSync4(file2) && !existsSync4(file2 + ".aemcp.bak")) copyFileSync2(file2, file2 + ".aemcp.bak");
+      writeFileSync3(file2, removeCodexBlock(text).trimEnd() + "\n\n" + codexBlock(nodePath, INSTALLED_SERVER));
+      ok("Codex (OpenAI)");
+      registered.push("Codex");
+    } catch (e) {
+      warn(`Codex: ${e.message}`);
+    }
+  }
+  if (restartClaude) {
+    startClaudeDesktop();
+    ok("Claude Desktop restarted");
+  }
+  step("4/4  Done!");
+  console.log(`
+  ${bold("Restart After Effects")} if it is open. The connection starts automatically with it.
+  ${registered.length ? `Connected: ${registered.join(", ")}. Restart ${registered.filter((r) => r !== "Claude Desktop" || !restartClaude).join(", ") || "nothing else"} if open.` : "No AI apps were found to connect."}
+
+  Try asking Claude: ${bold('"Check After Effects is connected, then make a 1080p comp with an animated title."')}
+  Check the installation any time with: ${bold(isWin ? "Test Installation (Windows).bat" : "Test Installation (Mac).command")}
+  ChatGPT: run ${bold(isWin ? "Connect ChatGPT (Windows).bat" : "Connect ChatGPT (Mac).command")} (see README).
+
+  Other MCP apps can use:  command ${nodePath}
+                           args    ["${INSTALLED_SERVER}"]
+`);
+}
+var init_install = __esm({
+  "src/cli/install.ts"() {
+    "use strict";
+    init_define_AEMCP_CEP_FILES();
+    init_config();
+    init_setup();
+    init_util();
+  }
+});
+
+// src/cli/uninstall.ts
+var uninstall_exports = {};
+__export(uninstall_exports, {
+  uninstall: () => uninstall
+});
+import { existsSync as existsSync5, readdirSync as readdirSync2, readFileSync as readFileSync6, rmSync as rmSync2, writeFileSync as writeFileSync4 } from "node:fs";
+import { join as join6 } from "node:path";
+function uninstall(argv) {
+  console.log(bold("\nAfter Effects MCP uninstaller\n"));
+  const keepConfig = argv.includes("--keep-config");
+  if (existsSync5(extensionDir())) {
+    rmSync2(extensionDir(), { recursive: true, force: true });
+    ok(`Removed the After Effects extension`);
+  }
+  if (existsSync5(AEMCP_DIR)) {
+    for (const name of readdirSync2(AEMCP_DIR))
+      if (name !== "node" && !(keepConfig && name === "config.json")) rmSync2(join6(AEMCP_DIR, name), { recursive: true, force: true });
+  }
+  ok(keepConfig ? "Removed the server (kept ~/.aemcp/config.json)" : `Removed ${AEMCP_DIR}`);
+  for (const [label, file2] of [["Claude Desktop", claudeDesktopConfig()], ["Cursor", cursorConfig()], ["Claude Code", claudeCodeConfig()]]) {
+    const data = readJson(file2, null);
+    if (data?.mcpServers?.[SERVER_NAME]) {
+      delete data.mcpServers[SERVER_NAME];
+      writeJsonWithBackup(file2, data);
+      ok(`Removed from ${label}`);
+    }
+  }
+  const claude = findClaudeCli();
+  if (claude) {
+    try {
+      run(claude, ["mcp", "remove", SERVER_NAME, "--scope", "user"]);
+      ok("Removed from Claude Code");
+    } catch {
+    }
+  }
+  if (existsSync5(codexConfig())) {
+    const t = readFileSync6(codexConfig(), "utf8");
+    const n = removeCodexBlock(t);
+    if (n !== t) {
+      writeFileSync4(codexConfig(), n.trimEnd() + "\n");
+      ok("Removed from Codex");
+    }
+  }
+  console.log("\nDone. Restart After Effects and your AI apps.");
+  console.log("If you installed the Claude Desktop extension (.mcpb), remove it in Claude Desktop > Settings > Extensions.");
+  warn("PlayerDebugMode was left enabled (harmless; other extensions may rely on it).");
+}
+var init_uninstall = __esm({
+  "src/cli/uninstall.ts"() {
+    "use strict";
+    init_define_AEMCP_CEP_FILES();
+    init_util();
+  }
+});
+
+// src/cli/selftest.ts
+var selftest_exports = {};
+__export(selftest_exports, {
+  selftest: () => selftest
+});
+import { existsSync as existsSync6, mkdirSync as mkdirSync5, readFileSync as readFileSync7, statSync as statSync2, unlinkSync as unlinkSync2 } from "node:fs";
+import { join as join7 } from "node:path";
+import { spawnSync as spawnSync4 } from "node:child_process";
+async function selftest() {
+  let failures = 0;
+  const bad = (m) => {
+    failures++;
+    fail(m);
+  };
+  console.log(bold(`
+After Effects MCP self-test v${VERSION}`));
+  console.log(`  ${process.platform} \xB7 node ${process.version}
+`);
+  if (existsSync6(CONFIG_FILE) && loadConfig().token) ok(`Config ${CONFIG_FILE}`);
+  else bad(`No config at ${CONFIG_FILE}. Run the installer.`);
+  const hash2 = installedExtensionHash();
+  if (!existsSync6(join7(extensionDir(), "CSXS", "manifest.xml"))) bad(`After Effects extension missing at ${extensionDir()}. Run the installer.`);
+  else if (hash2 !== "b0fa4965a9f3") warn(`Extension at ${extensionDir()} is a different version (${hash2 ?? "unknown"} vs ${"b0fa4965a9f3"}). Re-run the installer.`);
+  else ok("After Effects extension installed");
+  const offVersions = CSXS_VERSIONS.filter((v) => {
+    const r = isWin ? spawnSync4("reg", ["query", `HKCU\\Software\\Adobe\\CSXS.${v}`, "/v", "PlayerDebugMode"], { encoding: "utf8" }) : isMac ? spawnSync4("defaults", ["read", `com.adobe.CSXS.${v}`, "PlayerDebugMode"], { encoding: "utf8" }) : null;
+    return r && !(r.status === 0 && /(^|\s)1\s*$/m.test(r.stdout));
+  });
+  if (offVersions.length) bad(`PlayerDebugMode not enabled for CSXS ${offVersions.join(", ")}. Run the installer.`);
+  else ok("Unsigned extensions allowed (PlayerDebugMode)");
+  const desktop = readJson(claudeDesktopConfig(), null);
+  if (desktop?.mcpServers?.[SERVER_NAME]) {
+    const cmd = desktop.mcpServers[SERVER_NAME].command;
+    if (cmd && !existsSync6(cmd)) bad(`Claude Desktop points to a Node that no longer exists: ${cmd}. Re-run the installer.`);
+    else ok("Claude Desktop configured");
+  } else console.log("  - Claude Desktop config has no after-effects entry (fine if you use the .mcpb extension or another app)");
+  console.log("");
+  let h;
+  try {
+    h = await health();
+  } catch (e) {
+    bad(`Bridge not reachable on 127.0.0.1:${loadConfig().bridgePort}. Is After Effects running? (restart it after installing)`);
+    const statusFile = join7(AEMCP_DIR, "bridge-status.json");
+    if (existsSync6(statusFile)) {
+      const st = readJson(statusFile, {});
+      console.log(`    last bridge status: ${st.listening ? "listening" : "not listening"}${st.error ? " - " + st.error : ""} (${st.at})`);
+    }
+    return summary(failures);
+  }
+  ok(`Bridge running inside ${h.host?.appName ?? "AE"} ${h.host?.appVersion ?? ""} (bridge v${h.version})`);
+  if (h.authorized === false) {
+    bad("Bridge rejected our token: config mismatch. Re-run the installer and restart After Effects.");
+    return summary(failures);
+  }
+  const info = await runJsx(
+    "var w = null; try { w = app.preferences.getPrefAsLong('Main Pref Section', 'Pref_SCRIPTING_FILE_NETWORK_SECURITY') === 1; } catch (e) {} return { version: app.version, os: $.os, canWrite: w };",
+    {},
+    { undoGroup: false, timeoutMs: 15e3 }
+  ).catch((e) => ({ ok: false, error: { message: e.message } }));
+  if (!info.ok) return bad(`ExtendScript failed: ${info.error?.message}`), summary(failures);
+  ok(`ExtendScript works: After Effects ${info.result.version} on ${info.result.os}`);
+  if (info.result.canWrite === false)
+    warn("'Allow Scripts to Write Files and Access Network' is OFF: enable it in AE Settings > Scripting & Expressions (needed for frame previews).");
+  const tmpDir = join7(AEMCP_DIR, "tmp");
+  mkdirSync5(tmpDir, { recursive: true });
+  const png = join7(tmpDir, `selftest_${Date.now()}.png`);
+  const job = await runJsx(
+    `var c = app.project.items.addComp("__aemcp_selftest", 640, 360, 1, 2, 30);
+var t = c.layers.addText("AE MCP OK");
+var p = t.property("ADBE Transform Group").property("ADBE Position");
+p.setValuesAtTimes([0, 1], [[100, 180], [540, 180]]);
+var fx = t.property("ADBE Effect Parade").addProperty("ADBE Drop Shadow");
+t.property("ADBE Transform Group").property("ADBE Opacity").expression = "50 + 50 * Math.sin(time)";
+var f = new File(args.png);
+var wrote = false;
+if (args.canWrite !== false) { c.saveFrameToPng(1, f); var w = 0; while (!f.exists && w < 10000) { $.sleep(50); w += 50; } wrote = f.exists; $.sleep(100); }
+var r = { keys: p.numKeys, effect: fx.matchName, exprError: t.property("ADBE Transform Group").property("ADBE Opacity").expressionError, wrote: wrote };
+c.remove();
+return r;`,
+    { png, canWrite: info.result.canWrite },
+    { undoGroup: "AE MCP self-test", timeoutMs: 6e4 }
+  );
+  if (!job.ok) bad(`Test job failed: ${job.error?.message}`);
+  else {
+    const r = job.result;
+    if (r.keys === 2 && r.effect === "ADBE Drop Shadow" && !r.exprError) ok("Created a comp, text layer, keyframes, effect and expression (then removed it)");
+    else bad(`Unexpected test result: ${JSON.stringify(r)}`);
+    if (info.result.canWrite !== false) {
+      for (let i = 0; i < 50 && !(existsSync6(png) && statSync2(png).size > 0); i++) await sleep(100);
+      if (existsSync6(png) && statSync2(png).size > 0) {
+        const sig = readFileSync7(png).subarray(1, 4).toString();
+        sig === "PNG" ? ok("Rendered a frame preview") : bad("Frame preview is not a valid PNG");
+        try {
+          unlinkSync2(png);
+        } catch {
+        }
+      } else bad(`Frame preview was not written to ${png}`);
+    }
+  }
+  return summary(failures);
+}
+function summary(failures) {
+  console.log(failures ? `
+${red(bold(`${failures} problem(s) found.`))} See README > Troubleshooting.
+` : `
+${green(bold("All checks passed. After Effects MCP is ready."))}
+`);
+  return failures ? 1 : 0;
+}
+var init_selftest = __esm({
+  "src/cli/selftest.ts"() {
+    "use strict";
+    init_define_AEMCP_CEP_FILES();
+    init_bridge();
+    init_config();
+    init_jsx();
+    init_setup();
+    init_util();
+  }
+});
+
+// src/cli/chatgpt.ts
+var chatgpt_exports = {};
+__export(chatgpt_exports, {
+  chatgpt: () => chatgpt
+});
+import { spawn as spawn2 } from "node:child_process";
+import { existsSync as existsSync7 } from "node:fs";
+import { fileURLToPath as fileURLToPath2 } from "node:url";
+function chatgpt(argv) {
+  ensureConfig();
+  const cfg = loadConfig();
+  const port = String(cfg.httpPort);
+  const children = [];
+  const cleanup = () => children.forEach((c) => {
+    try {
+      c.kill();
+    } catch {
+    }
+  });
+  process.on("SIGINT", () => {
+    cleanup();
+    process.exit(0);
+  });
+  process.on("exit", cleanup);
+  const srv = spawn2(process.execPath, [fileURLToPath2(import.meta.url), "--http", "--port", port], { stdio: ["ignore", "inherit", "inherit"] });
+  children.push(srv);
+  srv.on("exit", (code) => {
+    fail(`MCP server exited (${code})`);
+    process.exit(1);
+  });
+  const announce = (base) => console.log(`
+${bold("ChatGPT connector URL")} (keep it secret, it contains your access token):
+
+  ${yellow(`${base}/mcp/${cfg.token}`)}
+
+In ChatGPT: Settings > Apps & Connectors > Advanced settings > turn on Developer mode,
+then Create a connector > paste the URL above > Authentication: "No authentication" > Create.
+Keep this window open while you use it. Press Ctrl+C to stop.
+`);
+  if (argv.includes("--local")) return announce(`http://127.0.0.1:${port}`);
+  const cloudflared = which("cloudflared") || (isWin ? null : ["/opt/homebrew/bin/cloudflared", "/usr/local/bin/cloudflared"].find((p) => existsSync7(p)) ?? null);
+  const ngrok = which("ngrok");
+  let shown = false;
+  if (cloudflared) {
+    const t = spawn2(cloudflared, ["tunnel", "--no-autoupdate", "--url", `http://127.0.0.1:${port}`], { stdio: ["ignore", "pipe", "pipe"] });
+    children.push(t);
+    const onData = (d) => {
+      const m = String(d).match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/);
+      if (m && !shown) {
+        shown = true;
+        announce(m[0]);
+      }
+    };
+    t.stdout.on("data", onData);
+    t.stderr.on("data", onData);
+    console.log(dim("Starting Cloudflare tunnel..."));
+  } else if (ngrok) {
+    const t = spawn2(ngrok, ["http", port, "--log", "stdout", "--log-format", "json"], { stdio: ["ignore", "pipe", "inherit"] });
+    children.push(t);
+    t.stdout.on("data", (d) => {
+      for (const line of String(d).split("\n")) {
+        try {
+          const j = JSON.parse(line);
+          if (j.url?.startsWith("https") && !shown) {
+            shown = true;
+            announce(j.url);
+          }
+        } catch {
+        }
+      }
+    });
+    console.log(dim("Starting ngrok tunnel..."));
+  } else {
+    warn("ChatGPT needs a public HTTPS address, which needs a free tunnel tool. Install one, then run this again:");
+    console.log(`  - cloudflared (no account): ${isWin ? "winget install --id Cloudflare.cloudflared" : "brew install cloudflared"}`);
+    console.log("  - or ngrok: https://ngrok.com/download");
+    console.log(`
+The server is running locally at http://127.0.0.1:${port}/mcp (token in ~/.aemcp/config.json).`);
+  }
+}
+var init_chatgpt = __esm({
+  "src/cli/chatgpt.ts"() {
+    "use strict";
+    init_define_AEMCP_CEP_FILES();
+    init_config();
+    init_setup();
+    init_util();
+  }
+});
+
+// src/index.ts
+init_define_AEMCP_CEP_FILES();
+
+// node_modules/@modelcontextprotocol/sdk/dist/esm/server/mcp.js
+init_define_AEMCP_CEP_FILES();
+
+// node_modules/@modelcontextprotocol/sdk/dist/esm/server/index.js
+init_define_AEMCP_CEP_FILES();
+
+// node_modules/@modelcontextprotocol/sdk/dist/esm/shared/protocol.js
+init_define_AEMCP_CEP_FILES();
+
+// node_modules/@modelcontextprotocol/sdk/dist/esm/server/zod-compat.js
+init_define_AEMCP_CEP_FILES();
+
+// node_modules/zod/v3/errors.js
+init_define_AEMCP_CEP_FILES();
+
+// node_modules/zod/v3/locales/en.js
+init_define_AEMCP_CEP_FILES();
+
+// node_modules/zod/v3/ZodError.js
+init_define_AEMCP_CEP_FILES();
+
 // node_modules/zod/v3/helpers/util.js
+init_define_AEMCP_CEP_FILES();
 var util;
 (function(util2) {
   util2.assertEqual = (_) => {
@@ -7677,6 +9214,7 @@ function getErrorMap() {
 }
 
 // node_modules/zod/v3/helpers/parseUtil.js
+init_define_AEMCP_CEP_FILES();
 var makeIssue = (params2) => {
   const { data, path, errorMaps, issueData } = params2;
   const fullPath = [...path, ...issueData.path || []];
@@ -7785,7 +9323,11 @@ var isDirty = (x) => x.status === "dirty";
 var isValid = (x) => x.status === "valid";
 var isAsync = (x) => typeof Promise !== "undefined" && x instanceof Promise;
 
+// node_modules/zod/v3/types.js
+init_define_AEMCP_CEP_FILES();
+
 // node_modules/zod/v3/helpers/errorUtil.js
+init_define_AEMCP_CEP_FILES();
 var errorUtil;
 (function(errorUtil2) {
   errorUtil2.errToObj = (message) => typeof message === "string" ? { message } : message || {};
@@ -8763,12 +10305,12 @@ ZodString.create = (params2) => {
     ...processCreateParams(params2)
   });
 };
-function floatSafeRemainder(val, step) {
+function floatSafeRemainder(val, step2) {
   const valDecCount = (val.toString().split(".")[1] || "").length;
-  const stepDecCount = (step.toString().split(".")[1] || "").length;
+  const stepDecCount = (step2.toString().split(".")[1] || "").length;
   const decCount = valDecCount > stepDecCount ? valDecCount : stepDecCount;
   const valInt = Number.parseInt(val.toFixed(decCount).replace(".", ""));
-  const stepInt = Number.parseInt(step.toFixed(decCount).replace(".", ""));
+  const stepInt = Number.parseInt(step2.toFixed(decCount).replace(".", ""));
   return valInt % stepInt / 10 ** decCount;
 }
 var ZodNumber = class _ZodNumber extends ZodType {
@@ -11199,6 +12741,9 @@ var nullableType = ZodNullable.create;
 var preprocessType = ZodEffects.createWithPreprocess;
 var pipelineType = ZodPipeline.create;
 
+// node_modules/zod/v4/mini/external.js
+init_define_AEMCP_CEP_FILES();
+
 // node_modules/zod/v4/core/index.js
 var core_exports2 = {};
 __export(core_exports2, {
@@ -11515,6 +13060,10 @@ __export(core_exports2, {
   version: () => version,
   withParser: () => withParser
 });
+init_define_AEMCP_CEP_FILES();
+
+// node_modules/zod/v4/core/core.js
+init_define_AEMCP_CEP_FILES();
 
 // node_modules/zod/v4/core/util.js
 var util_exports = {};
@@ -11596,6 +13145,7 @@ __export(util_exports, {
   uint8ArrayToHex: () => uint8ArrayToHex,
   unwrapMessage: () => unwrapMessage
 });
+init_define_AEMCP_CEP_FILES();
 function assertEqual(val) {
   return val;
 }
@@ -11650,8 +13200,8 @@ function cleanRegex(source) {
   const end = source.endsWith("$") ? source.length - 1 : source.length;
   return source.slice(start, end);
 }
-function floatSafeRemainder2(val, step) {
-  const ratio = val / step;
+function floatSafeRemainder2(val, step2) {
+  const ratio = val / step2;
   const roundedRatio = Math.round(ratio);
   const tolerance = 4 * Number.EPSILON * Math.max(Math.abs(ratio), 1);
   if (Math.abs(ratio - roundedRatio) < tolerance)
@@ -12494,7 +14044,11 @@ function config(newConfig) {
   return globalConfig;
 }
 
+// node_modules/zod/v4/core/parse.js
+init_define_AEMCP_CEP_FILES();
+
 // node_modules/zod/v4/core/errors.js
+init_define_AEMCP_CEP_FILES();
 function _getMessage() {
   const internals = this._zod;
   internals.message ?? (internals.message = JSON.stringify(internals.def, jsonStringifyReplacer, 2));
@@ -12846,6 +14400,12 @@ var _safeDecodeAsync = (_Err) => async (schema, value, _ctx) => {
 };
 var safeDecodeAsync = /* @__PURE__ */ _safeDecodeAsync($ZodRealError);
 
+// node_modules/zod/v4/core/schemas.js
+init_define_AEMCP_CEP_FILES();
+
+// node_modules/zod/v4/core/checks.js
+init_define_AEMCP_CEP_FILES();
+
 // node_modules/zod/v4/core/regexes.js
 var regexes_exports = {};
 __export(regexes_exports, {
@@ -12914,6 +14474,7 @@ __export(regexes_exports, {
   uuid7: () => uuid7,
   xid: () => xid
 });
+init_define_AEMCP_CEP_FILES();
 var cuid = /^[cC][0-9a-z]{6,}$/;
 var cuid2 = /^[0-9a-z]+$/;
 var ulid = /^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$/;
@@ -13495,6 +15056,7 @@ var $ZodCheckOverwrite = /* @__PURE__ */ $constructor("$ZodCheckOverwrite", (ins
 });
 
 // node_modules/zod/v4/core/doc.js
+init_define_AEMCP_CEP_FILES();
 var Doc = class {
   constructor(args = [], closed = {}) {
     this.content = [];
@@ -13536,6 +15098,7 @@ ${content.join("\n")}
 };
 
 // node_modules/zod/v4/core/versions.js
+init_define_AEMCP_CEP_FILES();
 var version = {
   major: 4,
   minor: 6,
@@ -15985,6 +17548,7 @@ function handleRefineResult(result, payload, input2, inst) {
 }
 
 // node_modules/zod/v4/core/memoizer.js
+init_define_AEMCP_CEP_FILES();
 var $ZodCyclicError = class extends Error {
   constructor() {
     super(`Cannot parse a reference cycle that closes through a transform`);
@@ -16328,8 +17892,10 @@ __export(locales_exports, {
   zhCN: () => zh_CN_default,
   zhTW: () => zh_TW_default
 });
+init_define_AEMCP_CEP_FILES();
 
 // node_modules/zod/v4/locales/ar.js
+init_define_AEMCP_CEP_FILES();
 var error = () => {
   const Sizable = {
     string: { unit: "\u062D\u0631\u0641", verb: "\u0623\u0646 \u064A\u062D\u0648\u064A" },
@@ -16442,6 +18008,7 @@ function ar_default() {
 }
 
 // node_modules/zod/v4/locales/az.js
+init_define_AEMCP_CEP_FILES();
 var error2 = () => {
   const Sizable = {
     string: { unit: "simvol", verb: "olmal\u0131d\u0131r" },
@@ -16553,6 +18120,7 @@ function az_default() {
 }
 
 // node_modules/zod/v4/locales/be.js
+init_define_AEMCP_CEP_FILES();
 function getBelarusianPlural(count, one, few, many) {
   const absCount = Math.abs(count);
   const lastDigit = absCount % 10;
@@ -16722,6 +18290,7 @@ function be_default() {
 }
 
 // node_modules/zod/v4/locales/bg.js
+init_define_AEMCP_CEP_FILES();
 var error4 = () => {
   const Sizable = {
     string: { unit: "\u0441\u0438\u043C\u0432\u043E\u043B\u0430", verb: "\u0434\u0430 \u0441\u044A\u0434\u044A\u0440\u0436\u0430" },
@@ -16848,6 +18417,7 @@ function bg_default() {
 }
 
 // node_modules/zod/v4/locales/bn.js
+init_define_AEMCP_CEP_FILES();
 var error5 = () => {
   const Sizable = {
     string: { unit: "\u0985\u0995\u09CD\u09B7\u09B0", verb: "\u09A5\u09BE\u0995\u09A4\u09C7 \u09B9\u09AC\u09C7" },
@@ -16962,6 +18532,7 @@ function bn_default() {
 }
 
 // node_modules/zod/v4/locales/ca.js
+init_define_AEMCP_CEP_FILES();
 var error6 = () => {
   const Sizable = {
     string: { unit: "car\xE0cters", verb: "contenir" },
@@ -17076,6 +18647,7 @@ function ca_default() {
 }
 
 // node_modules/zod/v4/locales/ckb.js
+init_define_AEMCP_CEP_FILES();
 var error7 = () => {
   const Sizable = {
     string: { unit: "\u067E\u06CC\u062A", verb: "\u0628\u06CE\u062A" },
@@ -17209,6 +18781,7 @@ function ckb_default() {
 }
 
 // node_modules/zod/v4/locales/cs.js
+init_define_AEMCP_CEP_FILES();
 var error8 = () => {
   const Sizable = {
     string: { unit: "znak\u016F", verb: "m\xEDt" },
@@ -17326,6 +18899,7 @@ function cs_default() {
 }
 
 // node_modules/zod/v4/locales/da.js
+init_define_AEMCP_CEP_FILES();
 var error9 = () => {
   const Sizable = {
     string: { unit: "tegn", verb: "havde" },
@@ -17447,6 +19021,7 @@ function da_default() {
 }
 
 // node_modules/zod/v4/locales/de.js
+init_define_AEMCP_CEP_FILES();
 var error10 = () => {
   const Sizable = {
     string: { unit: "Zeichen", verb: "zu haben" },
@@ -17561,6 +19136,7 @@ function de_default() {
 }
 
 // node_modules/zod/v4/locales/el.js
+init_define_AEMCP_CEP_FILES();
 var error11 = () => {
   const Sizable = {
     string: { unit: "\u03C7\u03B1\u03C1\u03B1\u03BA\u03C4\u03AE\u03C1\u03B5\u03C2", verb: "\u03BD\u03B1 \u03AD\u03C7\u03B5\u03B9" },
@@ -17674,6 +19250,7 @@ function el_default() {
 }
 
 // node_modules/zod/v4/locales/en.js
+init_define_AEMCP_CEP_FILES();
 var error12 = () => {
   const Sizable = {
     string: { unit: "characters", verb: "to have" },
@@ -17799,6 +19376,7 @@ function en_default2() {
 }
 
 // node_modules/zod/v4/locales/eo.js
+init_define_AEMCP_CEP_FILES();
 var error13 = () => {
   const Sizable = {
     string: { unit: "karaktrojn", verb: "havi" },
@@ -17914,6 +19492,7 @@ function eo_default() {
 }
 
 // node_modules/zod/v4/locales/es.js
+init_define_AEMCP_CEP_FILES();
 var error14 = () => {
   const Sizable = {
     string: { unit: "caracteres", verb: "tener" },
@@ -18051,6 +19630,7 @@ function es_default() {
 }
 
 // node_modules/zod/v4/locales/fa.js
+init_define_AEMCP_CEP_FILES();
 var error15 = () => {
   const Sizable = {
     string: { unit: "\u06A9\u0627\u0631\u0627\u06A9\u062A\u0631", verb: "\u062F\u0627\u0634\u062A\u0647 \u0628\u0627\u0634\u062F" },
@@ -18171,6 +19751,7 @@ function fa_default() {
 }
 
 // node_modules/zod/v4/locales/fi.js
+init_define_AEMCP_CEP_FILES();
 var error16 = () => {
   const Sizable = {
     string: { unit: "merkki\xE4", subject: "merkkijonon" },
@@ -18289,6 +19870,7 @@ function fi_default() {
 }
 
 // node_modules/zod/v4/locales/fr.js
+init_define_AEMCP_CEP_FILES();
 var error17 = () => {
   const Sizable = {
     string: { unit: "caract\xE8res", verb: "avoir" },
@@ -18419,6 +20001,7 @@ function fr_default() {
 }
 
 // node_modules/zod/v4/locales/fr-CA.js
+init_define_AEMCP_CEP_FILES();
 var error18 = () => {
   const Sizable = {
     string: { unit: "caract\xE8res", verb: "avoir" },
@@ -18532,6 +20115,7 @@ function fr_CA_default() {
 }
 
 // node_modules/zod/v4/locales/gu.js
+init_define_AEMCP_CEP_FILES();
 var error19 = () => {
   const Sizable = {
     string: { unit: "\u0A85\u0A95\u0ACD\u0AB7\u0AB0", verb: "\u0AB9\u0ACB\u0AB5\u0ABE \u0A9C\u0ACB\u0A88\u0A8F" },
@@ -18646,6 +20230,7 @@ function gu_default() {
 }
 
 // node_modules/zod/v4/locales/he.js
+init_define_AEMCP_CEP_FILES();
 var error20 = () => {
   const TypeNames = {
     string: { label: "\u05DE\u05D7\u05E8\u05D5\u05D6\u05EA", gender: "f" },
@@ -18848,6 +20433,7 @@ function he_default() {
 }
 
 // node_modules/zod/v4/locales/hi.js
+init_define_AEMCP_CEP_FILES();
 var error21 = () => {
   const Sizable = {
     string: { unit: "\u0905\u0915\u094D\u0937\u0930", verb: "\u0930\u0916\u0928\u0947 \u0915\u0947 \u0932\u093F\u090F" },
@@ -18960,6 +20546,7 @@ function hi_default() {
 }
 
 // node_modules/zod/v4/locales/hr.js
+init_define_AEMCP_CEP_FILES();
 var error22 = () => {
   const Sizable = {
     string: { unit: "znakova", verb: "imati" },
@@ -19087,6 +20674,7 @@ function hr_default() {
 }
 
 // node_modules/zod/v4/locales/hu.js
+init_define_AEMCP_CEP_FILES();
 var error23 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "legyen" },
@@ -19201,6 +20789,7 @@ function hu_default() {
 }
 
 // node_modules/zod/v4/locales/hy.js
+init_define_AEMCP_CEP_FILES();
 function getArmenianPlural(count, one, many) {
   return Math.abs(count) === 1 ? one : many;
 }
@@ -19360,6 +20949,7 @@ function hy_default() {
 }
 
 // node_modules/zod/v4/locales/id.js
+init_define_AEMCP_CEP_FILES();
 var error25 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "memiliki" },
@@ -19472,6 +21062,7 @@ function id_default() {
 }
 
 // node_modules/zod/v4/locales/is.js
+init_define_AEMCP_CEP_FILES();
 var error26 = () => {
   const Sizable = {
     string: { unit: "stafi", verb: "a\xF0 hafa" },
@@ -19587,6 +21178,7 @@ function is_default() {
 }
 
 // node_modules/zod/v4/locales/it.js
+init_define_AEMCP_CEP_FILES();
 var error27 = () => {
   const Sizable = {
     string: { unit: "caratteri", verb: "avere" },
@@ -19701,6 +21293,7 @@ function it_default() {
 }
 
 // node_modules/zod/v4/locales/ja.js
+init_define_AEMCP_CEP_FILES();
 var error28 = () => {
   const Sizable = {
     string: { unit: "\u6587\u5B57", verb: "\u3067\u3042\u308B" },
@@ -19814,6 +21407,7 @@ function ja_default() {
 }
 
 // node_modules/zod/v4/locales/ka.js
+init_define_AEMCP_CEP_FILES();
 var error29 = () => {
   const Sizable = {
     string: { unit: "\u10E1\u10D8\u10DB\u10D1\u10DD\u10DA\u10DD", verb: "\u10E3\u10DC\u10D3\u10D0 \u10E8\u10D4\u10D8\u10EA\u10D0\u10D5\u10D3\u10D4\u10E1" },
@@ -19931,7 +21525,11 @@ function ka_default() {
   };
 }
 
+// node_modules/zod/v4/locales/kh.js
+init_define_AEMCP_CEP_FILES();
+
 // node_modules/zod/v4/locales/km.js
+init_define_AEMCP_CEP_FILES();
 var error30 = () => {
   const Sizable = {
     string: { unit: "\u178F\u17BD\u17A2\u1780\u17D2\u179F\u179A", verb: "\u1782\u17BD\u179A\u1798\u17B6\u1793" },
@@ -20053,6 +21651,7 @@ function kh_default() {
 }
 
 // node_modules/zod/v4/locales/kn.js
+init_define_AEMCP_CEP_FILES();
 var error31 = () => {
   const Sizable = {
     string: { unit: "\u0C85\u0C95\u0CCD\u0CB7\u0CB0\u0C97\u0CB3\u0CC1", verb: "\u0CB9\u0CCA\u0C82\u0CA6\u0CB2\u0CC1" },
@@ -20169,6 +21768,7 @@ function kn_default() {
 }
 
 // node_modules/zod/v4/locales/ko.js
+init_define_AEMCP_CEP_FILES();
 var error32 = () => {
   const Sizable = {
     string: { unit: "\uBB38\uC790", verb: "to have" },
@@ -20286,6 +21886,7 @@ function ko_default() {
 }
 
 // node_modules/zod/v4/locales/lt.js
+init_define_AEMCP_CEP_FILES();
 var capitalizeFirstCharacter = (text) => {
   return text.charAt(0).toUpperCase() + text.slice(1);
 };
@@ -20494,6 +22095,7 @@ function lt_default() {
 }
 
 // node_modules/zod/v4/locales/mk.js
+init_define_AEMCP_CEP_FILES();
 var error34 = () => {
   const Sizable = {
     string: { unit: "\u0437\u043D\u0430\u0446\u0438", verb: "\u0434\u0430 \u0438\u043C\u0430\u0430\u0442" },
@@ -20609,6 +22211,7 @@ function mk_default() {
 }
 
 // node_modules/zod/v4/locales/ms.js
+init_define_AEMCP_CEP_FILES();
 var error35 = () => {
   const Sizable = {
     string: { unit: "aksara", verb: "mempunyai" },
@@ -20722,6 +22325,7 @@ function ms_default() {
 }
 
 // node_modules/zod/v4/locales/ne.js
+init_define_AEMCP_CEP_FILES();
 var error36 = () => {
   const Sizable = {
     string: { unit: "\u0905\u0915\u094D\u0937\u0930", verb: "\u0939\u0941\u0928\u0941\u092A\u0930\u094D\u091B" },
@@ -20834,6 +22438,7 @@ function ne_default() {
 }
 
 // node_modules/zod/v4/locales/nl.js
+init_define_AEMCP_CEP_FILES();
 var error37 = () => {
   const Sizable = {
     string: { unit: "tekens", verb: "heeft" },
@@ -20950,6 +22555,7 @@ function nl_default() {
 }
 
 // node_modules/zod/v4/locales/nn.js
+init_define_AEMCP_CEP_FILES();
 var error38 = () => {
   const Sizable = {
     string: { unit: "teikn", verb: "\xE5 ha" },
@@ -21064,6 +22670,7 @@ function nn_default() {
 }
 
 // node_modules/zod/v4/locales/no.js
+init_define_AEMCP_CEP_FILES();
 var error39 = () => {
   const Sizable = {
     string: { unit: "tegn", verb: "\xE5 ha" },
@@ -21178,6 +22785,7 @@ function no_default() {
 }
 
 // node_modules/zod/v4/locales/ota.js
+init_define_AEMCP_CEP_FILES();
 var error40 = () => {
   const Sizable = {
     string: { unit: "harf", verb: "olmal\u0131d\u0131r" },
@@ -21293,6 +22901,7 @@ function ota_default() {
 }
 
 // node_modules/zod/v4/locales/ps.js
+init_define_AEMCP_CEP_FILES();
 var error41 = () => {
   const Sizable = {
     string: { unit: "\u062A\u0648\u06A9\u064A", verb: "\u0648\u0644\u0631\u064A" },
@@ -21413,6 +23022,7 @@ function ps_default() {
 }
 
 // node_modules/zod/v4/locales/pl.js
+init_define_AEMCP_CEP_FILES();
 var error42 = () => {
   const Sizable = {
     string: { unit: "znak\xF3w", verb: "mie\u0107" },
@@ -21528,6 +23138,7 @@ function pl_default() {
 }
 
 // node_modules/zod/v4/locales/pt.js
+init_define_AEMCP_CEP_FILES();
 var error43 = () => {
   const Sizable = {
     string: { unit: "caracteres" },
@@ -21672,6 +23283,7 @@ function pt_default() {
 }
 
 // node_modules/zod/v4/locales/pt-BR.js
+init_define_AEMCP_CEP_FILES();
 var error44 = () => {
   const Sizable = {
     string: { unit: "caracteres" },
@@ -21817,6 +23429,7 @@ function pt_BR_default() {
 }
 
 // node_modules/zod/v4/locales/ro.js
+init_define_AEMCP_CEP_FILES();
 var error45 = () => {
   const Sizable = {
     string: { unit: "caractere", verb: "s\u0103 aib\u0103" },
@@ -21940,6 +23553,7 @@ function ro_default() {
 }
 
 // node_modules/zod/v4/locales/ru.js
+init_define_AEMCP_CEP_FILES();
 function getRussianPlural(count, one, few, many) {
   const absCount = Math.abs(count);
   const lastDigit = absCount % 10;
@@ -22109,6 +23723,7 @@ function ru_default() {
 }
 
 // node_modules/zod/v4/locales/sk.js
+init_define_AEMCP_CEP_FILES();
 var error47 = () => {
   const Sizable = {
     string: { unit: "znakov", verb: "ma\u0165" },
@@ -22226,6 +23841,7 @@ function sk_default() {
 }
 
 // node_modules/zod/v4/locales/sl.js
+init_define_AEMCP_CEP_FILES();
 var error48 = () => {
   const Sizable = {
     string: { unit: "znakov", verb: "imeti" },
@@ -22341,6 +23957,7 @@ function sl_default() {
 }
 
 // node_modules/zod/v4/locales/sv.js
+init_define_AEMCP_CEP_FILES();
 var error49 = () => {
   const Sizable = {
     string: { unit: "tecken", verb: "att ha" },
@@ -22457,6 +24074,7 @@ function sv_default() {
 }
 
 // node_modules/zod/v4/locales/ta.js
+init_define_AEMCP_CEP_FILES();
 var error50 = () => {
   const Sizable = {
     string: { unit: "\u0B8E\u0BB4\u0BC1\u0BA4\u0BCD\u0BA4\u0BC1\u0B95\u0BCD\u0B95\u0BB3\u0BCD", verb: "\u0B95\u0BCA\u0BA3\u0BCD\u0B9F\u0BBF\u0BB0\u0BC1\u0B95\u0BCD\u0B95 \u0BB5\u0BC7\u0BA3\u0BCD\u0B9F\u0BC1\u0BAE\u0BCD" },
@@ -22573,6 +24191,7 @@ function ta_default() {
 }
 
 // node_modules/zod/v4/locales/tg.js
+init_define_AEMCP_CEP_FILES();
 var error51 = () => {
   const Sizable = {
     string: { unit: "\u0430\u043B\u043E\u043C\u0430\u0442", verb: "\u0434\u043E\u0448\u0442\u0430 \u0431\u043E\u0448\u0430\u0434" },
@@ -22690,6 +24309,7 @@ function tg_default() {
 }
 
 // node_modules/zod/v4/locales/th.js
+init_define_AEMCP_CEP_FILES();
 var error52 = () => {
   const Sizable = {
     string: { unit: "\u0E15\u0E31\u0E27\u0E2D\u0E31\u0E01\u0E29\u0E23", verb: "\u0E04\u0E27\u0E23\u0E21\u0E35" },
@@ -22806,6 +24426,7 @@ function th_default() {
 }
 
 // node_modules/zod/v4/locales/tk.js
+init_define_AEMCP_CEP_FILES();
 var error53 = () => {
   const Sizable = {
     string: { unit: "simwol", verb: "bolmaly" },
@@ -22914,6 +24535,7 @@ function tk_default() {
 }
 
 // node_modules/zod/v4/locales/tr.js
+init_define_AEMCP_CEP_FILES();
 var error54 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "olmal\u0131" },
@@ -23024,7 +24646,11 @@ function tr_default() {
   };
 }
 
+// node_modules/zod/v4/locales/ua.js
+init_define_AEMCP_CEP_FILES();
+
 // node_modules/zod/v4/locales/uk.js
+init_define_AEMCP_CEP_FILES();
 var error55 = () => {
   const Sizable = {
     string: { unit: "\u0441\u0438\u043C\u0432\u043E\u043B\u0456\u0432", verb: "\u043C\u0430\u0442\u0438\u043C\u0435" },
@@ -23144,6 +24770,7 @@ function ua_default() {
 }
 
 // node_modules/zod/v4/locales/ur.js
+init_define_AEMCP_CEP_FILES();
 var error56 = () => {
   const Sizable = {
     string: { unit: "\u062D\u0631\u0648\u0641", verb: "\u06C1\u0648\u0646\u0627" },
@@ -23260,6 +24887,7 @@ function ur_default() {
 }
 
 // node_modules/zod/v4/locales/uz.js
+init_define_AEMCP_CEP_FILES();
 var error57 = () => {
   const Sizable = {
     string: { unit: "belgi", verb: "bo\u2018lishi kerak" },
@@ -23374,6 +25002,7 @@ function uz_default() {
 }
 
 // node_modules/zod/v4/locales/vi.js
+init_define_AEMCP_CEP_FILES();
 var error58 = () => {
   const Sizable = {
     string: { unit: "k\xFD t\u1EF1", verb: "c\xF3" },
@@ -23488,6 +25117,7 @@ function vi_default() {
 }
 
 // node_modules/zod/v4/locales/zh-CN.js
+init_define_AEMCP_CEP_FILES();
 var error59 = () => {
   const Sizable = {
     string: { unit: "\u5B57\u7B26", verb: "\u5305\u542B" },
@@ -23603,6 +25233,7 @@ function zh_CN_default() {
 }
 
 // node_modules/zod/v4/locales/zh-TW.js
+init_define_AEMCP_CEP_FILES();
 var error60 = () => {
   const Sizable = {
     string: { unit: "\u5B57\u5143", verb: "\u64C1\u6709" },
@@ -23716,6 +25347,7 @@ function zh_TW_default() {
 }
 
 // node_modules/zod/v4/locales/yo.js
+init_define_AEMCP_CEP_FILES();
 var error61 = () => {
   const Sizable = {
     string: { unit: "\xE0mi", verb: "n\xED" },
@@ -23829,6 +25461,7 @@ function yo_default() {
 }
 
 // node_modules/zod/v4/core/registries.js
+init_define_AEMCP_CEP_FILES();
 var _a2;
 var $output = /* @__PURE__ */ Symbol("ZodOutput");
 var $input = /* @__PURE__ */ Symbol("ZodInput");
@@ -23879,6 +25512,7 @@ function registry() {
 var globalRegistry = globalThis.__zod_globalRegistry;
 
 // node_modules/zod/v4/core/compile.js
+init_define_AEMCP_CEP_FILES();
 var INVALID2 = /* @__PURE__ */ Symbol.for("zod.compile.invalid");
 var FALLBACK_FLAG = /* @__PURE__ */ Symbol.for("zod.compile.fallback");
 var ZodCompileAsyncError = class extends Error {
@@ -25489,6 +27123,7 @@ function generateTransformCheck(doc, ctx, schema, accessor) {
 }
 
 // node_modules/zod/v4/core/api.js
+init_define_AEMCP_CEP_FILES();
 function snapshotChecks(def) {
   if (def.checks)
     def.checks = [...def.checks];
@@ -26548,6 +28183,7 @@ function _stringFormat(Class2, format, fnOrRegex, _params = {}) {
 }
 
 // node_modules/zod/v4/core/to-json-schema.js
+init_define_AEMCP_CEP_FILES();
 function assignProps(target, ...sources) {
   for (const source of sources) {
     for (const key of Reflect.ownKeys(source)) {
@@ -27078,6 +28714,7 @@ var createStandardJSONSchemaMethod = (schema, io, processors = {}) => (params2) 
 };
 
 // node_modules/zod/v4/core/json-schema-processors.js
+init_define_AEMCP_CEP_FILES();
 var narrowMin = (agg, key, value) => {
   if (agg[key] === void 0 || value > agg[key])
     agg[key] = value;
@@ -27826,6 +29463,7 @@ function toJSONSchema(input2, params2) {
 }
 
 // node_modules/zod/v4/core/json-schema-generator.js
+init_define_AEMCP_CEP_FILES();
 var JSONSchemaGenerator = class {
   /** @deprecated Access via ctx instead */
   get metadataRegistry() {
@@ -27905,8 +29543,13 @@ var JSONSchemaGenerator = class {
 
 // node_modules/zod/v4/core/json-schema.js
 var json_schema_exports = {};
+init_define_AEMCP_CEP_FILES();
+
+// node_modules/zod/v4/mini/parse.js
+init_define_AEMCP_CEP_FILES();
 
 // node_modules/zod/v4/mini/schemas.js
+init_define_AEMCP_CEP_FILES();
 var ZodMiniType = /* @__PURE__ */ $constructor("ZodMiniType", (inst, def) => {
   if (!inst._zod)
     throw new Error("Uninitialized schema in ZodMiniType.");
@@ -27973,6 +29616,7 @@ function object(shape, params2) {
 }
 
 // node_modules/zod/v4/core/visit.js
+init_define_AEMCP_CEP_FILES();
 var RESOLVING = /* @__PURE__ */ Symbol("z.visit/resolving");
 function visit(schema, fnOrHandlers) {
   const fn = typeof fnOrHandlers === "function" ? fnOrHandlers : (node2, rewritten) => {
@@ -27980,7 +29624,7 @@ function visit(schema, fnOrHandlers) {
     return h ? h(node2, rewritten) : node2;
   };
   const cache = /* @__PURE__ */ new Map();
-  function run(s) {
+  function run2(s) {
     const cached2 = cache.get(s);
     if (cached2 === RESOLVING) {
       return new $ZodLazy({
@@ -28006,21 +29650,21 @@ function visit(schema, fnOrHandlers) {
         let changed = false;
         const newShape = {};
         for (const k of keys) {
-          const mapped = run(oldShape[k]);
+          const mapped = run2(oldShape[k]);
           if (mapped !== oldShape[k])
             changed = true;
           newShape[k] = mapped;
         }
         let newCatchall = def.catchall;
         if (def.catchall) {
-          newCatchall = run(def.catchall);
+          newCatchall = run2(def.catchall);
           if (newCatchall !== def.catchall)
             changed = true;
         }
         return changed ? clone(s, { ...def, shape: newShape, catchall: newCatchall }) : s;
       }
       case "array": {
-        const mapped = run(def.element);
+        const mapped = run2(def.element);
         return mapped === def.element ? s : clone(s, { ...def, element: mapped });
       }
       case "tuple": {
@@ -28028,14 +29672,14 @@ function visit(schema, fnOrHandlers) {
         let changed = false;
         const newItems = [];
         for (const item of oldItems) {
-          const mapped = run(item);
+          const mapped = run2(item);
           if (mapped !== item)
             changed = true;
           newItems.push(mapped);
         }
         let newRest = def.rest;
         if (def.rest) {
-          newRest = run(def.rest);
+          newRest = run2(def.rest);
           if (newRest !== def.rest)
             changed = true;
         }
@@ -28043,12 +29687,12 @@ function visit(schema, fnOrHandlers) {
       }
       case "record":
       case "map": {
-        const newKey = run(def.keyType);
-        const newVal = run(def.valueType);
+        const newKey = run2(def.keyType);
+        const newVal = run2(def.valueType);
         return newKey === def.keyType && newVal === def.valueType ? s : clone(s, { ...def, keyType: newKey, valueType: newVal });
       }
       case "set": {
-        const newVal = run(def.valueType);
+        const newVal = run2(def.valueType);
         return newVal === def.valueType ? s : clone(s, { ...def, valueType: newVal });
       }
       case "union": {
@@ -28056,7 +29700,7 @@ function visit(schema, fnOrHandlers) {
         let changed = false;
         const newOptions = [];
         for (const opt of oldOptions) {
-          const mapped = run(opt);
+          const mapped = run2(opt);
           if (mapped !== opt)
             changed = true;
           newOptions.push(mapped);
@@ -28064,8 +29708,8 @@ function visit(schema, fnOrHandlers) {
         return changed ? clone(s, { ...def, options: newOptions }) : s;
       }
       case "intersection": {
-        const newLeft = run(def.left);
-        const newRight = run(def.right);
+        const newLeft = run2(def.left);
+        const newRight = run2(def.right);
         return newLeft === def.left && newRight === def.right ? s : clone(s, { ...def, left: newLeft, right: newRight });
       }
       case "optional":
@@ -28077,23 +29721,23 @@ function visit(schema, fnOrHandlers) {
       case "nonoptional":
       case "promise":
       case "success": {
-        const newInner = run(def.innerType);
+        const newInner = run2(def.innerType);
         return newInner === def.innerType ? s : clone(s, { ...def, innerType: newInner });
       }
       case "pipe": {
-        const newIn = run(def.in);
-        const newOut = run(def.out);
+        const newIn = run2(def.in);
+        const newOut = run2(def.out);
         return newIn === def.in && newOut === def.out ? s : clone(s, { ...def, in: newIn, out: newOut });
       }
       case "function": {
-        const newInput = run(def.input);
-        const newOutput = run(def.output);
+        const newInput = run2(def.input);
+        const newOutput = run2(def.output);
         return newInput === def.input && newOutput === def.output ? s : clone(s, { ...def, input: newInput, output: newOutput });
       }
       case "lazy": {
         const original = def.getter;
         const { _cachedInner, ...rest } = def;
-        return clone(s, { ...rest, getter: () => run(original()) });
+        return clone(s, { ...rest, getter: () => run2(original()) });
       }
       // A leaf by choice: `parts` are regex fragments, not data positions.
       case "template_literal":
@@ -28124,7 +29768,7 @@ function visit(schema, fnOrHandlers) {
       }
     }
   }
-  return run(schema);
+  return run2(schema);
 }
 
 // node_modules/@modelcontextprotocol/sdk/dist/esm/server/zod-compat.js
@@ -28286,6 +29930,9 @@ function getLiteralValue(schema) {
     return directValue;
   return void 0;
 }
+
+// node_modules/@modelcontextprotocol/sdk/dist/esm/types.js
+init_define_AEMCP_CEP_FILES();
 
 // node_modules/zod/v4/classic/external.js
 var external_exports = {};
@@ -28549,6 +30196,7 @@ __export(external_exports, {
   xid: () => xid2,
   xor: () => xor
 });
+init_define_AEMCP_CEP_FILES();
 
 // node_modules/zod/v4/classic/schemas.js
 var schemas_exports2 = {};
@@ -28730,6 +30378,7 @@ __export(schemas_exports2, {
   xid: () => xid2,
   xor: () => xor
 });
+init_define_AEMCP_CEP_FILES();
 
 // node_modules/zod/v4/classic/checks.js
 var checks_exports2 = {};
@@ -28765,8 +30414,13 @@ __export(checks_exports2, {
   trim: () => _trim,
   uppercase: () => _uppercase
 });
+init_define_AEMCP_CEP_FILES();
+
+// node_modules/zod/v4/classic/parse.js
+init_define_AEMCP_CEP_FILES();
 
 // node_modules/zod/v4/classic/errors.js
+init_define_AEMCP_CEP_FILES();
 var _installedErrorProtos = /* @__PURE__ */ new WeakSet([Object.prototype, Error.prototype]);
 function _lazyMethod(proto, key, make) {
   Object.defineProperty(proto, key, {
@@ -30292,6 +31946,7 @@ function preprocess(fn, schema) {
 }
 
 // node_modules/zod/v4/classic/compat.js
+init_define_AEMCP_CEP_FILES();
 var ZodIssueCode2 = {
   invalid_type: "invalid_type",
   too_big: "too_big",
@@ -30317,6 +31972,9 @@ var ZodFirstPartyTypeKind2;
 /* @__PURE__ */ (function(ZodFirstPartyTypeKind3) {
 })(ZodFirstPartyTypeKind2 || (ZodFirstPartyTypeKind2 = {}));
 
+// node_modules/zod/v4/classic/from-json-schema.js
+init_define_AEMCP_CEP_FILES();
+
 // node_modules/zod/v4/classic/iso.js
 var iso_exports2 = {};
 __export(iso_exports2, {
@@ -30329,6 +31987,7 @@ __export(iso_exports2, {
   duration: () => duration2,
   time: () => time2
 });
+init_define_AEMCP_CEP_FILES();
 function datetime2(params2) {
   return _isoDateTime(ZodISODateTime, params2);
 }
@@ -31076,6 +32735,7 @@ function fromJSONSchema(schema, params2) {
 }
 
 // node_modules/zod/v4/classic/deep-partial.js
+init_define_AEMCP_CEP_FILES();
 function deepPartial(schema) {
   return visit(schema, {
     object: (s) => s.partial(),
@@ -31088,6 +32748,7 @@ function deepPartial(schema) {
 }
 
 // node_modules/zod/v4/classic/in-out.js
+init_define_AEMCP_CEP_FILES();
 function withChecks(side, checks) {
   if (!checks?.length)
     return side;
@@ -31126,6 +32787,7 @@ __export(coerce_exports2, {
   number: () => number3,
   string: () => string3
 });
+init_define_AEMCP_CEP_FILES();
 function string3(params2) {
   return _coercedString(ZodString2, params2);
 }
@@ -32676,11 +34338,19 @@ var UrlElicitationRequiredError = class extends McpError {
 };
 
 // node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/interfaces.js
+init_define_AEMCP_CEP_FILES();
 function isTerminal(status) {
   return status === "completed" || status === "failed" || status === "cancelled";
 }
 
+// node_modules/@modelcontextprotocol/sdk/dist/esm/server/zod-json-schema-compat.js
+init_define_AEMCP_CEP_FILES();
+
+// node_modules/zod-to-json-schema/dist/esm/index.js
+init_define_AEMCP_CEP_FILES();
+
 // node_modules/zod-to-json-schema/dist/esm/Options.js
+init_define_AEMCP_CEP_FILES();
 var ignoreOverride = /* @__PURE__ */ Symbol("Let zodToJsonSchema decide on which parser to use");
 var defaultOptions = {
   name: void 0,
@@ -32715,6 +34385,7 @@ var getDefaultOptions = (options) => typeof options === "string" ? {
 };
 
 // node_modules/zod-to-json-schema/dist/esm/Refs.js
+init_define_AEMCP_CEP_FILES();
 var getRefs = (options) => {
   const _options = getDefaultOptions(options);
   const currentPath = _options.name !== void 0 ? [..._options.basePath, _options.definitionPath, _options.name] : _options.basePath;
@@ -32736,6 +34407,7 @@ var getRefs = (options) => {
 };
 
 // node_modules/zod-to-json-schema/dist/esm/errorMessages.js
+init_define_AEMCP_CEP_FILES();
 function addErrorMessage(res, key, errorMessage, refs) {
   if (!refs?.errorMessages)
     return;
@@ -32752,6 +34424,7 @@ function setResponseValueAndErrors(res, key, value, errorMessage, refs) {
 }
 
 // node_modules/zod-to-json-schema/dist/esm/getRelativePath.js
+init_define_AEMCP_CEP_FILES();
 var getRelativePath = (pathA, pathB) => {
   let i = 0;
   for (; i < pathA.length && i < pathB.length; i++) {
@@ -32761,7 +34434,14 @@ var getRelativePath = (pathA, pathB) => {
   return [(pathA.length - i).toString(), ...pathB.slice(i)].join("/");
 };
 
+// node_modules/zod-to-json-schema/dist/esm/parseDef.js
+init_define_AEMCP_CEP_FILES();
+
+// node_modules/zod-to-json-schema/dist/esm/selectParser.js
+init_define_AEMCP_CEP_FILES();
+
 // node_modules/zod-to-json-schema/dist/esm/parsers/any.js
+init_define_AEMCP_CEP_FILES();
 function parseAnyDef(refs) {
   if (refs.target !== "openAi") {
     return {};
@@ -32778,6 +34458,7 @@ function parseAnyDef(refs) {
 }
 
 // node_modules/zod-to-json-schema/dist/esm/parsers/array.js
+init_define_AEMCP_CEP_FILES();
 function parseArrayDef(def, refs) {
   const res = {
     type: "array"
@@ -32802,6 +34483,7 @@ function parseArrayDef(def, refs) {
 }
 
 // node_modules/zod-to-json-schema/dist/esm/parsers/bigint.js
+init_define_AEMCP_CEP_FILES();
 function parseBigintDef(def, refs) {
   const res = {
     type: "integer",
@@ -32848,6 +34530,7 @@ function parseBigintDef(def, refs) {
 }
 
 // node_modules/zod-to-json-schema/dist/esm/parsers/boolean.js
+init_define_AEMCP_CEP_FILES();
 function parseBooleanDef() {
   return {
     type: "boolean"
@@ -32855,16 +34538,19 @@ function parseBooleanDef() {
 }
 
 // node_modules/zod-to-json-schema/dist/esm/parsers/branded.js
+init_define_AEMCP_CEP_FILES();
 function parseBrandedDef(_def, refs) {
   return parseDef(_def.type._def, refs);
 }
 
 // node_modules/zod-to-json-schema/dist/esm/parsers/catch.js
+init_define_AEMCP_CEP_FILES();
 var parseCatchDef = (def, refs) => {
   return parseDef(def.innerType._def, refs);
 };
 
 // node_modules/zod-to-json-schema/dist/esm/parsers/date.js
+init_define_AEMCP_CEP_FILES();
 function parseDateDef(def, refs, overrideDateStrategy) {
   const strategy = overrideDateStrategy ?? refs.dateStrategy;
   if (Array.isArray(strategy)) {
@@ -32924,6 +34610,7 @@ var integerDateParser = (def, refs) => {
 };
 
 // node_modules/zod-to-json-schema/dist/esm/parsers/default.js
+init_define_AEMCP_CEP_FILES();
 function parseDefaultDef(_def, refs) {
   return {
     ...parseDef(_def.innerType._def, refs),
@@ -32932,11 +34619,13 @@ function parseDefaultDef(_def, refs) {
 }
 
 // node_modules/zod-to-json-schema/dist/esm/parsers/effects.js
+init_define_AEMCP_CEP_FILES();
 function parseEffectsDef(_def, refs) {
   return refs.effectStrategy === "input" ? parseDef(_def.schema._def, refs) : parseAnyDef(refs);
 }
 
 // node_modules/zod-to-json-schema/dist/esm/parsers/enum.js
+init_define_AEMCP_CEP_FILES();
 function parseEnumDef(def) {
   return {
     type: "string",
@@ -32945,6 +34634,7 @@ function parseEnumDef(def) {
 }
 
 // node_modules/zod-to-json-schema/dist/esm/parsers/intersection.js
+init_define_AEMCP_CEP_FILES();
 var isJsonSchema7AllOfType = (type) => {
   if ("type" in type && type.type === "string")
     return false;
@@ -32987,6 +34677,7 @@ function parseIntersectionDef(def, refs) {
 }
 
 // node_modules/zod-to-json-schema/dist/esm/parsers/literal.js
+init_define_AEMCP_CEP_FILES();
 function parseLiteralDef(def, refs) {
   const parsedType2 = typeof def.value;
   if (parsedType2 !== "bigint" && parsedType2 !== "number" && parsedType2 !== "boolean" && parsedType2 !== "string") {
@@ -33006,7 +34697,14 @@ function parseLiteralDef(def, refs) {
   };
 }
 
+// node_modules/zod-to-json-schema/dist/esm/parsers/map.js
+init_define_AEMCP_CEP_FILES();
+
+// node_modules/zod-to-json-schema/dist/esm/parsers/record.js
+init_define_AEMCP_CEP_FILES();
+
 // node_modules/zod-to-json-schema/dist/esm/parsers/string.js
+init_define_AEMCP_CEP_FILES();
 var emojiRegex2 = void 0;
 var zodPatterns = {
   /**
@@ -33409,6 +35107,7 @@ function parseMapDef(def, refs) {
 }
 
 // node_modules/zod-to-json-schema/dist/esm/parsers/nativeEnum.js
+init_define_AEMCP_CEP_FILES();
 function parseNativeEnumDef(def) {
   const object3 = def.values;
   const actualKeys = Object.keys(def.values).filter((key) => {
@@ -33423,6 +35122,7 @@ function parseNativeEnumDef(def) {
 }
 
 // node_modules/zod-to-json-schema/dist/esm/parsers/never.js
+init_define_AEMCP_CEP_FILES();
 function parseNeverDef(refs) {
   return refs.target === "openAi" ? void 0 : {
     not: parseAnyDef({
@@ -33433,6 +35133,7 @@ function parseNeverDef(refs) {
 }
 
 // node_modules/zod-to-json-schema/dist/esm/parsers/null.js
+init_define_AEMCP_CEP_FILES();
 function parseNullDef(refs) {
   return refs.target === "openApi3" ? {
     enum: ["null"],
@@ -33442,7 +35143,11 @@ function parseNullDef(refs) {
   };
 }
 
+// node_modules/zod-to-json-schema/dist/esm/parsers/nullable.js
+init_define_AEMCP_CEP_FILES();
+
 // node_modules/zod-to-json-schema/dist/esm/parsers/union.js
+init_define_AEMCP_CEP_FILES();
 var primitiveMappings = {
   ZodString: "string",
   ZodNumber: "number",
@@ -33543,6 +35248,7 @@ function parseNullableDef(def, refs) {
 }
 
 // node_modules/zod-to-json-schema/dist/esm/parsers/number.js
+init_define_AEMCP_CEP_FILES();
 function parseNumberDef(def, refs) {
   const res = {
     type: "number"
@@ -33592,6 +35298,7 @@ function parseNumberDef(def, refs) {
 }
 
 // node_modules/zod-to-json-schema/dist/esm/parsers/object.js
+init_define_AEMCP_CEP_FILES();
 function parseObjectDef(def, refs) {
   const forceOptionalIntoNullable = refs.target === "openAi";
   const result = {
@@ -33662,6 +35369,7 @@ function safeIsOptional(schema) {
 }
 
 // node_modules/zod-to-json-schema/dist/esm/parsers/optional.js
+init_define_AEMCP_CEP_FILES();
 var parseOptionalDef = (def, refs) => {
   if (refs.currentPath.toString() === refs.propertyPath?.toString()) {
     return parseDef(def.innerType._def, refs);
@@ -33681,6 +35389,7 @@ var parseOptionalDef = (def, refs) => {
 };
 
 // node_modules/zod-to-json-schema/dist/esm/parsers/pipeline.js
+init_define_AEMCP_CEP_FILES();
 var parsePipelineDef = (def, refs) => {
   if (refs.pipeStrategy === "input") {
     return parseDef(def.in._def, refs);
@@ -33701,11 +35410,13 @@ var parsePipelineDef = (def, refs) => {
 };
 
 // node_modules/zod-to-json-schema/dist/esm/parsers/promise.js
+init_define_AEMCP_CEP_FILES();
 function parsePromiseDef(def, refs) {
   return parseDef(def.type._def, refs);
 }
 
 // node_modules/zod-to-json-schema/dist/esm/parsers/set.js
+init_define_AEMCP_CEP_FILES();
 function parseSetDef(def, refs) {
   const items = parseDef(def.valueType._def, {
     ...refs,
@@ -33726,6 +35437,7 @@ function parseSetDef(def, refs) {
 }
 
 // node_modules/zod-to-json-schema/dist/esm/parsers/tuple.js
+init_define_AEMCP_CEP_FILES();
 function parseTupleDef(def, refs) {
   if (def.rest) {
     return {
@@ -33754,6 +35466,7 @@ function parseTupleDef(def, refs) {
 }
 
 // node_modules/zod-to-json-schema/dist/esm/parsers/undefined.js
+init_define_AEMCP_CEP_FILES();
 function parseUndefinedDef(refs) {
   return {
     not: parseAnyDef(refs)
@@ -33761,11 +35474,13 @@ function parseUndefinedDef(refs) {
 }
 
 // node_modules/zod-to-json-schema/dist/esm/parsers/unknown.js
+init_define_AEMCP_CEP_FILES();
 function parseUnknownDef(refs) {
   return parseAnyDef(refs);
 }
 
 // node_modules/zod-to-json-schema/dist/esm/parsers/readonly.js
+init_define_AEMCP_CEP_FILES();
 var parseReadonlyDef = (def, refs) => {
   return parseDef(def.innerType._def, refs);
 };
@@ -33902,7 +35617,11 @@ var addMeta = (def, refs, jsonSchema) => {
   return jsonSchema;
 };
 
+// node_modules/zod-to-json-schema/dist/esm/parseTypes.js
+init_define_AEMCP_CEP_FILES();
+
 // node_modules/zod-to-json-schema/dist/esm/zodToJsonSchema.js
+init_define_AEMCP_CEP_FILES();
 var zodToJsonSchema = (schema, options) => {
   const refs = getRefs(options);
   let definitions = typeof options === "object" && options.definitions ? Object.entries(options.definitions).reduce((acc, [name2, schema2]) => ({
@@ -34984,6 +36703,7 @@ function mergeCapabilities(base, additional) {
 }
 
 // node_modules/@modelcontextprotocol/sdk/dist/esm/validation/ajv-provider.js
+init_define_AEMCP_CEP_FILES();
 var import_ajv = __toESM(require_ajv(), 1);
 var import_ajv_formats = __toESM(require_dist(), 1);
 function createDefaultAjvInstance() {
@@ -35052,6 +36772,7 @@ var AjvJsonSchemaValidator = class {
 };
 
 // node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/server.js
+init_define_AEMCP_CEP_FILES();
 var ExperimentalServerTasks = class {
   constructor(_server) {
     this._server = _server;
@@ -35265,6 +36986,7 @@ var ExperimentalServerTasks = class {
 };
 
 // node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/helpers.js
+init_define_AEMCP_CEP_FILES();
 function assertToolsCallTaskCapability(requests, method, entityName) {
   if (!requests) {
     throw new Error(`${entityName} does not support task creation (required for ${method})`);
@@ -35671,6 +37393,7 @@ var Server = class extends Protocol {
 };
 
 // node_modules/@modelcontextprotocol/sdk/dist/esm/server/completable.js
+init_define_AEMCP_CEP_FILES();
 var COMPLETABLE_SYMBOL = /* @__PURE__ */ Symbol.for("mcp.completable");
 function isCompletable(schema) {
   return !!schema && typeof schema === "object" && COMPLETABLE_SYMBOL in schema;
@@ -35684,7 +37407,11 @@ var McpZodTypeKind;
   McpZodTypeKind2["Completable"] = "McpCompletable";
 })(McpZodTypeKind || (McpZodTypeKind = {}));
 
+// node_modules/@modelcontextprotocol/sdk/dist/esm/shared/uriTemplate.js
+init_define_AEMCP_CEP_FILES();
+
 // node_modules/@modelcontextprotocol/sdk/dist/esm/shared/toolNameValidation.js
+init_define_AEMCP_CEP_FILES();
 var TOOL_NAME_REGEX = /^[A-Za-z0-9._-]{1,128}$/;
 function validateToolName(name) {
   const warnings = [];
@@ -35743,6 +37470,7 @@ function validateAndWarnToolName(name) {
 }
 
 // node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/mcp-server.js
+init_define_AEMCP_CEP_FILES();
 var ExperimentalMcpServerTasks = class {
   constructor(_mcpServer) {
     this._mcpServer = _mcpServer;
@@ -35756,6 +37484,9 @@ var ExperimentalMcpServerTasks = class {
     return mcpServerInternal._createRegisteredTool(name, config2.title, config2.description, config2.inputSchema, config2.outputSchema, config2.annotations, execution, config2._meta, handler);
   }
 };
+
+// node_modules/zod/index.js
+init_define_AEMCP_CEP_FILES();
 
 // node_modules/@modelcontextprotocol/sdk/dist/esm/server/mcp.js
 function toolInputElementCount(value, max) {
@@ -36590,9 +38321,11 @@ var EMPTY_COMPLETION_RESULT = {
 };
 
 // node_modules/@modelcontextprotocol/sdk/dist/esm/server/stdio.js
+init_define_AEMCP_CEP_FILES();
 import process2 from "node:process";
 
 // node_modules/@modelcontextprotocol/sdk/dist/esm/shared/stdio.js
+init_define_AEMCP_CEP_FILES();
 var STDIO_DEFAULT_MAX_BUFFER_SIZE = 10 * 1024 * 1024;
 var ReadBuffer = class {
   constructor(options) {
@@ -36696,7 +38429,14 @@ var StdioServerTransport = class {
   }
 };
 
+// node_modules/@modelcontextprotocol/sdk/dist/esm/server/streamableHttp.js
+init_define_AEMCP_CEP_FILES();
+
+// node_modules/@hono/node-server/dist/index.mjs
+init_define_AEMCP_CEP_FILES();
+
 // node_modules/@hono/node-server/dist/constants-BLSFu_RU.mjs
+init_define_AEMCP_CEP_FILES();
 var X_ALREADY_SENT = "x-hono-already-sent";
 
 // node_modules/@hono/node-server/dist/index.mjs
@@ -36705,6 +38445,7 @@ import { Http2ServerRequest, constants } from "node:http2";
 import { Readable } from "node:stream";
 
 // node_modules/hono/dist/helper/websocket/index.js
+init_define_AEMCP_CEP_FILES();
 var defineWebSocketHelper = (handler) => {
   return ((...args) => {
     if (typeof args[0] === "function") {
@@ -37892,7 +39633,11 @@ var upgradeWebSocket = defineWebSocketHelper(async (c, events, options) => {
   return new Response();
 });
 
+// node_modules/@modelcontextprotocol/sdk/dist/esm/server/webStandardStreamableHttp.js
+init_define_AEMCP_CEP_FILES();
+
 // node_modules/@modelcontextprotocol/sdk/dist/esm/shared/mediaType.js
+init_define_AEMCP_CEP_FILES();
 var import_content_type = __toESM(require_content_type(), 1);
 function mediaTypeEssence(header) {
   if (!header) {
@@ -37916,6 +39661,7 @@ function isJsonContentType(header) {
 }
 
 // node_modules/@modelcontextprotocol/sdk/dist/esm/server/requestBody.js
+init_define_AEMCP_CEP_FILES();
 var DEFAULT_MAX_REQUEST_BODY_SIZE = 4 * 1024 * 1024;
 var MAX_BATCH_SIZE = 100;
 function requestBodyTooLargeMessage(maxBytes) {
@@ -37960,6 +39706,7 @@ async function readRequestBody(request2, maxBytes = DEFAULT_MAX_REQUEST_BODY_SIZ
 }
 
 // node_modules/@modelcontextprotocol/sdk/dist/esm/server/sseKeepAlive.js
+init_define_AEMCP_CEP_FILES();
 var DEFAULT_SSE_KEEP_ALIVE_MS = 15e3;
 var MAX_TIMER_DELAY_MS = 2 ** 31 - 1;
 function armSseKeepAlive(intervalMs, onTick) {
@@ -38817,31 +40564,12 @@ var StreamableHTTPServerTransport = class {
 };
 
 // src/index.ts
+init_config();
 import { createServer as createServer2 } from "node:http";
 import { timingSafeEqual } from "node:crypto";
 
-// src/config.ts
-import { readFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
-var VERSION = "1.0.0";
-function configPath() {
-  return process.env.AEMCP_CONFIG || join(homedir(), ".aemcp", "config.json");
-}
-function loadConfig() {
-  let file2 = {};
-  try {
-    file2 = JSON.parse(readFileSync(configPath(), "utf8"));
-  } catch {
-  }
-  return {
-    bridgePort: Number(process.env.AEMCP_BRIDGE_PORT || file2.bridgePort || 8765),
-    token: process.env.AEMCP_TOKEN || file2.token || "",
-    httpPort: Number(process.env.AEMCP_HTTP_PORT || file2.httpPort || 8766)
-  };
-}
-
 // src/docs.ts
+init_define_AEMCP_CEP_FILES();
 var INSTRUCTIONS = `This server controls a running Adobe After Effects instance through ExtendScript.
 - Start with ae_status to confirm the connection, then ae_get_project_info / ae_get_comp_info to understand the project.
 - Prefer the specific tools (ae_create_comp, ae_add_layer, ae_set_keyframes, ae_apply_effect...) for common edits; use ae_run_script for anything else - the full AE scripting API is available.
@@ -38951,6 +40679,7 @@ comp.saveFrameToPng(time, new File("/tmp/frame.png"));
 `;
 
 // src/tools/app.ts
+init_define_AEMCP_CEP_FILES();
 var appTools = [
   {
     name: "ae_execute_menu_command",
@@ -39017,534 +40746,13 @@ return o;`
   }
 ];
 
-// src/bridge.ts
-var BridgeError = class extends Error {
-  constructor(message, code) {
-    super(message);
-    this.code = code;
-  }
-  code;
-};
-var NOT_RUNNING_HELP = "Cannot reach After Effects. Make sure After Effects is running and the AE MCP bridge is loaded (it starts automatically with AE after install; you can also open Window > Extensions > AE MCP to check its status). If you just installed, restart After Effects.";
-async function request(path, init = {}) {
-  const cfg = loadConfig();
-  const ctrl = new AbortController();
-  const timeoutMs = init.timeoutMs ?? 3e4;
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-  let res;
-  try {
-    res = await fetch(`http://127.0.0.1:${cfg.bridgePort}${path}`, {
-      ...init,
-      signal: ctrl.signal,
-      headers: { "content-type": "application/json", authorization: `Bearer ${cfg.token}`, ...init.headers || {} }
-    });
-  } catch (e) {
-    if (e?.name === "AbortError")
-      throw new BridgeError(
-        `After Effects did not respond within ${Math.round(timeoutMs / 1e3)}s. The script may still be running (ExtendScript cannot be interrupted), or AE is blocked by a modal dialog. Check After Effects.`,
-        "TIMEOUT"
-      );
-    throw new BridgeError(NOT_RUNNING_HELP, "NOT_RUNNING");
-  } finally {
-    clearTimeout(timer);
-  }
-  const body = await res.json().catch(() => ({}));
-  if (res.status === 401) throw new BridgeError("Bridge rejected the token. Re-run the installer so server and AE share ~/.aemcp/config.json, then restart AE.", "AUTH");
-  if (!res.ok || body.ok === false) throw new BridgeError(body.error || `Bridge error HTTP ${res.status}`, "BRIDGE");
-  return body;
-}
-async function health() {
-  return request("/health", { method: "GET", timeoutMs: 3e3 });
-}
-async function evalRaw(script, timeoutMs = 12e4) {
-  const body = await request("/eval", { method: "POST", body: JSON.stringify({ script, timeoutMs }), timeoutMs: timeoutMs + 5e3 });
-  return String(body.result ?? "");
-}
-
-// src/jsx.ts
-import { createHash } from "node:crypto";
-
-// src/aemcp.jsxinc
-var aemcp_default = `// aemcp helper library \u2014 loaded once into the After Effects ExtendScript engine
-// by the MCP server (sent over the bridge whenever the version check fails).
-// ES3 only: no let/const, arrow functions, Array.prototype.map, JSON, etc.
-aemcp = (function () {
-  var A = {};
-  A.version = "__AEMCP_VERSION__";
-
-  // ---------- JSON ----------
-  function quote(s) {
-    return '"' + String(s).replace(/[\\\\"\\u0000-\\u001f\\u2028\\u2029]/g, function (c) {
-      switch (c) {
-        case '"': return '\\\\"';
-        case "\\\\": return "\\\\\\\\";
-        case "\\n": return "\\\\n";
-        case "\\r": return "\\\\r";
-        case "\\t": return "\\\\t";
-        case "\\b": return "\\\\b";
-        case "\\f": return "\\\\f";
-      }
-      var h = c.charCodeAt(0).toString(16);
-      return "\\\\u" + "0000".substr(h.length) + h;
-    }) + '"';
-  }
-  A.stringify = function (v) {
-    if (v === null || v === undefined) return "null";
-    var t = typeof v;
-    if (t === "number") return isFinite(v) ? String(v) : "null";
-    if (t === "boolean") return v ? "true" : "false";
-    if (t === "string") return quote(v);
-    if (v instanceof Array) {
-      var parts = [];
-      for (var i = 0; i < v.length; i++) parts.push(A.stringify(v[i]));
-      return "[" + parts.join(",") + "]";
-    }
-    if (t === "object") {
-      var out = [];
-      for (var k in v) {
-        if (!v.hasOwnProperty(k)) continue;
-        var val = v[k];
-        if (typeof val === "function" || val === undefined) continue;
-        out.push(quote(k) + ":" + A.stringify(val));
-      }
-      return "{" + out.join(",") + "}";
-    }
-    return "null";
-  };
-
-  // ---------- small utils ----------
-  A.round = function (n) { return typeof n === "number" ? Math.round(n * 10000) / 10000 : n; };
-  function isAE(name) { try { return typeof $.global[name] !== "undefined"; } catch (e) { return false; } }
-  function inst(v, ctor) { try { return isAE(ctor) && v instanceof $.global[ctor]; } catch (e) { return false; } }
-  A.fail = function (msg) { var e = new Error(msg); e.aemcpUser = true; throw e; };
-
-  // ---------- finders ----------
-  // ref: number (item id) | string (name) | "active" | undefined (=active)
-  A.findItem = function (ref) {
-    var p = app.project;
-    if (ref === undefined || ref === null || ref === "active") {
-      if (!p.activeItem) A.fail("No active item. Open/select a composition or pass an id/name.");
-      return p.activeItem;
-    }
-    if (typeof ref === "number") {
-      var it = p.itemByID(ref);
-      if (!it) A.fail("No project item with id " + ref);
-      return it;
-    }
-    for (var i = 1; i <= p.numItems; i++) if (p.item(i).name === ref) return p.item(i);
-    A.fail("No project item named '" + ref + "'");
-  };
-  A.findComp = function (ref) {
-    if (ref === undefined || ref === null || ref === "active") {
-      var a = app.project.activeItem;
-      if (a && a instanceof CompItem) return a;
-      // fall back to the comp open in the viewer
-      try { if (app.activeViewer && app.activeViewer.type === ViewerType.VIEWER_COMPOSITION) { app.activeViewer.setActive(); a = app.project.activeItem; if (a instanceof CompItem) return a; } } catch (e) {}
-      A.fail("No active composition. Open a comp or pass compId / compName.");
-    }
-    var it = A.findItem(ref);
-    if (!(it instanceof CompItem)) A.fail("Item '" + it.name + "' is not a composition");
-    return it;
-  };
-  // ref: number (1-based index) | string (name) | {id:n}
-  A.findLayer = function (comp, ref) {
-    if (ref === undefined || ref === null) {
-      if (comp.selectedLayers.length) return comp.selectedLayers[0];
-      A.fail("No layer specified and none selected");
-    }
-    if (typeof ref === "number") {
-      if (ref < 1 || ref > comp.numLayers) A.fail("Layer index " + ref + " out of range 1-" + comp.numLayers);
-      return comp.layer(ref);
-    }
-    if (typeof ref === "object" && ref.id !== undefined) {
-      for (var i = 1; i <= comp.numLayers; i++) if (comp.layer(i).id === ref.id) return comp.layer(i);
-      A.fail("No layer with id " + ref.id);
-    }
-    var l = comp.layer(String(ref));
-    if (!l) A.fail("No layer named '" + ref + "' in comp '" + comp.name + "'");
-    return l;
-  };
-  // path: "Transform/Position" | ["ADBE Transform Group","ADBE Position"] | "Effects/Gaussian Blur/Blurriness"
-  // Each segment may be a display name, match name, or 1-based index.
-  A.resolveProp = function (layer, path) {
-    var segs = path instanceof Array ? path : String(path).split("/");
-    var cur = layer;
-    for (var i = 0; i < segs.length; i++) {
-      var s = segs[i];
-      if (s === "" || s === undefined) continue;
-      var next = null;
-      if (typeof s === "number" || /^\\d+$/.test(s)) next = cur.property(Number(s));
-      else {
-        try { next = cur.property(s); } catch (e) { next = null; }
-        if (!next && String(s).toLowerCase() === "effects") next = cur.property("ADBE Effect Parade");
-        if (!next && cur.numProperties) {
-          var low = String(s).toLowerCase();
-          for (var j = 1; j <= cur.numProperties; j++) {
-            var c = cur.property(j);
-            if (c.name.toLowerCase() === low || c.matchName.toLowerCase() === low) { next = c; break; }
-          }
-        }
-      }
-      if (!next) A.fail("Property '" + s + "' not found under '" + (cur.name || "layer") + "' (path " + segs.join("/") + ")");
-      cur = next;
-    }
-    return cur;
-  };
-
-  // ---------- serializers ----------
-  A.itemType = function (it) {
-    if (it instanceof CompItem) return "comp";
-    if (it instanceof FolderItem) return "folder";
-    if (it instanceof FootageItem) {
-      try {
-        if (it.mainSource instanceof SolidSource) return "solid";
-        if (it.mainSource instanceof PlaceholderSource) return "placeholder";
-      } catch (e) {}
-      return "footage";
-    }
-    return "item";
-  };
-  A.itemInfo = function (it) {
-    var o = { id: it.id, name: it.name, type: A.itemType(it), parentFolder: it.parentFolder ? it.parentFolder.name : null, comment: it.comment, label: it.label };
-    if (it instanceof CompItem || it instanceof FootageItem) {
-      o.width = it.width; o.height = it.height; o.duration = A.round(it.duration); o.pixelAspect = it.pixelAspect;
-      o.hasVideo = it.hasVideo; o.hasAudio = it.hasAudio;
-      try { o.frameRate = A.round(it.frameRate); } catch (e) {}
-    }
-    if (it instanceof CompItem) { o.numLayers = it.numLayers; o.bgColor = it.bgColor; o.workAreaStart = A.round(it.workAreaStart); o.workAreaDuration = A.round(it.workAreaDuration); o.displayStartTime = A.round(it.displayStartTime); }
-    if (it instanceof FootageItem) {
-      try { o.file = it.file ? it.file.fsName : null; } catch (e) {}
-      try { o.isStill = it.mainSource.isStill; } catch (e) {}
-      try { if (it.mainSource instanceof SolidSource) o.color = it.mainSource.color; } catch (e) {}
-      o.footageMissing = it.footageMissing;
-    }
-    if (it instanceof FolderItem) o.numItems = it.numItems;
-    return o;
-  };
-  A.layerType = function (l) {
-    if (inst(l, "TextLayer")) return "text";
-    if (inst(l, "ShapeLayer")) return "shape";
-    if (inst(l, "CameraLayer")) return "camera";
-    if (inst(l, "LightLayer")) return "light";
-    if (inst(l, "AVLayer")) {
-      if (l.nullLayer) return "null";
-      if (l.adjustmentLayer) return "adjustment";
-      try { if (l.source instanceof CompItem) return "precomp"; } catch (e) {}
-      try { if (l.source.mainSource instanceof SolidSource) return "solid"; } catch (e) {}
-      return "footage";
-    }
-    return "layer";
-  };
-  A.layerInfo = function (l, detail) {
-    var o = { index: l.index, id: l.id, name: l.name, type: A.layerType(l), enabled: l.enabled, solo: l.solo, locked: l.locked, shy: l.shy,
-      inPoint: A.round(l.inPoint), outPoint: A.round(l.outPoint), startTime: A.round(l.startTime), stretch: l.stretch, label: l.label,
-      parent: l.parent ? l.parent.index : null, selected: l.selected, comment: l.comment };
-    if (inst(l, "AVLayer")) {
-      o.threeD = l.threeDLayer; o.blendingMode = A.enumName(BlendingMode, l.blendingMode);
-      o.trackMatteType = A.enumName(TrackMatteType, l.trackMatteType); o.audioEnabled = l.audioEnabled;
-      o.adjustmentLayer = l.adjustmentLayer; o.motionBlur = l.motionBlur; o.collapseTransformation = l.collapseTransformation;
-      try { if (l.source) o.source = { id: l.source.id, name: l.source.name, type: A.itemType(l.source) }; } catch (e) {}
-    }
-    if (detail) {
-      var tr = l.property("ADBE Transform Group");
-      o.transform = {};
-      for (var i = 1; i <= tr.numProperties; i++) {
-        var p = tr.property(i);
-        try { if (p.propertyValueType !== PropertyValueType.NO_VALUE) o.transform[p.name] = A.valueOf(p.value); } catch (e) {}
-      }
-      o.effects = [];
-      var fx = l.property("ADBE Effect Parade");
-      if (fx) for (var j = 1; j <= fx.numProperties; j++) o.effects.push({ index: j, name: fx.property(j).name, matchName: fx.property(j).matchName, enabled: fx.property(j).enabled });
-      var masks = l.property("ADBE Mask Parade");
-      o.numMasks = masks ? masks.numProperties : 0;
-      o.markers = A.markers(l.property("ADBE Marker"));
-      if (inst(l, "TextLayer")) o.text = A.textInfo(l.property("ADBE Text Properties").property("ADBE Text Document").value);
-      o.animated = A.animatedProps(l);
-    }
-    return o;
-  };
-  A.compInfo = function (c, withLayers) {
-    var o = A.itemInfo(c);
-    o.time = A.round(c.time); o.frameDuration = A.round(c.frameDuration); o.motionBlur = c.motionBlur; o.renderer = c.renderer;
-    try { o.activeCamera = c.activeCamera ? c.activeCamera.name : null; } catch (e) {}
-    if (withLayers) { o.layers = []; for (var i = 1; i <= c.numLayers; i++) o.layers.push(A.layerInfo(c.layer(i), false)); }
-    return o;
-  };
-  A.textInfo = function (td) {
-    var o = { text: td.text };
-    var keys = ["font", "fontSize", "fillColor", "strokeColor", "strokeWidth", "applyFill", "applyStroke", "tracking", "leading", "fauxBold", "fauxItalic", "allCaps", "boxText", "pointText"];
-    for (var i = 0; i < keys.length; i++) { try { var v = td[keys[i]]; if (v !== undefined) o[keys[i]] = A.valueOf(v); } catch (e) {} }
-    try { o.justification = A.enumName(ParagraphJustification, td.justification); } catch (e) {}
-    try { if (td.boxText) o.boxTextSize = td.boxTextSize; } catch (e) {}
-    return o;
-  };
-  A.enumName = function (en, val) {
-    for (var k in en) { try { if (en[k] === val) return k; } catch (e) {} }
-    return val;
-  };
-  A.markers = function (mp) {
-    var out = [];
-    if (!mp) return out;
-    for (var i = 1; i <= mp.numKeys; i++) {
-      var m = mp.keyValue(i);
-      out.push({ time: A.round(mp.keyTime(i)), comment: m.comment, duration: A.round(m.duration), chapter: m.chapter, url: m.url });
-    }
-    return out;
-  };
-  A.valueOf = function (v) {
-    if (v === null || v === undefined) return null;
-    if (typeof v === "number") return A.round(v);
-    if (v instanceof Array) { var a = []; for (var i = 0; i < v.length; i++) a.push(A.valueOf(v[i])); return a; }
-    if (inst(v, "TextDocument")) return A.textInfo(v);
-    if (inst(v, "Shape")) return { vertices: v.vertices, inTangents: v.inTangents, outTangents: v.outTangents, closed: v.closed };
-    if (inst(v, "MarkerValue")) return { comment: v.comment, duration: v.duration };
-    return v;
-  };
-  A.animatedProps = function (layer) {
-    var out = [];
-    function walk(g, path) {
-      for (var i = 1; i <= g.numProperties; i++) {
-        var p = g.property(i), pp = path + "/" + p.name;
-        if (p.propertyType === PropertyType.PROPERTY) {
-          var e = false; try { e = p.canSetExpression && p.expressionEnabled; } catch (x) {}
-          if (p.numKeys > 0 || e) out.push({ path: pp.substr(1), numKeys: p.numKeys, expression: e ? p.expression : undefined });
-        } else walk(p, pp);
-      }
-    }
-    try { walk(layer, ""); } catch (e) {}
-    return out;
-  };
-  A.propInfo = function (p, opts) {
-    opts = opts || {};
-    var o = { name: p.name, matchName: p.matchName, propertyIndex: p.propertyIndex };
-    if (p.propertyType === PropertyType.PROPERTY) {
-      o.kind = "property";
-      o.valueType = A.enumName(PropertyValueType, p.propertyValueType);
-      try { if (p.propertyValueType !== PropertyValueType.NO_VALUE) o.value = A.valueOf(p.value); } catch (e) {}
-      o.numKeys = p.numKeys;
-      try { o.canSetExpression = p.canSetExpression; if (p.expression) { o.expression = p.expression; o.expressionEnabled = p.expressionEnabled; o.expressionError = p.expressionError; } } catch (e) {}
-      try { if (p.hasMin) o.min = p.minValue; if (p.hasMax) o.max = p.maxValue; } catch (e) {}
-      try { o.unitsText = p.unitsText; } catch (e) {}
-      if (opts.keyframes && p.numKeys) o.keyframes = A.keyframes(p);
-    } else {
-      o.kind = p.propertyType === PropertyType.INDEXED_GROUP ? "indexedGroup" : "group";
-      o.numProperties = p.numProperties;
-      try { if (p.canSetEnabled) o.enabled = p.enabled; } catch (e) {}
-      var depth = opts.depth === undefined ? 1 : opts.depth;
-      if (depth > 0) {
-        o.children = [];
-        for (var i = 1; i <= p.numProperties; i++) {
-          var c = p.property(i);
-          if (!opts.includeHidden) { try { if (c.propertyType === PropertyType.PROPERTY && c.propertyValueType === PropertyValueType.NO_VALUE) continue; } catch (e) {} }
-          o.children.push(A.propInfo(c, { depth: depth - 1, keyframes: opts.keyframes, includeHidden: opts.includeHidden }));
-        }
-      }
-    }
-    return o;
-  };
-  A.keyframes = function (p) {
-    var ks = [];
-    for (var k = 1; k <= p.numKeys; k++) {
-      var kf = { index: k, time: A.round(p.keyTime(k)), value: A.valueOf(p.keyValue(k)) };
-      try { kf.inInterpolation = A.enumName(KeyframeInterpolationType, p.keyInInterpolationType(k)); kf.outInterpolation = A.enumName(KeyframeInterpolationType, p.keyOutInterpolationType(k)); } catch (e) {}
-      try {
-        var ie = p.keyInTemporalEase(k), oe = p.keyOutTemporalEase(k);
-        kf.easeIn = []; kf.easeOut = [];
-        for (var d = 0; d < ie.length; d++) { kf.easeIn.push({ speed: A.round(ie[d].speed), influence: A.round(ie[d].influence) }); kf.easeOut.push({ speed: A.round(oe[d].speed), influence: A.round(oe[d].influence) }); }
-      } catch (e) {}
-      ks.push(kf);
-    }
-    return ks;
-  };
-
-  // Generic serializer for arbitrary return values of user scripts.
-  // \`depth\` limits how far AE objects (comps, layers, properties) are expanded;
-  // plain arrays/objects are copied as-is up to a nesting guard.
-  A.serialize = function (v, depth, nest) {
-    if (depth === undefined) depth = 4;
-    nest = nest || 0;
-    if (v === null || v === undefined) return null;
-    var t = typeof v;
-    if (t === "number" || t === "string" || t === "boolean") return v;
-    if (t === "function") return "[function]";
-    if (nest > 30) return "[too deep]";
-    try {
-      if (v instanceof CompItem) return A.compInfo(v, depth > 1);
-      if (inst(v, "Item")) return A.itemInfo(v);
-      if (inst(v, "Layer")) return A.layerInfo(v, depth > 2);
-      if (inst(v, "PropertyBase")) return A.propInfo(v, { depth: depth > 2 ? 1 : 0 });
-      if (inst(v, "Project")) return A.projectInfo();
-      if (inst(v, "File") || inst(v, "Folder")) return v.fsName;
-      if (inst(v, "TextDocument") || inst(v, "Shape") || inst(v, "MarkerValue")) return A.valueOf(v);
-      if (inst(v, "KeyframeEase")) return { speed: A.round(v.speed), influence: A.round(v.influence) };
-      if (inst(v, "RenderQueueItem")) return { comp: v.comp.name, status: A.enumName(RQItemStatus, v.status) };
-      if (inst(v, "Collection") || inst(v, "ItemCollection") || inst(v, "LayerCollection")) {
-        if (depth <= 0) return "[collection of " + v.length + "]";
-        var c = []; for (var ci = 1; ci <= v.length; ci++) c.push(A.serialize(v[ci], depth - 1, nest + 1)); return c;
-      }
-    } catch (e) {}
-    if (v instanceof Array) {
-      var a = [], n = Math.min(v.length, 2000);
-      for (var i = 0; i < n; i++) a.push(A.serialize(v[i], depth, nest + 1));
-      if (v.length > n) a.push("... " + (v.length - n) + " more");
-      return a;
-    }
-    var isPlain = false;
-    try { isPlain = v.constructor === Object; } catch (e) {}
-    if (!isPlain && depth <= 0) return "[" + (v.reflect ? v.reflect.name : "object") + "]";
-    var o = {};
-    for (var k in v) { try { if (typeof v[k] !== "function") o[k] = A.serialize(v[k], isPlain ? depth : depth - 1, nest + 1); } catch (e) {} }
-    return o;
-  };
-
-  A.projectInfo = function () {
-    var p = app.project, counts = { comp: 0, footage: 0, folder: 0, solid: 0, placeholder: 0 };
-    for (var i = 1; i <= p.numItems; i++) { var t = A.itemType(p.item(i)); counts[t] = (counts[t] || 0) + 1; }
-    var o = { file: p.file ? p.file.fsName : null, name: p.file ? p.file.name : "Untitled", dirty: p.dirty, numItems: p.numItems, counts: counts,
-      bitsPerChannel: p.bitsPerChannel, renderQueueItems: p.renderQueue.numItems };
-    try { o.frameRate = A.round(p.frameRate); } catch (e) {}
-    try { o.workingSpace = p.workingSpace; } catch (e) {}
-    try { o.expressionEngine = p.expressionEngine; } catch (e) {}
-    var a = p.activeItem;
-    o.activeItem = a ? { id: a.id, name: a.name, type: A.itemType(a) } : null;
-    return o;
-  };
-
-  // ---------- value helpers used by tools ----------
-  A.toAEValue = function (prop, v) {
-    if (prop.propertyValueType === PropertyValueType.TEXT_DOCUMENT) {
-      var td = prop.value;
-      if (typeof v === "string") { td.text = v; return td; }
-      A.applyText(td, v); return td;
-    }
-    if (prop.propertyValueType === PropertyValueType.SHAPE && v && v.vertices) {
-      var s = new Shape(); s.vertices = v.vertices; if (v.inTangents) s.inTangents = v.inTangents; if (v.outTangents) s.outTangents = v.outTangents; s.closed = v.closed !== false; return s;
-    }
-    if (prop.propertyValueType === PropertyValueType.COLOR) return A.color(v);
-    return v;
-  };
-  // Accepts [r,g,b], [r,g,b,a] (0-1 or 0-255) or "#rrggbb".
-  A.color = function (v) {
-    if (typeof v === "string") {
-      var h = v.replace("#", "");
-      if (h.length === 3) h = h.charAt(0) + h.charAt(0) + h.charAt(1) + h.charAt(1) + h.charAt(2) + h.charAt(2);
-      return [parseInt(h.substr(0, 2), 16) / 255, parseInt(h.substr(2, 2), 16) / 255, parseInt(h.substr(4, 2), 16) / 255, 1];
-    }
-    if (v instanceof Array) {
-      var big = false; for (var i = 0; i < v.length; i++) if (v[i] > 1) big = true;
-      var c = []; for (var j = 0; j < v.length; j++) c.push(big ? v[j] / 255 : v[j]);
-      if (c.length === 3) c.push(1);
-      return c;
-    }
-    return v;
-  };
-  A.color3 = function (v) { var c = A.color(v); return [c[0], c[1], c[2]]; };
-  A.applyText = function (td, o) {
-    if (o.text !== undefined) td.text = o.text;
-    if (o.font !== undefined) td.font = o.font;
-    if (o.fontSize !== undefined) td.fontSize = o.fontSize;
-    if (o.fillColor !== undefined) { td.applyFill = true; td.fillColor = A.color3(o.fillColor); }
-    if (o.strokeColor !== undefined) { td.applyStroke = true; td.strokeColor = A.color3(o.strokeColor); }
-    if (o.strokeWidth !== undefined) td.strokeWidth = o.strokeWidth;
-    if (o.tracking !== undefined) td.tracking = o.tracking;
-    if (o.leading !== undefined) { try { td.autoLeading = false; } catch (e) {} td.leading = o.leading; }
-    if (o.fauxBold !== undefined) td.fauxBold = o.fauxBold;
-    if (o.fauxItalic !== undefined) td.fauxItalic = o.fauxItalic;
-    if (o.allCaps !== undefined) td.allCaps = o.allCaps;
-    if (o.justification !== undefined) td.justification = ParagraphJustification[String(o.justification).toUpperCase()] || td.justification;
-    return td;
-  };
-  A.interp = function (name) {
-    if (!name) return null;
-    var m = { linear: KeyframeInterpolationType.LINEAR, bezier: KeyframeInterpolationType.BEZIER, hold: KeyframeInterpolationType.HOLD };
-    return m[String(name).toLowerCase()] || null;
-  };
-  // ease: {speed, influence} or number (influence %, speed 0) applied to every dimension
-  A.easeArr = function (prop, e) {
-    var dims = 1;
-    if (prop.propertyValueType === PropertyValueType.TwoD) dims = 2;
-    else if (prop.propertyValueType === PropertyValueType.ThreeD) dims = 3;
-    var sp = typeof e === "number" ? 0 : (e.speed || 0), inf = typeof e === "number" ? e : (e.influence || 33.333);
-    var a = []; for (var i = 0; i < dims; i++) a.push(new KeyframeEase(sp, Math.max(0.1, Math.min(100, inf))));
-    return a;
-  };
-
-  // ---------- runner ----------
-  A.run = function (fn, args, opts) {
-    opts = opts || {};
-    var logs = [];
-    function log() {
-      var parts = [];
-      for (var i = 0; i < arguments.length; i++) { var a = arguments[i]; parts.push(typeof a === "string" ? a : A.stringify(A.serialize(a, 2))); }
-      logs.push(parts.join(" "));
-    }
-    var undo = opts.undoGroup !== false && opts.undoGroup !== "";
-    var res;
-    try {
-      if (opts.suppressDialogs !== false) { try { app.beginSuppressDialogs(); } catch (e) {} }
-      if (undo) app.beginUndoGroup(opts.undoGroup || "AE MCP");
-      var r = fn(args || {}, log);
-      res = { ok: true, result: opts.raw ? r : A.serialize(r, opts.depth || 4), logs: logs };
-    } catch (e) {
-      res = { ok: false, error: { message: e.message || String(e), name: e.name, line: e.line, user: !!e.aemcpUser }, logs: logs };
-    } finally {
-      if (undo) { try { app.endUndoGroup(); } catch (e) {} }
-      if (opts.suppressDialogs !== false) { try { app.endSuppressDialogs(false); } catch (e) {} }
-    }
-    return A.stringify(res);
-  };
-
-  return A;
-})();
-"aemcp loaded " + aemcp.version;
-`;
-
-// src/jsx.ts
-var NEED_HELPERS = "__AEMCP_NEED_HELPERS__";
-var HELPER_VERSION = `${VERSION}-${createHash("sha1").update(aemcp_default).digest("hex").slice(0, 10)}`;
-var helperSource = aemcp_default.replace("__AEMCP_VERSION__", HELPER_VERSION);
-function toJsLiteral(v) {
-  return (JSON.stringify(v ?? null) ?? "null").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
-}
-function wrapBody(body, args, opts = {}) {
-  const runOpts = { undoGroup: opts.undoGroup === void 0 ? "AE MCP" : opts.undoGroup, depth: opts.depth };
-  return `(function(){
-if (typeof aemcp === 'undefined' || aemcp.version !== ${toJsLiteral(HELPER_VERSION)}) return ${toJsLiteral(NEED_HELPERS)};
-return aemcp.run(function(args, log){
-` + body + `
-}, ${toJsLiteral(args ?? {})}, ${toJsLiteral(runOpts)});
-})()`;
-}
-function userCodeBody(code) {
-  return `var __fn = eval(${toJsLiteral("(function(args, log){" + code + "\n})")});
-return __fn(args, log);`;
-}
-function parseResult(raw) {
-  if (raw === "EvalScript error.")
-    return { ok: false, logs: [], error: { message: "ExtendScript could not evaluate the script (EvalScript error). This usually means a syntax error outside the user code wrapper." } };
-  try {
-    const r = JSON.parse(raw);
-    if (r && typeof r === "object" && "ok" in r) return { logs: [], ...r };
-    return { ok: true, result: r, logs: [] };
-  } catch {
-    return { ok: true, result: raw, logs: [] };
-  }
-}
-async function ensureHelpers() {
-  const r = await evalRaw(helperSource, 3e4);
-  if (!r.startsWith("aemcp loaded")) throw new Error("Failed to load aemcp helpers into After Effects: " + r);
-}
-async function runJsx(body, args = {}, opts = {}) {
-  const script = wrapBody(body, args, opts);
-  let raw = await evalRaw(script, opts.timeoutMs);
-  if (raw === NEED_HELPERS) {
-    await ensureHelpers();
-    raw = await evalRaw(script, opts.timeoutMs);
-  }
-  return parseResult(raw);
-}
+// src/tools/comp.ts
+init_define_AEMCP_CEP_FILES();
 
 // src/tools/registry.ts
+init_define_AEMCP_CEP_FILES();
+init_bridge();
+init_jsx();
 var compRef = external_exports.union([external_exports.number().int(), external_exports.string()]).optional().describe('Composition: item id (number) or exact name. Omit (or "active") for the active/open composition.');
 var layerRef = external_exports.union([external_exports.number().int(), external_exports.string()]).describe("Layer: 1-based index (number) or exact layer name.");
 var itemRef = external_exports.union([external_exports.number().int(), external_exports.string()]).describe("Project item id (number) or exact name.");
@@ -39725,10 +40933,15 @@ return aemcp.markers(mp);`
 ];
 
 // src/tools/core.ts
-import { existsSync, mkdirSync, readFileSync as readFileSync2, statSync, unlinkSync } from "node:fs";
-import { homedir as homedir2 } from "node:os";
-import { join as join2 } from "node:path";
-var sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+init_define_AEMCP_CEP_FILES();
+import { existsSync as existsSync3, mkdirSync as mkdirSync3, readFileSync as readFileSync4, statSync, unlinkSync } from "node:fs";
+import { homedir as homedir3 } from "node:os";
+import { join as join4 } from "node:path";
+init_bridge();
+init_setup();
+init_config();
+init_jsx();
+var sleep2 = (ms) => new Promise((r) => setTimeout(r, ms));
 function registerCoreTools(server) {
   server.registerTool(
     "ae_run_script",
@@ -39771,7 +40984,7 @@ function registerCoreTools(server) {
     },
     async ({ path, args, timeoutSeconds }) => {
       try {
-        if (!existsSync(path)) return errorResult(`File not found: ${path}`);
+        if (!existsSync3(path)) return errorResult(`File not found: ${path}`);
         const body = "var f = new File(args.path); if (!f.exists) aemcp.fail('File not found in AE: ' + args.path);\n$.global.AEMCP_ARGS = args.args || {};\nreturn $.evalFile(f);";
         return formatResult(await runJsx(body, { path, args: args ?? {} }, { undoGroup: "AE MCP Script File", timeoutMs: (timeoutSeconds ?? 300) * 1e3 }));
       } catch (e) {
@@ -39802,6 +41015,8 @@ function registerCoreTools(server) {
             text: "WARNING: 'Allow Scripts to Write Files and Access Network' is OFF in After Effects, so scripts cannot write files (frame previews, exports, File.write). Ask the user to enable it: After Effects > Settings > Scripting & Expressions (Windows: Edit > Preferences > Scripting & Expressions)."
           });
         out.content.unshift({ type: "text", text: `Connected to After Effects bridge v${h.version} (MCP server v${VERSION}).` });
+        if (lastSetup?.extensionUpdated)
+          out.content.push({ type: "text", text: "Note: the After Effects extension was updated on disk; ask the user to restart After Effects when convenient to load the new version." });
         return out;
       } catch (e) {
         return errorResult(e);
@@ -39863,22 +41078,22 @@ var info = { path: f.fsName, width: target.width, height: target.height, time: t
 var waited = 0; while (!f.exists && waited < 10000) { $.sleep(50); waited += 50; }
 if (tmp) { $.sleep(100); tmp.remove(); }
 return info;`;
-        const tmpDir = join2(homedir2(), ".aemcp", "tmp");
-        mkdirSync(tmpDir, { recursive: true });
+        const tmpDir = join4(homedir3(), ".aemcp", "tmp");
+        mkdirSync3(tmpDir, { recursive: true });
         const r = await runJsx(body, { comp, time: time3, maxSize, outputPath, tmpDir }, { undoGroup: false, timeoutMs: 12e4 });
         if (!r.ok) return formatResult(r);
         const info = r.result;
         let last = -1;
         for (let i = 0; i < 100; i++) {
-          if (existsSync(info.path)) {
+          if (existsSync3(info.path)) {
             const size = statSync(info.path).size;
             if (size > 0 && size === last) break;
             last = size;
           }
-          await sleep(100);
+          await sleep2(100);
         }
-        if (!existsSync(info.path)) return errorResult(`After Effects did not write the frame to ${info.path}`);
-        const data = readFileSync2(info.path).toString("base64");
+        if (!existsSync3(info.path)) return errorResult(`After Effects did not write the frame to ${info.path}`);
+        const data = readFileSync4(info.path).toString("base64");
         if (!outputPath) {
           try {
             unlinkSync(info.path);
@@ -39899,6 +41114,7 @@ return info;`;
 }
 
 // src/tools/effects.ts
+init_define_AEMCP_CEP_FILES();
 var params = external_exports.record(external_exports.string(), external_exports.any()).optional().describe('Effect parameters by display name or match name, e.g. {"Blurriness": 20, "Repeat Edge Pixels": true} or {"Color": "#ff0000"}.');
 var setParams = `
 function setParams(fx, params) {
@@ -40076,6 +41292,7 @@ return aemcp.propInfo(m, { depth: 1 });`
 ];
 
 // src/tools/layer.ts
+init_define_AEMCP_CEP_FILES();
 var textStyle = {
   font: external_exports.string().optional().describe('PostScript font name, e.g. "Arial-BoldMT", "Helvetica", "Montserrat-Bold".'),
   fontSize: external_exports.number().optional(),
@@ -40279,6 +41496,7 @@ return aemcp.textInfo(p.value);`
 ];
 
 // src/tools/project.ts
+init_define_AEMCP_CEP_FILES();
 var projectTools = [
   {
     name: "ae_get_project_info",
@@ -40433,6 +41651,7 @@ app.project.close(CloseOptions.DO_NOT_SAVE_CHANGES); app.newProject(); return ae
 ];
 
 // src/tools/property.ts
+init_define_AEMCP_CEP_FILES();
 var easeSchema = external_exports.union([external_exports.number(), external_exports.object({ speed: external_exports.number().optional(), influence: external_exports.number().optional() })]).describe("Temporal ease: influence % (e.g. 75 = strong easy-ease) or {speed, influence}.");
 var propertyTools = [
   {
@@ -40558,6 +41777,7 @@ return out;`
 ];
 
 // src/tools/render.ts
+init_define_AEMCP_CEP_FILES();
 var renderTools = [
   {
     name: "ae_list_render_queue",
@@ -40623,6 +41843,7 @@ return { removed: n };`
 ];
 
 // src/index.ts
+init_setup();
 function createMcpServer() {
   const server = new McpServer({ name: "after-effects", title: "Adobe After Effects", version: VERSION }, { instructions: INSTRUCTIONS });
   registerCoreTools(server);
@@ -40709,19 +41930,54 @@ function startHttp() {
     if (!noAuth) console.error(`Auth: header "Authorization: Bearer <token>" or URL http://${host}:${port}/mcp/<token> (token in ~/.aemcp/config.json)`);
   });
 }
-async function main() {
-  if (process.argv.includes("--version")) return void console.log(VERSION);
-  if (process.argv.includes("--help")) {
-    console.log(`ae-mcp v${VERSION} - MCP server for Adobe After Effects
+var HELP = `ae-mcp v${VERSION} - MCP server for Adobe After Effects
 
 Usage:
-  ae-mcp                 stdio transport (Claude Desktop, Claude Code, Cursor...)
+  ae-mcp                 run the MCP server over stdio (Claude Desktop, Claude Code, Cursor...)
   ae-mcp --http [--port 8766] [--host 127.0.0.1] [--no-auth]
-                         Streamable HTTP transport at /mcp (ChatGPT via a tunnel)
+                         run over Streamable HTTP at /mcp (ChatGPT via a tunnel)
+  ae-mcp install [--skip-clients] [--no-claude-desktop|--no-claude-code|--no-cursor|--no-codex]
+                         install the server + After Effects extension and connect AI apps
+  ae-mcp uninstall [--keep-config]
+  ae-mcp selftest        check the installation and the connection to After Effects
+  ae-mcp chatgpt [--local]
+                         HTTP server + public tunnel for ChatGPT
+  ae-mcp setup           only install/update the After Effects extension and config
 
-Config: ~/.aemcp/config.json  (env: AEMCP_CONFIG, AEMCP_BRIDGE_PORT, AEMCP_TOKEN, AEMCP_HTTP_PORT, AEMCP_HTTP_TOKEN)`);
-    return;
+Config: ~/.aemcp/config.json  (env: AEMCP_CONFIG, AEMCP_BRIDGE_PORT, AEMCP_TOKEN, AEMCP_HTTP_PORT, AEMCP_HTTP_TOKEN)`;
+function autoSetup() {
+  if (process.env.AEMCP_NO_AUTOSETUP) return;
+  try {
+    const r = ensureAeSetup();
+    if (r.extensionInstalled) console.error(`[ae-mcp] After Effects extension ${r.extensionUpdated ? "updated" : "installed"}; restart After Effects to load it.`);
+    if (r.errors.length) console.error(`[ae-mcp] setup problems: ${r.errors.join("; ")}`);
+  } catch (e) {
+    console.error("[ae-mcp] setup failed:", e);
   }
+}
+async function main() {
+  const cmd = process.argv[2];
+  const rest = process.argv.slice(3);
+  if (process.argv.includes("--version")) return void console.log(VERSION);
+  if (process.argv.includes("--help") || cmd === "help") return void console.log(HELP);
+  switch (cmd) {
+    case "install":
+      return (await Promise.resolve().then(() => (init_install(), install_exports))).install(rest);
+    case "uninstall":
+      return (await Promise.resolve().then(() => (init_uninstall(), uninstall_exports))).uninstall(rest);
+    case "selftest":
+    case "test":
+      process.exitCode = await (await Promise.resolve().then(() => (init_selftest(), selftest_exports))).selftest();
+      return;
+    case "chatgpt":
+      return (await Promise.resolve().then(() => (init_chatgpt(), chatgpt_exports))).chatgpt(rest);
+    case "setup": {
+      const r = ensureAeSetup({ forceExtension: rest.includes("--force") });
+      console.log(JSON.stringify(r, null, 2));
+      return;
+    }
+  }
+  autoSetup();
   if (process.argv.includes("--http")) return startHttp();
   const server = createMcpServer();
   await server.connect(new StdioServerTransport());

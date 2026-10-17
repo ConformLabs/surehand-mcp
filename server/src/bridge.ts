@@ -1,4 +1,5 @@
 import { loadConfig } from "./config.js";
+import { setupHint } from "./cli/setup.js";
 
 export class BridgeError extends Error {
   constructor(message: string, readonly code: "NOT_RUNNING" | "AUTH" | "TIMEOUT" | "BRIDGE") {
@@ -39,7 +40,7 @@ async function request(path: string, init: RequestInit & { timeoutMs?: number } 
           "or AE is blocked by a modal dialog. Check After Effects.",
         "TIMEOUT",
       );
-    throw new BridgeError(NOT_RUNNING_HELP, "NOT_RUNNING");
+    throw new BridgeError(NOT_RUNNING_HELP + setupHint(), "NOT_RUNNING");
   } finally {
     clearTimeout(timer);
   }

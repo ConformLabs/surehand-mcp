@@ -4,3 +4,5 @@ declare module "*.jsxinc" {
 }
 
 declare const __AEMCP_VERSION__: string;
+declare const __AEMCP_CEP_FILES__: Record<string, string>;
+declare const __AEMCP_CEP_HASH__: string;

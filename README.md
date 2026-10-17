@@ -11,30 +11,67 @@ Claude / ChatGPT ──MCP──> ae-mcp server (Node) ──localhost──> AE
 ## Requirements
 
 - After Effects 2020 (17.0) or newer on macOS or Windows (tested on AE 2026 / macOS)
-- [Node.js](https://nodejs.org) 18 or newer (LTS recommended)
+- Nothing else: the `.mcpb` uses Claude Desktop's built-in Node.js, and the installer downloads Node.js if it is missing
 
 ## Install
 
-1. Download / clone this folder.
-2. Quit After Effects.
-3. Run the installer:
-   - **macOS:** double-click `install-mac.command`
-     (if macOS blocks it: right-click > Open, or run `bash install-mac.command` in Terminal)
-   - **Windows:** double-click `install-windows.bat`
-4. Start After Effects, and restart your AI app (Claude Desktop, Cursor...).
+Get the release folder (`npm run package` in `server/` builds `dist-zip/AE-MCP/` and a zip), then:
+
+**Claude Desktop only (easiest):** double-click **`AE-MCP.mcpb`** and click Install in Claude Desktop. Restart After Effects once.
+On first start the server installs its After Effects extension by itself.
+
+**Any app (Claude Desktop, Claude Code, Cursor, Codex) + ChatGPT:** double-click
+**`Install (Mac).command`** or **`Install (Windows).bat`**, then restart After Effects once.
+Use either the `.mcpb` or the installer for Claude Desktop, not both.
+
+**Check it:** with After Effects open, run **`Test Installation (Mac).command`** / **`Test Installation (Windows).bat`**.
+
+`INSTALL.txt` has the same steps in plain language for people you share it with, including what to do if
+macOS Gatekeeper or Windows SmartScreen blocks the files.
 
 The installer:
-- copies the MCP server to `~/.aemcp/server/ae-mcp.mjs` (a single self-contained file)
-- installs the After Effects extension (`com.aemcp`) into your user CEP extensions folder
-- enables unsigned extensions (`PlayerDebugMode`) for CSXS 9-14
+- uses the Node.js on your PATH, or downloads a private Node.js 22 LTS into `~/.aemcp/node` (checksum-verified)
+- copies the MCP server to `~/.aemcp/server/ae-mcp.mjs` (one self-contained file)
+- installs the After Effects extension (`com.aemcp`) into your user CEP extensions folder and enables
+  unsigned extensions (`PlayerDebugMode`) for CSXS 9-14
 - creates `~/.aemcp/config.json` with a random access token
-- registers the server with **Claude Desktop**, **Claude Code**, **Cursor**, and **Codex** if they are installed
-  (original config files are backed up once as `*.aemcp.bak`)
+- registers the server with **Claude Desktop**, **Claude Code**, **Cursor** and **Codex** if they are installed
+  (original config files are backed up once as `*.aemcp.bak`); if Claude Desktop is open it offers to restart it,
+  because a running Claude Desktop overwrites its config file
+
+The server also checks the After Effects extension every time it starts and installs or updates it if needed, so
+updating is just: replace the `.mcpb` (or re-run the installer) and restart After Effects.
 
 The bridge starts automatically with After Effects; nothing needs to be opened.
-To check its status open **Window > Extensions > AE MCP** (green dot = connected, with a log of recent calls).
+To see its status, open **Window > Extensions > AE MCP** (green dot = connected, plus a log of recent calls).
 
-To uninstall: `uninstall-mac.command` / `uninstall-windows.bat`.
+To uninstall: `Uninstall (Mac).command` / `Uninstall (Windows).bat` (and remove the `.mcpb` in Claude Desktop >
+Settings > Extensions if you used it).
+
+## Testing on Windows
+
+You need a Windows 10/11 PC (or VM) with After Effects. Your Creative Cloud license allows two activations,
+so a second machine works. On a Mac, a Windows VM in Parallels/VMware also works, but performance under
+x64 emulation on Apple Silicon may be slow, so a real PC is better.
+
+1. Copy `AE-MCP-<version>.zip` to the PC, right-click > **Extract All**.
+2. Make sure After Effects is **closed**, then double-click **`Install (Windows).bat`**.
+   - If SmartScreen appears: **More info > Run anyway**.
+   - Expect: Node.js downloads if missing, then check marks for the server, extension, PlayerDebugMode and apps found.
+3. Start After Effects and wait for it to finish loading.
+4. Double-click **`Test Installation (Windows).bat`**. All lines should show check marks, ending with
+   "All checks passed".
+5. In After Effects, open **Window > Extensions > AE MCP**: the dot should be green.
+6. Open Claude Desktop (restart it if it was open during the install) and ask:
+   *"Check After Effects is connected, then make a 1080p comp with an animated title and show me frame 1."*
+7. Optional, more thorough: with Node installed, run `node server\scripts\smoke.mjs` from a full source checkout
+   (`npm install` in `server\` first). This calls all major tools and needs After Effects open.
+8. Also try the `.mcpb`: run `Uninstall (Windows).bat`, double-click `AE-MCP.mcpb`, install it in Claude Desktop,
+   ask Claude to check the connection (it should say to restart After Effects), restart AE, ask again.
+
+Things worth checking specifically on Windows: paths with spaces or non-English characters in the user name,
+a machine without Node.js (tests the automatic download), and Windows on ARM.
+If something fails, send the full output of `Test Installation (Windows).bat` and `%USERPROFILE%\.aemcp\bridge-status.json`.
 
 ### Other MCP clients
 
@@ -54,11 +91,11 @@ ChatGPT connects to MCP servers over HTTPS, so the server runs in HTTP mode behi
 
 1. Install a tunnel tool once: **cloudflared** (no account needed: `brew install cloudflared` on macOS,
    `winget install --id Cloudflare.cloudflared` on Windows) or [ngrok](https://ngrok.com/download).
-2. Double-click `start-chatgpt.command` (macOS) or `start-chatgpt.bat` (Windows). It prints a URL like
+2. Double-click `Connect ChatGPT (Mac).command` or `Connect ChatGPT (Windows).bat`. It prints a URL like
    `https://xxxx.trycloudflare.com/mcp/<token>`.
 3. In ChatGPT: **Settings > Apps & Connectors > Advanced settings > Developer mode** on, then **Create** a connector,
    paste the URL, choose **No authentication** (the token is in the URL), and save.
-4. In a chat, enable the connector from the tools menu. Keep the start-chatgpt window open while you use it.
+4. In a chat, enable the connector from the tools menu. Keep that window open while you use it.
 
 The URL contains your secret token: anyone with it can run scripts on your machine while the tunnel is up.
 Quick-tunnel URLs change on every start, so update the connector URL each time (or set up a named Cloudflare tunnel).
@@ -118,23 +155,28 @@ Logs: the AE MCP panel shows recent calls; `~/.aemcp/bridge-status.json` shows w
 ## Development
 
 ```
-server/            MCP server (TypeScript) -> bundled into server/dist/ae-mcp.mjs
-  src/aemcp.jsxinc   ExtendScript helper library loaded into AE on demand (reloaded automatically when it changes)
-  src/tools/         tool definitions (each tool is a small ExtendScript function body)
-  scripts/smoke.mjs  end-to-end test against a running After Effects
-cep-panel/         After Effects extension: invisible bridge (auto-starts) + status panel
-installer/         cross-platform installer / uninstaller / ChatGPT launcher (Node)
+server/              MCP server (TypeScript) -> bundled into server/dist/ae-mcp.mjs
+  src/aemcp.jsxinc     ExtendScript helper library, loaded into AE on demand (reloaded when it changes)
+  src/tools/           tool definitions (each tool is a small ExtendScript function body)
+  src/cli/             install / uninstall / selftest / chatgpt / setup commands (ae-mcp <command>)
+  scripts/smoke.mjs    end-to-end test against a running After Effects
+  scripts/package.mjs  builds the shareable release folder, zip and .mcpb
+cep-panel/           After Effects extension: invisible bridge (auto-starts) + status panel
+installer/           run.sh / run.ps1: find or download Node.js, then run an ae-mcp command
+*.command, *.bat     double-click launchers
 ```
 
 ```bash
 cd server
 npm install
-npm test             # unit tests (wrapper, bridge protocol, ES3 lint of every tool)
-npm run build        # -> dist/ae-mcp.mjs
+npm test                 # unit tests (wrapper, bridge protocol, ES3 lint of every tool)
+npm run build            # -> dist/ae-mcp.mjs
 node scripts/smoke.mjs   # live test: needs After Effects running with the bridge
+npm run package          # -> ../dist-zip/AE-MCP/ (launchers, server, AE-MCP.mcpb) + zip
 ```
 
-After changing the server, re-run the installer (or copy `dist/ae-mcp.mjs` to `~/.aemcp/server/`).
-After changing `cep-panel/`, re-run the installer and restart After Effects.
+The After Effects extension in `cep-panel/` is embedded in the server bundle at build time, and the server installs
+or updates it when it starts. After changing the server or the panel: rebuild, re-run the installer, restart After Effects.
+
 To add a tool, add an entry to one of the arrays in `server/src/tools/*.ts`: a zod input schema plus an ExtendScript
 function body that receives `args` and can use the `aemcp` helpers.

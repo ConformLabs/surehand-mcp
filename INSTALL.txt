@@ -1,0 +1,54 @@
+AFTER EFFECTS MCP - HOW TO INSTALL
+==================================
+
+Lets Claude (or ChatGPT, Cursor, Codex) control Adobe After Effects on your computer.
+
+
+OPTION A - Claude Desktop only (easiest, nothing else to install)
+-----------------------------------------------------------------
+1. Double-click  AE-MCP.mcpb
+   Claude Desktop opens and asks to install the extension. Click Install.
+2. Restart After Effects (once).
+3. In Claude, ask: "Check After Effects is connected."
+
+
+OPTION B - Claude Desktop, Claude Code, Cursor, Codex (and ChatGPT)
+-------------------------------------------------------------------
+1. Double-click:
+     Mac:      Install (Mac).command
+     Windows:  Install (Windows).bat
+   Node.js is downloaded automatically if you don't have it.
+   If Claude Desktop is open, the installer offers to restart it.
+2. Restart After Effects (once).
+3. In Claude, ask: "Check After Effects is connected."
+
+Use A or B for Claude Desktop, not both.
+
+
+CHECK IT WORKS
+--------------
+With After Effects open, double-click  "Test Installation (Mac).command"
+or "Test Installation (Windows).bat". Every line should show a check mark.
+(It makes a temporary comp and removes it again; your project is not changed.)
+
+
+CHATGPT
+-------
+Double-click "Connect ChatGPT (Mac).command" / "Connect ChatGPT (Windows).bat"
+and follow the instructions it prints. See README.md for details.
+
+
+IF YOUR COMPUTER BLOCKS THE FILES
+---------------------------------
+Mac:     "cannot be opened because it is from an unidentified developer"
+         -> Open System Settings > Privacy & Security, scroll down and click
+            "Open Anyway" next to the file name, then double-click it again.
+         Or open Terminal and drag the .command file into the window, press Enter.
+Windows: "Windows protected your PC" -> click "More info" > "Run anyway".
+
+
+UNINSTALL
+---------
+Double-click "Uninstall (Mac).command" / "Uninstall (Windows).bat".
+If you used the .mcpb: Claude Desktop > Settings > Extensions > After Effects MCP > Uninstall,
+then also run the Uninstall file above to remove the After Effects part.
