@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir, platform } from "node:os";
 import { dirname, join } from "node:path";
 import { createInterface } from "node:readline";
@@ -24,7 +24,24 @@ export const claudeDesktopDir = () => (isWin ? join(APPDATA, "Claude") : join(HO
 export const claudeDesktopConfig = () => join(claudeDesktopDir(), "claude_desktop_config.json");
 export const claudeCodeConfig = () => join(HOME, ".claude.json");
 export const cursorConfig = () => join(HOME, ".cursor", "mcp.json");
-export const codexConfig = () => join(HOME, ".codex", "config.toml");
+/** ChatGPT desktop and Codex share this file (CODEX_HOME overrides ~/.codex). */
+export const codexConfig = () => join(process.env.CODEX_HOME || join(HOME, ".codex"), "config.toml");
+
+/** True if the ChatGPT desktop app or Codex is installed, even if it hasn't created ~/.codex yet. */
+export function chatgptDesktopInstalled(): boolean {
+  if (which("codex")) return true;
+  if (isMac)
+    return ["/Applications/ChatGPT.app", "/Applications/Codex.app", join(HOME, "Applications", "ChatGPT.app")].some((p) => existsSync(p));
+  if (isWin) {
+    if ([join(LOCALAPPDATA, "Programs", "ChatGPT"), join(LOCALAPPDATA, "Microsoft", "WindowsApps", "ChatGPT.exe")].some((p) => existsSync(p))) return true;
+    try {
+      return readdirSync(join(LOCALAPPDATA, "Packages")).some((n) => /^OpenAI\.(ChatGPT|Codex)/i.test(n));
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
 export const claudeDesktopExe = () => join(LOCALAPPDATA, "AnthropicClaude", "claude.exe");
 
 const useColor = process.stdout.isTTY || isWin;

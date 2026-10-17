@@ -7645,10 +7645,24 @@ var init_config = __esm({
 
 // src/cli/util.ts
 import { execFileSync, spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, readFileSync as readFileSync2, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync as readFileSync2, writeFileSync } from "node:fs";
 import { homedir as homedir2, platform } from "node:os";
 import { dirname, join as join2 } from "node:path";
 import { createInterface } from "node:readline";
+function chatgptDesktopInstalled() {
+  if (which("codex")) return true;
+  if (isMac)
+    return ["/Applications/ChatGPT.app", "/Applications/Codex.app", join2(HOME, "Applications", "ChatGPT.app")].some((p) => existsSync(p));
+  if (isWin) {
+    if ([join2(LOCALAPPDATA, "Programs", "ChatGPT"), join2(LOCALAPPDATA, "Microsoft", "WindowsApps", "ChatGPT.exe")].some((p) => existsSync(p))) return true;
+    try {
+      return readdirSync(join2(LOCALAPPDATA, "Packages")).some((n) => /^OpenAI\.(ChatGPT|Codex)/i.test(n));
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
 function readJson(file2, fallback) {
   try {
     return JSON.parse(readFileSync2(file2, "utf8"));
@@ -7723,7 +7737,7 @@ var init_util = __esm({
     claudeDesktopConfig = () => join2(claudeDesktopDir(), "claude_desktop_config.json");
     claudeCodeConfig = () => join2(HOME, ".claude.json");
     cursorConfig = () => join2(HOME, ".cursor", "mcp.json");
-    codexConfig = () => join2(HOME, ".codex", "config.toml");
+    codexConfig = () => join2(process.env.CODEX_HOME || join2(HOME, ".codex"), "config.toml");
     claudeDesktopExe = () => join2(LOCALAPPDATA, "AnthropicClaude", "claude.exe");
     useColor = process.stdout.isTTY || isWin;
     color = (c) => (s) => useColor ? `\x1B[${c}m${s}\x1B[0m` : s;
@@ -8393,12 +8407,12 @@ __export(install_exports, {
   install: () => install
 });
 import { spawn, spawnSync as spawnSync3 } from "node:child_process";
-import { chmodSync, copyFileSync as copyFileSync2, existsSync as existsSync4, mkdirSync as mkdirSync4, readdirSync, readFileSync as readFileSync5, writeFileSync as writeFileSync3 } from "node:fs";
+import { chmodSync, copyFileSync as copyFileSync2, existsSync as existsSync4, mkdirSync as mkdirSync4, readdirSync as readdirSync2, readFileSync as readFileSync5, writeFileSync as writeFileSync3 } from "node:fs";
 import { dirname as dirname3, join as join5 } from "node:path";
 import { fileURLToPath } from "node:url";
 function mcpbInstalled() {
   try {
-    return readdirSync(join5(claudeDesktopDir(), "Claude Extensions")).some((n) => /after-effects/i.test(n) && !n.endsWith(".json"));
+    return readdirSync2(join5(claudeDesktopDir(), "Claude Extensions")).some((n) => /after-effects/i.test(n) && !n.endsWith(".json"));
   } catch {
     return false;
   }
@@ -8511,14 +8525,16 @@ After Effects MCP installer v${VERSION}`));
     else console.log(dim("  - Claude Code not installed (skipped)"));
   }
   if (want("cursor") && existsSync4(dirname3(cursorConfig()))) addJson("Cursor", cursorConfig());
-  if (want("codex") && existsSync4(dirname3(codexConfig()))) {
+  if (want("codex") && (existsSync4(dirname3(codexConfig())) || chatgptDesktopInstalled())) {
     try {
       const file2 = codexConfig();
+      mkdirSync4(dirname3(file2), { recursive: true });
       const text = existsSync4(file2) ? readFileSync5(file2, "utf8") : "";
       if (existsSync4(file2) && !existsSync4(file2 + ".aemcp.bak")) copyFileSync2(file2, file2 + ".aemcp.bak");
-      writeFileSync3(file2, removeCodexBlock(text).trimEnd() + "\n\n" + codexBlock(nodePath, INSTALLED_SERVER));
-      ok("Codex (OpenAI)");
-      registered.push("Codex");
+      const rest = removeCodexBlock(text).trim();
+      writeFileSync3(file2, (rest ? rest + "\n\n" : "") + codexBlock(nodePath, INSTALLED_SERVER));
+      ok("ChatGPT desktop / Codex");
+      registered.push("ChatGPT desktop");
     } catch (e) {
       warn(`Codex: ${e.message}`);
     }
@@ -8534,7 +8550,7 @@ After Effects MCP installer v${VERSION}`));
 
   Try asking Claude: ${bold('"Check After Effects is connected, then make a 1080p comp with an animated title."')}
   Check the installation any time with ${bold("2. Test Installation")} (in the ${isWin ? "Windows" : "Mac"} folder).
-  ChatGPT: run ${bold("3. Connect ChatGPT")} from the same folder.
+${registered.includes("ChatGPT desktop") ? "  ChatGPT desktop app: restart it; after-effects appears under Settings > Plugins > Servers.\n" : ""}  ChatGPT on the web: run ${bold("3. Connect ChatGPT")} from the same folder.
 
   Other MCP apps can use:  command ${nodePath}
                            args    ["${INSTALLED_SERVER}"]
@@ -8555,7 +8571,7 @@ var uninstall_exports = {};
 __export(uninstall_exports, {
   uninstall: () => uninstall
 });
-import { existsSync as existsSync5, readdirSync as readdirSync2, readFileSync as readFileSync6, rmSync as rmSync2, writeFileSync as writeFileSync4 } from "node:fs";
+import { existsSync as existsSync5, readdirSync as readdirSync3, readFileSync as readFileSync6, rmSync as rmSync2, writeFileSync as writeFileSync4 } from "node:fs";
 import { join as join6 } from "node:path";
 function uninstall(argv) {
   console.log(bold("\nAfter Effects MCP uninstaller\n"));
@@ -8565,7 +8581,7 @@ function uninstall(argv) {
     ok(`Removed the After Effects extension`);
   }
   if (existsSync5(AEMCP_DIR)) {
-    for (const name of readdirSync2(AEMCP_DIR))
+    for (const name of readdirSync3(AEMCP_DIR))
       if (name !== "node" && !(keepConfig && name === "config.json")) rmSync2(join6(AEMCP_DIR, name), { recursive: true, force: true });
   }
   ok(keepConfig ? "Removed the server (kept ~/.aemcp/config.json)" : `Removed ${AEMCP_DIR}`);
@@ -8765,6 +8781,7 @@ In ChatGPT: Settings > Apps & Connectors > Advanced settings > turn on Developer
 then Create a connector > paste the URL above > Authentication: "No authentication" > Create.
 Keep this window open while you use it. Press Ctrl+C to stop.
 `);
+  console.log(dim("Tip: the ChatGPT desktop app does not need this; 1. Install connects it directly (Settings > Plugins).\n"));
   if (argv.includes("--local")) return announce(`http://127.0.0.1:${port}`);
   const cloudflared = which("cloudflared") || (isWin ? null : ["/opt/homebrew/bin/cloudflared", "/usr/local/bin/cloudflared"].find((p) => existsSync7(p)) ?? null);
   const ngrok = which("ngrok");

@@ -1,7 +1,7 @@
 AFTER EFFECTS MCP - START HERE
 ==============================
 
-Lets Claude (or ChatGPT, Cursor, Codex) control Adobe After Effects on your computer.
+Lets Claude, ChatGPT (desktop app), Cursor or Codex control Adobe After Effects on your computer.
 
 Pick ONE way to install:
 
@@ -31,6 +31,8 @@ Pick ONE way to install:
 
 Node.js is downloaded automatically if your computer doesn't have it.
 If Claude Desktop is open during the install, the installer offers to restart it.
+ChatGPT desktop app: restart it after installing. "after-effects" then appears in
+ChatGPT under Settings > Plugins > Servers. Make sure its switch is on.
 
 
 WHAT THE NUMBERED FILES DO (in the Mac and Windows folders)
@@ -38,8 +40,9 @@ WHAT THE NUMBERED FILES DO (in the Mac and Windows folders)
 1. Install             Installs everything and connects your AI apps.
 2. Test Installation   Run with After Effects open: every line should show a check mark.
                        It makes a temporary comp and removes it; your project is not changed.
-3. Connect ChatGPT     Optional. Connects ChatGPT; follow the instructions it shows and
-                       keep the window open while you use it.
+3. Connect ChatGPT     Only for ChatGPT on the WEB (chatgpt.com). The ChatGPT desktop app
+                       doesn't need it. Follow the instructions it shows and keep the
+                       window open while you use it.
 4. Uninstall           Removes everything. (If you used AE-MCP.mcpb, also remove it in
                        Claude Desktop > Settings > Extensions.)
 

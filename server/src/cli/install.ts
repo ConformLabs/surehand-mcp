@@ -6,7 +6,7 @@ import { VERSION } from "../config.js";
 import { ensureConfig, ensureDebugMode, ensureExtension } from "./setup.js";
 import {
   CONFIG_FILE, INSTALLED_SERVER, SERVER_NAME, ask, bold, claudeCodeConfig, claudeDesktopConfig, claudeDesktopDir, claudeDesktopExe,
-  codexBlock, codexConfig, cursorConfig, dim, extensionDir, fail, findClaudeCli, isMac, isWin, ok, readJson, removeCodexBlock, run,
+  chatgptDesktopInstalled, codexBlock, codexConfig, cursorConfig, dim, extensionDir, fail, findClaudeCli, isMac, isWin, ok, readJson, removeCodexBlock, run,
   sleep, stableNodePath, step, warn, writeJsonWithBackup, CSXS_VERSIONS,
 } from "./util.js";
 
@@ -137,14 +137,17 @@ export async function install(argv: string[]) {
 
   if (want("cursor") && existsSync(dirname(cursorConfig()))) addJson("Cursor", cursorConfig());
 
-  if (want("codex") && existsSync(dirname(codexConfig()))) {
+  // ChatGPT desktop and Codex read ~/.codex/config.toml; create it if the app is installed but has never written it
+  if (want("codex") && (existsSync(dirname(codexConfig())) || chatgptDesktopInstalled())) {
     try {
       const file = codexConfig();
+      mkdirSync(dirname(file), { recursive: true });
       const text = existsSync(file) ? readFileSync(file, "utf8") : "";
       if (existsSync(file) && !existsSync(file + ".aemcp.bak")) copyFileSync(file, file + ".aemcp.bak");
-      writeFileSync(file, removeCodexBlock(text).trimEnd() + "\n\n" + codexBlock(nodePath, INSTALLED_SERVER));
-      ok("Codex (OpenAI)");
-      registered.push("Codex");
+      const rest = removeCodexBlock(text).trim();
+      writeFileSync(file, (rest ? rest + "\n\n" : "") + codexBlock(nodePath, INSTALLED_SERVER));
+      ok("ChatGPT desktop / Codex");
+      registered.push("ChatGPT desktop");
     } catch (e: any) {
       warn(`Codex: ${e.message}`);
     }
@@ -161,7 +164,7 @@ export async function install(argv: string[]) {
 
   Try asking Claude: ${bold('"Check After Effects is connected, then make a 1080p comp with an animated title."')}
   Check the installation any time with ${bold("2. Test Installation")} (in the ${isWin ? "Windows" : "Mac"} folder).
-  ChatGPT: run ${bold("3. Connect ChatGPT")} from the same folder.
+${registered.includes("ChatGPT desktop") ? "  ChatGPT desktop app: restart it; after-effects appears under Settings > Plugins > Servers.\n" : ""}  ChatGPT on the web: run ${bold("3. Connect ChatGPT")} from the same folder.
 
   Other MCP apps can use:  command ${nodePath}
                            args    ["${INSTALLED_SERVER}"]

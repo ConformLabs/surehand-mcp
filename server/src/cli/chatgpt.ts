@@ -30,6 +30,7 @@ then Create a connector > paste the URL above > Authentication: "No authenticati
 Keep this window open while you use it. Press Ctrl+C to stop.
 `);
 
+  console.log(dim("Tip: the ChatGPT desktop app does not need this; 1. Install connects it directly (Settings > Plugins).\n"));
   if (argv.includes("--local")) return announce(`http://127.0.0.1:${port}`);
 
   const cloudflared = which("cloudflared") || (isWin ? null : ["/opt/homebrew/bin/cloudflared", "/usr/local/bin/cloudflared"].find((p) => existsSync(p)) ?? null);

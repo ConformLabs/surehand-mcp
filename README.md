@@ -1,6 +1,6 @@
 # After Effects MCP
 
-Connect **Claude** (Desktop / Code), **ChatGPT**, Cursor, Codex, or any MCP client to **Adobe After Effects**.
+Connect **Claude** (Desktop / Code), **ChatGPT** (desktop app or web), Cursor, Codex, or any MCP client to **Adobe After Effects**.
 The AI can run any ExtendScript (JSX) inside After Effects, read information back, and use 58 ready-made tools
 for projects, comps, layers, keyframes, expressions, effects, shapes, masks, rendering, and frame previews it can *see*.
 
@@ -10,7 +10,7 @@ Claude / ChatGPT ──MCP──> ae-mcp server (Node) ──localhost──> AE
 
 ## Requirements
 
-- After Effects 2020 (17.0) or newer on macOS or Windows (tested on AE 2026 / macOS)
+- After Effects 2020 (17.0) or newer on macOS or Windows (tested with AE 2026 on macOS and Windows 11)
 - Nothing else: the `.mcpb` uses Claude Desktop's built-in Node.js, and the installer downloads Node.js if it is missing
 
 ## Install
@@ -31,7 +31,7 @@ Then:
 **Claude Desktop only (easiest):** double-click **`AE-MCP.mcpb`** and click Install in Claude Desktop. Restart After Effects once.
 On first start the server installs its After Effects extension by itself.
 
-**Any app (Claude Desktop, Claude Code, Cursor, Codex) + ChatGPT:** double-click **1. Install** in the
+**Any app (Claude Desktop, Claude Code, ChatGPT desktop, Cursor, Codex):** double-click **1. Install** in the
 `2. Mac` or `3. Windows` folder, then restart After Effects once.
 Use either the `.mcpb` or the installer for Claude Desktop, not both.
 
@@ -46,7 +46,8 @@ The installer:
 - installs the After Effects extension (`com.aemcp`) into your user CEP extensions folder and enables
   unsigned extensions (`PlayerDebugMode`) for CSXS 9-14
 - creates `~/.aemcp/config.json` with a random access token
-- registers the server with **Claude Desktop**, **Claude Code**, **Cursor** and **Codex** if they are installed
+- registers the server with **Claude Desktop**, **Claude Code**, **ChatGPT desktop / Codex** (`~/.codex/config.toml`,
+  created if the ChatGPT or Codex app is installed) and **Cursor** if they are installed
   (original config files are backed up once as `*.aemcp.bak`); if Claude Desktop is open it offers to restart it,
   because a running Claude Desktop overwrites its config file
 
@@ -60,6 +61,10 @@ To uninstall: double-click **4. Uninstall** (and remove the `.mcpb` in Claude De
 Settings > Extensions if you used it).
 
 ## Testing on Windows
+
+Confirmed working on Windows 11: install (including the automatic Node.js download), self-test, and the
+ChatGPT desktop app. Use this checklist to test other machines.
+
 
 You need a Windows 10/11 PC (or VM) with After Effects. Your Creative Cloud license allows two activations,
 so a second machine works. On a Mac, a Windows VM in Parallels/VMware also works, but performance under
@@ -98,7 +103,13 @@ Point them at the installed server (stdio):
 
 ## ChatGPT
 
-ChatGPT connects to MCP servers over HTTPS, so the server runs in HTTP mode behind a temporary public tunnel:
+**ChatGPT desktop app (Mac/Windows): no tunnel needed.** It runs local MCP servers itself and reads the same
+`~/.codex/config.toml` as Codex, which **1. Install** fills in. Restart ChatGPT after installing; **after-effects**
+appears under **Settings > Plugins > Servers** (switch on). To add it by hand: **Add > MCP server > STDIO**, command =
+the Node path printed by the installer, argument = `~/.aemcp/server/ae-mcp.mjs`. Tested working on Windows.
+
+**ChatGPT on the web (chatgpt.com):** it can only reach MCP servers over public HTTPS, so the server runs in HTTP mode
+behind a temporary tunnel:
 
 1. Install a tunnel tool once: **cloudflared** (no account needed: `brew install cloudflared` on macOS,
    `winget install --id Cloudflare.cloudflared` on Windows) or [ngrok](https://ngrok.com/download).
