@@ -81,7 +81,7 @@ export async function selftest(full = false): Promise<number> {
   if (!info.ok) return bad(`ExtendScript failed: ${info.error?.message}`), summary(failures);
   ok(`ExtendScript works: After Effects ${info.result.version} on ${info.result.os}`);
   if (info.result.canWrite === false)
-    warn("'Allow Scripts to Write Files and Access Network' is OFF: enable it in AE Settings > Scripting & Expressions (needed for frame previews).");
+    warn("'Allow Scripts to Write Files and Access Network' is OFF. Previews still work; scripts that write files themselves (File.write, exports) or use the network need it: AE Settings > Scripting & Expressions.");
 
   // --- functional test in a temporary comp ---
   const tmpDir = join(AEMCP_DIR, "tmp");
@@ -96,11 +96,12 @@ var fx = t.property("ADBE Effect Parade").addProperty("ADBE Drop Shadow");
 t.property("ADBE Transform Group").property("ADBE Opacity").expression = "50 + 50 * Math.sin(time)";
 var f = new File(args.png);
 var wrote = false;
-if (args.canWrite !== false) { c.saveFrameToPng(1, f); var w = 0; while (!f.exists && w < 10000) { $.sleep(50); w += 50; } wrote = f.exists; $.sleep(100); }
+// saveFrameToPng works even when "Allow Scripts to Write Files" is off (confirmed on macOS and Windows)
+c.saveFrameToPng(1, f); var w = 0; while (!f.exists && w < 10000) { $.sleep(50); w += 50; } wrote = f.exists; $.sleep(100);
 var r = { keys: p.numKeys, effect: fx.matchName, exprError: t.property("ADBE Transform Group").property("ADBE Opacity").expressionError, wrote: wrote };
 c.remove();
 return r;`,
-    { png, canWrite: info.result.canWrite },
+    { png },
     { undoGroup: "AE MCP self-test", timeoutMs: 60000 },
   );
   if (!job.ok) bad(`Test job failed: ${job.error?.message}`);
@@ -108,7 +109,7 @@ return r;`,
     const r = job.result as any;
     if (r.keys === 2 && r.effect === "ADBE Drop Shadow" && !r.exprError) ok("Created a comp, text layer, keyframes, effect and expression (then removed it)");
     else bad(`Unexpected test result: ${JSON.stringify(r)}`);
-    if (info.result.canWrite !== false) {
+    {
       for (let i = 0; i < 50 && !(existsSync(png) && statSync(png).size > 0); i++) await sleep(100);
       if (existsSync(png) && statSync(png).size > 0) {
         const sig = readFileSync(png).subarray(1, 4).toString();

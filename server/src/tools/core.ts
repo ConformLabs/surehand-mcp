@@ -335,8 +335,9 @@ export function registerCoreTools(server: McpServer) {
           out.content.push({
             type: "text",
             text:
-              "WARNING: 'Allow Scripts to Write Files and Access Network' is OFF in After Effects, so scripts cannot write files (frame previews, exports, File.write). " +
-              "Ask the user to enable it: After Effects > Settings > Scripting & Expressions (Windows: Edit > Preferences > Scripting & Expressions).",
+              "Note: 'Allow Scripts to Write Files and Access Network' is OFF in After Effects. Frame previews and the built-in tools still work, " +
+              "but your own scripts can't write files (File.write, exporting data) or use the network. If you need that, ask the user to enable it: " +
+              "After Effects > Settings > Scripting & Expressions (Windows: Edit > Preferences > Scripting & Expressions).",
           });
         const upd = updateMessage(await checkForUpdate());
         if (upd) out.content.push({ type: "text", text: `${upd}\nTell the user about this update.` });

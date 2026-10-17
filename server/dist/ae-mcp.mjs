@@ -498,7 +498,8 @@ var init_define_AEMCP_CEP_FILES = __esm({
     var host = AEMCPBridge.hostInfo();
     lines.push("host: " + host.appName + " " + host.appVersion + " \xB7 bridge v" + AEMCPBridge.VERSION + " \xB7 port " + myPort);
     lines.push("os: " + process.platform + " " + os.release() + " " + os.arch() + " \xB7 CEP node " + process.versions.node);
-    try { lines.push("extension: " + decodeURI(window.__adobe_cep__.getSystemPath("extension")).replace(/^file:\\/\\//, "")); } catch (e) {}
+    // file:///C:/... on Windows: drop the slash before the drive letter
+    try { lines.push("extension: " + decodeURI(window.__adobe_cep__.getSystemPath("extension")).replace(/^file:\\/\\//, "").replace(/^\\/([A-Za-z]:)/, "$1")); } catch (e) {}
     var cfg = readJson(AEMCPBridge.CONFIG_FILE);
     if (cfg) { if (cfg.token) cfg.token = "<set, " + cfg.token.length + " chars>"; lines.push("config: " + JSON.stringify(cfg)); }
     else lines.push("config: MISSING (" + AEMCPBridge.CONFIG_FILE + ")");
@@ -73843,7 +73844,7 @@ function installedExtensionHash() {
 function ensureExtension(force = false) {
   const dir = extensionDir();
   const current2 = installedExtensionHash();
-  if (!force && current2 === "42052ad26295" && existsSync2(join3(dir, "CSXS", "manifest.xml"))) return { installed: false, updated: false };
+  if (!force && current2 === "3020d7818f1c" && existsSync2(join3(dir, "CSXS", "manifest.xml"))) return { installed: false, updated: false };
   const updated = existsSync2(dir);
   rmSync(dir, { recursive: true, force: true });
   for (const [rel, content] of Object.entries(define_AEMCP_CEP_FILES_default)) {
@@ -73851,7 +73852,7 @@ function ensureExtension(force = false) {
     mkdirSync2(dirname2(p), { recursive: true });
     writeFileSync2(p, content);
   }
-  writeFileSync2(join3(dir, HASH_FILE), "42052ad26295");
+  writeFileSync2(join3(dir, HASH_FILE), "3020d7818f1c");
   return { installed: true, updated };
 }
 function debugModeOn(v) {
@@ -75568,7 +75569,7 @@ ${source.slice(0, 1500)}` } } : void 0
         if (r.ok && r.result?.canWriteFiles === false)
           out.content.push({
             type: "text",
-            text: "WARNING: 'Allow Scripts to Write Files and Access Network' is OFF in After Effects, so scripts cannot write files (frame previews, exports, File.write). Ask the user to enable it: After Effects > Settings > Scripting & Expressions (Windows: Edit > Preferences > Scripting & Expressions)."
+            text: "Note: 'Allow Scripts to Write Files and Access Network' is OFF in After Effects. Frame previews and the built-in tools still work, but your own scripts can't write files (File.write, exporting data) or use the network. If you need that, ask the user to enable it: After Effects > Settings > Scripting & Expressions (Windows: Edit > Preferences > Scripting & Expressions)."
           });
         const upd = updateMessage(await checkForUpdate());
         if (upd) out.content.push({ type: "text", text: `${upd}
@@ -77635,7 +77636,7 @@ async function diagnostics() {
   if (cfg) L.push(`config: ${JSON.stringify({ ...cfg, token: cfg.token ? `<set, ${cfg.token.length} chars>` : "MISSING" })}`);
   else L.push(`config: MISSING (${CONFIG_FILE})`);
   L.push(`installed server: ${existsSync7(INSTALLED_SERVER) ? INSTALLED_SERVER : "not installed (fine when using the .mcpb)"}`);
-  L.push(`extension: ${extensionDir()} \xB7 ${existsSync7(join9(extensionDir(), "CSXS", "manifest.xml")) ? `hash ${installedExtensionHash()} (bundled ${"42052ad26295"})` : "MISSING"}`);
+  L.push(`extension: ${extensionDir()} \xB7 ${existsSync7(join9(extensionDir(), "CSXS", "manifest.xml")) ? `hash ${installedExtensionHash()} (bundled ${"3020d7818f1c"})` : "MISSING"}`);
   L.push(`PlayerDebugMode: ${debugMode()}`);
   L.push(`Claude Desktop: ${clientEntry(claudeDesktopConfig())}`);
   L.push(`Claude Code: ${clientEntry(claudeCodeConfig())}`);
@@ -77959,7 +77960,7 @@ After Effects MCP self-test v${VERSION}`));
   else bad(`No config at ${CONFIG_FILE}. Run the installer.`);
   const hash2 = installedExtensionHash();
   if (!existsSync10(join12(extensionDir(), "CSXS", "manifest.xml"))) bad(`After Effects extension missing at ${extensionDir()}. Run the installer.`);
-  else if (hash2 !== "42052ad26295") warn(`Extension at ${extensionDir()} is a different version (${hash2 ?? "unknown"} vs ${"42052ad26295"}). Re-run the installer.`);
+  else if (hash2 !== "3020d7818f1c") warn(`Extension at ${extensionDir()} is a different version (${hash2 ?? "unknown"} vs ${"3020d7818f1c"}). Re-run the installer.`);
   else ok("After Effects extension installed");
   const offVersions = CSXS_VERSIONS.filter((v) => {
     const r = isWin ? spawnSync5("reg", ["query", `HKCU\\Software\\Adobe\\CSXS.${v}`, "/v", "PlayerDebugMode"], { encoding: "utf8" }) : isMac ? spawnSync5("defaults", ["read", `com.adobe.CSXS.${v}`, "PlayerDebugMode"], { encoding: "utf8" }) : null;
@@ -77999,7 +78000,7 @@ After Effects MCP self-test v${VERSION}`));
   if (!info.ok) return bad(`ExtendScript failed: ${info.error?.message}`), summary(failures);
   ok(`ExtendScript works: After Effects ${info.result.version} on ${info.result.os}`);
   if (info.result.canWrite === false)
-    warn("'Allow Scripts to Write Files and Access Network' is OFF: enable it in AE Settings > Scripting & Expressions (needed for frame previews).");
+    warn("'Allow Scripts to Write Files and Access Network' is OFF. Previews still work; scripts that write files themselves (File.write, exports) or use the network need it: AE Settings > Scripting & Expressions.");
   const tmpDir = join12(AEMCP_DIR, "tmp");
   mkdirSync9(tmpDir, { recursive: true });
   const png = join12(tmpDir, `selftest_${Date.now()}.png`);
@@ -78012,11 +78013,12 @@ var fx = t.property("ADBE Effect Parade").addProperty("ADBE Drop Shadow");
 t.property("ADBE Transform Group").property("ADBE Opacity").expression = "50 + 50 * Math.sin(time)";
 var f = new File(args.png);
 var wrote = false;
-if (args.canWrite !== false) { c.saveFrameToPng(1, f); var w = 0; while (!f.exists && w < 10000) { $.sleep(50); w += 50; } wrote = f.exists; $.sleep(100); }
+// saveFrameToPng works even when "Allow Scripts to Write Files" is off (confirmed on macOS and Windows)
+c.saveFrameToPng(1, f); var w = 0; while (!f.exists && w < 10000) { $.sleep(50); w += 50; } wrote = f.exists; $.sleep(100);
 var r = { keys: p.numKeys, effect: fx.matchName, exprError: t.property("ADBE Transform Group").property("ADBE Opacity").expressionError, wrote: wrote };
 c.remove();
 return r;`,
-    { png, canWrite: info.result.canWrite },
+    { png },
     { undoGroup: "AE MCP self-test", timeoutMs: 6e4 }
   );
   if (!job.ok) bad(`Test job failed: ${job.error?.message}`);
@@ -78024,7 +78026,7 @@ return r;`,
     const r = job.result;
     if (r.keys === 2 && r.effect === "ADBE Drop Shadow" && !r.exprError) ok("Created a comp, text layer, keyframes, effect and expression (then removed it)");
     else bad(`Unexpected test result: ${JSON.stringify(r)}`);
-    if (info.result.canWrite !== false) {
+    {
       for (let i = 0; i < 50 && !(existsSync10(png) && statSync4(png).size > 0); i++) await sleep(100);
       if (existsSync10(png) && statSync4(png).size > 0) {
         const sig = readFileSync10(png).subarray(1, 4).toString();

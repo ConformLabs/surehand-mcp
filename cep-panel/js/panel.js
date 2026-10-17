@@ -181,7 +181,8 @@
     var host = AEMCPBridge.hostInfo();
     lines.push("host: " + host.appName + " " + host.appVersion + " · bridge v" + AEMCPBridge.VERSION + " · port " + myPort);
     lines.push("os: " + process.platform + " " + os.release() + " " + os.arch() + " · CEP node " + process.versions.node);
-    try { lines.push("extension: " + decodeURI(window.__adobe_cep__.getSystemPath("extension")).replace(/^file:\/\//, "")); } catch (e) {}
+    // file:///C:/... on Windows: drop the slash before the drive letter
+    try { lines.push("extension: " + decodeURI(window.__adobe_cep__.getSystemPath("extension")).replace(/^file:\/\//, "").replace(/^\/([A-Za-z]:)/, "$1")); } catch (e) {}
     var cfg = readJson(AEMCPBridge.CONFIG_FILE);
     if (cfg) { if (cfg.token) cfg.token = "<set, " + cfg.token.length + " chars>"; lines.push("config: " + JSON.stringify(cfg)); }
     else lines.push("config: MISSING (" + AEMCPBridge.CONFIG_FILE + ")");

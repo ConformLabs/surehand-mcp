@@ -240,8 +240,8 @@ If After Effects doesn't answer, the error says what it is busy with and for how
 dialog. `ae_status` shows the same.
 
 **Compatibility check.** `ae-mcp selftest --full` runs every major tool against temporary comps (removed afterwards),
-lists which scripting features your After Effects version has, and saves a report to `~/.aemcp/compat/`. Tested so far
-on After Effects 2026 (26.5) on macOS; please share reports from other versions.
+lists which scripting features your After Effects version has, and saves a report to `~/.aemcp/compat/`. All 32 steps
+pass on After Effects 2026 (26.5) on macOS and Windows 11; please share reports from other versions.
 
 ## Troubleshooting
 
@@ -251,7 +251,7 @@ on After Effects 2026 (26.5) on macOS; please share reports from other versions.
 | Extension missing from the menu | Unsigned extensions must be allowed. The installer sets `PlayerDebugMode=1`; check with `defaults read com.adobe.CSXS.12` (macOS) or in the registry under `HKCU\Software\Adobe\CSXS.12` (Windows). |
 | "Port 8765 is already in use" | Only one After Effects instance can host the bridge. Close the other instance, or change `bridgePort` in `~/.aemcp/config.json` and restart AE + your AI app. |
 | "Token mismatch" | Re-run the installer (it keeps the existing token) and restart AE. |
-| Frame previews / file writes fail | Enable **Settings > Scripting & Expressions > Allow Scripts to Write Files and Access Network** in After Effects. |
+| Scripts can't write files or use the network | Enable **Settings > Scripting & Expressions > Allow Scripts to Write Files and Access Network** in After Effects. Frame previews and the built-in tools work without it. |
 | A call times out | ExtendScript can't be interrupted: long scripts or renders keep AE busy, and modal dialogs block it. Check AE, then retry. Pass `timeoutSeconds` for long jobs. |
 | Claude Desktop doesn't show the tools | Quit Claude Desktop completely (menu bar / tray) and reopen it. Check `claude_desktop_config.json` contains `after-effects`. |
 
