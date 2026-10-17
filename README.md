@@ -287,7 +287,8 @@ installer/           run.sh / run.ps1: find or download Node.js, then run an ae-
 ```bash
 cd server
 npm install
-npm test                 # unit tests (wrapper, bridge protocol, ES3 lint of every tool)
+npm run check            # what CI runs: type-check, all tests, build (run before pushing)
+npm test                 # unit tests only
 npm run build            # -> dist/ae-mcp.mjs
 node scripts/smoke.mjs   # live test: needs After Effects running with the bridge
 npm run package          # -> ../dist-zip/AE-MCP/ (launchers, server, AE-MCP.mcpb) + zip
