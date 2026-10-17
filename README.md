@@ -15,18 +15,29 @@ Claude / ChatGPT ──MCP──> ae-mcp server (Node) ──localhost──> AE
 
 ## Install
 
-Get the release folder (`npm run package` in `server/` builds `dist-zip/AE-MCP/` and a zip), then:
+Get the release folder (`npm run package` in `server/` builds `dist-zip/AE-MCP/` and a zip). It looks like this:
+
+```
+AE-MCP/
+  START HERE.txt
+  1. Claude Desktop (easiest)/   AE-MCP.mcpb
+  2. Mac/                        Install, Test Installation, Connect ChatGPT, Uninstall (.command)
+  3. Windows/                    Install, Test Installation, Connect ChatGPT, Uninstall (.bat)
+  Support files/                 run.sh, run.ps1, ae-mcp.mjs, this README
+```
+
+Then:
 
 **Claude Desktop only (easiest):** double-click **`AE-MCP.mcpb`** and click Install in Claude Desktop. Restart After Effects once.
 On first start the server installs its After Effects extension by itself.
 
-**Any app (Claude Desktop, Claude Code, Cursor, Codex) + ChatGPT:** double-click
-**`Install (Mac).command`** or **`Install (Windows).bat`**, then restart After Effects once.
+**Any app (Claude Desktop, Claude Code, Cursor, Codex) + ChatGPT:** double-click **Install** in the
+`2. Mac` or `3. Windows` folder, then restart After Effects once.
 Use either the `.mcpb` or the installer for Claude Desktop, not both.
 
-**Check it:** with After Effects open, run **`Test Installation (Mac).command`** / **`Test Installation (Windows).bat`**.
+**Check it:** with After Effects open, double-click **Test Installation** in the same folder.
 
-`INSTALL.txt` has the same steps in plain language for people you share it with, including what to do if
+`START HERE.txt` (from `INSTALL.txt` in this repo) has the same steps in plain language for people you share it with, including what to do if
 macOS Gatekeeper or Windows SmartScreen blocks the files.
 
 The installer:
@@ -45,7 +56,7 @@ updating is just: replace the `.mcpb` (or re-run the installer) and restart Afte
 The bridge starts automatically with After Effects; nothing needs to be opened.
 To see its status, open **Window > Extensions > AE MCP** (green dot = connected, plus a log of recent calls).
 
-To uninstall: `Uninstall (Mac).command` / `Uninstall (Windows).bat` (and remove the `.mcpb` in Claude Desktop >
+To uninstall: double-click **Uninstall** (and remove the `.mcpb` in Claude Desktop >
 Settings > Extensions if you used it).
 
 ## Testing on Windows
@@ -55,23 +66,23 @@ so a second machine works. On a Mac, a Windows VM in Parallels/VMware also works
 x64 emulation on Apple Silicon may be slow, so a real PC is better.
 
 1. Copy `AE-MCP-<version>.zip` to the PC, right-click > **Extract All**.
-2. Make sure After Effects is **closed**, then double-click **`Install (Windows).bat`**.
+2. Make sure After Effects is **closed**, then open `3. Windows` and double-click **Install**.
    - If SmartScreen appears: **More info > Run anyway**.
    - Expect: Node.js downloads if missing, then check marks for the server, extension, PlayerDebugMode and apps found.
 3. Start After Effects and wait for it to finish loading.
-4. Double-click **`Test Installation (Windows).bat`**. All lines should show check marks, ending with
+4. Double-click **Test Installation** (same folder). All lines should show check marks, ending with
    "All checks passed".
 5. In After Effects, open **Window > Extensions > AE MCP**: the dot should be green.
 6. Open Claude Desktop (restart it if it was open during the install) and ask:
    *"Check After Effects is connected, then make a 1080p comp with an animated title and show me frame 1."*
 7. Optional, more thorough: with Node installed, run `node server\scripts\smoke.mjs` from a full source checkout
    (`npm install` in `server\` first). This calls all major tools and needs After Effects open.
-8. Also try the `.mcpb`: run `Uninstall (Windows).bat`, double-click `AE-MCP.mcpb`, install it in Claude Desktop,
+8. Also try the `.mcpb`: run **Uninstall**, double-click `1. Claude Desktop (easiest)\\AE-MCP.mcpb`, install it in Claude Desktop,
    ask Claude to check the connection (it should say to restart After Effects), restart AE, ask again.
 
 Things worth checking specifically on Windows: paths with spaces or non-English characters in the user name,
 a machine without Node.js (tests the automatic download), and Windows on ARM.
-If something fails, send the full output of `Test Installation (Windows).bat` and `%USERPROFILE%\.aemcp\bridge-status.json`.
+If something fails, send the full output of **Test Installation** and `%USERPROFILE%\.aemcp\bridge-status.json`.
 
 ### Other MCP clients
 
@@ -91,7 +102,7 @@ ChatGPT connects to MCP servers over HTTPS, so the server runs in HTTP mode behi
 
 1. Install a tunnel tool once: **cloudflared** (no account needed: `brew install cloudflared` on macOS,
    `winget install --id Cloudflare.cloudflared` on Windows) or [ngrok](https://ngrok.com/download).
-2. Double-click `Connect ChatGPT (Mac).command` or `Connect ChatGPT (Windows).bat`. It prints a URL like
+2. Double-click **Connect ChatGPT** in the `2. Mac` or `3. Windows` folder. It prints a URL like
    `https://xxxx.trycloudflare.com/mcp/<token>`.
 3. In ChatGPT: **Settings > Apps & Connectors > Advanced settings > Developer mode** on, then **Create** a connector,
    paste the URL, choose **No authentication** (the token is in the URL), and save.
@@ -163,7 +174,7 @@ server/              MCP server (TypeScript) -> bundled into server/dist/ae-mcp.
   scripts/package.mjs  builds the shareable release folder, zip and .mcpb
 cep-panel/           After Effects extension: invisible bridge (auto-starts) + status panel
 installer/           run.sh / run.ps1: find or download Node.js, then run an ae-mcp command
-*.command, *.bat     double-click launchers
+*.command, *.bat     double-click launchers for a source checkout (the release has its own, in folders)
 ```
 
 ```bash

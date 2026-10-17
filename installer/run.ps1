@@ -5,7 +5,9 @@ $ProgressPreference = "SilentlyContinue"   # Invoke-WebRequest is very slow with
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $root = Split-Path -Parent $PSScriptRoot
-$server = Join-Path $root "server\dist\ae-mcp.mjs"
+# release layout: the server sits next to this script; source checkout: server\dist
+$server = Join-Path $PSScriptRoot "ae-mcp.mjs"
+if (-not (Test-Path $server)) { $server = Join-Path $root "server\dist\ae-mcp.mjs" }
 $privateNode = Join-Path $env:USERPROFILE ".aemcp\node"
 
 # Files extracted from a downloaded zip carry the "downloaded from the internet" mark; clear it.

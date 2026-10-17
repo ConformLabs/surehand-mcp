@@ -1,54 +1,51 @@
-AFTER EFFECTS MCP - HOW TO INSTALL
-==================================
+AFTER EFFECTS MCP - START HERE
+==============================
 
 Lets Claude (or ChatGPT, Cursor, Codex) control Adobe After Effects on your computer.
 
+Pick ONE way to install:
 
-OPTION A - Claude Desktop only (easiest, nothing else to install)
------------------------------------------------------------------
+
+>> Only use Claude Desktop?  Open the folder "1. Claude Desktop (easiest)"
+-------------------------------------------------------------------------
 1. Double-click  AE-MCP.mcpb
-   Claude Desktop opens and asks to install the extension. Click Install.
+   Claude Desktop opens and asks to install it. Click Install.
 2. Restart After Effects (once).
 3. In Claude, ask: "Check After Effects is connected."
 
 
-OPTION B - Claude Desktop, Claude Code, Cursor, Codex (and ChatGPT)
--------------------------------------------------------------------
-1. Double-click:
-     Mac:      Install (Mac).command
-     Windows:  Install (Windows).bat
-   Node.js is downloaded automatically if you don't have it.
-   If Claude Desktop is open, the installer offers to restart it.
+>> Mac (any AI app, including ChatGPT)?  Open the folder "2. Mac"
+-----------------------------------------------------------------
+1. Double-click  Install
 2. Restart After Effects (once).
 3. In Claude, ask: "Check After Effects is connected."
 
-Use A or B for Claude Desktop, not both.
+
+>> Windows (any AI app, including ChatGPT)?  Open the folder "3. Windows"
+-------------------------------------------------------------------------
+1. Double-click  Install
+2. Restart After Effects (once).
+3. In Claude, ask: "Check After Effects is connected."
+
+Node.js is downloaded automatically if your computer doesn't have it.
+If Claude Desktop is open during the install, the installer offers to restart it.
 
 
-CHECK IT WORKS
---------------
-With After Effects open, double-click  "Test Installation (Mac).command"
-or "Test Installation (Windows).bat". Every line should show a check mark.
-(It makes a temporary comp and removes it again; your project is not changed.)
+OTHER BUTTONS (in the Mac and Windows folders)
+----------------------------------------------
+Test Installation   Run with After Effects open: every line should show a check mark.
+                    It makes a temporary comp and removes it; your project is not changed.
+Connect ChatGPT     Connects ChatGPT. Follow the instructions it shows and keep the window open.
+Uninstall           Removes everything.
+                    (If you used AE-MCP.mcpb, also remove it in Claude Desktop >
+                    Settings > Extensions.)
 
-
-CHATGPT
--------
-Double-click "Connect ChatGPT (Mac).command" / "Connect ChatGPT (Windows).bat"
-and follow the instructions it prints. See README.md for details.
+The "Support files" folder is used by the buttons above; you don't need to open it.
 
 
 IF YOUR COMPUTER BLOCKS THE FILES
 ---------------------------------
 Mac:     "cannot be opened because it is from an unidentified developer"
-         -> Open System Settings > Privacy & Security, scroll down and click
-            "Open Anyway" next to the file name, then double-click it again.
-         Or open Terminal and drag the .command file into the window, press Enter.
+         -> Open System Settings > Privacy & Security, scroll down, click "Open Anyway",
+            then double-click the file again. (Only needed the first time.)
 Windows: "Windows protected your PC" -> click "More info" > "Run anyway".
-
-
-UNINSTALL
----------
-Double-click "Uninstall (Mac).command" / "Uninstall (Windows).bat".
-If you used the .mcpb: Claude Desktop > Settings > Extensions > After Effects MCP > Uninstall,
-then also run the Uninstall file above to remove the After Effects part.

@@ -2,8 +2,11 @@
 # macOS launcher: finds Node.js 18+ (or downloads a private copy into ~/.aemcp/node, verified
 # against the nodejs.org checksums) and runs the AE MCP command given as arguments.
 set -u
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SERVER="$ROOT/server/dist/ae-mcp.mjs"
+HERE="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$(cd "$HERE/.." && pwd)"
+# release layout: the server sits next to this script; source checkout: server/dist
+SERVER="$HERE/ae-mcp.mjs"
+[ -f "$SERVER" ] || SERVER="$ROOT/server/dist/ae-mcp.mjs"
 PRIVATE_NODE="$HOME/.aemcp/node"
 export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$HOME/.volta/bin:$PATH"
 [ -s "$HOME/.nvm/nvm.sh" ] && . "$HOME/.nvm/nvm.sh" >/dev/null 2>&1

@@ -1,10 +1,10 @@
-// Builds the shareable release: dist-zip/AE-MCP/ (+ AE-MCP-<version>.zip) containing the
-// launchers, the single-file server, and AE-MCP.mcpb (one-click Claude Desktop extension).
+// Builds the shareable release: dist-zip/AE-MCP/ (+ AE-MCP-<version>.zip), organised as
+//   START HERE.txt, "1. Claude Desktop (easiest)/AE-MCP.mcpb", "2. Mac/", "3. Windows/", "Support files/".
 // Usage: npm run package
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { execFileSync } from "node:child_process";
-import { chmodSync, copyFileSync, cpSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -57,19 +57,40 @@ const manifest = {
 writeFileSync(join(STAGE, "manifest.json"), JSON.stringify(manifest, null, 2));
 const mcpbCli = join(SERVER, "node_modules", "@anthropic-ai", "mcpb", "dist", "cli", "cli.js");
 run(process.execPath, [mcpbCli, "validate", join(STAGE, "manifest.json")]);
-mkdirSync(OUT, { recursive: true });
-run(process.execPath, [mcpbCli, "pack", STAGE, join(OUT, "AE-MCP.mcpb")]);
+// --- folder layout ---
+const DIRS = {
+  claude: join(OUT, "1. Claude Desktop (easiest)"),
+  mac: join(OUT, "2. Mac"),
+  win: join(OUT, "3. Windows"),
+  support: join(OUT, "Support files"),
+};
+for (const d of Object.values(DIRS)) mkdirSync(d, { recursive: true });
+run(process.execPath, [mcpbCli, "pack", STAGE, join(DIRS.claude, "AE-MCP.mcpb")]);
 rmSync(STAGE, { recursive: true, force: true });
 
-// --- launchers + server for the script installer ---
-for (const f of readdirSync(ROOT)) if (/\.(command|bat)$/.test(f)) copyFileSync(join(ROOT, f), join(OUT, f));
-cpSync(join(ROOT, "installer"), join(OUT, "installer"), { recursive: true });
-mkdirSync(join(OUT, "server", "dist"), { recursive: true });
-copyFileSync(bundle, join(OUT, "server", "dist", "ae-mcp.mjs"));
-copyFileSync(join(ROOT, "README.md"), join(OUT, "README.md"));
-copyFileSync(join(ROOT, "INSTALL.txt"), join(OUT, "INSTALL.txt"));
-for (const f of readdirSync(OUT)) if (f.endsWith(".command")) chmodSync(join(OUT, f), 0o755);
-chmodSync(join(OUT, "installer", "run.sh"), 0o755);
+// launchers: one per command and platform, all calling the scripts in "Support files"
+const LAUNCHERS = [
+  ["Install", "install", "Installs AE MCP and connects your AI apps."],
+  ["Test Installation", "selftest", "Checks that AE MCP is installed and can talk to After Effects."],
+  ["Connect ChatGPT", "chatgpt", "Connects ChatGPT (local server + secure tunnel). Keep the window open while you use it."],
+  ["Uninstall", "uninstall", "Removes AE MCP."],
+];
+for (const [name, cmd, desc] of LAUNCHERS) {
+  const mac = join(DIRS.mac, `${name}.command`);
+  writeFileSync(mac, `#!/bin/bash\n# ${desc}\nbash "$(dirname "$0")/../Support files/run.sh" ${cmd} "$@"\necho\nread -r -p "Press Enter to close..."\n`);
+  chmodSync(mac, 0o755);
+  writeFileSync(
+    join(DIRS.win, `${name}.bat`),
+    ["@echo off", `REM ${desc}`, `powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0..\\Support files\\run.ps1" ${cmd} %*`, "echo.", "pause", ""].join("\r\n"),
+  );
+}
+
+copyFileSync(join(ROOT, "installer", "run.sh"), join(DIRS.support, "run.sh"));
+chmodSync(join(DIRS.support, "run.sh"), 0o755);
+copyFileSync(join(ROOT, "installer", "run.ps1"), join(DIRS.support, "run.ps1"));
+copyFileSync(bundle, join(DIRS.support, "ae-mcp.mjs"));
+copyFileSync(join(ROOT, "README.md"), join(DIRS.support, "README (technical).md"));
+copyFileSync(join(ROOT, "INSTALL.txt"), join(OUT, "START HERE.txt"));
 
 // --- zip (keeps the executable bits on the macOS launchers) ---
 const zip = `AE-MCP-${pkg.version}.zip`;
