@@ -55,3 +55,8 @@ Mac:     "cannot be opened because it is from an unidentified developer"
          -> Open System Settings > Privacy & Security, scroll down, click "Open Anyway",
             then double-click the file again. (Only needed the first time.)
 Windows: "Windows protected your PC" -> click "More info" > "Run anyway".
+
+
+UPDATES & HELP
+--------------
+New versions and questions: https://github.com/ronron555/after-effects-mcp

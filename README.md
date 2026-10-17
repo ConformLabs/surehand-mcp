@@ -8,6 +8,12 @@ for projects, comps, layers, keyframes, expressions, effects, shapes, masks, ren
 Claude / ChatGPT ──MCP──> ae-mcp server (Node) ──localhost──> AE MCP bridge (extension inside After Effects) ──> ExtendScript
 ```
 
+## Download
+
+**[⬇ Download the latest release](https://github.com/ronron555/after-effects-mcp/releases/latest)**: get
+`AE-MCP-<version>.zip` (everything, Mac + Windows), or just `AE-MCP.mcpb` if you only use Claude Desktop.
+Unzip it and open `START HERE.txt`.
+
 ## Requirements
 
 - After Effects 2020 (17.0) or newer on macOS or Windows (tested with AE 2026 on macOS and Windows 11)
