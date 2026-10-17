@@ -82,7 +82,7 @@
   };
 
   // ---------- approvals ----------
-  var shownPending = "";
+  var shownPending = null; // ids currently on screen (null = nothing rendered yet)
   function renderPending(list) {
     var key = list.map(function (p) { return p.id; }).join(",");
     if (key === shownPending) return;
@@ -96,13 +96,16 @@
       d.innerHTML = '<div class="what"></div><pre></pre><div class="row"><button class="allow">Allow</button><button class="deny">Deny</button></div>';
       d.querySelector(".what").textContent = p.tool + " · " + new Date(p.at).toLocaleTimeString();
       d.querySelector("pre").textContent = p.summary;
-      d.querySelector(".allow").onclick = function () { answer(p.id, true); };
-      d.querySelector(".deny").onclick = function () { answer(p.id, false); };
+      d.querySelector(".allow").onclick = function () { answer(p.id, true, d); };
+      d.querySelector(".deny").onclick = function () { answer(p.id, false, d); };
       box.appendChild(d);
     });
   }
-  function answer(id, allow) {
-    call("POST", "/approve", { id: id, allow: allow }, function () { shownPending = ""; pollPending(); });
+  function answer(id, allow, card) {
+    // remove the card right away; the next poll redraws from the bridge's list either way
+    if (card && card.parentNode) card.parentNode.removeChild(card);
+    if (!$("approvalList").children.length) $("approvals").hidden = true;
+    call("POST", "/approve", { id: id, allow: allow }, function () { shownPending = null; pollPending(); });
   }
   function pollPending() {
     call("GET", "/pending", null, function (err, r) { if (!err && r && r.pending) renderPending(r.pending); });
@@ -221,7 +224,7 @@
       if (h.queue) extra.push("queue " + h.queue);
       if (h.permissionMode && h.permissionMode !== "full") extra.push(h.permissionMode === "ask" ? "asks before changes" : "read-only");
       setStatus(h.busy && h.busyForMs > 15000 ? "warn" : "ok", "Connected · port " + h.port + (extra.length ? " · " + extra.join(" · ") : ""));
-      if (h.pendingApprovals || shownPending) pollPending();
+      pollPending(); // cheap local request; also clears cards answered elsewhere or cancelled by the AI app
     });
     renderActivity();
     showUpdate();

@@ -241,7 +241,8 @@ dialog. `ae_status` shows the same.
 
 **Compatibility check.** `ae-mcp selftest --full` runs every major tool against temporary comps (removed afterwards),
 lists which scripting features your After Effects version has, and saves a report to `~/.aemcp/compat/`. All 32 steps
-pass on After Effects 2026 (26.5) on macOS and Windows 11; please share reports from other versions.
+pass on After Effects 2026 (26.5) on macOS and Windows 11, and the panel, permissions, approvals and background
+rendering are verified on both; please share reports from other versions.
 
 ## Troubleshooting
 

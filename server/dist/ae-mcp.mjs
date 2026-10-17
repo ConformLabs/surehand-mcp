@@ -399,7 +399,7 @@ var init_define_AEMCP_CEP_FILES = __esm({
   };
 
   // ---------- approvals ----------
-  var shownPending = "";
+  var shownPending = null; // ids currently on screen (null = nothing rendered yet)
   function renderPending(list) {
     var key = list.map(function (p) { return p.id; }).join(",");
     if (key === shownPending) return;
@@ -413,13 +413,16 @@ var init_define_AEMCP_CEP_FILES = __esm({
       d.innerHTML = '<div class="what"></div><pre></pre><div class="row"><button class="allow">Allow</button><button class="deny">Deny</button></div>';
       d.querySelector(".what").textContent = p.tool + " \xB7 " + new Date(p.at).toLocaleTimeString();
       d.querySelector("pre").textContent = p.summary;
-      d.querySelector(".allow").onclick = function () { answer(p.id, true); };
-      d.querySelector(".deny").onclick = function () { answer(p.id, false); };
+      d.querySelector(".allow").onclick = function () { answer(p.id, true, d); };
+      d.querySelector(".deny").onclick = function () { answer(p.id, false, d); };
       box.appendChild(d);
     });
   }
-  function answer(id, allow) {
-    call("POST", "/approve", { id: id, allow: allow }, function () { shownPending = ""; pollPending(); });
+  function answer(id, allow, card) {
+    // remove the card right away; the next poll redraws from the bridge's list either way
+    if (card && card.parentNode) card.parentNode.removeChild(card);
+    if (!$("approvalList").children.length) $("approvals").hidden = true;
+    call("POST", "/approve", { id: id, allow: allow }, function () { shownPending = null; pollPending(); });
   }
   function pollPending() {
     call("GET", "/pending", null, function (err, r) { if (!err && r && r.pending) renderPending(r.pending); });
@@ -538,7 +541,7 @@ var init_define_AEMCP_CEP_FILES = __esm({
       if (h.queue) extra.push("queue " + h.queue);
       if (h.permissionMode && h.permissionMode !== "full") extra.push(h.permissionMode === "ask" ? "asks before changes" : "read-only");
       setStatus(h.busy && h.busyForMs > 15000 ? "warn" : "ok", "Connected \xB7 port " + h.port + (extra.length ? " \xB7 " + extra.join(" \xB7 ") : ""));
-      if (h.pendingApprovals || shownPending) pollPending();
+      pollPending(); // cheap local request; also clears cards answered elsewhere or cancelled by the AI app
     });
     renderActivity();
     showUpdate();
@@ -73844,7 +73847,7 @@ function installedExtensionHash() {
 function ensureExtension(force = false) {
   const dir = extensionDir();
   const current2 = installedExtensionHash();
-  if (!force && current2 === "3020d7818f1c" && existsSync2(join3(dir, "CSXS", "manifest.xml"))) return { installed: false, updated: false };
+  if (!force && current2 === "e0b574ec0cdd" && existsSync2(join3(dir, "CSXS", "manifest.xml"))) return { installed: false, updated: false };
   const updated = existsSync2(dir);
   rmSync(dir, { recursive: true, force: true });
   for (const [rel, content] of Object.entries(define_AEMCP_CEP_FILES_default)) {
@@ -73852,7 +73855,7 @@ function ensureExtension(force = false) {
     mkdirSync2(dirname2(p), { recursive: true });
     writeFileSync2(p, content);
   }
-  writeFileSync2(join3(dir, HASH_FILE), "3020d7818f1c");
+  writeFileSync2(join3(dir, HASH_FILE), "e0b574ec0cdd");
   return { installed: true, updated };
 }
 function debugModeOn(v) {
@@ -77636,7 +77639,7 @@ async function diagnostics() {
   if (cfg) L.push(`config: ${JSON.stringify({ ...cfg, token: cfg.token ? `<set, ${cfg.token.length} chars>` : "MISSING" })}`);
   else L.push(`config: MISSING (${CONFIG_FILE})`);
   L.push(`installed server: ${existsSync7(INSTALLED_SERVER) ? INSTALLED_SERVER : "not installed (fine when using the .mcpb)"}`);
-  L.push(`extension: ${extensionDir()} \xB7 ${existsSync7(join9(extensionDir(), "CSXS", "manifest.xml")) ? `hash ${installedExtensionHash()} (bundled ${"3020d7818f1c"})` : "MISSING"}`);
+  L.push(`extension: ${extensionDir()} \xB7 ${existsSync7(join9(extensionDir(), "CSXS", "manifest.xml")) ? `hash ${installedExtensionHash()} (bundled ${"e0b574ec0cdd"})` : "MISSING"}`);
   L.push(`PlayerDebugMode: ${debugMode()}`);
   L.push(`Claude Desktop: ${clientEntry(claudeDesktopConfig())}`);
   L.push(`Claude Code: ${clientEntry(claudeCodeConfig())}`);
@@ -77960,7 +77963,7 @@ After Effects MCP self-test v${VERSION}`));
   else bad(`No config at ${CONFIG_FILE}. Run the installer.`);
   const hash2 = installedExtensionHash();
   if (!existsSync10(join12(extensionDir(), "CSXS", "manifest.xml"))) bad(`After Effects extension missing at ${extensionDir()}. Run the installer.`);
-  else if (hash2 !== "3020d7818f1c") warn(`Extension at ${extensionDir()} is a different version (${hash2 ?? "unknown"} vs ${"3020d7818f1c"}). Re-run the installer.`);
+  else if (hash2 !== "e0b574ec0cdd") warn(`Extension at ${extensionDir()} is a different version (${hash2 ?? "unknown"} vs ${"e0b574ec0cdd"}). Re-run the installer.`);
   else ok("After Effects extension installed");
   const offVersions = CSXS_VERSIONS.filter((v) => {
     const r = isWin ? spawnSync5("reg", ["query", `HKCU\\Software\\Adobe\\CSXS.${v}`, "/v", "PlayerDebugMode"], { encoding: "utf8" }) : isMac ? spawnSync5("defaults", ["read", `com.adobe.CSXS.${v}`, "PlayerDebugMode"], { encoding: "utf8" }) : null;
