@@ -27,6 +27,47 @@ var p = args.path !== undefined ? aemcp.resolveProp(l, args.path) : l;
 return aemcp.propInfo(p, { depth: args.depth === undefined ? 2 : args.depth, keyframes: !!args.keyframes, includeHidden: !!args.includeHidden });`,
   },
   {
+    name: "ae_find_properties",
+    title: "Find properties",
+    description:
+      "Search every layer of a comp (or one layer) for properties whose name or match name contains the query, e.g. \"opacity\", " +
+      "\"blur\", \"Source Text\", \"ADBE Fill Color\". Returns ready-to-use paths. Filter to animated or expression properties.",
+    input: {
+      comp: compRef,
+      query: z.string().optional().describe("Case-insensitive text to match in the property name or match name. Omit to list all matches of the filters."),
+      layer: layerRef.optional(),
+      onlyAnimated: z.boolean().optional().describe("Only properties with keyframes."),
+      onlyExpressions: z.boolean().optional().describe("Only properties with an expression."),
+      limit: z.number().int().min(1).max(1000).optional().describe("Default 100."),
+    },
+    readOnly: true,
+    jsx: `
+var c = aemcp.findComp(args.comp), out = [], lim = args.limit || 100, q = args.query ? String(args.query).toLowerCase() : null, truncated = false;
+if (!q && !args.onlyAnimated && !args.onlyExpressions) aemcp.fail("Give a query, onlyAnimated or onlyExpressions");
+function walk(g, layer, path, depth) {
+  if (depth > 12) return;
+  for (var i = 1; i <= g.numProperties; i++) {
+    if (out.length >= lim) { truncated = true; return; }
+    var p = g.property(i), pp = path ? path + "/" + p.name : p.name;
+    var hit = !q || p.name.toLowerCase().indexOf(q) >= 0 || p.matchName.toLowerCase().indexOf(q) >= 0;
+    if (p.propertyType === PropertyType.PROPERTY) {
+      if (p.propertyValueType === PropertyValueType.NO_VALUE) continue;
+      var expr = false; try { expr = p.canSetExpression && p.expression !== ""; } catch (e) {}
+      if (args.onlyAnimated && p.numKeys === 0) continue;
+      if (args.onlyExpressions && !expr) continue;
+      if (!hit) continue;
+      var o = { layer: layer.index, layerName: layer.name, path: pp, matchName: p.matchName, numKeys: p.numKeys };
+      try { o.value = aemcp.valueOf(p.value); } catch (e) {}
+      if (expr) { o.expression = p.expression; try { o.expressionError = p.expressionError || undefined; } catch (e) {} }
+      out.push(o);
+    } else walk(p, layer, pp, depth + 1);
+  }
+}
+if (args.layer !== undefined) { var l = aemcp.findLayer(c, args.layer); walk(l, l, "", 0); }
+else for (var j = 1; j <= c.numLayers && out.length < lim; j++) walk(c.layer(j), c.layer(j), "", 0);
+return { comp: c.name, count: out.length, truncated: truncated, results: out };`,
+  },
+  {
     name: "ae_set_property",
     title: "Set property value",
     description:

@@ -13,10 +13,23 @@
       <div id="sub" class="muted">checking…</div>
     </div>
   </header>
+  <div id="update" class="banner" hidden>
+    <span id="updateText"></span>
+    <button id="updateBtn">Download</button>
+  </div>
   <section class="row">
     <button id="test">Test</button>
     <button id="refresh">Refresh</button>
+    <button id="diag" title="Copies a report to paste into a bug report or a chat">Copy diagnostics</button>
   </section>
+  <section class="row setting">
+    <label for="profile">AI tools</label>
+    <select id="profile">
+      <option value="core">Core (faster, recommended)</option>
+      <option value="full">Full (all tools)</option>
+    </select>
+  </section>
+  <div id="profileNote" class="muted small" hidden>Saved. Restart your AI app to apply.</div>
   <section>
     <div class="label">Recent calls</div>
     <ul id="log"><li class="muted">No calls yet</li></ul>

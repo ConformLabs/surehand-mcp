@@ -15,9 +15,19 @@ import { propertyTools } from "./tools/property.js";
 import { registerJsxTools } from "./tools/registry.js";
 import { renderTools } from "./tools/render.js";
 import { ensureAeSetup } from "./cli/setup.js";
+import { applyProfile, resolveProfile } from "./tools/profile.js";
+import { checkForUpdate } from "./update.js";
 
 export function createMcpServer(): McpServer {
-  const server = new McpServer({ name: "after-effects", title: "Adobe After Effects", version: VERSION }, { instructions: INSTRUCTIONS });
+  const profile = resolveProfile();
+  const instructions =
+    INSTRUCTIONS +
+    (profile.name === "full"
+      ? ""
+      : "\n- This is the core tool set. Anything else (render queue, import, project/folder management, masks, markers, fonts, menu commands...) " +
+        "is done with ae_run_script. The user can enable every tool by setting \"toolProfile\": \"full\" (AE MCP panel or ~/.aemcp/config.json).");
+  const server = new McpServer({ name: "after-effects", title: "Adobe After Effects", version: VERSION }, { instructions });
+  applyProfile(server, profile);
   registerCoreTools(server);
   registerJsxTools(server, [...projectTools, ...compTools, ...layerTools, ...propertyTools, ...effectTools, ...renderTools, ...appTools]);
   server.registerResource(
@@ -118,12 +128,14 @@ const HELP = `ae-mcp v${VERSION} - MCP server for Adobe After Effects
 
 Usage:
   ae-mcp                 run the MCP server over stdio (Claude Desktop, Claude Code, Cursor...)
+  ae-mcp [--tools core|full]   core (default, ~20 tools) or every tool
   ae-mcp --http [--port 8766] [--host 127.0.0.1] [--no-auth]
                          run over Streamable HTTP at /mcp (ChatGPT via a tunnel)
   ae-mcp install [--skip-clients] [--no-claude-desktop|--no-claude-code|--no-cursor|--no-codex]
                          install the server + After Effects extension and connect AI apps
   ae-mcp uninstall [--keep-config]
   ae-mcp selftest        check the installation and the connection to After Effects
+  ae-mcp diagnostics     print a report to paste into a bug report (no secrets)
   ae-mcp chatgpt [--local]
                          HTTP server + public tunnel for ChatGPT
   ae-mcp setup           only install/update the After Effects extension and config
@@ -156,6 +168,8 @@ async function main() {
     case "test":
       process.exitCode = await (await import("./cli/selftest.js")).selftest();
       return;
+    case "diagnostics":
+      return void console.log(await (await import("./cli/diagnostics.js")).diagnostics());
     case "chatgpt":
       return (await import("./cli/chatgpt.js")).chatgpt(rest);
     case "setup": {
@@ -165,6 +179,7 @@ async function main() {
     }
   }
   autoSetup();
+  void checkForUpdate(); // background, cached for a day, silent when offline
   if (process.argv.includes("--http")) return startHttp();
   const server = createMcpServer();
   await server.connect(new StdioServerTransport());

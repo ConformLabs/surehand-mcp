@@ -10,7 +10,7 @@
   var path = nodeRequire("path");
   var crypto = nodeRequire("crypto");
 
-  var VERSION = "1.0.0";
+  var VERSION = "__AEMCP_VERSION__"; // replaced with the release version at build time
   var CONFIG_DIR = path.join(os.homedir(), ".aemcp");
   var CONFIG_FILE = path.join(CONFIG_DIR, "config.json");
   var STATUS_FILE = path.join(CONFIG_DIR, "bridge-status.json");

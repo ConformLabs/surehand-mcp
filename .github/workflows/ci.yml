@@ -1,0 +1,123 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  # Unit tests, type check, and a check that the committed bundle matches the source.
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm test
+      - name: Committed server/dist is up to date
+        run: |
+          npm run build
+          git diff --exit-code -- dist/ || (echo "::error::server/dist is stale: run 'npm run build' in server/ and commit" && exit 1)
+      - name: Lint launchers
+        working-directory: .
+        run: |
+          shellcheck -S warning installer/run.sh
+          pwsh -NoProfile -Command '$e = $null; [System.Management.Automation.Language.Parser]::ParseFile("installer/run.ps1", [ref]$null, [ref]$e) | Out-Null; if ($e) { $e; exit 1 }'
+
+  # Builds the release folder and runs the real launchers end to end on a clean, fake user
+  # profile: Node download, install, self-test, uninstall. (No After Effects on CI.)
+  install:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - name: Build release folder
+        working-directory: server
+        run: |
+          npm ci
+          npm run package
+
+      - name: Fake user profile (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p "$RUNNER_TEMP/home"
+          echo "HOME=$RUNNER_TEMP/home" >> "$GITHUB_ENV"
+      - name: Fake user profile (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $h = Join-Path $env:RUNNER_TEMP "home"
+          New-Item -ItemType Directory -Force -Path "$h\AppData\Roaming", "$h\AppData\Local" | Out-Null
+          "USERPROFILE=$h" >> $env:GITHUB_ENV
+          "APPDATA=$h\AppData\Roaming" >> $env:GITHUB_ENV
+          "LOCALAPPDATA=$h\AppData\Local" >> $env:GITHUB_ENV
+
+      - name: 1. Install (macOS launcher, forced Node download)
+        if: runner.os == 'macOS'
+        env:
+          AEMCP_FORCE_NODE_DOWNLOAD: "1"
+        run: bash "dist-zip/AE-MCP/2. Mac/1. Install.command" --skip-clients < /dev/null
+      - name: 1. Install (Windows launcher, forced Node download)
+        if: runner.os == 'Windows'
+        shell: cmd
+        env:
+          AEMCP_FORCE_NODE_DOWNLOAD: "1"
+        run: call "dist-zip\AE-MCP\3. Windows\1. Install.bat" --skip-clients < NUL
+
+      - name: 2. Test Installation (macOS launcher)
+        if: runner.os == 'macOS'
+        env:
+          AEMCP_FORCE_NODE_DOWNLOAD: "1"
+        run: bash "dist-zip/AE-MCP/2. Mac/2. Test Installation.command" > "$RUNNER_TEMP/selftest.txt" 2>&1 < /dev/null || true
+      - name: 2. Test Installation (Windows launcher)
+        if: runner.os == 'Windows'
+        shell: cmd
+        env:
+          AEMCP_FORCE_NODE_DOWNLOAD: "1"
+        run: call "dist-zip\AE-MCP\3. Windows\2. Test Installation.bat" > "%RUNNER_TEMP%\selftest.txt" 2>&1 < NUL & exit /b 0
+
+      - name: Check installation
+        shell: bash
+        run: |
+          cat "$RUNNER_TEMP/selftest.txt"
+          node server/scripts/ci-check.mjs installed "$RUNNER_TEMP/selftest.txt"
+
+      - name: 4. Uninstall (macOS launcher)
+        if: runner.os == 'macOS'
+        env:
+          AEMCP_FORCE_NODE_DOWNLOAD: "1"
+        run: bash "dist-zip/AE-MCP/2. Mac/4. Uninstall.command" < /dev/null
+      - name: 4. Uninstall (Windows launcher)
+        if: runner.os == 'Windows'
+        shell: cmd
+        env:
+          AEMCP_FORCE_NODE_DOWNLOAD: "1"
+        run: call "dist-zip\AE-MCP\3. Windows\4. Uninstall.bat" < NUL
+
+      - name: Check uninstall
+        shell: bash
+        run: node server/scripts/ci-check.mjs uninstalled
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: release-${{ runner.os }}
+          path: dist-zip/AE-MCP-*.zip
+          retention-days: 7

@@ -13,7 +13,7 @@ const cepFiles = {};
     const p = join(dir, name);
     if (name.startsWith(".")) continue;
     if (statSync(p).isDirectory()) walk(p);
-    else cepFiles[relative(cepRoot, p).split(sep).join("/")] = readFileSync(p, "utf8");
+    else cepFiles[relative(cepRoot, p).split(sep).join("/")] = readFileSync(p, "utf8").replaceAll("__AEMCP_VERSION__", pkg.version);
   }
 })(cepRoot);
 const cepHash = createHash("sha1").update(JSON.stringify(cepFiles)).digest("hex").slice(0, 12);

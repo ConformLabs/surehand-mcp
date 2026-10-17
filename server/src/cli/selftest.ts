@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { health } from "../bridge.js";
 import { loadConfig, VERSION } from "../config.js";
 import { runJsx } from "../jsx.js";
+import { checkForUpdate, updateCheckEnabled, updateMessage } from "../update.js";
 import { installedExtensionHash } from "./setup.js";
 import {
   AEMCP_DIR, CONFIG_FILE, CSXS_VERSIONS, SERVER_NAME, bold, claudeDesktopConfig, extensionDir, fail, green, isMac, isWin, ok, readJson, red, sleep, warn,
@@ -15,6 +16,13 @@ export async function selftest(): Promise<number> {
   const bad = (m: string) => { failures++; fail(m); };
   console.log(bold(`\nAfter Effects MCP self-test v${VERSION}`));
   console.log(`  ${process.platform} · node ${process.version}\n`);
+
+  if (updateCheckEnabled()) {
+    const u = await checkForUpdate(true);
+    const msg = updateMessage(u);
+    if (msg) warn(msg);
+    else if (u?.latest) ok(`Up to date (latest release v${u.latest})`);
+  }
 
   // --- installation ---
   if (existsSync(CONFIG_FILE) && loadConfig().token) ok(`Config ${CONFIG_FILE}`);
@@ -110,7 +118,14 @@ return r;`,
   return summary(failures);
 }
 
-function summary(failures: number): number {
-  console.log(failures ? `\n${red(bold(`${failures} problem(s) found.`))} See README > Troubleshooting.\n` : `\n${green(bold("All checks passed. After Effects MCP is ready."))}\n`);
-  return failures ? 1 : 0;
+async function summary(failures: number): Promise<number> {
+  if (!failures) {
+    console.log(`\n${green(bold("All checks passed. After Effects MCP is ready."))}\n`);
+    return 0;
+  }
+  console.log(`\n${red(bold(`${failures} problem(s) found.`))} See README > Troubleshooting.`);
+  console.log("If you report it, include everything below (it contains no secrets):\n");
+  const { diagnostics } = await import("./diagnostics.js");
+  console.log(await diagnostics());
+  return 1;
 }

@@ -89,3 +89,38 @@ describe("ExtendScript sources", () => {
     });
   }
 });
+
+describe("update check", () => {
+  it("compares versions", async () => {
+    const { compareVersions } = await import("../src/update.js");
+    expect(compareVersions("1.1.0", "1.0.9")).toBe(1);
+    expect(compareVersions("v1.0.0", "1.0.0")).toBe(0);
+    expect(compareVersions("1.0.0", "1.10.0")).toBe(-1);
+  });
+});
+
+describe("tool profiles", () => {
+  it("resolves core, full, extras and the .mcpb checkbox values", async () => {
+    const { resolveProfile } = await import("../src/tools/profile.js");
+    const saved = process.env.AEMCP_TOOLS;
+    process.env.AEMCP_CONFIG = "/nonexistent/config.json";
+    delete process.env.AEMCP_TOOLS;
+    expect(resolveProfile([]).name).toBe("core");
+    expect(resolveProfile(["--tools", "full"]).allows("ae_import_files")).toBe(true);
+    const custom = resolveProfile(["--tools", "core,ae_import_files"]);
+    expect(custom.allows("ae_import_files") && custom.allows("ae_run_script") && !custom.allows("ae_purge")).toBe(true);
+    process.env.AEMCP_TOOLS = "true";
+    expect(resolveProfile([]).name).toBe("full");
+    process.env.AEMCP_TOOLS = "false"; // checkbox off -> falls through to config (default core)
+    expect(resolveProfile([]).name).toBe("core");
+    if (saved === undefined) delete process.env.AEMCP_TOOLS;
+    else process.env.AEMCP_TOOLS = saved;
+  });
+
+  it("every core tool exists", async () => {
+    const { CORE_TOOLS } = await import("../src/tools/profile.js");
+    const names = new Set(allTools.map((t) => t.name));
+    for (const n of ["ae_status", "ae_run_script", "ae_get_scripting_guide", "ae_render_frame", "ae_render_contact_sheet"]) names.add(n);
+    for (const t of CORE_TOOLS) expect(names.has(t), t).toBe(true);
+  });
+});

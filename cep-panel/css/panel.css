@@ -15,3 +15,9 @@ li { border-top: 1px solid var(--line); padding: 4px 0; word-break: break-all; }
 li .t { color: var(--muted); margin-right: 6px; }
 li.err .s { color: var(--bad); } li.ok .s { color: var(--ok); }
 footer { margin-top: 10px; font-size: 10px; }
+.banner { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #2d2a12; border: 1px solid #5c531c; border-radius: 4px; padding: 6px 8px; margin-bottom: 10px; }
+.banner[hidden], [hidden] { display: none; }
+.setting { align-items: center; }
+.setting label { color: var(--muted); }
+select { background: #3a3a3a; color: var(--fg); border: 1px solid #4a4a4a; border-radius: 4px; padding: 3px 6px; font: inherit; flex: 1; }
+.small { font-size: 10px; margin: -6px 0 10px; }

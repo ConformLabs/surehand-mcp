@@ -42,15 +42,26 @@ const manifest = {
     "and use 58 tools for projects, compositions, layers, keyframes, expressions, effects, shapes, masks, the render queue and frame previews it can look at.\n\n" +
     "**First run:** the extension installs a small companion extension into After Effects automatically. Restart After Effects once afterwards. " +
     "Everything runs locally; nothing is sent anywhere except to Claude.",
-  author: { name: "Rony Itzhaki", url: "https://github.com/ronron555" },
-  repository: { type: "git", url: "https://github.com/ronron555/after-effects-mcp" },
-  homepage: "https://github.com/ronron555/after-effects-mcp",
-  support: "https://github.com/ronron555/after-effects-mcp/issues",
+  author: { name: "Rony Itzhaki", url: "https://github.com/ronyitzhaki" },
+  repository: { type: "git", url: "https://github.com/ronyitzhaki/after-effects-mcp" },
+  homepage: "https://github.com/ronyitzhaki/after-effects-mcp",
+  support: "https://github.com/ronyitzhaki/after-effects-mcp/issues",
   icon: "icon.png",
   server: {
     type: "node",
     entry_point: "server/ae-mcp.mjs",
-    mcp_config: { command: "node", args: ["${__dirname}/server/ae-mcp.mjs"], env: {} },
+    mcp_config: { command: "node", args: ["${__dirname}/server/ae-mcp.mjs"], env: { AEMCP_TOOLS: "${user_config.full_toolset}" } },
+  },
+  user_config: {
+    full_toolset: {
+      type: "boolean",
+      title: "Enable all tools",
+      description:
+        "Off (recommended): a fast core set of ~20 tools; everything else is still possible through scripts. " +
+        "On: all ~60 tools (uses more of Claude's context). Can also be switched in After Effects: Window > Extensions > AE MCP.",
+      default: false,
+      required: false,
+    },
   },
   tools: tools.map((t) => ({ name: t.name, description: (t.description || "").split("\n")[0].slice(0, 300) })),
   keywords: ["after effects", "adobe", "extendscript", "jsx", "motion graphics", "animation", "video"],

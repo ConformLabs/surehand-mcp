@@ -46,7 +46,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 var define_AEMCP_CEP_FILES_default;
 var init_define_AEMCP_CEP_FILES = __esm({
   "<define:__AEMCP_CEP_FILES__>"() {
-    define_AEMCP_CEP_FILES_default = { "CSXS/manifest.xml": '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n<ExtensionManifest xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n    ExtensionBundleId="com.aemcp"\n    ExtensionBundleVersion="1.0.0"\n    ExtensionBundleName="AE MCP"\n    Version="9.0">\n  <ExtensionList>\n    <Extension Id="com.aemcp.bridge" Version="1.0.0" />\n    <Extension Id="com.aemcp.panel" Version="1.0.0" />\n  </ExtensionList>\n  <ExecutionEnvironment>\n    <HostList>\n      <Host Name="AEFT" Version="[16.0,99.9]" />\n    </HostList>\n    <LocaleList>\n      <Locale Code="All" />\n    </LocaleList>\n    <RequiredRuntimeList>\n      <RequiredRuntime Name="CSXS" Version="9.0" />\n    </RequiredRuntimeList>\n  </ExecutionEnvironment>\n  <DispatchInfoList>\n    <!-- Invisible background extension: starts with After Effects and runs the local bridge server. -->\n    <Extension Id="com.aemcp.bridge">\n      <DispatchInfo>\n        <Resources>\n          <MainPath>./bridge.html</MainPath>\n          <CEFCommandLine>\n            <Parameter>--enable-nodejs</Parameter>\n            <Parameter>--mixed-context</Parameter>\n          </CEFCommandLine>\n        </Resources>\n        <Lifecycle>\n          <AutoVisible>false</AutoVisible>\n          <StartOn>\n            <Event>com.adobe.csxs.events.ApplicationInitialized</Event>\n            <Event>applicationActivate</Event>\n          </StartOn>\n        </Lifecycle>\n        <UI>\n          <Type>Custom</Type>\n          <Geometry>\n            <Size><Height>1</Height><Width>1</Width></Size>\n          </Geometry>\n        </UI>\n      </DispatchInfo>\n    </Extension>\n    <!-- Status panel: Window > Extensions > AE MCP -->\n    <Extension Id="com.aemcp.panel">\n      <DispatchInfo>\n        <Resources>\n          <MainPath>./index.html</MainPath>\n          <CEFCommandLine>\n            <Parameter>--enable-nodejs</Parameter>\n            <Parameter>--mixed-context</Parameter>\n          </CEFCommandLine>\n        </Resources>\n        <Lifecycle>\n          <AutoVisible>true</AutoVisible>\n        </Lifecycle>\n        <UI>\n          <Type>Panel</Type>\n          <Menu>AE MCP</Menu>\n          <Geometry>\n            <Size><Height>420</Height><Width>320</Width></Size>\n            <MinSize><Height>200</Height><Width>240</Width></MinSize>\n          </Geometry>\n        </UI>\n      </DispatchInfo>\n    </Extension>\n  </DispatchInfoList>\n</ExtensionManifest>\n', "bridge.html": '<!DOCTYPE html>\n<html>\n<head><meta charset="utf-8"><title>AE MCP Bridge</title></head>\n<body>\n<script src="js/bridge-core.js"></script>\n<script>AEMCPBridge.start();</script>\n</body>\n</html>\n', "css/panel.css": ':root { --bg: #232323; --fg: #d6d6d6; --muted: #8a8a8a; --ok: #3fb950; --bad: #f85149; --warn: #d29922; --line: #3a3a3a; }\n* { box-sizing: border-box; }\nbody { margin: 0; padding: 10px; background: var(--bg); color: var(--fg); font: 12px -apple-system, "Segoe UI", sans-serif; }\nheader { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }\n#title { font-weight: 600; font-size: 13px; }\n.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--warn); flex: none; }\n.dot.ok { background: var(--ok); } .dot.bad { background: var(--bad); }\n.muted { color: var(--muted); }\n.row { display: flex; gap: 6px; margin-bottom: 10px; }\nbutton { background: #3a3a3a; color: var(--fg); border: 1px solid #4a4a4a; border-radius: 4px; padding: 4px 10px; cursor: pointer; font: inherit; }\nbutton:hover { background: #454545; }\n.label { text-transform: uppercase; font-size: 10px; letter-spacing: .05em; color: var(--muted); margin-bottom: 4px; }\nul { list-style: none; padding: 0; margin: 0; }\nli { border-top: 1px solid var(--line); padding: 4px 0; word-break: break-all; }\nli .t { color: var(--muted); margin-right: 6px; }\nli.err .s { color: var(--bad); } li.ok .s { color: var(--ok); }\nfooter { margin-top: 10px; font-size: 10px; }\n', "index.html": '<!DOCTYPE html>\n<html>\n<head>\n  <meta charset="utf-8">\n  <title>AE MCP</title>\n  <link rel="stylesheet" href="css/panel.css">\n</head>\n<body>\n  <header>\n    <span id="dot" class="dot"></span>\n    <div>\n      <div id="title">AE MCP</div>\n      <div id="sub" class="muted">checking\u2026</div>\n    </div>\n  </header>\n  <section class="row">\n    <button id="test">Test</button>\n    <button id="refresh">Refresh</button>\n  </section>\n  <section>\n    <div class="label">Recent calls</div>\n    <ul id="log"><li class="muted">No calls yet</li></ul>\n  </section>\n  <footer class="muted" id="foot"></footer>\n  <script src="js/bridge-core.js"></script>\n  <script src="js/panel.js"></script>\n</body>\n</html>\n', "js/bridge-core.js": `/* AE MCP bridge: a tiny HTTP server inside After Effects (CEP + Node) that evaluates
+    define_AEMCP_CEP_FILES_default = { "CSXS/manifest.xml": '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n<ExtensionManifest xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n    ExtensionBundleId="com.aemcp"\n    ExtensionBundleVersion="1.0.0"\n    ExtensionBundleName="AE MCP"\n    Version="9.0">\n  <ExtensionList>\n    <Extension Id="com.aemcp.bridge" Version="1.0.0" />\n    <Extension Id="com.aemcp.panel" Version="1.0.0" />\n  </ExtensionList>\n  <ExecutionEnvironment>\n    <HostList>\n      <Host Name="AEFT" Version="[16.0,99.9]" />\n    </HostList>\n    <LocaleList>\n      <Locale Code="All" />\n    </LocaleList>\n    <RequiredRuntimeList>\n      <RequiredRuntime Name="CSXS" Version="9.0" />\n    </RequiredRuntimeList>\n  </ExecutionEnvironment>\n  <DispatchInfoList>\n    <!-- Invisible background extension: starts with After Effects and runs the local bridge server. -->\n    <Extension Id="com.aemcp.bridge">\n      <DispatchInfo>\n        <Resources>\n          <MainPath>./bridge.html</MainPath>\n          <CEFCommandLine>\n            <Parameter>--enable-nodejs</Parameter>\n            <Parameter>--mixed-context</Parameter>\n          </CEFCommandLine>\n        </Resources>\n        <Lifecycle>\n          <AutoVisible>false</AutoVisible>\n          <StartOn>\n            <Event>com.adobe.csxs.events.ApplicationInitialized</Event>\n            <Event>applicationActivate</Event>\n          </StartOn>\n        </Lifecycle>\n        <UI>\n          <Type>Custom</Type>\n          <Geometry>\n            <Size><Height>1</Height><Width>1</Width></Size>\n          </Geometry>\n        </UI>\n      </DispatchInfo>\n    </Extension>\n    <!-- Status panel: Window > Extensions > AE MCP -->\n    <Extension Id="com.aemcp.panel">\n      <DispatchInfo>\n        <Resources>\n          <MainPath>./index.html</MainPath>\n          <CEFCommandLine>\n            <Parameter>--enable-nodejs</Parameter>\n            <Parameter>--mixed-context</Parameter>\n          </CEFCommandLine>\n        </Resources>\n        <Lifecycle>\n          <AutoVisible>true</AutoVisible>\n        </Lifecycle>\n        <UI>\n          <Type>Panel</Type>\n          <Menu>AE MCP</Menu>\n          <Geometry>\n            <Size><Height>420</Height><Width>320</Width></Size>\n            <MinSize><Height>200</Height><Width>240</Width></MinSize>\n          </Geometry>\n        </UI>\n      </DispatchInfo>\n    </Extension>\n  </DispatchInfoList>\n</ExtensionManifest>\n', "bridge.html": '<!DOCTYPE html>\n<html>\n<head><meta charset="utf-8"><title>AE MCP Bridge</title></head>\n<body>\n<script src="js/bridge-core.js"></script>\n<script>AEMCPBridge.start();</script>\n</body>\n</html>\n', "css/panel.css": ':root { --bg: #232323; --fg: #d6d6d6; --muted: #8a8a8a; --ok: #3fb950; --bad: #f85149; --warn: #d29922; --line: #3a3a3a; }\n* { box-sizing: border-box; }\nbody { margin: 0; padding: 10px; background: var(--bg); color: var(--fg); font: 12px -apple-system, "Segoe UI", sans-serif; }\nheader { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }\n#title { font-weight: 600; font-size: 13px; }\n.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--warn); flex: none; }\n.dot.ok { background: var(--ok); } .dot.bad { background: var(--bad); }\n.muted { color: var(--muted); }\n.row { display: flex; gap: 6px; margin-bottom: 10px; }\nbutton { background: #3a3a3a; color: var(--fg); border: 1px solid #4a4a4a; border-radius: 4px; padding: 4px 10px; cursor: pointer; font: inherit; }\nbutton:hover { background: #454545; }\n.label { text-transform: uppercase; font-size: 10px; letter-spacing: .05em; color: var(--muted); margin-bottom: 4px; }\nul { list-style: none; padding: 0; margin: 0; }\nli { border-top: 1px solid var(--line); padding: 4px 0; word-break: break-all; }\nli .t { color: var(--muted); margin-right: 6px; }\nli.err .s { color: var(--bad); } li.ok .s { color: var(--ok); }\nfooter { margin-top: 10px; font-size: 10px; }\n.banner { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #2d2a12; border: 1px solid #5c531c; border-radius: 4px; padding: 6px 8px; margin-bottom: 10px; }\n.banner[hidden], [hidden] { display: none; }\n.setting { align-items: center; }\n.setting label { color: var(--muted); }\nselect { background: #3a3a3a; color: var(--fg); border: 1px solid #4a4a4a; border-radius: 4px; padding: 3px 6px; font: inherit; flex: 1; }\n.small { font-size: 10px; margin: -6px 0 10px; }\n', "index.html": '<!DOCTYPE html>\n<html>\n<head>\n  <meta charset="utf-8">\n  <title>AE MCP</title>\n  <link rel="stylesheet" href="css/panel.css">\n</head>\n<body>\n  <header>\n    <span id="dot" class="dot"></span>\n    <div>\n      <div id="title">AE MCP</div>\n      <div id="sub" class="muted">checking\u2026</div>\n    </div>\n  </header>\n  <div id="update" class="banner" hidden>\n    <span id="updateText"></span>\n    <button id="updateBtn">Download</button>\n  </div>\n  <section class="row">\n    <button id="test">Test</button>\n    <button id="refresh">Refresh</button>\n    <button id="diag" title="Copies a report to paste into a bug report or a chat">Copy diagnostics</button>\n  </section>\n  <section class="row setting">\n    <label for="profile">AI tools</label>\n    <select id="profile">\n      <option value="core">Core (faster, recommended)</option>\n      <option value="full">Full (all tools)</option>\n    </select>\n  </section>\n  <div id="profileNote" class="muted small" hidden>Saved. Restart your AI app to apply.</div>\n  <section>\n    <div class="label">Recent calls</div>\n    <ul id="log"><li class="muted">No calls yet</li></ul>\n  </section>\n  <footer class="muted" id="foot"></footer>\n  <script src="js/bridge-core.js"></script>\n  <script src="js/panel.js"></script>\n</body>\n</html>\n', "js/bridge-core.js": `/* AE MCP bridge: a tiny HTTP server inside After Effects (CEP + Node) that evaluates
  * ExtendScript sent by the ae-mcp server. Binds to 127.0.0.1 only and requires the
  * shared token from ~/.aemcp/config.json. */
 (function (global) {
@@ -58,7 +58,7 @@ var init_define_AEMCP_CEP_FILES = __esm({
   var path = nodeRequire("path");
   var crypto = nodeRequire("crypto");
 
-  var VERSION = "1.0.0";
+  var VERSION = "1.1.0"; // replaced with the release version at build time
   var CONFIG_DIR = path.join(os.homedir(), ".aemcp");
   var CONFIG_FILE = path.join(CONFIG_DIR, "config.json");
   var STATUS_FILE = path.join(CONFIG_DIR, "bridge-status.json");
@@ -201,19 +201,27 @@ var init_define_AEMCP_CEP_FILES = __esm({
 (function () {
   "use strict";
   var http = require("http");
+  var fs = require("fs");
+  var os = require("os");
+  var path = require("path");
   var $ = function (id) { return document.getElementById(id); };
+  var AEMCP_DIR = path.join(os.homedir(), ".aemcp");
 
-  function call(method, path, body, cb) {
+  function readJson(file) {
+    try { return JSON.parse(fs.readFileSync(file, "utf8")); } catch (e) { return null; }
+  }
+
+  function call(method, p, body, cb) {
     var cfg = AEMCPBridge.loadConfig();
     var data = body ? JSON.stringify(body) : null;
-    var req = http.request({ host: "127.0.0.1", port: cfg.bridgePort, path: path, method: method,
+    var req = http.request({ host: "127.0.0.1", port: cfg.bridgePort, path: p, method: method,
       headers: { authorization: "Bearer " + cfg.token, "content-type": "application/json" } }, function (res) {
       var chunks = [];
       res.on("data", function (c) { chunks.push(c); });
       res.on("end", function () { try { cb(null, JSON.parse(Buffer.concat(chunks).toString("utf8"))); } catch (e) { cb(e); } });
     });
     req.on("error", function (e) { cb(e); });
-    req.setTimeout(path === "/eval" ? 30000 : 3000, function () { req.destroy(new Error("timeout")); });
+    req.setTimeout(p === "/eval" ? 30000 : 3000, function () { req.destroy(new Error("timeout")); });
     if (data) req.write(data);
     req.end();
   }
@@ -230,14 +238,80 @@ var init_define_AEMCP_CEP_FILES = __esm({
     log.slice(0, 20).forEach(function (e) {
       var li = document.createElement("li");
       li.className = e.ok ? "ok" : "err";
-      var t = new Date(e.at);
       li.innerHTML = '<span class="t"></span><span class="s"></span> <span class="p"></span>';
-      li.querySelector(".t").textContent = t.toLocaleTimeString() + " \xB7 " + e.ms + "ms";
+      li.querySelector(".t").textContent = new Date(e.at).toLocaleTimeString() + " \xB7 " + e.ms + "ms";
       li.querySelector(".s").textContent = e.ok ? "ok" : "error";
       li.querySelector(".p").textContent = e.preview;
       ul.appendChild(li);
     });
   }
+
+  // --- update banner (the MCP server checks GitHub at most daily and caches the result) ---
+  function cmpVersions(a, b) {
+    var pa = String(a).replace(/^v/, "").split("."), pb = String(b).replace(/^v/, "").split(".");
+    for (var i = 0; i < 3; i++) { var x = parseInt(pa[i], 10) || 0, y = parseInt(pb[i], 10) || 0; if (x !== y) return x > y ? 1 : -1; }
+    return 0;
+  }
+  function showUpdate() {
+    var u = readJson(path.join(AEMCP_DIR, "update-check.json"));
+    if (u && u.latest && cmpVersions(u.latest, AEMCPBridge.VERSION) > 0) {
+      $("updateText").textContent = "Update available: v" + u.latest;
+      $("updateBtn").onclick = function () {
+        try { window.cep.util.openURLInDefaultBrowser(u.url); } catch (e) { alert(u.url); }
+      };
+      $("update").hidden = false;
+    } else $("update").hidden = true;
+  }
+
+  // --- tool profile (read by the MCP server when the AI app starts it) ---
+  function loadProfile() {
+    var cfg = readJson(AEMCPBridge.CONFIG_FILE) || {};
+    $("profile").value = cfg.toolProfile === "full" ? "full" : "core";
+  }
+  $("profile").onchange = function () {
+    var cfg = readJson(AEMCPBridge.CONFIG_FILE) || AEMCPBridge.loadConfig();
+    cfg.toolProfile = $("profile").value;
+    try {
+      fs.writeFileSync(AEMCPBridge.CONFIG_FILE, JSON.stringify(cfg, null, 2) + "\\n");
+      $("profileNote").hidden = false;
+    } catch (e) { alert("Could not save: " + e.message); }
+  };
+
+  // --- diagnostics ---
+  function copyText(text) {
+    var ta = document.createElement("textarea");
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    var ok = false;
+    try { ok = document.execCommand("copy"); } catch (e) {}
+    document.body.removeChild(ta);
+    return ok;
+  }
+  $("diag").onclick = function () {
+    var lines = ["### AE MCP diagnostics", "time: " + new Date().toISOString()];
+    var host = AEMCPBridge.hostInfo();
+    lines.push("host: " + host.appName + " " + host.appVersion + " \xB7 bridge v" + AEMCPBridge.VERSION);
+    lines.push("os: " + process.platform + " " + os.release() + " " + os.arch() + " \xB7 CEP node " + process.versions.node);
+    try { lines.push("extension: " + decodeURI(window.__adobe_cep__.getSystemPath("extension")).replace(/^file:\\/\\//, "")); } catch (e) {}
+    var cfg = readJson(AEMCPBridge.CONFIG_FILE);
+    if (cfg) { if (cfg.token) cfg.token = "<set, " + cfg.token.length + " chars>"; lines.push("config: " + JSON.stringify(cfg)); }
+    else lines.push("config: MISSING (" + AEMCPBridge.CONFIG_FILE + ")");
+    lines.push("bridge status: " + JSON.stringify(readJson(path.join(AEMCP_DIR, "bridge-status.json"))));
+    lines.push("update check: " + JSON.stringify(readJson(path.join(AEMCP_DIR, "update-check.json"))));
+    lines.push("server installed: " + fs.existsSync(path.join(AEMCP_DIR, "server", "ae-mcp.mjs")));
+    var script = "(function(){var w=null;try{w=app.preferences.getPrefAsLong('Main Pref Section','Pref_SCRIPTING_FILE_NETWORK_SECURITY')===1;}catch(e){}" +
+      "return 'ae: '+app.version+' \xB7 '+$.os+' \xB7 items '+app.project.numItems+' \xB7 scriptsCanWriteFiles '+w+' \xB7 helpers '+(typeof aemcp==='undefined'?'not loaded':aemcp.version);})()";
+    call("POST", "/eval", { script: script, timeoutMs: 10000 }, function (err, r) {
+      lines.push(err ? "bridge eval: ERROR " + err.message : String(r.result));
+      call("GET", "/log", null, function (e2, lg) {
+        lines.push("recent calls:");
+        if (!e2 && lg.log) lg.log.slice(0, 15).forEach(function (e) { lines.push("  " + e.at + " " + (e.ok ? "ok " : "ERR") + " " + e.ms + "ms " + e.preview); });
+        var text = lines.join("\\n");
+        alert(copyText(text) ? "Diagnostics copied to the clipboard." : text);
+      });
+    });
+  };
 
   var triedStart = false;
   function refresh() {
@@ -249,8 +323,7 @@ var init_define_AEMCP_CEP_FILES = __esm({
           setTimeout(refresh, 500);
           return;
         }
-        var st = AEMCPBridge.state;
-        setStatus("bad", st.error || "Bridge not running: " + err.message);
+        setStatus("bad", AEMCPBridge.state.error || "Bridge not running: " + err.message);
         return;
       }
       if (!h.authorized) { setStatus("bad", "Token mismatch: re-run the installer"); return; }
@@ -258,6 +331,7 @@ var init_define_AEMCP_CEP_FILES = __esm({
       setStatus("ok", "Listening on 127.0.0.1:" + cfg.bridgePort + (h.busy ? " \xB7 busy" : "") + (h.queue ? " \xB7 queue " + h.queue : ""));
       call("GET", "/log", null, function (e2, r) { if (!e2) renderLog(r.log); });
     });
+    showUpdate();
   }
 
   $("refresh").onclick = refresh;
@@ -267,7 +341,8 @@ var init_define_AEMCP_CEP_FILES = __esm({
       refresh();
     });
   };
-  $("foot").textContent = "Bridge v" + AEMCPBridge.VERSION + " \xB7 config: " + AEMCPBridge.CONFIG_FILE;
+  $("foot").textContent = "v" + AEMCPBridge.VERSION + " \xB7 config: " + AEMCPBridge.CONFIG_FILE;
+  loadProfile();
   refresh();
   setInterval(refresh, 3000);
 })();
@@ -7631,7 +7706,9 @@ function loadConfig() {
   return {
     bridgePort: Number(process.env.AEMCP_BRIDGE_PORT || file2.bridgePort || 8765),
     token: process.env.AEMCP_TOKEN || file2.token || "",
-    httpPort: Number(process.env.AEMCP_HTTP_PORT || file2.httpPort || 8766)
+    httpPort: Number(process.env.AEMCP_HTTP_PORT || file2.httpPort || 8766),
+    toolProfile: file2.toolProfile,
+    updateCheck: file2.updateCheck
   };
 }
 var VERSION;
@@ -7639,7 +7716,7 @@ var init_config = __esm({
   "src/config.ts"() {
     "use strict";
     init_define_AEMCP_CEP_FILES();
-    VERSION = "1.0.0";
+    VERSION = "1.1.0";
   }
 });
 
@@ -7781,8 +7858,8 @@ function installedExtensionHash() {
 }
 function ensureExtension(force = false) {
   const dir = extensionDir();
-  const current = installedExtensionHash();
-  if (!force && current === "b0fa4965a9f3" && existsSync2(join3(dir, "CSXS", "manifest.xml"))) return { installed: false, updated: false };
+  const current2 = installedExtensionHash();
+  if (!force && current2 === "a18b01e6708c" && existsSync2(join3(dir, "CSXS", "manifest.xml"))) return { installed: false, updated: false };
   const updated = existsSync2(dir);
   rmSync(dir, { recursive: true, force: true });
   for (const [rel, content] of Object.entries(define_AEMCP_CEP_FILES_default)) {
@@ -7790,7 +7867,7 @@ function ensureExtension(force = false) {
     mkdirSync2(dirname2(p), { recursive: true });
     writeFileSync2(p, content);
   }
-  writeFileSync2(join3(dir, HASH_FILE), "b0fa4965a9f3");
+  writeFileSync2(join3(dir, HASH_FILE), "a18b01e6708c");
   return { installed: true, updated };
 }
 function debugModeOn(v) {
@@ -8401,18 +8478,130 @@ var init_jsx = __esm({
   }
 });
 
+// src/update.ts
+import { mkdirSync as mkdirSync3, readFileSync as readFileSync4, writeFileSync as writeFileSync3 } from "node:fs";
+import { homedir as homedir3 } from "node:os";
+import { dirname as dirname3, join as join4 } from "node:path";
+function compareVersions(a, b) {
+  const pa = a.replace(/^v/, "").split(/[.-]/).map((x) => parseInt(x, 10) || 0);
+  const pb = b.replace(/^v/, "").split(/[.-]/).map((x) => parseInt(x, 10) || 0);
+  for (let i = 0; i < 3; i++) if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) > (pb[i] ?? 0) ? 1 : -1;
+  return 0;
+}
+function updateCheckEnabled() {
+  return !process.env.AEMCP_NO_UPDATE_CHECK && loadConfig().updateCheck !== false;
+}
+function readCache() {
+  try {
+    return JSON.parse(readFileSync4(CACHE, "utf8"));
+  } catch {
+    return null;
+  }
+}
+function knownUpdate() {
+  const c = current ?? readCache();
+  if (!c?.latest) return null;
+  return { ...c, current: VERSION, updateAvailable: compareVersions(c.latest, VERSION) > 0 };
+}
+async function checkForUpdate(force = false) {
+  if (!updateCheckEnabled()) return null;
+  const cached2 = readCache();
+  if (!force && cached2 && Date.now() - Date.parse(cached2.checkedAt) < DAY) return current = knownUpdate();
+  try {
+    const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
+      headers: { "user-agent": `ae-mcp/${VERSION}`, accept: "application/vnd.github+json" },
+      signal: AbortSignal.timeout(4e3)
+    });
+    if (!res.ok) return knownUpdate();
+    const rel = await res.json();
+    if (!rel.tag_name) return knownUpdate();
+    const latest = rel.tag_name.replace(/^v/, "");
+    current = { checkedAt: (/* @__PURE__ */ new Date()).toISOString(), current: VERSION, latest, url: rel.html_url || RELEASES_URL, updateAvailable: compareVersions(latest, VERSION) > 0 };
+    mkdirSync3(dirname3(CACHE), { recursive: true });
+    writeFileSync3(CACHE, JSON.stringify(current, null, 2));
+    return current;
+  } catch {
+    return knownUpdate();
+  }
+}
+function updateMessage(u) {
+  return u?.updateAvailable ? `A newer version of AE MCP is available: v${u.latest} (you have v${u.current}). Download: ${u.url}` : null;
+}
+var REPO, RELEASES_URL, CACHE, DAY, current;
+var init_update = __esm({
+  "src/update.ts"() {
+    "use strict";
+    init_define_AEMCP_CEP_FILES();
+    init_config();
+    REPO = "ronyitzhaki/after-effects-mcp";
+    RELEASES_URL = `https://github.com/${REPO}/releases/latest`;
+    CACHE = join4(homedir3(), ".aemcp", "update-check.json");
+    DAY = 24 * 3600 * 1e3;
+    current = null;
+  }
+});
+
+// src/tools/profile.ts
+function resolveProfile(argv = process.argv) {
+  const i = argv.indexOf("--tools");
+  const env = process.env.AEMCP_TOOLS && process.env.AEMCP_TOOLS.toLowerCase() !== "false" ? process.env.AEMCP_TOOLS : void 0;
+  const raw = (i >= 0 ? argv[i + 1] : void 0) ?? env ?? loadConfig().toolProfile ?? "core";
+  const v = String(raw).trim().toLowerCase();
+  if (v === "full" || v === "all" || v === "true") return { name: "full", allows: () => true };
+  if (v === "core" || v === "false" || v === "") return { name: "core", allows: (t) => CORE_TOOLS.has(t) };
+  const extra = new Set(v.split(",").map((s) => s.trim()).filter((s) => s && s !== "core"));
+  return { name: "custom", allows: (t) => CORE_TOOLS.has(t) || extra.has(t) };
+}
+function applyProfile(server, profile) {
+  const original = server.registerTool.bind(server);
+  server.registerTool = (name, ...rest) => profile.allows(name) ? original(name, ...rest) : void 0;
+}
+var CORE_TOOLS;
+var init_profile = __esm({
+  "src/tools/profile.ts"() {
+    "use strict";
+    init_define_AEMCP_CEP_FILES();
+    init_config();
+    CORE_TOOLS = /* @__PURE__ */ new Set([
+      // connection, scripting, seeing
+      "ae_status",
+      "ae_run_script",
+      "ae_get_scripting_guide",
+      "ae_render_frame",
+      "ae_render_contact_sheet",
+      // understanding the project
+      "ae_get_project_info",
+      "ae_get_comp_info",
+      "ae_get_layer_info",
+      "ae_get_selection",
+      "ae_get_properties",
+      "ae_find_properties",
+      // common edits
+      "ae_create_comp",
+      "ae_add_layer",
+      "ae_add_shape",
+      "ae_set_property",
+      "ae_set_keyframes",
+      "ae_set_expression",
+      "ae_apply_effect",
+      "ae_get_effect_params",
+      "ae_undo"
+    ]);
+  }
+});
+
 // src/cli/install.ts
 var install_exports = {};
 __export(install_exports, {
   install: () => install
 });
 import { spawn, spawnSync as spawnSync3 } from "node:child_process";
-import { chmodSync, copyFileSync as copyFileSync2, existsSync as existsSync4, mkdirSync as mkdirSync4, readdirSync as readdirSync2, readFileSync as readFileSync5, writeFileSync as writeFileSync3 } from "node:fs";
-import { dirname as dirname3, join as join5 } from "node:path";
+import { chmodSync, copyFileSync as copyFileSync2, existsSync as existsSync4, mkdirSync as mkdirSync5, readdirSync as readdirSync2, readFileSync as readFileSync6, writeFileSync as writeFileSync4 } from "node:fs";
+import { dirname as dirname4, join as join6 } from "node:path";
 import { fileURLToPath } from "node:url";
 function mcpbInstalled() {
   try {
-    return readdirSync2(join5(claudeDesktopDir(), "Claude Extensions")).some((n) => /after-effects/i.test(n) && !n.endsWith(".json"));
+    return readdirSync2(join6(claudeDesktopDir(), "Claude Extensions")).some((n) => /after-effects/i.test(n) && !n.endsWith(".json"));
   } catch {
     return false;
   }
@@ -8449,7 +8638,7 @@ After Effects MCP installer v${VERSION}`));
   if (!isMac && !isWin) warn("After Effects only runs on macOS and Windows; continuing anyway.");
   step("1/4  Installing the MCP server");
   const self = fileURLToPath(import.meta.url);
-  mkdirSync4(dirname3(INSTALLED_SERVER), { recursive: true });
+  mkdirSync5(dirname4(INSTALLED_SERVER), { recursive: true });
   if (self !== INSTALLED_SERVER) copyFileSync2(self, INSTALLED_SERVER);
   if (!isWin) chmodSync(INSTALLED_SERVER, 493);
   ok(`Server: ${INSTALLED_SERVER}`);
@@ -8524,15 +8713,15 @@ After Effects MCP installer v${VERSION}`));
     } else if (existsSync4(claudeCodeConfig())) addJson("Claude Code", claudeCodeConfig(), { type: "stdio", ...entry, env: {} });
     else console.log(dim("  - Claude Code not installed (skipped)"));
   }
-  if (want("cursor") && existsSync4(dirname3(cursorConfig()))) addJson("Cursor", cursorConfig());
-  if (want("codex") && (existsSync4(dirname3(codexConfig())) || chatgptDesktopInstalled())) {
+  if (want("cursor") && existsSync4(dirname4(cursorConfig()))) addJson("Cursor", cursorConfig());
+  if (want("codex") && (existsSync4(dirname4(codexConfig())) || chatgptDesktopInstalled())) {
     try {
       const file2 = codexConfig();
-      mkdirSync4(dirname3(file2), { recursive: true });
-      const text = existsSync4(file2) ? readFileSync5(file2, "utf8") : "";
+      mkdirSync5(dirname4(file2), { recursive: true });
+      const text = existsSync4(file2) ? readFileSync6(file2, "utf8") : "";
       if (existsSync4(file2) && !existsSync4(file2 + ".aemcp.bak")) copyFileSync2(file2, file2 + ".aemcp.bak");
       const rest = removeCodexBlock(text).trim();
-      writeFileSync3(file2, (rest ? rest + "\n\n" : "") + codexBlock(nodePath, INSTALLED_SERVER));
+      writeFileSync4(file2, (rest ? rest + "\n\n" : "") + codexBlock(nodePath, INSTALLED_SERVER));
       ok("ChatGPT desktop / Codex");
       registered.push("ChatGPT desktop");
     } catch (e) {
@@ -8571,8 +8760,8 @@ var uninstall_exports = {};
 __export(uninstall_exports, {
   uninstall: () => uninstall
 });
-import { existsSync as existsSync5, readdirSync as readdirSync3, readFileSync as readFileSync6, rmSync as rmSync2, writeFileSync as writeFileSync4 } from "node:fs";
-import { join as join6 } from "node:path";
+import { existsSync as existsSync5, readdirSync as readdirSync3, readFileSync as readFileSync7, rmSync as rmSync2, writeFileSync as writeFileSync5 } from "node:fs";
+import { join as join7 } from "node:path";
 function uninstall(argv) {
   console.log(bold("\nAfter Effects MCP uninstaller\n"));
   const keepConfig = argv.includes("--keep-config");
@@ -8582,7 +8771,7 @@ function uninstall(argv) {
   }
   if (existsSync5(AEMCP_DIR)) {
     for (const name of readdirSync3(AEMCP_DIR))
-      if (name !== "node" && !(keepConfig && name === "config.json")) rmSync2(join6(AEMCP_DIR, name), { recursive: true, force: true });
+      if (name !== "node" && !(keepConfig && name === "config.json")) rmSync2(join7(AEMCP_DIR, name), { recursive: true, force: true });
   }
   ok(keepConfig ? "Removed the server (kept ~/.aemcp/config.json)" : `Removed ${AEMCP_DIR}`);
   for (const [label, file2] of [["Claude Desktop", claudeDesktopConfig()], ["Cursor", cursorConfig()], ["Claude Code", claudeCodeConfig()]]) {
@@ -8602,10 +8791,10 @@ function uninstall(argv) {
     }
   }
   if (existsSync5(codexConfig())) {
-    const t = readFileSync6(codexConfig(), "utf8");
+    const t = readFileSync7(codexConfig(), "utf8");
     const n = removeCodexBlock(t);
     if (n !== t) {
-      writeFileSync4(codexConfig(), n.trimEnd() + "\n");
+      writeFileSync5(codexConfig(), n.trimEnd() + "\n");
       ok("Removed from Codex");
     }
   }
@@ -8621,14 +8810,84 @@ var init_uninstall = __esm({
   }
 });
 
+// src/cli/diagnostics.ts
+var diagnostics_exports = {};
+__export(diagnostics_exports, {
+  diagnostics: () => diagnostics
+});
+import { spawnSync as spawnSync4 } from "node:child_process";
+import { arch, release } from "node:os";
+import { join as join8 } from "node:path";
+import { existsSync as existsSync6, readFileSync as readFileSync8 } from "node:fs";
+function debugMode() {
+  return CSXS_VERSIONS.map((v) => {
+    const r = isWin ? spawnSync4("reg", ["query", `HKCU\\Software\\Adobe\\CSXS.${v}`, "/v", "PlayerDebugMode"], { encoding: "utf8" }) : isMac ? spawnSync4("defaults", ["read", `com.adobe.CSXS.${v}`, "PlayerDebugMode"], { encoding: "utf8" }) : null;
+    return `${v}:${r && r.status === 0 && /(^|\s)1\s*$/m.test(r.stdout) ? "on" : "off"}`;
+  }).join(" ");
+}
+function clientEntry(file2) {
+  const data = readJson(file2, null);
+  const e = data?.mcpServers?.[SERVER_NAME];
+  if (!e) return data ? "no entry" : "not found";
+  return `${e.command} ${(e.args || []).join(" ")}${e.command && !existsSync6(e.command) ? "  (COMMAND MISSING)" : ""}`;
+}
+async function diagnostics() {
+  const L = ["### AE MCP diagnostics", `time: ${(/* @__PURE__ */ new Date()).toISOString()}`];
+  L.push(`server: v${VERSION} (helpers ${HELPER_VERSION}) \xB7 tools profile: ${resolveProfile().name}`);
+  L.push(`os: ${process.platform} ${release()} ${arch()} \xB7 node ${process.version} at ${process.execPath}`);
+  const cfg = readJson(CONFIG_FILE, null);
+  if (cfg) L.push(`config: ${JSON.stringify({ ...cfg, token: cfg.token ? `<set, ${cfg.token.length} chars>` : "MISSING" })}`);
+  else L.push(`config: MISSING (${CONFIG_FILE})`);
+  L.push(`installed server: ${existsSync6(INSTALLED_SERVER) ? INSTALLED_SERVER : "not installed (fine when using the .mcpb)"}`);
+  L.push(`extension: ${extensionDir()} \xB7 ${existsSync6(join8(extensionDir(), "CSXS", "manifest.xml")) ? `hash ${installedExtensionHash()} (bundled ${"a18b01e6708c"})` : "MISSING"}`);
+  L.push(`PlayerDebugMode: ${debugMode()}`);
+  L.push(`Claude Desktop: ${clientEntry(claudeDesktopConfig())}`);
+  L.push(`Claude Code: ${clientEntry(claudeCodeConfig())}`);
+  L.push(`Cursor: ${clientEntry(cursorConfig())}`);
+  let codex = "not found";
+  try {
+    codex = readFileSync8(codexConfig(), "utf8").includes(`[mcp_servers.${SERVER_NAME}]`) ? "entry present" : "no entry";
+  } catch {
+  }
+  L.push(`ChatGPT desktop / Codex (${codexConfig()}): ${codex}`);
+  L.push(`bridge status file: ${JSON.stringify(readJson(join8(AEMCP_DIR, "bridge-status.json"), null))}`);
+  const u = knownUpdate();
+  L.push(`update: ${u ? `latest v${u.latest}${u.updateAvailable ? " (UPDATE AVAILABLE)" : ""}` : "unknown"}`);
+  try {
+    const h = await health();
+    L.push(`bridge: reachable \xB7 ${h.host?.appName} ${h.host?.appVersion} \xB7 bridge v${h.version} \xB7 authorized ${h.authorized}`);
+    const r = await evalRaw(
+      "(function(){var w=null;try{w=app.preferences.getPrefAsLong('Main Pref Section','Pref_SCRIPTING_FILE_NETWORK_SECURITY')===1;}catch(e){}return 'ae: '+app.version+' \xB7 '+$.os+' \xB7 items '+app.project.numItems+' \xB7 scriptsCanWriteFiles '+w+' \xB7 helpers '+(typeof aemcp==='undefined'?'not loaded':aemcp.version);})()",
+      1e4
+    );
+    L.push(r);
+  } catch (e) {
+    L.push(`bridge: NOT reachable (${e.message.split(".")[0]})`);
+  }
+  return L.join("\n");
+}
+var init_diagnostics = __esm({
+  "src/cli/diagnostics.ts"() {
+    "use strict";
+    init_define_AEMCP_CEP_FILES();
+    init_bridge();
+    init_config();
+    init_jsx();
+    init_profile();
+    init_update();
+    init_setup();
+    init_util();
+  }
+});
+
 // src/cli/selftest.ts
 var selftest_exports = {};
 __export(selftest_exports, {
   selftest: () => selftest
 });
-import { existsSync as existsSync6, mkdirSync as mkdirSync5, readFileSync as readFileSync7, statSync as statSync2, unlinkSync as unlinkSync2 } from "node:fs";
-import { join as join7 } from "node:path";
-import { spawnSync as spawnSync4 } from "node:child_process";
+import { existsSync as existsSync7, mkdirSync as mkdirSync6, readFileSync as readFileSync9, statSync as statSync2, unlinkSync as unlinkSync2 } from "node:fs";
+import { join as join9 } from "node:path";
+import { spawnSync as spawnSync5 } from "node:child_process";
 async function selftest() {
   let failures = 0;
   const bad = (m) => {
@@ -8639,14 +8898,20 @@ async function selftest() {
 After Effects MCP self-test v${VERSION}`));
   console.log(`  ${process.platform} \xB7 node ${process.version}
 `);
-  if (existsSync6(CONFIG_FILE) && loadConfig().token) ok(`Config ${CONFIG_FILE}`);
+  if (updateCheckEnabled()) {
+    const u = await checkForUpdate(true);
+    const msg = updateMessage(u);
+    if (msg) warn(msg);
+    else if (u?.latest) ok(`Up to date (latest release v${u.latest})`);
+  }
+  if (existsSync7(CONFIG_FILE) && loadConfig().token) ok(`Config ${CONFIG_FILE}`);
   else bad(`No config at ${CONFIG_FILE}. Run the installer.`);
   const hash2 = installedExtensionHash();
-  if (!existsSync6(join7(extensionDir(), "CSXS", "manifest.xml"))) bad(`After Effects extension missing at ${extensionDir()}. Run the installer.`);
-  else if (hash2 !== "b0fa4965a9f3") warn(`Extension at ${extensionDir()} is a different version (${hash2 ?? "unknown"} vs ${"b0fa4965a9f3"}). Re-run the installer.`);
+  if (!existsSync7(join9(extensionDir(), "CSXS", "manifest.xml"))) bad(`After Effects extension missing at ${extensionDir()}. Run the installer.`);
+  else if (hash2 !== "a18b01e6708c") warn(`Extension at ${extensionDir()} is a different version (${hash2 ?? "unknown"} vs ${"a18b01e6708c"}). Re-run the installer.`);
   else ok("After Effects extension installed");
   const offVersions = CSXS_VERSIONS.filter((v) => {
-    const r = isWin ? spawnSync4("reg", ["query", `HKCU\\Software\\Adobe\\CSXS.${v}`, "/v", "PlayerDebugMode"], { encoding: "utf8" }) : isMac ? spawnSync4("defaults", ["read", `com.adobe.CSXS.${v}`, "PlayerDebugMode"], { encoding: "utf8" }) : null;
+    const r = isWin ? spawnSync5("reg", ["query", `HKCU\\Software\\Adobe\\CSXS.${v}`, "/v", "PlayerDebugMode"], { encoding: "utf8" }) : isMac ? spawnSync5("defaults", ["read", `com.adobe.CSXS.${v}`, "PlayerDebugMode"], { encoding: "utf8" }) : null;
     return r && !(r.status === 0 && /(^|\s)1\s*$/m.test(r.stdout));
   });
   if (offVersions.length) bad(`PlayerDebugMode not enabled for CSXS ${offVersions.join(", ")}. Run the installer.`);
@@ -8654,7 +8919,7 @@ After Effects MCP self-test v${VERSION}`));
   const desktop = readJson(claudeDesktopConfig(), null);
   if (desktop?.mcpServers?.[SERVER_NAME]) {
     const cmd = desktop.mcpServers[SERVER_NAME].command;
-    if (cmd && !existsSync6(cmd)) bad(`Claude Desktop points to a Node that no longer exists: ${cmd}. Re-run the installer.`);
+    if (cmd && !existsSync7(cmd)) bad(`Claude Desktop points to a Node that no longer exists: ${cmd}. Re-run the installer.`);
     else ok("Claude Desktop configured");
   } else console.log("  - Claude Desktop config has no after-effects entry (fine if you use the .mcpb extension or another app)");
   console.log("");
@@ -8663,8 +8928,8 @@ After Effects MCP self-test v${VERSION}`));
     h = await health();
   } catch (e) {
     bad(`Bridge not reachable on 127.0.0.1:${loadConfig().bridgePort}. Is After Effects running? (restart it after installing)`);
-    const statusFile = join7(AEMCP_DIR, "bridge-status.json");
-    if (existsSync6(statusFile)) {
+    const statusFile = join9(AEMCP_DIR, "bridge-status.json");
+    if (existsSync7(statusFile)) {
       const st = readJson(statusFile, {});
       console.log(`    last bridge status: ${st.listening ? "listening" : "not listening"}${st.error ? " - " + st.error : ""} (${st.at})`);
     }
@@ -8684,9 +8949,9 @@ After Effects MCP self-test v${VERSION}`));
   ok(`ExtendScript works: After Effects ${info.result.version} on ${info.result.os}`);
   if (info.result.canWrite === false)
     warn("'Allow Scripts to Write Files and Access Network' is OFF: enable it in AE Settings > Scripting & Expressions (needed for frame previews).");
-  const tmpDir = join7(AEMCP_DIR, "tmp");
-  mkdirSync5(tmpDir, { recursive: true });
-  const png = join7(tmpDir, `selftest_${Date.now()}.png`);
+  const tmpDir = join9(AEMCP_DIR, "tmp");
+  mkdirSync6(tmpDir, { recursive: true });
+  const png = join9(tmpDir, `selftest_${Date.now()}.png`);
   const job = await runJsx(
     `var c = app.project.items.addComp("__aemcp_selftest", 640, 360, 1, 2, 30);
 var t = c.layers.addText("AE MCP OK");
@@ -8709,9 +8974,9 @@ return r;`,
     if (r.keys === 2 && r.effect === "ADBE Drop Shadow" && !r.exprError) ok("Created a comp, text layer, keyframes, effect and expression (then removed it)");
     else bad(`Unexpected test result: ${JSON.stringify(r)}`);
     if (info.result.canWrite !== false) {
-      for (let i = 0; i < 50 && !(existsSync6(png) && statSync2(png).size > 0); i++) await sleep(100);
-      if (existsSync6(png) && statSync2(png).size > 0) {
-        const sig = readFileSync7(png).subarray(1, 4).toString();
+      for (let i = 0; i < 50 && !(existsSync7(png) && statSync2(png).size > 0); i++) await sleep(100);
+      if (existsSync7(png) && statSync2(png).size > 0) {
+        const sig = readFileSync9(png).subarray(1, 4).toString();
         sig === "PNG" ? ok("Rendered a frame preview") : bad("Frame preview is not a valid PNG");
         try {
           unlinkSync2(png);
@@ -8722,13 +8987,19 @@ return r;`,
   }
   return summary(failures);
 }
-function summary(failures) {
-  console.log(failures ? `
-${red(bold(`${failures} problem(s) found.`))} See README > Troubleshooting.
-` : `
+async function summary(failures) {
+  if (!failures) {
+    console.log(`
 ${green(bold("All checks passed. After Effects MCP is ready."))}
 `);
-  return failures ? 1 : 0;
+    return 0;
+  }
+  console.log(`
+${red(bold(`${failures} problem(s) found.`))} See README > Troubleshooting.`);
+  console.log("If you report it, include everything below (it contains no secrets):\n");
+  const { diagnostics: diagnostics2 } = await Promise.resolve().then(() => (init_diagnostics(), diagnostics_exports));
+  console.log(await diagnostics2());
+  return 1;
 }
 var init_selftest = __esm({
   "src/cli/selftest.ts"() {
@@ -8737,6 +9008,7 @@ var init_selftest = __esm({
     init_bridge();
     init_config();
     init_jsx();
+    init_update();
     init_setup();
     init_util();
   }
@@ -8748,7 +9020,7 @@ __export(chatgpt_exports, {
   chatgpt: () => chatgpt
 });
 import { spawn as spawn2 } from "node:child_process";
-import { existsSync as existsSync7 } from "node:fs";
+import { existsSync as existsSync8 } from "node:fs";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 function chatgpt(argv) {
   ensureConfig();
@@ -8783,7 +9055,7 @@ Keep this window open while you use it. Press Ctrl+C to stop.
 `);
   console.log(dim("Tip: the ChatGPT desktop app does not need this; 1. Install connects it directly (Settings > Plugins).\n"));
   if (argv.includes("--local")) return announce(`http://127.0.0.1:${port}`);
-  const cloudflared = which("cloudflared") || (isWin ? null : ["/opt/homebrew/bin/cloudflared", "/usr/local/bin/cloudflared"].find((p) => existsSync7(p)) ?? null);
+  const cloudflared = which("cloudflared") || (isWin ? null : ["/opt/homebrew/bin/cloudflared", "/usr/local/bin/cloudflared"].find((p) => existsSync8(p)) ?? null);
   const ngrok = which("ngrok");
   let shown = false;
   if (cloudflared) {
@@ -40808,7 +41080,7 @@ function registerJsxTools(server, tools) {
       async (args) => {
         try {
           const timeoutMs = typeof args.timeoutSeconds === "number" ? args.timeoutSeconds * 1e3 : t.timeoutMs;
-          return formatResult(await runJsx(t.jsx, args, { undoGroup: t.readOnly || t.noUndo ? false : t.title, timeoutMs }));
+          return formatResult(await runJsx(t.jsx, args, { undoGroup: t.tempItems ? "AE MCP " + t.title : t.readOnly || t.noUndo ? false : t.title, timeoutMs }));
         } catch (e) {
           return errorResult(e);
         }
@@ -40951,14 +41223,40 @@ return aemcp.markers(mp);`
 
 // src/tools/core.ts
 init_define_AEMCP_CEP_FILES();
-import { existsSync as existsSync3, mkdirSync as mkdirSync3, readFileSync as readFileSync4, statSync, unlinkSync } from "node:fs";
-import { homedir as homedir3 } from "node:os";
-import { join as join4 } from "node:path";
+import { existsSync as existsSync3, mkdirSync as mkdirSync4, readFileSync as readFileSync5, statSync, unlinkSync } from "node:fs";
+import { homedir as homedir4 } from "node:os";
+import { join as join5 } from "node:path";
 init_bridge();
 init_setup();
+init_update();
 init_config();
 init_jsx();
 var sleep2 = (ms) => new Promise((r) => setTimeout(r, ms));
+async function renderPng(body, args) {
+  const tmpDir = join5(homedir4(), ".aemcp", "tmp");
+  mkdirSync4(tmpDir, { recursive: true });
+  const r = await runJsx(body, { ...args, tmpDir }, { undoGroup: "AE MCP preview", timeoutMs: 18e4 });
+  if (!r.ok) return { error: formatResult(r) };
+  const info = r.result;
+  let last = -1;
+  for (let i = 0; i < 150; i++) {
+    if (existsSync3(info.path)) {
+      const size = statSync(info.path).size;
+      if (size > 0 && size === last) break;
+      last = size;
+    }
+    await sleep2(100);
+  }
+  if (!existsSync3(info.path)) return { error: errorResult(`After Effects did not write the image to ${info.path}`) };
+  const data = readFileSync5(info.path).toString("base64");
+  if (!args.outputPath) {
+    try {
+      unlinkSync(info.path);
+    } catch {
+    }
+  }
+  return { info, data };
+}
 function registerCoreTools(server) {
   server.registerTool(
     "ae_run_script",
@@ -41032,6 +41330,9 @@ function registerCoreTools(server) {
             text: "WARNING: 'Allow Scripts to Write Files and Access Network' is OFF in After Effects, so scripts cannot write files (frame previews, exports, File.write). Ask the user to enable it: After Effects > Settings > Scripting & Expressions (Windows: Edit > Preferences > Scripting & Expressions)."
           });
         out.content.unshift({ type: "text", text: `Connected to After Effects bridge v${h.version} (MCP server v${VERSION}).` });
+        const upd = updateMessage(await checkForUpdate());
+        if (upd) out.content.push({ type: "text", text: `${upd}
+Tell the user about this update.` });
         if (lastSetup?.extensionUpdated)
           out.content.push({ type: "text", text: "Note: the After Effects extension was updated on disk; ask the user to restart After Effects when convenient to load the new version." });
         return out;
@@ -41088,39 +41389,119 @@ if (scale < 1) {
   l.property("ADBE Transform Group").property("ADBE Anchor Point").setValue([c.width / 2, c.height / 2]);
   target = tmp;
 }
-var f = new File(args.outputPath || (args.tmpDir + "/aemcp_frame_" + new Date().getTime() + ".png"));
-if (f.exists) f.remove();
-target.saveFrameToPng(t, f);
-var info = { path: f.fsName, width: target.width, height: target.height, time: t, comp: c.name };
-var waited = 0; while (!f.exists && waited < 10000) { $.sleep(50); waited += 50; }
-if (tmp) { $.sleep(100); tmp.remove(); }
+try {
+  var f = new File(args.outputPath || (args.tmpDir + "/aemcp_frame_" + new Date().getTime() + ".png"));
+  if (f.exists) f.remove();
+  target.saveFrameToPng(t, f);
+  var info = { path: f.fsName, width: target.width, height: target.height, time: t, comp: c.name };
+  var waited = 0; while (!f.exists && waited < 10000) { $.sleep(50); waited += 50; }
+  if (tmp) $.sleep(100);
+} finally {
+  // never leave the temporary comp behind, even if rendering fails
+  if (tmp) try { tmp.remove(); } catch (e) {}
+}
 return info;`;
-        const tmpDir = join4(homedir3(), ".aemcp", "tmp");
-        mkdirSync3(tmpDir, { recursive: true });
-        const r = await runJsx(body, { comp, time: time3, maxSize, outputPath, tmpDir }, { undoGroup: false, timeoutMs: 12e4 });
-        if (!r.ok) return formatResult(r);
-        const info = r.result;
-        let last = -1;
-        for (let i = 0; i < 100; i++) {
-          if (existsSync3(info.path)) {
-            const size = statSync(info.path).size;
-            if (size > 0 && size === last) break;
-            last = size;
-          }
-          await sleep2(100);
-        }
-        if (!existsSync3(info.path)) return errorResult(`After Effects did not write the frame to ${info.path}`);
-        const data = readFileSync4(info.path).toString("base64");
-        if (!outputPath) {
-          try {
-            unlinkSync(info.path);
-          } catch {
-          }
-        }
+        const out = await renderPng(body, { comp, time: time3, maxSize, outputPath });
+        if ("error" in out) return out.error;
+        const { info, data } = out;
         return {
           content: [
             { type: "image", data, mimeType: "image/png" },
             { type: "text", text: `Frame of "${info.comp}" at ${info.time}s (${info.width}x${info.height})${outputPath ? ` saved to ${info.path}` : ""}` }
+          ]
+        };
+      } catch (e) {
+        return errorResult(e);
+      }
+    }
+  );
+  server.registerTool(
+    "ae_render_contact_sheet",
+    {
+      title: "Preview animation (contact sheet)",
+      description: "Render several frames of a composition into ONE image (a grid, each cell labelled with its time and frame number), so you can judge motion, timing and easing, not just a single frame. Defaults to 9 frames spread over the work area.",
+      inputSchema: {
+        comp: compRef,
+        frames: external_exports.number().int().min(2).max(36).optional().describe("Number of evenly spaced frames (default 9)."),
+        start: external_exports.number().optional().describe("Start time in seconds (default: work area start)."),
+        end: external_exports.number().optional().describe("End time in seconds (default: work area end)."),
+        times: external_exports.array(external_exports.number()).min(1).max(36).optional().describe("Exact times (seconds) instead of evenly spaced frames."),
+        columns: external_exports.number().int().min(1).max(12).optional().describe("Grid columns (default: square-ish)."),
+        width: external_exports.number().int().min(320).max(4096).optional().describe("Width of the returned image in pixels (default 1600)."),
+        outputPath: external_exports.string().optional().describe("Optional absolute path to also save the PNG to.")
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false }
+    },
+    async (args) => {
+      try {
+        const body = `
+var c = aemcp.findComp(args.comp);
+var fd = c.frameDuration, times = [];
+if (args.times) { for (var k = 0; k < args.times.length; k++) times.push(args.times[k]); }
+else {
+  var n = args.frames || 9;
+  var t0 = args.start !== undefined ? args.start : c.workAreaStart;
+  var t1 = args.end !== undefined ? args.end : c.workAreaStart + c.workAreaDuration;
+  if (t1 <= t0) aemcp.fail("end must be after start");
+  var last = Math.max(t0, t1 - fd);
+  for (var i = 0; i < n; i++) times.push(t0 + (last - t0) * i / (n - 1));
+}
+for (var q = 0; q < times.length; q++) times[q] = Math.max(0, Math.min(c.duration - fd, Math.round(times[q] / fd) * fd));
+var count = times.length;
+var cols = args.columns || Math.ceil(Math.sqrt(count)), rows = Math.ceil(count / cols);
+var W = args.width || 1600, gap = 8, labelH = 26;
+var cellW = Math.floor((W - gap * (cols + 1)) / cols);
+var cellH = Math.round(cellW * c.height / (c.width * c.pixelAspect));
+var H = rows * (cellH + labelH + gap) + gap;
+var sheet = app.project.items.addComp("__aemcp_contact_sheet", W, H, 1, 1, c.frameRate);
+try {
+  // opaque dark background (a shape layer, so no solid is left in the project)
+  var bg = sheet.layers.addShape();
+  var bgv = bg.property("ADBE Root Vectors Group").addProperty("ADBE Vector Group").property("ADBE Vectors Group");
+  bgv.addProperty("ADBE Vector Shape - Rect").property("ADBE Vector Rect Size").setValue([W, H]);
+  bgv.addProperty("ADBE Vector Graphic - Fill").property("ADBE Vector Fill Color").setValue([0.09, 0.09, 0.1]);
+  bg.property("ADBE Transform Group").property("ADBE Position").setValue([W / 2, H / 2]);
+  var sc = cellW / (c.width * c.pixelAspect) * 100;
+  for (var j = 0; j < count; j++) {
+    var col = j % cols, row = Math.floor(j / cols);
+    var x0 = gap + col * (cellW + gap), y0 = gap + row * (cellH + labelH + gap);
+    var l = sheet.layers.add(c);
+    l.startTime = -times[j];
+    var tr = l.property("ADBE Transform Group");
+    tr.property("ADBE Anchor Point").setValue([c.width / 2, c.height / 2]);
+    tr.property("ADBE Scale").setValue([sc, sc, 100]);
+    tr.property("ADBE Position").setValue([x0 + cellW / 2, y0 + cellH / 2]);
+    var t = sheet.layers.addText((Math.round(times[j] * 100) / 100) + "s  \xB7  f" + Math.round(times[j] / fd));
+    var src = t.property("ADBE Text Properties").property("ADBE Text Document"), td = src.value;
+    try { td.font = "ArialMT"; } catch (e) {}
+    td.fontSize = 15; td.applyFill = true; td.fillColor = [0.85, 0.85, 0.85]; td.applyStroke = false;
+    try { td.fauxBold = false; td.fauxItalic = false; td.allCaps = false; td.tracking = 0; } catch (e) {}
+    td.justification = ParagraphJustification.CENTER_JUSTIFY;
+    src.setValue(td);
+    // center the label under its cell using its real bounds (independent of AE's last-used text settings)
+    var rc = t.sourceRectAtTime(0, false), ttr = t.property("ADBE Transform Group");
+    ttr.property("ADBE Anchor Point").setValue([rc.left + rc.width / 2, rc.top + rc.height / 2]);
+    ttr.property("ADBE Position").setValue([x0 + cellW / 2, y0 + cellH + labelH / 2]);
+    t.moveToBeginning();
+  }
+  var f = new File(args.outputPath || (args.tmpDir + "/aemcp_sheet_" + new Date().getTime() + ".png"));
+  if (f.exists) f.remove();
+  sheet.saveFrameToPng(0, f);
+  var waited = 0; while (!f.exists && waited < 20000) { $.sleep(50); waited += 50; }
+  $.sleep(150);
+  var r = { path: f.fsName, comp: c.name, times: times, columns: cols, rows: rows, width: W, height: H };
+} finally { sheet.remove(); }
+return r;`;
+        const out = await renderPng(body, args);
+        if ("error" in out) return out.error;
+        const { info, data } = out;
+        return {
+          content: [
+            { type: "image", data, mimeType: "image/png" },
+            {
+              type: "text",
+              text: `Contact sheet of "${info.comp}": ${info.times.length} frames (${info.columns}x${info.rows}, left-to-right, top-to-bottom) at ${info.times.map((t) => Math.round(t * 100) / 100 + "s").join(", ")}${args.outputPath ? `; saved to ${info.path}` : ""}`
+            }
           ]
         };
       } catch (e) {
@@ -41155,13 +41536,68 @@ var effectTools = [
     readOnly: true,
     jsx: `
 var out = [], q = args.nameContains ? args.nameContains.toLowerCase() : null, cat = args.category ? args.category.toLowerCase() : null, lim = args.limit || 300;
-for (var i = 0; i < app.effects.length && out.length < lim; i++) {
-  var e = app.effects[i];
+var all = app.effects; // app.effects builds a new array on every access: read it once
+for (var i = 0; i < all.length && out.length < lim; i++) {
+  var e = all[i];
   if (q && e.displayName.toLowerCase().indexOf(q) < 0 && e.matchName.toLowerCase().indexOf(q) < 0) continue;
   if (cat && String(e.category).toLowerCase().indexOf(cat) < 0) continue;
   out.push({ name: e.displayName, matchName: e.matchName, category: e.category });
 }
-return { total: app.effects.length, returned: out.length, effects: out };`
+return { total: all.length, returned: out.length, effects: out };`
+  },
+  {
+    name: "ae_get_effect_params",
+    title: "Inspect effect parameters",
+    description: "List an effect's parameters (names, match names, value types, defaults, min/max) WITHOUT changing your layers, so you know the exact parameter names for ae_apply_effect / ae_set_effect_params. Pass comp+layer to inspect an effect already applied (current values).",
+    input: {
+      effect: external_exports.union([external_exports.string(), external_exports.number().int()]).describe('Match name (e.g. "ADBE Glo2") or display name ("Glow"); with comp+layer, also an index in the stack.'),
+      comp: compRef,
+      layer: layerRef.optional().describe("Inspect the effect on this layer instead of a fresh default instance.")
+    },
+    readOnly: true,
+    tempItems: true,
+    jsx: `
+function describe(fx) {
+  var out = [];
+  for (var i = 1; i <= fx.numProperties; i++) {
+    var p = fx.property(i);
+    var o = { index: i, name: p.name, matchName: p.matchName };
+    if (p.propertyType === PropertyType.PROPERTY) {
+      o.type = aemcp.enumName(PropertyValueType, p.propertyValueType);
+      if (p.propertyValueType === PropertyValueType.NO_VALUE) { o.type = "group start/end or button"; }
+      else {
+        try { o.value = aemcp.valueOf(p.value); } catch (e) {}
+        try { if (p.hasMin) o.min = p.minValue; if (p.hasMax) o.max = p.maxValue; } catch (e) {}
+        try { if (p.isDropdownEffect) o.dropdown = true; } catch (e) {}
+        try { o.animatable = p.canVaryOverTime; } catch (e) {}
+      }
+    } else { o.type = "group"; o.children = describe(p); }
+    if (o.type !== "group start/end or button") out.push(o);
+  }
+  return out;
+}
+if (args.layer !== undefined) {
+  var lc = aemcp.findComp(args.comp), ll = aemcp.findLayer(lc, args.layer);
+  var efx = aemcp.resolveProp(ll, ["ADBE Effect Parade", args.effect]);
+  return { effect: efx.name, matchName: efx.matchName, layer: ll.name, params: describe(efx) };
+}
+var mn = null, q = String(args.effect).toLowerCase(), info = null;
+var all = app.effects; // read once: every access rebuilds the whole list
+for (var k = 0; k < all.length; k++) {
+  var e = all[k];
+  if (e.matchName.toLowerCase() === q || e.displayName.toLowerCase() === q) { mn = e.matchName; info = e; break; }
+}
+if (!mn) aemcp.fail("Unknown effect '" + args.effect + "'. Use ae_list_available_effects (or app.effects) to search.");
+var c = app.project.items.addComp("__aemcp_inspect", 100, 100, 1, 1, 30);
+try {
+  var s = c.layers.addSolid([0, 0, 0], "tmp", 100, 100, 1);
+  var fx = s.property("ADBE Effect Parade").addProperty(mn);
+  var res = { effect: info.displayName, matchName: mn, category: info.category, params: describe(fx) };
+} finally {
+  var src = null; try { src = s.source; } catch (e) {}
+  c.remove(); if (src) try { src.remove(); } catch (e) {}
+}
+return res;`
   },
   {
     name: "ae_apply_effect",
@@ -41173,7 +41609,8 @@ var c = aemcp.findComp(args.comp), l = aemcp.findLayer(c, args.layer), parade = 
 var mn = args.effect;
 if (!parade.canAddProperty(mn)) {
   mn = null;
-  for (var i = 0; i < app.effects.length; i++) if (app.effects[i].displayName.toLowerCase() === String(args.effect).toLowerCase()) { mn = app.effects[i].matchName; break; }
+  var all = app.effects; // read once: every access rebuilds the whole list
+  for (var i = 0; i < all.length; i++) if (all[i].displayName.toLowerCase() === String(args.effect).toLowerCase()) { mn = all[i].matchName; break; }
   if (!mn) aemcp.fail("Unknown effect '" + args.effect + "'. Use ae_list_available_effects to find the match name.");
 }
 var fx = parade.addProperty(mn);
@@ -41690,6 +42127,45 @@ var p = args.path !== undefined ? aemcp.resolveProp(l, args.path) : l;
 return aemcp.propInfo(p, { depth: args.depth === undefined ? 2 : args.depth, keyframes: !!args.keyframes, includeHidden: !!args.includeHidden });`
   },
   {
+    name: "ae_find_properties",
+    title: "Find properties",
+    description: 'Search every layer of a comp (or one layer) for properties whose name or match name contains the query, e.g. "opacity", "blur", "Source Text", "ADBE Fill Color". Returns ready-to-use paths. Filter to animated or expression properties.',
+    input: {
+      comp: compRef,
+      query: external_exports.string().optional().describe("Case-insensitive text to match in the property name or match name. Omit to list all matches of the filters."),
+      layer: layerRef.optional(),
+      onlyAnimated: external_exports.boolean().optional().describe("Only properties with keyframes."),
+      onlyExpressions: external_exports.boolean().optional().describe("Only properties with an expression."),
+      limit: external_exports.number().int().min(1).max(1e3).optional().describe("Default 100.")
+    },
+    readOnly: true,
+    jsx: `
+var c = aemcp.findComp(args.comp), out = [], lim = args.limit || 100, q = args.query ? String(args.query).toLowerCase() : null, truncated = false;
+if (!q && !args.onlyAnimated && !args.onlyExpressions) aemcp.fail("Give a query, onlyAnimated or onlyExpressions");
+function walk(g, layer, path, depth) {
+  if (depth > 12) return;
+  for (var i = 1; i <= g.numProperties; i++) {
+    if (out.length >= lim) { truncated = true; return; }
+    var p = g.property(i), pp = path ? path + "/" + p.name : p.name;
+    var hit = !q || p.name.toLowerCase().indexOf(q) >= 0 || p.matchName.toLowerCase().indexOf(q) >= 0;
+    if (p.propertyType === PropertyType.PROPERTY) {
+      if (p.propertyValueType === PropertyValueType.NO_VALUE) continue;
+      var expr = false; try { expr = p.canSetExpression && p.expression !== ""; } catch (e) {}
+      if (args.onlyAnimated && p.numKeys === 0) continue;
+      if (args.onlyExpressions && !expr) continue;
+      if (!hit) continue;
+      var o = { layer: layer.index, layerName: layer.name, path: pp, matchName: p.matchName, numKeys: p.numKeys };
+      try { o.value = aemcp.valueOf(p.value); } catch (e) {}
+      if (expr) { o.expression = p.expression; try { o.expressionError = p.expressionError || undefined; } catch (e) {} }
+      out.push(o);
+    } else walk(p, layer, pp, depth + 1);
+  }
+}
+if (args.layer !== undefined) { var l = aemcp.findLayer(c, args.layer); walk(l, l, "", 0); }
+else for (var j = 1; j <= c.numLayers && out.length < lim; j++) walk(c.layer(j), c.layer(j), "", 0);
+return { comp: c.name, count: out.length, truncated: truncated, results: out };`
+  },
+  {
     name: "ae_set_property",
     title: "Set property value",
     description: 'Set the value of any property (transform, effect parameter, shape attribute, text...). If `time` is given (or the property already has keyframes) a keyframe is set at that time. Examples: path "Transform/Opacity" value 50; "Transform/Position" [960,540]; "Transform/Scale" [50,50]; "Effects/Fill/Color" "#ff0000".',
@@ -41861,8 +42337,13 @@ return { removed: n };`
 
 // src/index.ts
 init_setup();
+init_profile();
+init_update();
 function createMcpServer() {
-  const server = new McpServer({ name: "after-effects", title: "Adobe After Effects", version: VERSION }, { instructions: INSTRUCTIONS });
+  const profile = resolveProfile();
+  const instructions = INSTRUCTIONS + (profile.name === "full" ? "" : '\n- This is the core tool set. Anything else (render queue, import, project/folder management, masks, markers, fonts, menu commands...) is done with ae_run_script. The user can enable every tool by setting "toolProfile": "full" (AE MCP panel or ~/.aemcp/config.json).');
+  const server = new McpServer({ name: "after-effects", title: "Adobe After Effects", version: VERSION }, { instructions });
+  applyProfile(server, profile);
   registerCoreTools(server);
   registerJsxTools(server, [...projectTools, ...compTools, ...layerTools, ...propertyTools, ...effectTools, ...renderTools, ...appTools]);
   server.registerResource(
@@ -41951,12 +42432,14 @@ var HELP = `ae-mcp v${VERSION} - MCP server for Adobe After Effects
 
 Usage:
   ae-mcp                 run the MCP server over stdio (Claude Desktop, Claude Code, Cursor...)
+  ae-mcp [--tools core|full]   core (default, ~20 tools) or every tool
   ae-mcp --http [--port 8766] [--host 127.0.0.1] [--no-auth]
                          run over Streamable HTTP at /mcp (ChatGPT via a tunnel)
   ae-mcp install [--skip-clients] [--no-claude-desktop|--no-claude-code|--no-cursor|--no-codex]
                          install the server + After Effects extension and connect AI apps
   ae-mcp uninstall [--keep-config]
   ae-mcp selftest        check the installation and the connection to After Effects
+  ae-mcp diagnostics     print a report to paste into a bug report (no secrets)
   ae-mcp chatgpt [--local]
                          HTTP server + public tunnel for ChatGPT
   ae-mcp setup           only install/update the After Effects extension and config
@@ -41986,6 +42469,8 @@ async function main() {
     case "test":
       process.exitCode = await (await Promise.resolve().then(() => (init_selftest(), selftest_exports))).selftest();
       return;
+    case "diagnostics":
+      return void console.log(await (await Promise.resolve().then(() => (init_diagnostics(), diagnostics_exports))).diagnostics());
     case "chatgpt":
       return (await Promise.resolve().then(() => (init_chatgpt(), chatgpt_exports))).chatgpt(rest);
     case "setup": {
@@ -41995,6 +42480,7 @@ async function main() {
     }
   }
   autoSetup();
+  void checkForUpdate();
   if (process.argv.includes("--http")) return startHttp();
   const server = createMcpServer();
   await server.connect(new StdioServerTransport());

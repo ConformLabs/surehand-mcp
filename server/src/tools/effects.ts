@@ -29,13 +29,70 @@ export const effectTools: JsxTool[] = [
     readOnly: true,
     jsx: `
 var out = [], q = args.nameContains ? args.nameContains.toLowerCase() : null, cat = args.category ? args.category.toLowerCase() : null, lim = args.limit || 300;
-for (var i = 0; i < app.effects.length && out.length < lim; i++) {
-  var e = app.effects[i];
+var all = app.effects; // app.effects builds a new array on every access: read it once
+for (var i = 0; i < all.length && out.length < lim; i++) {
+  var e = all[i];
   if (q && e.displayName.toLowerCase().indexOf(q) < 0 && e.matchName.toLowerCase().indexOf(q) < 0) continue;
   if (cat && String(e.category).toLowerCase().indexOf(cat) < 0) continue;
   out.push({ name: e.displayName, matchName: e.matchName, category: e.category });
 }
-return { total: app.effects.length, returned: out.length, effects: out };`,
+return { total: all.length, returned: out.length, effects: out };`,
+  },
+  {
+    name: "ae_get_effect_params",
+    title: "Inspect effect parameters",
+    description:
+      "List an effect's parameters (names, match names, value types, defaults, min/max) WITHOUT changing your layers, so you know the exact " +
+      "parameter names for ae_apply_effect / ae_set_effect_params. Pass comp+layer to inspect an effect already applied (current values).",
+    input: {
+      effect: z.union([z.string(), z.number().int()]).describe('Match name (e.g. "ADBE Glo2") or display name ("Glow"); with comp+layer, also an index in the stack.'),
+      comp: compRef,
+      layer: layerRef.optional().describe("Inspect the effect on this layer instead of a fresh default instance."),
+    },
+    readOnly: true,
+    tempItems: true,
+    jsx: `
+function describe(fx) {
+  var out = [];
+  for (var i = 1; i <= fx.numProperties; i++) {
+    var p = fx.property(i);
+    var o = { index: i, name: p.name, matchName: p.matchName };
+    if (p.propertyType === PropertyType.PROPERTY) {
+      o.type = aemcp.enumName(PropertyValueType, p.propertyValueType);
+      if (p.propertyValueType === PropertyValueType.NO_VALUE) { o.type = "group start/end or button"; }
+      else {
+        try { o.value = aemcp.valueOf(p.value); } catch (e) {}
+        try { if (p.hasMin) o.min = p.minValue; if (p.hasMax) o.max = p.maxValue; } catch (e) {}
+        try { if (p.isDropdownEffect) o.dropdown = true; } catch (e) {}
+        try { o.animatable = p.canVaryOverTime; } catch (e) {}
+      }
+    } else { o.type = "group"; o.children = describe(p); }
+    if (o.type !== "group start/end or button") out.push(o);
+  }
+  return out;
+}
+if (args.layer !== undefined) {
+  var lc = aemcp.findComp(args.comp), ll = aemcp.findLayer(lc, args.layer);
+  var efx = aemcp.resolveProp(ll, ["ADBE Effect Parade", args.effect]);
+  return { effect: efx.name, matchName: efx.matchName, layer: ll.name, params: describe(efx) };
+}
+var mn = null, q = String(args.effect).toLowerCase(), info = null;
+var all = app.effects; // read once: every access rebuilds the whole list
+for (var k = 0; k < all.length; k++) {
+  var e = all[k];
+  if (e.matchName.toLowerCase() === q || e.displayName.toLowerCase() === q) { mn = e.matchName; info = e; break; }
+}
+if (!mn) aemcp.fail("Unknown effect '" + args.effect + "'. Use ae_list_available_effects (or app.effects) to search.");
+var c = app.project.items.addComp("__aemcp_inspect", 100, 100, 1, 1, 30);
+try {
+  var s = c.layers.addSolid([0, 0, 0], "tmp", 100, 100, 1);
+  var fx = s.property("ADBE Effect Parade").addProperty(mn);
+  var res = { effect: info.displayName, matchName: mn, category: info.category, params: describe(fx) };
+} finally {
+  var src = null; try { src = s.source; } catch (e) {}
+  c.remove(); if (src) try { src.remove(); } catch (e) {}
+}
+return res;`,
   },
   {
     name: "ae_apply_effect",
@@ -48,7 +105,8 @@ var c = aemcp.findComp(args.comp), l = aemcp.findLayer(c, args.layer), parade = 
 var mn = args.effect;
 if (!parade.canAddProperty(mn)) {
   mn = null;
-  for (var i = 0; i < app.effects.length; i++) if (app.effects[i].displayName.toLowerCase() === String(args.effect).toLowerCase()) { mn = app.effects[i].matchName; break; }
+  var all = app.effects; // read once: every access rebuilds the whole list
+  for (var i = 0; i < all.length; i++) if (all[i].displayName.toLowerCase() === String(args.effect).toLowerCase()) { mn = all[i].matchName; break; }
   if (!mn) aemcp.fail("Unknown effect '" + args.effect + "'. Use ae_list_available_effects to find the match name.");
 }
 var fx = parade.addProperty(mn);

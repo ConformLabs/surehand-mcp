@@ -8,6 +8,10 @@ export interface AemcpConfig {
   bridgePort: number;
   token: string;
   httpPort: number;
+  /** "core" (default) | "full" | "core,extra_tool,..." */
+  toolProfile?: string;
+  /** set to false to disable the GitHub update check */
+  updateCheck?: boolean;
 }
 
 export function configPath(): string {
@@ -26,5 +30,7 @@ export function loadConfig(): AemcpConfig {
     bridgePort: Number(process.env.AEMCP_BRIDGE_PORT || file.bridgePort || 8765),
     token: process.env.AEMCP_TOKEN || file.token || "",
     httpPort: Number(process.env.AEMCP_HTTP_PORT || file.httpPort || 8766),
+    toolProfile: file.toolProfile,
+    updateCheck: file.updateCheck,
   };
 }

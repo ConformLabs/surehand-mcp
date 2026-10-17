@@ -20,7 +20,10 @@ function Test-Node($path) {
 
 $node = $null
 $onPath = Get-Command node -ErrorAction SilentlyContinue
-foreach ($c in @($(if ($onPath) { $onPath.Source }), (Join-Path $privateNode "node.exe"))) {
+$candidates = @($(if ($onPath) { $onPath.Source }), (Join-Path $privateNode "node.exe"))
+# CI/testing: AEMCP_FORCE_NODE_DOWNLOAD=1 ignores the system Node, so the private download is used
+if ($env:AEMCP_FORCE_NODE_DOWNLOAD) { $candidates = @((Join-Path $privateNode "node.exe")) }
+foreach ($c in $candidates) {
   if (Test-Node $c) { $node = $c; break }
 }
 

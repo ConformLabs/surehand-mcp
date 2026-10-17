@@ -59,4 +59,7 @@ Windows: "Windows protected your PC" -> click "More info" > "Run anyway".
 
 UPDATES & HELP
 --------------
-New versions and questions: https://github.com/ronron555/after-effects-mcp
+When a new version is out, After Effects shows it in Window > Extensions > AE MCP.
+Something wrong? Run "2. Test Installation"; if it finds a problem it prints a report
+(with no passwords or keys in it) that you can send along with your question.
+New versions and questions: https://github.com/ronyitzhaki/after-effects-mcp

@@ -17,7 +17,10 @@ xattr -dr com.apple.quarantine "$ROOT" 2>/dev/null
 node_ok() { [ -x "$1" ] && [ "$("$1" -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)" -ge 18 ]; }
 
 NODE=""
-for c in "$(command -v node 2>/dev/null)" "$PRIVATE_NODE/bin/node"; do
+CANDIDATES=("$(command -v node 2>/dev/null)" "$PRIVATE_NODE/bin/node")
+# CI/testing: AEMCP_FORCE_NODE_DOWNLOAD=1 ignores the system Node, so the private download is used
+[ -n "${AEMCP_FORCE_NODE_DOWNLOAD:-}" ] && CANDIDATES=("$PRIVATE_NODE/bin/node")
+for c in "${CANDIDATES[@]+"${CANDIDATES[@]}"}"; do
   if [ -n "$c" ] && node_ok "$c"; then NODE="$c"; break; fi
 done
 

@@ -15,6 +15,8 @@ export interface JsxTool {
   destructive?: boolean;
   /** Mutating, but must not run inside an undo group (open/close project, undo itself...). */
   noUndo?: boolean;
+  /** Read-only for the user, but creates and removes temporary items: wrap them in one undo step. */
+  tempItems?: boolean;
   timeoutMs?: number;
 }
 
@@ -67,7 +69,7 @@ export function registerJsxTools(server: McpServer, tools: JsxTool[]) {
       async (args: Record<string, unknown>) => {
         try {
           const timeoutMs = typeof args.timeoutSeconds === "number" ? args.timeoutSeconds * 1000 : t.timeoutMs;
-          return formatResult(await runJsx(t.jsx, args, { undoGroup: t.readOnly || t.noUndo ? false : t.title, timeoutMs }));
+          return formatResult(await runJsx(t.jsx, args, { undoGroup: t.tempItems ? "AE MCP " + t.title : t.readOnly || t.noUndo ? false : t.title, timeoutMs }));
         } catch (e) {
           return errorResult(e);
         }

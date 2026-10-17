@@ -1,8 +1,11 @@
 # After Effects MCP
 
+[![CI](https://github.com/ronyitzhaki/after-effects-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/ronyitzhaki/after-effects-mcp/actions/workflows/ci.yml)
+
 Connect **Claude** (Desktop / Code), **ChatGPT** (desktop app or web), Cursor, Codex, or any MCP client to **Adobe After Effects**.
-The AI can run any ExtendScript (JSX) inside After Effects, read information back, and use 58 ready-made tools
-for projects, comps, layers, keyframes, expressions, effects, shapes, masks, rendering, and frame previews it can *see*.
+The AI can run any ExtendScript (JSX) inside After Effects, read information back, and use up to 61 ready-made tools
+for projects, comps, layers, keyframes, expressions, effects, shapes, masks, rendering, and previews it can *see*:
+single frames and contact sheets that show the motion over time.
 
 ```
 Claude / ChatGPT ──MCP──> ae-mcp server (Node) ──localhost──> AE MCP bridge (extension inside After Effects) ──> ExtendScript
@@ -10,7 +13,7 @@ Claude / ChatGPT ──MCP──> ae-mcp server (Node) ──localhost──> AE
 
 ## Download
 
-**[⬇ Download the latest release](https://github.com/ronron555/after-effects-mcp/releases/latest)**: get
+**[⬇ Download the latest release](https://github.com/ronyitzhaki/after-effects-mcp/releases/latest)**: get
 `AE-MCP-<version>.zip` (everything, Mac + Windows), or just `AE-MCP.mcpb` if you only use Claude Desktop.
 Unzip it and open `START HERE.txt`.
 
@@ -139,14 +142,27 @@ To rotate the token, delete `token` from `~/.aemcp/config.json` and re-run the i
 | `ae_run_script_file` | Run a `.jsx` / `.jsxbin` file from disk with arguments. |
 | `ae_get_scripting_guide` | ExtendScript cheat sheet for the model (also an MCP resource `aemcp://docs/extendscript`). |
 
-**Built-in tools:**
+**Tool profiles.** Every tool description is sent to the AI in every chat, so by default only a **core set of
+20 tools** is enabled (about 6k tokens instead of 14k for all 61); everything else is still possible through
+`ae_run_script`. Switch to **Full** in After Effects (**Window > Extensions > AE MCP > AI tools**), in Claude Desktop's
+extension settings ("Enable all tools") for the `.mcpb`, or with `"toolProfile": "full"` in `~/.aemcp/config.json`, then
+restart the AI app. Advanced: `"toolProfile": "core,ae_import_files,ae_render_queue_start"` adds single tools.
 
+Core set: `ae_status`, `ae_run_script`, `ae_get_scripting_guide`, `ae_render_frame`, `ae_render_contact_sheet`,
+`ae_get_project_info`, `ae_get_comp_info`, `ae_get_layer_info`, `ae_get_selection`, `ae_get_properties`,
+`ae_find_properties`, `ae_create_comp`, `ae_add_layer`, `ae_add_shape`, `ae_set_property`, `ae_set_keyframes`,
+`ae_set_expression`, `ae_apply_effect`, `ae_get_effect_params`, `ae_undo`.
+
+**All tools (Full profile):**
+
+- **Seeing the result:** `ae_render_frame` (one frame as an image), `ae_render_contact_sheet` (a grid of frames across
+  time, labelled with time and frame number, to judge motion and easing)
 - **Status & app:** `ae_status`, `ae_system_info`, `ae_execute_menu_command`, `ae_undo`, `ae_redo`, `ae_purge`, `ae_get_fonts`, `ae_reload_helpers`
 - **Project:** `ae_get_project_info`, `ae_list_items`, `ae_get_item_info`, `ae_import_files`, `ae_create_folder`, `ae_move_items`, `ae_rename_item`, `ae_remove_items`, `ae_replace_footage`, `ae_save_project`, `ae_open_project`, `ae_new_project`
-- **Compositions:** `ae_list_comps`, `ae_get_comp_info`, `ae_create_comp`, `ae_set_comp_settings`, `ae_duplicate_comp`, `ae_open_comp`, `ae_precompose`, `ae_add_comp_marker`, `ae_render_frame` (returns a PNG the model can look at)
+- **Compositions:** `ae_list_comps`, `ae_get_comp_info`, `ae_create_comp`, `ae_set_comp_settings`, `ae_duplicate_comp`, `ae_open_comp`, `ae_precompose`, `ae_add_comp_marker`
 - **Layers:** `ae_get_layer_info`, `ae_add_layer` (solid, text, shape, null, adjustment, camera, light, footage/comp), `ae_set_layer_attributes` (switches, timing, parent, blend mode, track matte, order...), `ae_delete_layers`, `ae_duplicate_layer`, `ae_split_layer`, `ae_get_selection`, `ae_select_layers`, `ae_set_text`
-- **Properties & animation:** `ae_get_properties`, `ae_set_property`, `ae_set_keyframes` (interpolation + easing), `ae_remove_keyframes`, `ae_set_expression`, `ae_get_expressions`
-- **Effects, shapes & masks:** `ae_list_available_effects`, `ae_apply_effect`, `ae_set_effect_params`, `ae_remove_effect`, `ae_apply_preset`, `ae_add_shape`, `ae_add_mask`
+- **Properties & animation:** `ae_get_properties`, `ae_find_properties` (search all layers by name/match name, or list animated / expression properties), `ae_set_property`, `ae_set_keyframes` (interpolation + easing), `ae_remove_keyframes`, `ae_set_expression`, `ae_get_expressions`
+- **Effects, shapes & masks:** `ae_list_available_effects`, `ae_get_effect_params` (an effect's exact parameter names, types, defaults and ranges, without touching your layers), `ae_apply_effect`, `ae_set_effect_params`, `ae_remove_effect`, `ae_apply_preset`, `ae_add_shape`, `ae_add_mask`
 - **Render:** `ae_list_render_queue`, `ae_add_to_render_queue`, `ae_render_queue_start`, `ae_clear_render_queue`
 
 Comps can be referenced by id, name, or omitted for the active comp; layers by 1-based index or name; properties by
@@ -171,7 +187,10 @@ paths like `"Transform/Position"` or `"Effects/Gaussian Blur/Blurriness"` (displ
 | A call times out | ExtendScript can't be interrupted: long scripts or renders keep AE busy, and modal dialogs block it. Check AE, then retry. Pass `timeoutSeconds` for long jobs. |
 | Claude Desktop doesn't show the tools | Quit Claude Desktop completely (menu bar / tray) and reopen it. Check `claude_desktop_config.json` contains `after-effects`. |
 
-Logs: the AE MCP panel shows recent calls; `~/.aemcp/bridge-status.json` shows whether the bridge is listening.
+**Reporting a problem:** run **2. Test Installation**. If anything fails, it prints a diagnostics report at the end
+(no secrets in it). You can also click **Copy diagnostics** in the AE MCP panel, or run `ae-mcp diagnostics`.
+The panel also shows recent calls, and a banner when a new version is out (checked against GitHub at most once a day;
+turn off with `"updateCheck": false` in `~/.aemcp/config.json`).
 
 ## Security
 
@@ -189,6 +208,8 @@ server/              MCP server (TypeScript) -> bundled into server/dist/ae-mcp.
   src/cli/             install / uninstall / selftest / chatgpt / setup commands (ae-mcp <command>)
   scripts/smoke.mjs    end-to-end test against a running After Effects
   scripts/package.mjs  builds the shareable release folder, zip and .mcpb
+  scripts/ci-check.mjs assertions for the CI install / uninstall dry runs
+.github/workflows/   CI: unit tests + real launcher install/test/uninstall on macOS and Windows
 cep-panel/           After Effects extension: invisible bridge (auto-starts) + status panel
 installer/           run.sh / run.ps1: find or download Node.js, then run an ae-mcp command
 *.command, *.bat     double-click launchers for a source checkout (the release has its own, in folders)
