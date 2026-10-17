@@ -43,7 +43,7 @@ const manifest = {
     "and use 58 tools for projects, compositions, layers, keyframes, expressions, effects, shapes, masks, the render queue and frame previews it can look at.\n\n" +
     "**First run:** the extension installs a small companion extension into After Effects automatically. Restart After Effects once afterwards. " +
     "Everything runs locally; nothing is sent anywhere except to Claude.",
-  author: { name: "Rony Itzhaki", url: "https://github.com/ronyitzhaki" },
+  author: { name: "Ron Yitzhaki", url: "https://github.com/ronyitzhaki" },
   repository: { type: "git", url: "https://github.com/ronyitzhaki/after-effects-mcp" },
   homepage: "https://github.com/ronyitzhaki/after-effects-mcp",
   support: "https://github.com/ronyitzhaki/after-effects-mcp/issues",

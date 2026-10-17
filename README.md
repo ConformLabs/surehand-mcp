@@ -325,3 +325,7 @@ or updates it when it starts. After changing the server or the panel: rebuild, r
 
 To add a tool, add an entry to one of the arrays in `server/src/tools/*.ts`: a zod input schema plus an ExtendScript
 function body that receives `args` and can use the `aemcp` helpers.
+
+## License
+
+MIT, see [LICENSE](LICENSE). Created and maintained by Ron Yitzhaki ([@ronyitzhaki](https://github.com/ronyitzhaki)).
