@@ -3,7 +3,7 @@ import { chmodSync, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSy
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { VERSION } from "../config.js";
-import { bundledExtensionSigned, ensureConfig, ensureDebugMode, ensureExtension } from "./setup.js";
+import { bundledExtensionSigned, ensureConfig, ensureDebugMode, ensureExtension, RUNTIME_FILE } from "./setup.js";
 import {
   CONFIG_FILE, INSTALLED_SERVER, SERVER_NAME, ask, bold, claudeCodeConfig, claudeDesktopConfig, claudeDesktopDir, claudeDesktopExe,
   chatgptDesktopInstalled, codexBlock, codexConfig, cursorConfig, dim, extensionDir, fail, findClaudeCli, isMac, isWin, ok, readJson, removeCodexBlock, run,
@@ -59,6 +59,7 @@ export async function install(argv: string[]) {
   if (self !== INSTALLED_SERVER) copyFileSync(self, INSTALLED_SERVER);
   if (!isWin) chmodSync(INSTALLED_SERVER, 0o755);
   ok(`Server: ${INSTALLED_SERVER}`);
+  writeFileSync(RUNTIME_FILE, JSON.stringify({ node: stableNodePath(), server: INSTALLED_SERVER, version: VERSION }, null, 2));
   ensureConfig();
   ok(`Config: ${CONFIG_FILE}`);
 

@@ -21,6 +21,8 @@ import { chatgpt } from "./cli/chatgpt.js";
 import { diagnostics } from "./cli/diagnostics.js";
 import { install } from "./cli/install.js";
 import { selftest } from "./cli/selftest.js";
+import { updateCommand } from "./cli/update-cmd.js";
+import { recordRuntime } from "./cli/setup.js";
 import { uninstall } from "./cli/uninstall.js";
 
 export function createMcpServer(): McpServer {
@@ -149,6 +151,7 @@ Usage:
   ae-mcp activity [n]    the last n tool calls (default 30); full log in ~/.aemcp/activity.jsonl
   ae-mcp chatgpt [--local]
                          HTTP server + public tunnel for ChatGPT
+  ae-mcp update [--json]  install the latest release over this installation (and the AE extension)
   ae-mcp setup           only install/update the After Effects extension and config
 
 Config: ~/.aemcp/config.json  (env: AEMCP_CONFIG, AEMCP_BRIDGE_PORT, AEMCP_TOKEN, AEMCP_HTTP_PORT, AEMCP_HTTP_TOKEN)`;
@@ -191,6 +194,8 @@ async function main() {
       return void console.log(await diagnostics());
     case "chatgpt":
       return chatgpt(rest);
+    case "update":
+      return updateCommand(rest);
     case "setup": {
       const r = ensureAeSetup({ forceExtension: rest.includes("--force") });
       console.log(JSON.stringify(r, null, 2));
@@ -198,6 +203,7 @@ async function main() {
     }
   }
   autoSetup();
+  recordRuntime();
   void checkForUpdate(); // background, cached for a day, silent when offline
   if (process.argv.includes("--http")) return startHttp();
   const server = createMcpServer();

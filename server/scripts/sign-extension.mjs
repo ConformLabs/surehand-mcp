@@ -1,8 +1,8 @@
 // Signs the After Effects extension with Adobe's ZXPSignCmd and stores the result in
-// cep-panel/ (META-INF/signatures.xml + mimetype), so it ships inside the build.
+// extension/ (META-INF/signatures.xml + mimetype), so it ships inside the build.
 // A signed extension loads without PlayerDebugMode ("unsigned extensions") on macOS and Windows.
 //
-// Re-run after changing anything in cep-panel/ or bumping the version (the version is stamped
+// Re-run after changing anything in extension/ or bumping the version (the version is stamped
 // into the extension files); `npm test` fails while the signature is out of date.
 //
 //   npm run sign
@@ -54,7 +54,7 @@ try {
     mkdirSync(dirname(p), { recursive: true });
     writeFileSync(p, readFileSync(join(out, ...rel.split("/"))));
   }
-  console.log(`signed the After Effects extension for v${pkg.version} -> cep-panel/${SIGNATURE_FILES.join(", cep-panel/")}`);
+  console.log(`signed the After Effects extension for v${pkg.version} -> extension/${SIGNATURE_FILES.join(", extension/")}`);
 } finally {
   rmSync(work, { recursive: true, force: true });
 }

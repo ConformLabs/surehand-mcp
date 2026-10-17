@@ -4,4 +4,4 @@
 *.mjs text eol=lf
 *.png binary
 # the After Effects extension is signed byte for byte: never convert line endings
-cep-panel/** -text
+extension/** -text

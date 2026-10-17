@@ -6,8 +6,8 @@ import { loadConfig, VERSION } from "../config.js";
 import { runJsx } from "../jsx.js";
 import { diagnostics } from "./diagnostics.js";
 import { fullSelftest } from "./fulltest.js";
-import { checkForUpdate, updateCheckEnabled, updateMessage } from "../update.js";
-import { bundledExtensionSigned, debugModeEnabled, installedExtensionHash, installedExtensionSignature } from "./setup.js";
+import { checkForUpdate, compareVersions, updateCheckEnabled, updateMessage } from "../update.js";
+import { bundledExtensionSigned, debugModeEnabled, installedExtensionHash, installedExtensionSignature, installedExtensionVersion } from "./setup.js";
 import {
   AEMCP_DIR, CONFIG_FILE, CSXS_VERSIONS, SERVER_NAME, bold, claudeDesktopConfig, extensionDir, fail, green, isMac, isWin, ok, readJson, red, sleep, warn,
 } from "./util.js";
@@ -32,6 +32,8 @@ export async function selftest(full = false): Promise<number> {
 
   const hash = installedExtensionHash();
   if (!existsSync(join(extensionDir(), "CSXS", "manifest.xml"))) bad(`After Effects extension missing at ${extensionDir()}. Run the installer.`);
+  else if (hash !== __AEMCP_CEP_HASH__ && compareVersions(installedExtensionVersion() ?? "0", VERSION) > 0)
+    warn(`A newer After Effects extension (v${installedExtensionVersion()}) is installed than this server (v${VERSION}): another copy of AE MCP is newer. Update this one (ae-mcp update, or the latest .mcpb).`);
   else if (hash !== __AEMCP_CEP_HASH__) warn(`Extension at ${extensionDir()} is a different version (${hash ?? "unknown"} vs ${__AEMCP_CEP_HASH__}). Re-run the installer.`);
   else ok("After Effects extension installed");
 

@@ -50,7 +50,7 @@ Use either the `.mcpb` or the installer for Claude Desktop, not both.
 
 **Check it:** with After Effects open, double-click **2. Test Installation** in the same folder.
 
-`START HERE.txt` (from `INSTALL.txt` in this repo) has the same steps in plain language for people you share it with, including what to do if
+`START HERE.txt` (from `installer/START HERE.txt` in this repo) has the same steps in plain language for people you share it with, including what to do if
 macOS Gatekeeper or Windows SmartScreen blocks the files.
 
 The installer:
@@ -285,6 +285,12 @@ Please share reports from other versions.
 The panel also shows recent calls, and a banner when a new version is out (checked against GitHub at most once a day;
 turn off with `"updateCheck": false` in `~/.aemcp/config.json`).
 
+**Updating:** click **Update** in that banner, or run `ae-mcp update` (`node ~/.aemcp/server/ae-mcp.mjs update`). It
+downloads the server from the latest GitHub release, checks its SHA-256 checksum and that it starts, replaces the installed
+one (the old one is kept as `ae-mcp.mjs.previous`) and updates the After Effects extension. Restart After Effects and your
+AI apps afterwards. If you use the Claude Desktop extension (.mcpb), install the new `AE-MCP.mcpb` from the release page
+instead.
+
 ## Security
 
 - The bridge listens on `127.0.0.1` only and requires the token from `~/.aemcp/config.json` (file mode 600);
@@ -301,11 +307,15 @@ server/              MCP server (TypeScript) -> bundled into server/dist/ae-mcp.
   src/cli/             install / uninstall / selftest / chatgpt / setup commands (ae-mcp <command>)
   scripts/smoke.mjs    end-to-end test against a running After Effects
   scripts/package.mjs  builds the shareable release folder, zip and .mcpb
+  scripts/release.mjs  cuts a release: version, sign, check, Windows test, package, CI, GitHub release
+  scripts/test-windows.mjs  installs the build on a Windows PC over SSH and runs the full self-test
+  scripts/sign-extension.mjs  signs the After Effects extension
   scripts/ci-check.mjs assertions for the CI install / uninstall dry runs
-.github/workflows/   CI: unit tests + real launcher install/test/uninstall on macOS and Windows
-cep-panel/           After Effects extension: invisible bridge (auto-starts) + status panel
+extension/           After Effects extension (signed): invisible bridge (auto-starts) + status panel
 installer/           run.sh / run.ps1: find or download Node.js, then run an ae-mcp command
-*.command, *.bat     double-click launchers for a source checkout (the release has its own, in folders)
+  START HERE.txt       plain-language install guide (copied into the release)
+  mac/, windows/       double-click launchers for a source checkout (the release generates its own)
+.github/workflows/   CI: unit tests + real launcher install/test/uninstall on macOS and Windows
 ```
 
 ```bash
@@ -316,11 +326,13 @@ npm test                 # unit tests only
 npm run build            # -> dist/ae-mcp.mjs
 node scripts/smoke.mjs   # live test: needs After Effects running with the bridge
 npm run package          # -> ../dist-zip/AE-MCP/ (launchers, server, AE-MCP.mcpb) + zip
-npm run sign             # re-sign the After Effects extension after changing cep-panel/ or the version
+npm run sign             # re-sign the After Effects extension after changing extension/ or the version
                          # (needs the certificate in ~/.aemcp-signing; see scripts/sign-extension.mjs)
+npm run test:windows     # install this build on the Windows PC over SSH and run the full self-test
+npm run release -- 1.4.0 --notes notes.md   # everything above, then commit, CI and the GitHub release
 ```
 
-The After Effects extension in `cep-panel/` is embedded in the server bundle at build time, and the server installs
+The After Effects extension in `extension/` is embedded in the server bundle at build time, and the server installs
 or updates it when it starts. After changing the server or the panel: rebuild, re-run the installer, restart After Effects.
 
 To add a tool, add an entry to one of the arrays in `server/src/tools/*.ts`: a zod input schema plus an ExtendScript

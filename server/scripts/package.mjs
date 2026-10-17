@@ -105,7 +105,7 @@ chmodSync(join(DIRS.support, "run.sh"), 0o755);
 copyFileSync(join(ROOT, "installer", "run.ps1"), join(DIRS.support, "run.ps1"));
 copyFileSync(bundle, join(DIRS.support, "ae-mcp.mjs"));
 copyFileSync(join(ROOT, "README.md"), join(DIRS.support, "README (technical).md"));
-copyFileSync(join(ROOT, "INSTALL.txt"), join(OUT, "START HERE.txt"));
+copyFileSync(join(ROOT, "installer", "START HERE.txt"), join(OUT, "START HERE.txt"));
 
 // --- zip (keeps the executable bits on the macOS launchers) ---
 const zip = `AE-MCP-${pkg.version}.zip`;

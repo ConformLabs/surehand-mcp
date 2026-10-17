@@ -47,7 +47,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 var define_AEMCP_CEP_FILES_default;
 var init_define_AEMCP_CEP_FILES = __esm({
   "<define:__AEMCP_CEP_FILES__>"() {
-    define_AEMCP_CEP_FILES_default = { "CSXS/manifest.xml": '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n<ExtensionManifest xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n    ExtensionBundleId="com.aemcp"\n    ExtensionBundleVersion="1.0.0"\n    ExtensionBundleName="AE MCP"\n    Version="9.0">\n  <ExtensionList>\n    <Extension Id="com.aemcp.bridge" Version="1.0.0" />\n    <Extension Id="com.aemcp.panel" Version="1.0.0" />\n  </ExtensionList>\n  <ExecutionEnvironment>\n    <HostList>\n      <Host Name="AEFT" Version="[16.0,99.9]" />\n    </HostList>\n    <LocaleList>\n      <Locale Code="All" />\n    </LocaleList>\n    <RequiredRuntimeList>\n      <RequiredRuntime Name="CSXS" Version="9.0" />\n    </RequiredRuntimeList>\n  </ExecutionEnvironment>\n  <DispatchInfoList>\n    <!-- Invisible background extension: starts with After Effects and runs the local bridge server. -->\n    <Extension Id="com.aemcp.bridge">\n      <DispatchInfo>\n        <Resources>\n          <MainPath>./bridge.html</MainPath>\n          <CEFCommandLine>\n            <Parameter>--enable-nodejs</Parameter>\n            <Parameter>--mixed-context</Parameter>\n          </CEFCommandLine>\n        </Resources>\n        <Lifecycle>\n          <AutoVisible>false</AutoVisible>\n          <StartOn>\n            <Event>com.adobe.csxs.events.ApplicationInitialized</Event>\n            <Event>applicationActivate</Event>\n          </StartOn>\n        </Lifecycle>\n        <UI>\n          <Type>Custom</Type>\n          <Geometry>\n            <Size><Height>1</Height><Width>1</Width></Size>\n          </Geometry>\n        </UI>\n      </DispatchInfo>\n    </Extension>\n    <!-- Status panel: Window > Extensions > AE MCP -->\n    <Extension Id="com.aemcp.panel">\n      <DispatchInfo>\n        <Resources>\n          <MainPath>./index.html</MainPath>\n          <CEFCommandLine>\n            <Parameter>--enable-nodejs</Parameter>\n            <Parameter>--mixed-context</Parameter>\n          </CEFCommandLine>\n        </Resources>\n        <Lifecycle>\n          <AutoVisible>true</AutoVisible>\n        </Lifecycle>\n        <UI>\n          <Type>Panel</Type>\n          <Menu>AE MCP</Menu>\n          <Geometry>\n            <Size><Height>420</Height><Width>320</Width></Size>\n            <MinSize><Height>200</Height><Width>240</Width></MinSize>\n          </Geometry>\n        </UI>\n      </DispatchInfo>\n    </Extension>\n  </DispatchInfoList>\n</ExtensionManifest>\n', "META-INF/signatures.xml": '<signatures>\n<Signature xmlns="http://www.w3.org/2000/09/xmldsig#" Id="PackageSignature">\n<SignedInfo>\n<CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>\n<SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/>\n<Reference Type="http://www.w3.org/2000/09/xmldsig#Manifest" URI="#PackageContents">\n<Transforms>\n<Transform Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>\n</Transforms>\n<DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>\n<DigestValue>VN2vYRixK+T3kQ57hahwKRdGqa1ptYtIbdy019iCw6k=</DigestValue>\n</Reference>\n</SignedInfo>\n<SignatureValue Id="PackageSignatureValue">J5AflYC2UFRTThONWLI5sG2ejo2IgjUHFEfV1XQoxPN4YqAoWPdUkM6T4MAaGCeQ\n9T9/LrTPiLRZu1dtemTtWTUwl6B5i3o3MuSY9knUIIZRv0PGPqV4A3yKRDqFAVVt\n9v/QzBrt2fBrXExk8/oy5Nb4odm8eRCLEvbR8pzxnDI=</SignatureValue>\n\n<KeyInfo>\n<X509Data>\n<X509Certificate>MIIB/TCCAWYCCQDt8b8ZOqaroDANBgkqhkiG9w0BAQsFADBCMQswCQYDVQQGEwJJ\nTDELMAkGA1UECAwCTkExFTATBgNVBAoMDFJvbnkgSXR6aGFraTEPMA0GA1UEAwwG\nQUUgTUNQMCAXDTI2MTAxNzIwNDc0MFoYDzIwNTExMDExMjA0NzQwWjBCMQswCQYD\nVQQGEwJJTDELMAkGA1UECAwCTkExFTATBgNVBAoMDFJvbnkgSXR6aGFraTEPMA0G\nA1UEAwwGQUUgTUNQMIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCpv3D0LnoK\nVfHJj9cZffhfUTRVl/xYETq83Z2ftcLTjYUiHQqYAcAl43NQC869moAPfOgB0A/+\nF7aCAOQVPSKeVh4czeyAy4nCfdiNbRxHu9/ZUFW8tk71EjhfEHWc6jHcmlc143i3\nrkyG1DsgzyWnajm1JmvQ/QCNb/OTxv+RnwIDAQABMA0GCSqGSIb3DQEBCwUAA4GB\nAHVqZQs1/Q5O0B+WhgDBSJBXThC391CMyfoVAZnvQVodHAz73ubv/aN00wwPjFzL\ntT8pmLbStTaHMHVX7vQcvOcKJMiP/ki8T0zx5y1/qcU9C62O8RvpXaxruZmX+B1T\nyxFmRt6UHmiLiOgWpZtEyN94gOPAUp5guQ6i8yMnyjZW\n</X509Certificate>\n</X509Data>\n</KeyInfo>\n<Object>\n<Manifest Id="PackageContents">\n<Reference URI="mimetype"><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>b07Onu9cTlGK1WpvgtFOlfk+Tl0HscuNIt6GZtesPX8=</DigestValue></Reference><Reference URI="index.html"><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>vK1XQgKKg+8+cQy+HPC7GIfMtBE9kNrfvLQh+yDphMQ=</DigestValue></Reference><Reference URI="css/panel.css"><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>eUGSUu7v7xyduFiO38UWttti+BeJ7POEVpfkiXIfaZo=</DigestValue></Reference><Reference URI="js/bridge-core.js"><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>OKqKtG3jRW231EoG4YzKqUkfc6r4HlpUCI1XT+yJuMQ=</DigestValue></Reference><Reference URI="js/panel.js"><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>5p+u328WSxbBUpBFED6BGMbglg94syEeWNgdfi8OPgE=</DigestValue></Reference><Reference URI="CSXS/manifest.xml"><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>9eFcPHxkq/KbadMiXHueAVZRsxpafT/R8VhoJ+IAPEw=</DigestValue></Reference><Reference URI="bridge.html"><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>z3EV4R9yzRLZ2sOysVkF2kYhXAeuVXx3JvZOtB2nJuI=</DigestValue></Reference></Manifest>\n</Object>\n<Object xmlns:xades="http://uri.etsi.org/01903/v1.1.1#" >\n<xades:QualifyingProperties>\n<xades:UnsignedProperties>\n<xades:UnsignedSignatureProperties>\n<xades:SignatureTimeStamp>\n<xades:HashDataInfo uri="SignatureValue">\n<Transforms>\n<Transform Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>\n</Transforms>\n</xades:HashDataInfo>\n<xades:EncapsulatedTimeStamp>\nMIIXczADAgEAMIIXagYJKoZIhvcNAQcCoIIXWzCCF1cCAQMxDzANBglghkgBZQME\nAgEFADCBggYLKoZIhvcNAQkQAQSgcwRxMG8CAQEGCWCGSAGG/WwHATAxMA0GCWCG\nSAFlAwQCAQUABCBqn4kGky5Y8iVjU/XlRbX9CQa3a/Aaa6v2btSlluqgtgIQYRPo\nFtqq7b9DsDKdXIIcKxgPMjAyNjEwMTcyMTQ3MzVaAgkA+IQ3ZP2ZCWmgghM6MIIG\n7TCCBNWgAwIBAgIQCE/cM09+RU7bww+P+ZIYNTANBgkqhkiG9w0BAQsFADBpMQsw\nCQYDVQQGEwJVUzEXMBUGA1UEChMORGlnaUNlcnQsIEluYy4xQTA/BgNVBAMTOERp\nZ2lDZXJ0IFRydXN0ZWQgRzQgVGltZVN0YW1waW5nIFJTQTQwOTYgU0hBMjU2IDIw\nMjUgQ0ExMB4XDTI2MDgwNTAwMDAwMFoXDTM3MTEwNDIzNTk1OVowYzELMAkGA1UE\nBhMCVVMxFzAVBgNVBAoTDkRpZ2lDZXJ0LCBJbmMuMTswOQYDVQQDEzJEaWdpQ2Vy\ndCBTSEEyNTYgUlNBNDA5NiBUaW1lc3RhbXAgUmVzcG9uZGVyIDIwMjYgMTCCAiIw\nDQYJKoZIhvcNAQEBBQADggIPADCCAgoCggIBALZ7pvLJ/s1K+NSbTGWz/TjGMPh8\nCQ6RucZCLv5anHzWJjF/NWJrFIhy24fcpKXlgRiky4WAawDfU3YP0BMxt9l3Dm5o\nCG5Z69AqEN1kgHg2epx+l+lZBcmJCcN0ASURML5uFIS80sZsDwO3BSkUxDjLJhBI\n+qiZP3aixAC/qEGLjsBNlLol9VZ7pfGEXiMlneJIC5/YKuizVzNFKZZEeoy/0B8Z\nm+nzKBgSWG52lCO1w+nCg6XpCtklTJXeIg283hw7TmmsZXR+SMbjbrEOvZ3fP2Vx\nIgeR28Y90ZStd3F9VuA5RVynb/whITPAo9b75Zr4Ta6Mj3URm26QZYMn/FnbuTeg\ncoRcFEZ9FOqM5T6MTdtr/n74lIT/ug0eeOzmZ6QTFg33otX+bFRsIolvykE1jive\n4PuESaT8zzVeFWDAMDtozNgLctkGD1ZjkEyZtJrLl5ya0m5doH/ScpaZCZVl6pNU\nOCybMc/kxC6EAmSJY24L0yYKD1Nkddsnb/ItVKi/2nXpQNMu1PT5prW83vV8d67W\nowuUs0HdY4H8AMLGvdL/WHEj3ZnqMqAQQP9u3Ai9t+5eQ02GDwy0ODjdzi0xlp70\nW+ow63/0++YDEX1M0iwgUHwbrJvfpklkZQvw3+kv3vUPItdwroczk9icflf55W1z\nOEKAcJVAIXpcMCU9AgMBAAGjggGVMIIBkTAMBgNVHRMBAf8EAjAAMB0GA1UdDgQW\nBBQUyWOKMC7USvtulPPm40B+9ezN4jAfBgNVHSMEGDAWgBTvb1NK6eQGfHrK4pBW\n9i/USezLTjAOBgNVHQ8BAf8EBAMCB4AwFgYDVR0lAQH/BAwwCgYIKwYBBQUHAwgw\ngZUGCCsGAQUFBwEBBIGIMIGFMCQGCCsGAQUFBzABhhhodHRwOi8vb2NzcC5kaWdp\nY2VydC5jb20wXQYIKwYBBQUHMAKGUWh0dHA6Ly9jYWNlcnRzLmRpZ2ljZXJ0LmNv\nbS9EaWdpQ2VydFRydXN0ZWRHNFRpbWVTdGFtcGluZ1JTQTQwOTZTSEEyNTYyMDI1\nQ0ExLmNydDBfBgNVHR8EWDBWMFSgUqBQhk5odHRwOi8vY3JsMy5kaWdpY2VydC5j\nb20vRGlnaUNlcnRUcnVzdGVkRzRUaW1lU3RhbXBpbmdSU0E0MDk2U0hBMjU2MjAy\nNUNBMS5jcmwwIAYDVR0gBBkwFzAIBgZngQwBBAIwCwYJYIZIAYb9bAcBMA0GCSqG\nSIb3DQEBCwUAA4ICAQCNxTphHp1SCt+ZrAmAfn0oQLFr0mLywSLaDXQIENoyKqxr\nFbJblzCVP/pkXmwXOdrOpWygLzlT12os5ipDCy35RBCg2UMeApEtrfGhz45F4Wt4\nWGdNdIbRWt3YTYJmpR+b7lr4d7Uwn+H600u4D7RnOGf8Wj4UNgAdZkfHhHv1mx9E\nVh71SJelcEN/oORSjXzdjfw1iZH9d8Nh/thn6hH23d+VsPAr6GAYyzSA02nXD1nY\nLI7Ijmiv+xLCiYC41DSFYL3GhTiy0PxpawPtGRyaBVGzq+UiTfM8pD7KVyF5aQyW\nP4KhVGUUTnmm/RlYJoW3TiXA/+t0YcT2oRVBm3JETjajHug2AL+v5jhtKVnd3D0r\nbHXEu27o+Q8p4sEWPMqKDB+qbceb6T/6WcwTwXmQ9lOCLLYcsQeSWmvKqzpAec9e\ntE14jOQAzLKWdE3w/TCaKtLRaRT7LCkRYVnhA2D73FLje1O5b3HR5eHs0NzU/+xX\n7NbEdcofy0W3Wdwd1XOqtlpg/JgwtKfZM5dqO94lbUveOiJBI+xZEbGRsMNbXmMR\nEUTgu+Oca7Y73MPWcslIx2VhkSKSXjDbD6rgg39H5Mh7QfieAIjWagkJNt68Yfim\n6cjEzVSiLSeZfdkr5dtFPTW6jATlWJdYeeDRGCyatf8R1hSjzSvdN8yWQPT9gzCC\nBrQwggScoAMCAQICEA3HrFcF/yGZLkBDIgw6SYYwDQYJKoZIhvcNAQELBQAwYjEL\nMAkGA1UEBhMCVVMxFTATBgNVBAoTDERpZ2lDZXJ0IEluYzEZMBcGA1UECxMQd3d3\nLmRpZ2ljZXJ0LmNvbTEhMB8GA1UEAxMYRGlnaUNlcnQgVHJ1c3RlZCBSb290IEc0\nMB4XDTI1MDUwNzAwMDAwMFoXDTM4MDExNDIzNTk1OVowaTELMAkGA1UEBhMCVVMx\nFzAVBgNVBAoTDkRpZ2lDZXJ0LCBJbmMuMUEwPwYDVQQDEzhEaWdpQ2VydCBUcnVz\ndGVkIEc0IFRpbWVTdGFtcGluZyBSU0E0MDk2IFNIQTI1NiAyMDI1IENBMTCCAiIw\nDQYJKoZIhvcNAQEBBQADggIPADCCAgoCggIBALR4MdMKmEFyvjxGwBysddujRmh0\ntFEXnU2tjQ2UtZmWgyxU7UNqEY81FzJsQqr5G7A6c+Gh/qm8Xi4aPCOo2N8S9SLr\nC6Kbltqn7SWCWgzbNfiR+2fkHUiljNOqnIVD/gG3SYDEAd4dg2dDGpeZGKe+42DF\nUF0mR/vtLa4+gKPsYfwEu7EEbkC9+0F2w4QJLVSTEG8yAR2CQWIM1iI5PHg62IVw\nxKSpO0XaF9DPfNBKS7Zazch8NF5vp7eaZ2CVNxpqumzTCNSOxm+SAWSuIr21Qomb\n+zzQWKhxKTVVgtmUPAW35xUUFREmDrMxSNlr/NsJyUXzdtFUUt4aS4CEeIY8y9Ia\naGBpPNXKFifinT7zL2gdFpBP9qh8SdLnEut/GcalNeJQ55IuwnKCgs+nrpuQNfVm\nUB5KlCX3ZA4x5HHKS+rqBvKWxdCyQEEGcbLe1b8Aw4wJkhU1JrPsFfxW1gaou30y\nZ46t4Y9F20HHfIY4/6vHespYMQmUiote8ladjS/nJ0+k6MvqzfpzPDOy5y6gqzti\nT96Fv/9bH7mQyogxG9QEPHrPV6/7umw052AkyiLA6tQbZl1KhBtTasySkuJDpsZG\nKdlsjg4u70EwgWbVRSX1Wd4+zoFpp4Ra+MlKM2baoD6x0VR4RjSpWM8o5a6D8bpf\nm4CLKczsG7ZrIGNTAgMBAAGjggFdMIIBWTASBgNVHRMBAf8ECDAGAQH/AgEAMB0G\nA1UdDgQWBBTvb1NK6eQGfHrK4pBW9i/USezLTjAfBgNVHSMEGDAWgBTs1+OC0nFd\nZEzfLmc/57qYrhwPTzAOBgNVHQ8BAf8EBAMCAYYwEwYDVR0lBAwwCgYIKwYBBQUH\nAwgwdwYIKwYBBQUHAQEEazBpMCQGCCsGAQUFBzABhhhodHRwOi8vb2NzcC5kaWdp\nY2VydC5jb20wQQYIKwYBBQUHMAKGNWh0dHA6Ly9jYWNlcnRzLmRpZ2ljZXJ0LmNv\nbS9EaWdpQ2VydFRydXN0ZWRSb290RzQuY3J0MEMGA1UdHwQ8MDowOKA2oDSGMmh0\ndHA6Ly9jcmwzLmRpZ2ljZXJ0LmNvbS9EaWdpQ2VydFRydXN0ZWRSb290RzQuY3Js\nMCAGA1UdIAQZMBcwCAYGZ4EMAQQCMAsGCWCGSAGG/WwHATANBgkqhkiG9w0BAQsF\nAAOCAgEAF877FoAc/gc9EXZxML2+C8i1NKZ/zdCHxYgaMH9Pw5tcBnPw6O6FTGNp\noV2V4wzSUGvI9NAzaoQk97frPBtIj+ZLzdp+yXdhOP4hCFATuNT+ReOPK0mCefSG\n+tXqGpYZ3essBS3q8nL2UwM+NMvEuBd/2vmdYxDCvwzJv2sRUoKEfJ+nN57mQfQX\nwcAEGCvRR2qKtntujB71WPYAgwPyWLKu6RnaID/B0ba2H3LUiwDRAXx1Neq9ydOa\nl95CHfmTnM4I+ZI2rVQfjXQA1WSjjf4J2a7jLzWGNqNX+DF0SQzHU0pTi4dBwp9n\nEC8EAqoxW6q17r0z0noDjs6+BFo+z7bKSBwZXTRNivYuve3L2oiKNqetRHdqfMTC\nW/NmKLJ9M+MtucVGyOxiDf06VXxyKkOirv6o02OoXN4bFzK0vlNMsvhlqgF2puE6\nFndlENSmE+9JGYxOGLS/D284NHNboDGcmWXfwXRy4kbu4QFhOm0xJuF2EZAOk5eC\nkhSxZON3rGlHqhpB/8MluDezooIs8CVnrpHMiD2wL40mm53+/j7tFaxYKIqL0Q4s\nsd8xHZnIn/7GELH3IdvG2XlM9q7WP/UwgOkw/HQtyRN62JK4S1C8uw3PdBunvAZa\npsiI5YKdvlarEvf8EA+8hcpSM9LHJmyrxaFtoza2zNaQ9k+5t1wwggWNMIIEdaAD\nAgECAhAOmxiO+dAt5+/bUOIIQBhaMA0GCSqGSIb3DQEBDAUAMGUxCzAJBgNVBAYT\nAlVTMRUwEwYDVQQKEwxEaWdpQ2VydCBJbmMxGTAXBgNVBAsTEHd3dy5kaWdpY2Vy\ndC5jb20xJDAiBgNVBAMTG0RpZ2lDZXJ0IEFzc3VyZWQgSUQgUm9vdCBDQTAeFw0y\nMjA4MDEwMDAwMDBaFw0zMTExMDkyMzU5NTlaMGIxCzAJBgNVBAYTAlVTMRUwEwYD\nVQQKEwxEaWdpQ2VydCBJbmMxGTAXBgNVBAsTEHd3dy5kaWdpY2VydC5jb20xITAf\nBgNVBAMTGERpZ2lDZXJ0IFRydXN0ZWQgUm9vdCBHNDCCAiIwDQYJKoZIhvcNAQEB\nBQADggIPADCCAgoCggIBAL/mkHNo3rvkXUo8MCIwaTPswqclLskhPfKK2FnC4Smn\nPVirdprNrnsbhA3EMB/zG6Q4FutWxpdtHauyefLKEdLkX9YFPFIPUh/GnhWlfr6f\nqVcWWVVyr2iTcMKyunWZanMylNEQRBAu34LzB4TmdDttceItDBvuINXJIB1jKS3O\n7F5OyJP4IWGbNOsFxl7sWxq868nPzaw0QF+xembud8hIqGZXV59UWI4MK7dPpzDZ\nVu7Ke13jrclPXuU15zHL2pNe3I6PgNq2kZhAkHnDeMe2scS1ahg4AxCN2NQ3pC4F\nfYj1gj4QkXCrVYJBMtfbBHMqbpEBfCFM1LyuGwN1XXhm2ToxRJozQL8I11pJpMLm\nqaBn3aQnvKFPObURWBf3JFxGj2T3wWmIdph2PVldQnaHiZdpekjw4KISG2aadMre\nSx7nDmOu5tTvkpI6nj3cAORFJYm2mkQZK37AlLTSYW3rM9nF30sEAMx9HJXDj/ch\nsrIRt7t/8tWMcCxBYKqxYxhElRp2Yn72gLD76GSmM9GJB+G9t+ZDpBi4pncB4Q+U\nDCEdslQpJYls5Q5SUUd0viastkF13nqsX40/ybzTQRESW+UQUOsxxcpyFiIJ33xM\ndT9j7CFfxCBRa2+xq4aLT8LWRV+dIPyhHsXAj6KxfgommfXkaS+YHS312amyHeUb\nAgMBAAGjggE6MIIBNjAPBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQWBBTs1+OC0nFd\nZEzfLmc/57qYrhwPTzAfBgNVHSMEGDAWgBRF66Kv9JLLgjEtUYunpyGd823IDzAO\nBgNVHQ8BAf8EBAMCAYYweQYIKwYBBQUHAQEEbTBrMCQGCCsGAQUFBzABhhhodHRw\nOi8vb2NzcC5kaWdpY2VydC5jb20wQwYIKwYBBQUHMAKGN2h0dHA6Ly9jYWNlcnRz\nLmRpZ2ljZXJ0LmNvbS9EaWdpQ2VydEFzc3VyZWRJRFJvb3RDQS5jcnQwRQYDVR0f\nBD4wPDA6oDigNoY0aHR0cDovL2NybDMuZGlnaWNlcnQuY29tL0RpZ2lDZXJ0QXNz\ndXJlZElEUm9vdENBLmNybDARBgNVHSAECjAIMAYGBFUdIAAwDQYJKoZIhvcNAQEM\nBQADggEBAHCgv0NcVec4X6CjdBs9thbX979XB72arKGHLOyFXqkauyL4hxppVCLt\npIh3bb0aFPQTSnovLbc47/T/gLn4offyct4kvFIDyE7QKt76LVbP+fT3rDB6mouy\nXtTP0UNEm0Mh65ZyoUi0mcudT6cGAxN3J0TU53/oWajwvy8LpunyNDzs9wPHh6jS\nTEAZNUZqaVSwuKFWjuyk1T3osdz9HNj0d1pcVIxv76FQPfx2CWiEn2/K2yCNNWAc\nAgPLILCsWKAOQGPFmCLBsln1VWvPJ6tsds5vIy30fnFqI2si/xK4VC0nftg62fC2\nh5b9W9FcrBjDTZ9ztwGpn1eqXijiuZQxggN8MIIDeAIBATB9MGkxCzAJBgNVBAYT\nAlVTMRcwFQYDVQQKEw5EaWdpQ2VydCwgSW5jLjFBMD8GA1UEAxM4RGlnaUNlcnQg\nVHJ1c3RlZCBHNCBUaW1lU3RhbXBpbmcgUlNBNDA5NiBTSEEyNTYgMjAyNSBDQTEC\nEAhP3DNPfkVO28MPj/mSGDUwDQYJYIZIAWUDBAIBBQCggdEwGgYJKoZIhvcNAQkD\nMQ0GCyqGSIb3DQEJEAEEMBwGCSqGSIb3DQEJBTEPFw0yNjEwMTcyMTQ3MzVaMCsG\nCyqGSIb3DQEJEAIMMRwwGjAYMBYEFFHZq9oDSXPYT0JmrKSCSOazacQ5MC8GCSqG\nSIb3DQEJBDEiBCAcxHJV4Y8+if7zXTkYsMwM2G8Z+0MoTeXtgx6BExe6lDA3Bgsq\nhkiG9w0BCRACLzEoMCYwJDAiBCAtoJ2n9BMfn+cttsXm6cllZ1WvBD8ep0LMDSEg\n4UHr/DANBgkqhkiG9w0BAQEFAASCAgBwH9md2xadQ4N2tp+Q37ZzbMHtbhuUH/s8\nrcGJHN+FgtIfC1RCgP3+YfeWaBmkN9J1gFAUo80XRKmQtM8ReSxY2L+Ei2LxTvWC\ndAWyMstjK31MziUpdjzxa3yxj5MyvT+UsuCBPPw+YxhRuXFlg9xF7DoNYyOxSUnY\nLsXkxya09sEHGPnwY2PGjiru27Etzg8OSXZtmYncsDjpU1Mq1V+PmvFuJzxea4cF\nFn1jMlQzl3kfRv+zaifn2b5anuE6qWCMGriU+5NPCT5e4rk8gZrVXBR5zkMLg7Ks\nt/8k5CYLfmx4H0xZ7ZUx250mjS0xW1tsHBzdMRjRMca+RsooUao4iW7qIzeZSwM4\n7zT7H5jGF4oUzTIKMBFJ680oGhnzwipsmh7b/NdppOAVwgDpq2+O81krJllAOKED\nhnoLJ+0W6Xv4jxEbushdZTW1UK925PpQusstmncQT91uzeQF0+JWxYAatdYt29j1\nDCc2EeapHQYvNFLt5Uf52E9CP6KSh9PaWhYRFs3T2Quuus37xs3l6khwwgqJ/5C8\nsyN3NB0puoJk21v866yeQa3CsAyzRyqmE1L5Fi6soaKs8Kon6j8T4hzaK2psr1mY\nSUtu4sSTutKTmxzQurGBDbe9XicquyUwqhs95HRTU7OhVe9y1Dufice40M2I2k2I\nKx8fV/96PQ==\n</xades:EncapsulatedTimeStamp>\n</xades:SignatureTimeStamp>\n</xades:UnsignedSignatureProperties>\n</xades:UnsignedProperties>\n</xades:QualifyingProperties>\n</Object>\n</Signature>\n</signatures>', "bridge.html": '<!DOCTYPE html>\n<html>\n<head><meta charset="utf-8"><title>AE MCP Bridge</title></head>\n<body>\n<script src="js/bridge-core.js"></script>\n<script>AEMCPBridge.start();</script>\n</body>\n</html>\n', "css/panel.css": ':root { --bg: #232323; --fg: #d6d6d6; --muted: #8a8a8a; --ok: #3fb950; --bad: #f85149; --warn: #d29922; --line: #3a3a3a; }\n* { box-sizing: border-box; }\nbody { margin: 0; padding: 10px; background: var(--bg); color: var(--fg); font: 12px -apple-system, "Segoe UI", sans-serif; }\nheader { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }\n#title { font-weight: 600; font-size: 13px; }\n.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--warn); flex: none; }\n.dot.ok { background: var(--ok); } .dot.bad { background: var(--bad); }\n.muted { color: var(--muted); }\n.row { display: flex; gap: 6px; margin-bottom: 10px; }\nbutton { background: #3a3a3a; color: var(--fg); border: 1px solid #4a4a4a; border-radius: 4px; padding: 4px 10px; cursor: pointer; font: inherit; }\nbutton:hover { background: #454545; }\n.label { text-transform: uppercase; font-size: 10px; letter-spacing: .05em; color: var(--muted); margin-bottom: 4px; }\nul { list-style: none; padding: 0; margin: 0; }\nli { border-top: 1px solid var(--line); padding: 4px 0; word-break: break-all; }\nli .t { color: var(--muted); margin-right: 6px; }\nli.err .s { color: var(--bad); } li.ok .s { color: var(--ok); }\nfooter { margin-top: 10px; font-size: 10px; }\n.banner { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #2d2a12; border: 1px solid #5c531c; border-radius: 4px; padding: 6px 8px; margin-bottom: 10px; }\n.banner[hidden], [hidden] { display: none; }\n.setting { align-items: center; }\n.setting label { color: var(--muted); }\nselect { background: #3a3a3a; color: var(--fg); border: 1px solid #4a4a4a; border-radius: 4px; padding: 3px 6px; font: inherit; flex: 1; }\n.small { font-size: 10px; margin: -6px 0 10px; }\n.grid { display: grid; grid-template-columns: auto 1fr; gap: 6px 8px; align-items: center; margin-bottom: 8px; }\n.grid label { color: var(--muted); }\n#approvals { border: 1px solid #5c531c; background: #2d2a12; border-radius: 4px; padding: 6px 8px; margin-bottom: 10px; }\n.approval { border-top: 1px solid #4a4520; padding: 6px 0; }\n.approval:first-child { border-top: 0; }\n.approval .what { font-weight: 600; margin-bottom: 4px; }\n.approval pre, li pre { max-height: 160px; overflow: auto; background: #181818; padding: 6px; border-radius: 3px; margin: 4px 0; white-space: pre-wrap; word-break: break-word; font: 11px Menlo, Consolas, monospace; }\n.approval .row { margin: 4px 0 0; }\nbutton.allow { background: #1f4d2b; border-color: #2e6b3d; }\nbutton.deny { background: #5a1f1f; border-color: #7a2c2c; }\nli { cursor: pointer; }\nli .c { color: var(--muted); }\n', "index.html": '<!DOCTYPE html>\n<html>\n<head>\n  <meta charset="utf-8">\n  <title>AE MCP</title>\n  <link rel="stylesheet" href="css/panel.css">\n</head>\n<body>\n  <header>\n    <span id="dot" class="dot"></span>\n    <div>\n      <div id="title">AE MCP</div>\n      <div id="sub" class="muted">checking\u2026</div>\n    </div>\n  </header>\n  <div id="update" class="banner" hidden>\n    <span id="updateText"></span>\n    <button id="updateBtn">Download</button>\n  </div>\n\n  <section id="approvals" hidden>\n    <div class="label">Waiting for your approval</div>\n    <div id="approvalList"></div>\n  </section>\n\n  <section class="row">\n    <button id="test">Test</button>\n    <button id="diag" title="Copies a report to paste into a bug report or a chat">Copy diagnostics</button>\n    <button id="openLog" title="Show the full activity log file">Open log</button>\n  </section>\n\n  <section class="grid">\n    <label for="perm">Permissions</label>\n    <select id="perm">\n      <option value="full">Full access</option>\n      <option value="ask">Ask before every change</option>\n      <option value="read-only">Read-only</option>\n    </select>\n    <label for="shell">Shell commands</label>\n    <select id="shell">\n      <option value="on">Allowed</option>\n      <option value="off">Blocked</option>\n    </select>\n    <label for="profile">AI tools</label>\n    <select id="profile">\n      <option value="core">Core (faster, recommended)</option>\n      <option value="full">Full (all tools)</option>\n    </select>\n  </section>\n  <div id="note" class="muted small" hidden></div>\n\n  <section>\n    <div class="label">Activity <span class="muted" id="activityHint">(click an entry for details)</span></div>\n    <ul id="log"><li class="muted">No calls yet</li></ul>\n  </section>\n  <footer class="muted" id="foot"></footer>\n  <script src="js/bridge-core.js"></script>\n  <script src="js/panel.js"></script>\n</body>\n</html>\n', "js/bridge-core.js": `/* AE MCP bridge: a tiny HTTP server inside After Effects (CEP + Node) that evaluates
+    define_AEMCP_CEP_FILES_default = { "CSXS/manifest.xml": '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n<ExtensionManifest xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n    ExtensionBundleId="com.aemcp"\n    ExtensionBundleVersion="1.0.0"\n    ExtensionBundleName="AE MCP"\n    Version="9.0">\n  <ExtensionList>\n    <Extension Id="com.aemcp.bridge" Version="1.0.0" />\n    <Extension Id="com.aemcp.panel" Version="1.0.0" />\n  </ExtensionList>\n  <ExecutionEnvironment>\n    <HostList>\n      <Host Name="AEFT" Version="[16.0,99.9]" />\n    </HostList>\n    <LocaleList>\n      <Locale Code="All" />\n    </LocaleList>\n    <RequiredRuntimeList>\n      <RequiredRuntime Name="CSXS" Version="9.0" />\n    </RequiredRuntimeList>\n  </ExecutionEnvironment>\n  <DispatchInfoList>\n    <!-- Invisible background extension: starts with After Effects and runs the local bridge server. -->\n    <Extension Id="com.aemcp.bridge">\n      <DispatchInfo>\n        <Resources>\n          <MainPath>./bridge.html</MainPath>\n          <CEFCommandLine>\n            <Parameter>--enable-nodejs</Parameter>\n            <Parameter>--mixed-context</Parameter>\n          </CEFCommandLine>\n        </Resources>\n        <Lifecycle>\n          <AutoVisible>false</AutoVisible>\n          <StartOn>\n            <Event>com.adobe.csxs.events.ApplicationInitialized</Event>\n            <Event>applicationActivate</Event>\n          </StartOn>\n        </Lifecycle>\n        <UI>\n          <Type>Custom</Type>\n          <Geometry>\n            <Size><Height>1</Height><Width>1</Width></Size>\n          </Geometry>\n        </UI>\n      </DispatchInfo>\n    </Extension>\n    <!-- Status panel: Window > Extensions > AE MCP -->\n    <Extension Id="com.aemcp.panel">\n      <DispatchInfo>\n        <Resources>\n          <MainPath>./index.html</MainPath>\n          <CEFCommandLine>\n            <Parameter>--enable-nodejs</Parameter>\n            <Parameter>--mixed-context</Parameter>\n          </CEFCommandLine>\n        </Resources>\n        <Lifecycle>\n          <AutoVisible>true</AutoVisible>\n        </Lifecycle>\n        <UI>\n          <Type>Panel</Type>\n          <Menu>AE MCP</Menu>\n          <Geometry>\n            <Size><Height>420</Height><Width>320</Width></Size>\n            <MinSize><Height>200</Height><Width>240</Width></MinSize>\n          </Geometry>\n        </UI>\n      </DispatchInfo>\n    </Extension>\n  </DispatchInfoList>\n</ExtensionManifest>\n', "META-INF/signatures.xml": '<signatures>\n<Signature xmlns="http://www.w3.org/2000/09/xmldsig#" Id="PackageSignature">\n<SignedInfo>\n<CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>\n<SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/>\n<Reference Type="http://www.w3.org/2000/09/xmldsig#Manifest" URI="#PackageContents">\n<Transforms>\n<Transform Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>\n</Transforms>\n<DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>\n<DigestValue>J7jvmq6v2GsEgnzlfu9ZvIybMDhaRZhQBjd2CPNo4NY=</DigestValue>\n</Reference>\n</SignedInfo>\n<SignatureValue Id="PackageSignatureValue">mtDNP26ObHCZmG+D+J1diZg8RLyNlj3qwZ3CivqEnVIy/dK//4U3BcCaxM0x/xvW\nfiuKXxUWxJu/87w+lOWQjR5qdf0ueICwxhMEbp8O46hvVIrB2amcGajA1Y0B4tzE\nRD9rwqETPPYNRiEuFFqzzTYj+sHaFhSuv+A7Ij1yFxc=</SignatureValue>\n\n<KeyInfo>\n<X509Data>\n<X509Certificate>MIIB/TCCAWYCCQDt8b8ZOqaroDANBgkqhkiG9w0BAQsFADBCMQswCQYDVQQGEwJJ\nTDELMAkGA1UECAwCTkExFTATBgNVBAoMDFJvbnkgSXR6aGFraTEPMA0GA1UEAwwG\nQUUgTUNQMCAXDTI2MTAxNzIwNDc0MFoYDzIwNTExMDExMjA0NzQwWjBCMQswCQYD\nVQQGEwJJTDELMAkGA1UECAwCTkExFTATBgNVBAoMDFJvbnkgSXR6aGFraTEPMA0G\nA1UEAwwGQUUgTUNQMIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCpv3D0LnoK\nVfHJj9cZffhfUTRVl/xYETq83Z2ftcLTjYUiHQqYAcAl43NQC869moAPfOgB0A/+\nF7aCAOQVPSKeVh4czeyAy4nCfdiNbRxHu9/ZUFW8tk71EjhfEHWc6jHcmlc143i3\nrkyG1DsgzyWnajm1JmvQ/QCNb/OTxv+RnwIDAQABMA0GCSqGSIb3DQEBCwUAA4GB\nAHVqZQs1/Q5O0B+WhgDBSJBXThC391CMyfoVAZnvQVodHAz73ubv/aN00wwPjFzL\ntT8pmLbStTaHMHVX7vQcvOcKJMiP/ki8T0zx5y1/qcU9C62O8RvpXaxruZmX+B1T\nyxFmRt6UHmiLiOgWpZtEyN94gOPAUp5guQ6i8yMnyjZW\n</X509Certificate>\n</X509Data>\n</KeyInfo>\n<Object>\n<Manifest Id="PackageContents">\n<Reference URI="mimetype"><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>b07Onu9cTlGK1WpvgtFOlfk+Tl0HscuNIt6GZtesPX8=</DigestValue></Reference><Reference URI="index.html"><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>pf38+vwTJ8WJsr4epGr+W/0S2d7aG14RYPL2qZYox54=</DigestValue></Reference><Reference URI="css/panel.css"><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>eUGSUu7v7xyduFiO38UWttti+BeJ7POEVpfkiXIfaZo=</DigestValue></Reference><Reference URI="js/bridge-core.js"><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>OKqKtG3jRW231EoG4YzKqUkfc6r4HlpUCI1XT+yJuMQ=</DigestValue></Reference><Reference URI="js/panel.js"><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>K8ugFkAm4neGRj1H9luikeNwBDZ7845FfLaqvbZ/Pgs=</DigestValue></Reference><Reference URI="CSXS/manifest.xml"><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>9eFcPHxkq/KbadMiXHueAVZRsxpafT/R8VhoJ+IAPEw=</DigestValue></Reference><Reference URI="bridge.html"><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>z3EV4R9yzRLZ2sOysVkF2kYhXAeuVXx3JvZOtB2nJuI=</DigestValue></Reference></Manifest>\n</Object>\n<Object xmlns:xades="http://uri.etsi.org/01903/v1.1.1#" >\n<xades:QualifyingProperties>\n<xades:UnsignedProperties>\n<xades:UnsignedSignatureProperties>\n<xades:SignatureTimeStamp>\n<xades:HashDataInfo uri="SignatureValue">\n<Transforms>\n<Transform Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>\n</Transforms>\n</xades:HashDataInfo>\n<xades:EncapsulatedTimeStamp>\nMIIXcjADAgEAMIIXaQYJKoZIhvcNAQcCoIIXWjCCF1YCAQMxDzANBglghkgBZQME\nAgEFADCBgQYLKoZIhvcNAQkQAQSgcgRwMG4CAQEGCWCGSAGG/WwHATAxMA0GCWCG\nSAFlAwQCAQUABCBehVlrlbTYQfYqcd/6liapQj3jsAPOEc6jefj6W/micwIQQ/F6\np8re60NtVdTdG2ghpBgPMjAyNjEwMTcyMTU3MDZaAghEEu5c8/gbhaCCEzowggbt\nMIIE1aADAgECAhAIT9wzT35FTtvDD4/5khg1MA0GCSqGSIb3DQEBCwUAMGkxCzAJ\nBgNVBAYTAlVTMRcwFQYDVQQKEw5EaWdpQ2VydCwgSW5jLjFBMD8GA1UEAxM4RGln\naUNlcnQgVHJ1c3RlZCBHNCBUaW1lU3RhbXBpbmcgUlNBNDA5NiBTSEEyNTYgMjAy\nNSBDQTEwHhcNMjYwODA1MDAwMDAwWhcNMzcxMTA0MjM1OTU5WjBjMQswCQYDVQQG\nEwJVUzEXMBUGA1UEChMORGlnaUNlcnQsIEluYy4xOzA5BgNVBAMTMkRpZ2lDZXJ0\nIFNIQTI1NiBSU0E0MDk2IFRpbWVzdGFtcCBSZXNwb25kZXIgMjAyNiAxMIICIjAN\nBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAtnum8sn+zUr41JtMZbP9OMYw+HwJ\nDpG5xkIu/lqcfNYmMX81YmsUiHLbh9ykpeWBGKTLhYBrAN9Tdg/QEzG32XcObmgI\nblnr0CoQ3WSAeDZ6nH6X6VkFyYkJw3QBJREwvm4UhLzSxmwPA7cFKRTEOMsmEEj6\nqJk/dqLEAL+oQYuOwE2UuiX1Vnul8YReIyWd4kgLn9gq6LNXM0UplkR6jL/QHxmb\n6fMoGBJYbnaUI7XD6cKDpekK2SVMld4iDbzeHDtOaaxldH5IxuNusQ69nd8/ZXEi\nB5Hbxj3RlK13cX1W4DlFXKdv/CEhM8Cj1vvlmvhNroyPdRGbbpBlgyf8Wdu5N6By\nhFwURn0U6ozlPoxN22v+fviUhP+6DR547OZnpBMWDfei1f5sVGwiiW/KQTWOK97g\n+4RJpPzPNV4VYMAwO2jM2Aty2QYPVmOQTJm0msuXnJrSbl2gf9JylpkJlWXqk1Q4\nLJsxz+TELoQCZIljbgvTJgoPU2R12ydv8i1UqL/adelA0y7U9Pmmtbze9Xx3rtaj\nC5SzQd1jgfwAwsa90v9YcSPdmeoyoBBA/27cCL237l5DTYYPDLQ4ON3OLTGWnvRb\n6jDrf/T75gMRfUzSLCBQfBusm9+mSWRlC/Df6S/e9Q8i13CuhzOT2Jx+V/nlbXM4\nQoBwlUAhelwwJT0CAwEAAaOCAZUwggGRMAwGA1UdEwEB/wQCMAAwHQYDVR0OBBYE\nFBTJY4owLtRK+26U8+bjQH717M3iMB8GA1UdIwQYMBaAFO9vU0rp5AZ8esrikFb2\nL9RJ7MtOMA4GA1UdDwEB/wQEAwIHgDAWBgNVHSUBAf8EDDAKBggrBgEFBQcDCDCB\nlQYIKwYBBQUHAQEEgYgwgYUwJAYIKwYBBQUHMAGGGGh0dHA6Ly9vY3NwLmRpZ2lj\nZXJ0LmNvbTBdBggrBgEFBQcwAoZRaHR0cDovL2NhY2VydHMuZGlnaWNlcnQuY29t\nL0RpZ2lDZXJ0VHJ1c3RlZEc0VGltZVN0YW1waW5nUlNBNDA5NlNIQTI1NjIwMjVD\nQTEuY3J0MF8GA1UdHwRYMFYwVKBSoFCGTmh0dHA6Ly9jcmwzLmRpZ2ljZXJ0LmNv\nbS9EaWdpQ2VydFRydXN0ZWRHNFRpbWVTdGFtcGluZ1JTQTQwOTZTSEEyNTYyMDI1\nQ0ExLmNybDAgBgNVHSAEGTAXMAgGBmeBDAEEAjALBglghkgBhv1sBwEwDQYJKoZI\nhvcNAQELBQADggIBAI3FOmEenVIK35msCYB+fShAsWvSYvLBItoNdAgQ2jIqrGsV\nsluXMJU/+mRebBc52s6lbKAvOVPXaizmKkMLLflEEKDZQx4CkS2t8aHPjkXha3hY\nZ010htFa3dhNgmalH5vuWvh3tTCf4frTS7gPtGc4Z/xaPhQ2AB1mR8eEe/WbH0RW\nHvVIl6VwQ3+g5FKNfN2N/DWJkf13w2H+2GfqEfbd35Ww8CvoYBjLNIDTadcPWdgs\njsiOaK/7EsKJgLjUNIVgvcaFOLLQ/GlrA+0ZHJoFUbOr5SJN8zykPspXIXlpDJY/\ngqFUZRROeab9GVgmhbdOJcD/63RhxPahFUGbckRONqMe6DYAv6/mOG0pWd3cPSts\ndcS7buj5DyniwRY8yooMH6ptx5vpP/pZzBPBeZD2U4IsthyxB5Jaa8qrOkB5z160\nTXiM5ADMspZ0TfD9MJoq0tFpFPssKRFhWeEDYPvcUuN7U7lvcdHl4ezQ3NT/7Ffs\n1sR1yh/LRbdZ3B3Vc6q2WmD8mDC0p9kzl2o73iVtS946IkEj7FkRsZGww1teYxER\nROC745xrtjvcw9ZyyUjHZWGRIpJeMNsPquCDf0fkyHtB+J4AiNZqCQk23rxh+Kbp\nyMTNVKItJ5l92Svl20U9NbqMBOVYl1h54NEYLJq1/xHWFKPNK903zJZA9P2DMIIG\ntDCCBJygAwIBAgIQDcesVwX/IZkuQEMiDDpJhjANBgkqhkiG9w0BAQsFADBiMQsw\nCQYDVQQGEwJVUzEVMBMGA1UEChMMRGlnaUNlcnQgSW5jMRkwFwYDVQQLExB3d3cu\nZGlnaWNlcnQuY29tMSEwHwYDVQQDExhEaWdpQ2VydCBUcnVzdGVkIFJvb3QgRzQw\nHhcNMjUwNTA3MDAwMDAwWhcNMzgwMTE0MjM1OTU5WjBpMQswCQYDVQQGEwJVUzEX\nMBUGA1UEChMORGlnaUNlcnQsIEluYy4xQTA/BgNVBAMTOERpZ2lDZXJ0IFRydXN0\nZWQgRzQgVGltZVN0YW1waW5nIFJTQTQwOTYgU0hBMjU2IDIwMjUgQ0ExMIICIjAN\nBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAtHgx0wqYQXK+PEbAHKx126NGaHS0\nURedTa2NDZS1mZaDLFTtQ2oRjzUXMmxCqvkbsDpz4aH+qbxeLho8I6jY3xL1IusL\nopuW2qftJYJaDNs1+JH7Z+QdSKWM06qchUP+AbdJgMQB3h2DZ0Mal5kYp77jYMVQ\nXSZH++0trj6Ao+xh/AS7sQRuQL37QXbDhAktVJMQbzIBHYJBYgzWIjk8eDrYhXDE\npKk7RdoX0M980EpLtlrNyHw0Xm+nt5pnYJU3Gmq6bNMI1I7Gb5IBZK4ivbVCiZv7\nPNBYqHEpNVWC2ZQ8BbfnFRQVESYOszFI2Wv82wnJRfN20VRS3hpLgIR4hjzL0hpo\nYGk81coWJ+KdPvMvaB0WkE/2qHxJ0ucS638ZxqU14lDnki7CcoKCz6eum5A19WZQ\nHkqUJfdkDjHkccpL6uoG8pbF0LJAQQZxst7VvwDDjAmSFTUms+wV/FbWBqi7fTJn\njq3hj0XbQcd8hjj/q8d6ylgxCZSKi17yVp2NL+cnT6Toy+rN+nM8M7LnLqCrO2JP\n3oW//1sfuZDKiDEb1AQ8es9Xr/u6bDTnYCTKIsDq1BtmXUqEG1NqzJKS4kOmxkYp\n2WyODi7vQTCBZtVFJfVZ3j7OgWmnhFr4yUozZtqgPrHRVHhGNKlYzyjlroPxul+b\ngIspzOwbtmsgY1MCAwEAAaOCAV0wggFZMBIGA1UdEwEB/wQIMAYBAf8CAQAwHQYD\nVR0OBBYEFO9vU0rp5AZ8esrikFb2L9RJ7MtOMB8GA1UdIwQYMBaAFOzX44LScV1k\nTN8uZz/nupiuHA9PMA4GA1UdDwEB/wQEAwIBhjATBgNVHSUEDDAKBggrBgEFBQcD\nCDB3BggrBgEFBQcBAQRrMGkwJAYIKwYBBQUHMAGGGGh0dHA6Ly9vY3NwLmRpZ2lj\nZXJ0LmNvbTBBBggrBgEFBQcwAoY1aHR0cDovL2NhY2VydHMuZGlnaWNlcnQuY29t\nL0RpZ2lDZXJ0VHJ1c3RlZFJvb3RHNC5jcnQwQwYDVR0fBDwwOjA4oDagNIYyaHR0\ncDovL2NybDMuZGlnaWNlcnQuY29tL0RpZ2lDZXJ0VHJ1c3RlZFJvb3RHNC5jcmww\nIAYDVR0gBBkwFzAIBgZngQwBBAIwCwYJYIZIAYb9bAcBMA0GCSqGSIb3DQEBCwUA\nA4ICAQAXzvsWgBz+Bz0RdnEwvb4LyLU0pn/N0IfFiBowf0/Dm1wGc/Do7oVMY2mh\nXZXjDNJQa8j00DNqhCT3t+s8G0iP5kvN2n7Jd2E4/iEIUBO41P5F448rSYJ59Ib6\n1eoalhnd6ywFLerycvZTAz40y8S4F3/a+Z1jEMK/DMm/axFSgoR8n6c3nuZB9BfB\nwAQYK9FHaoq2e26MHvVY9gCDA/JYsq7pGdogP8HRtrYfctSLANEBfHU16r3J05qX\n3kId+ZOczgj5kjatVB+NdADVZKON/gnZruMvNYY2o1f4MXRJDMdTSlOLh0HCn2cQ\nLwQCqjFbqrXuvTPSegOOzr4EWj7PtspIHBldNE2K9i697cvaiIo2p61Ed2p8xMJb\n82Yosn0z4y25xUbI7GIN/TpVfHIqQ6Ku/qjTY6hc3hsXMrS+U0yy+GWqAXam4ToW\nd2UQ1KYT70kZjE4YtL8Pbzg0c1ugMZyZZd/BdHLiRu7hAWE6bTEm4XYRkA6Tl4KS\nFLFk43esaUeqGkH/wyW4N7OigizwJWeukcyIPbAvjSabnf7+Pu0VrFgoiovRDiyx\n3zEdmcif/sYQsfch28bZeUz2rtY/9TCA6TD8dC3JE3rYkrhLULy7Dc90G6e8Blqm\nyIjlgp2+VqsS9/wQD7yFylIz0scmbKvFoW2jNrbM1pD2T7m3XDCCBY0wggR1oAMC\nAQICEA6bGI750C3n79tQ4ghAGFowDQYJKoZIhvcNAQEMBQAwZTELMAkGA1UEBhMC\nVVMxFTATBgNVBAoTDERpZ2lDZXJ0IEluYzEZMBcGA1UECxMQd3d3LmRpZ2ljZXJ0\nLmNvbTEkMCIGA1UEAxMbRGlnaUNlcnQgQXNzdXJlZCBJRCBSb290IENBMB4XDTIy\nMDgwMTAwMDAwMFoXDTMxMTEwOTIzNTk1OVowYjELMAkGA1UEBhMCVVMxFTATBgNV\nBAoTDERpZ2lDZXJ0IEluYzEZMBcGA1UECxMQd3d3LmRpZ2ljZXJ0LmNvbTEhMB8G\nA1UEAxMYRGlnaUNlcnQgVHJ1c3RlZCBSb290IEc0MIICIjANBgkqhkiG9w0BAQEF\nAAOCAg8AMIICCgKCAgEAv+aQc2jeu+RdSjwwIjBpM+zCpyUuySE98orYWcLhKac9\nWKt2ms2uexuEDcQwH/MbpDgW61bGl20dq7J58soR0uRf1gU8Ug9SH8aeFaV+vp+p\nVxZZVXKvaJNwwrK6dZlqczKU0RBEEC7fgvMHhOZ0O21x4i0MG+4g1ckgHWMpLc7s\nXk7Ik/ghYZs06wXGXuxbGrzryc/NrDRAX7F6Zu53yEioZldXn1RYjgwrt0+nMNlW\n7sp7XeOtyU9e5TXnMcvak17cjo+A2raRmECQecN4x7axxLVqGDgDEI3Y1DekLgV9\niPWCPhCRcKtVgkEy19sEcypukQF8IUzUvK4bA3VdeGbZOjFEmjNAvwjXWkmkwuap\noGfdpCe8oU85tRFYF/ckXEaPZPfBaYh2mHY9WV1CdoeJl2l6SPDgohIbZpp0yt5L\nHucOY67m1O+SkjqePdwA5EUlibaaRBkrfsCUtNJhbesz2cXfSwQAzH0clcOP9yGy\nshG3u3/y1YxwLEFgqrFjGESVGnZifvaAsPvoZKYz0YkH4b235kOkGLimdwHhD5QM\nIR2yVCkliWzlDlJRR3S+Jqy2QXXeeqxfjT/JvNNBERJb5RBQ6zHFynIWIgnffEx1\nP2PsIV/EIFFrb7GrhotPwtZFX50g/KEexcCPorF+CiaZ9eRpL5gdLfXZqbId5RsC\nAwEAAaOCATowggE2MA8GA1UdEwEB/wQFMAMBAf8wHQYDVR0OBBYEFOzX44LScV1k\nTN8uZz/nupiuHA9PMB8GA1UdIwQYMBaAFEXroq/0ksuCMS1Ri6enIZ3zbcgPMA4G\nA1UdDwEB/wQEAwIBhjB5BggrBgEFBQcBAQRtMGswJAYIKwYBBQUHMAGGGGh0dHA6\nLy9vY3NwLmRpZ2ljZXJ0LmNvbTBDBggrBgEFBQcwAoY3aHR0cDovL2NhY2VydHMu\nZGlnaWNlcnQuY29tL0RpZ2lDZXJ0QXNzdXJlZElEUm9vdENBLmNydDBFBgNVHR8E\nPjA8MDqgOKA2hjRodHRwOi8vY3JsMy5kaWdpY2VydC5jb20vRGlnaUNlcnRBc3N1\ncmVkSURSb290Q0EuY3JsMBEGA1UdIAQKMAgwBgYEVR0gADANBgkqhkiG9w0BAQwF\nAAOCAQEAcKC/Q1xV5zhfoKN0Gz22Ftf3v1cHvZqsoYcs7IVeqRq7IviHGmlUIu2k\niHdtvRoU9BNKei8ttzjv9P+Aufih9/Jy3iS8UgPITtAq3votVs/59PesMHqai7Je\n1M/RQ0SbQyHrlnKhSLSZy51PpwYDE3cnRNTnf+hZqPC/Lwum6fI0POz3A8eHqNJM\nQBk1RmppVLC4oVaO7KTVPeix3P0c2PR3WlxUjG/voVA9/HYJaISfb8rbII01YBwC\nA8sgsKxYoA5AY8WYIsGyWfVVa88nq2x2zm8jLfR+cWojayL/ErhULSd+2DrZ8LaH\nlv1b0VysGMNNn3O3AamfV6peKOK5lDGCA3wwggN4AgEBMH0waTELMAkGA1UEBhMC\nVVMxFzAVBgNVBAoTDkRpZ2lDZXJ0LCBJbmMuMUEwPwYDVQQDEzhEaWdpQ2VydCBU\ncnVzdGVkIEc0IFRpbWVTdGFtcGluZyBSU0E0MDk2IFNIQTI1NiAyMDI1IENBMQIQ\nCE/cM09+RU7bww+P+ZIYNTANBglghkgBZQMEAgEFAKCB0TAaBgkqhkiG9w0BCQMx\nDQYLKoZIhvcNAQkQAQQwHAYJKoZIhvcNAQkFMQ8XDTI2MTAxNzIxNTcwNlowKwYL\nKoZIhvcNAQkQAgwxHDAaMBgwFgQUUdmr2gNJc9hPQmaspIJI5rNpxDkwLwYJKoZI\nhvcNAQkEMSIEIPV6abaD+IuouGmkpIwZglPY7qSkedBzqhR3OjkhapHEMDcGCyqG\nSIb3DQEJEAIvMSgwJjAkMCIEIC2gnaf0Ex+f5y22xebpyWVnVa8EPx6nQswNISDh\nQev8MA0GCSqGSIb3DQEBAQUABIICAGsA4hheowswbJFVxObU9+RYOQ2XzMEA6WEN\nAm+SUIg25OyXoxRdotq2Bf4EGXk4jRpCpCF+hMe+YSfWB9YpIgCqR6FfUFgQKtmG\n3uTbjsBQsgjjOkjZl87aJ3k8ccFAhyA0wOKZruMiQwpLykRDJwZNkm3w8UpY8Qil\nOniufrthVGTrxgSm5IMhzIG+AWfyGhHin64I2YuxFdsqDBsLpqIrqvJXBldz88gS\n3PFTWsOjn9bQrW90M9LLJAoO32ouFX/aYfzAouWo2ycplaeWqh2OuKEDtAMH3cEW\nV9TO8pIBOzIeEeYA9rNeh7fJqvwsofGukTpq//K1ZzT+MeTVMXgaKQdfM0rjuE2P\n+3/xy6bgT2tzIwYXJ9+Qsc2yQPxW/Aqf99oQZXPH61onzKO1ICXPDpof4bWCanHk\n728GyKFC3bTnMlMRVnB0NzQK/512R/fmOHTkQsXIvhWbZRd7wh/sEhGFCU6iilWo\nG75Nmm92qcoKMiQC1I1Xire+qZyw3ISfcoeeLXPCnK0Dj/LCZrJi1RQ2JNPr2HOR\n78uGK5tuISN+nBsc8KAsKzGWk/sXESnSCVCmFqLjZHOzw5fj+VMwi4KlYSjuEVK/\n2WKJH5VaHk/PTK+IvlZgq5iI3WqZr1vBu/Cw6ryM3WkW//N0JD583UsipUe1X1p9\nnBgIb+X9\n</xades:EncapsulatedTimeStamp>\n</xades:SignatureTimeStamp>\n</xades:UnsignedSignatureProperties>\n</xades:UnsignedProperties>\n</xades:QualifyingProperties>\n</Object>\n</Signature>\n</signatures>', "bridge.html": '<!DOCTYPE html>\n<html>\n<head><meta charset="utf-8"><title>AE MCP Bridge</title></head>\n<body>\n<script src="js/bridge-core.js"></script>\n<script>AEMCPBridge.start();</script>\n</body>\n</html>\n', "css/panel.css": ':root { --bg: #232323; --fg: #d6d6d6; --muted: #8a8a8a; --ok: #3fb950; --bad: #f85149; --warn: #d29922; --line: #3a3a3a; }\n* { box-sizing: border-box; }\nbody { margin: 0; padding: 10px; background: var(--bg); color: var(--fg); font: 12px -apple-system, "Segoe UI", sans-serif; }\nheader { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }\n#title { font-weight: 600; font-size: 13px; }\n.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--warn); flex: none; }\n.dot.ok { background: var(--ok); } .dot.bad { background: var(--bad); }\n.muted { color: var(--muted); }\n.row { display: flex; gap: 6px; margin-bottom: 10px; }\nbutton { background: #3a3a3a; color: var(--fg); border: 1px solid #4a4a4a; border-radius: 4px; padding: 4px 10px; cursor: pointer; font: inherit; }\nbutton:hover { background: #454545; }\n.label { text-transform: uppercase; font-size: 10px; letter-spacing: .05em; color: var(--muted); margin-bottom: 4px; }\nul { list-style: none; padding: 0; margin: 0; }\nli { border-top: 1px solid var(--line); padding: 4px 0; word-break: break-all; }\nli .t { color: var(--muted); margin-right: 6px; }\nli.err .s { color: var(--bad); } li.ok .s { color: var(--ok); }\nfooter { margin-top: 10px; font-size: 10px; }\n.banner { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #2d2a12; border: 1px solid #5c531c; border-radius: 4px; padding: 6px 8px; margin-bottom: 10px; }\n.banner[hidden], [hidden] { display: none; }\n.setting { align-items: center; }\n.setting label { color: var(--muted); }\nselect { background: #3a3a3a; color: var(--fg); border: 1px solid #4a4a4a; border-radius: 4px; padding: 3px 6px; font: inherit; flex: 1; }\n.small { font-size: 10px; margin: -6px 0 10px; }\n.grid { display: grid; grid-template-columns: auto 1fr; gap: 6px 8px; align-items: center; margin-bottom: 8px; }\n.grid label { color: var(--muted); }\n#approvals { border: 1px solid #5c531c; background: #2d2a12; border-radius: 4px; padding: 6px 8px; margin-bottom: 10px; }\n.approval { border-top: 1px solid #4a4520; padding: 6px 0; }\n.approval:first-child { border-top: 0; }\n.approval .what { font-weight: 600; margin-bottom: 4px; }\n.approval pre, li pre { max-height: 160px; overflow: auto; background: #181818; padding: 6px; border-radius: 3px; margin: 4px 0; white-space: pre-wrap; word-break: break-word; font: 11px Menlo, Consolas, monospace; }\n.approval .row { margin: 4px 0 0; }\nbutton.allow { background: #1f4d2b; border-color: #2e6b3d; }\nbutton.deny { background: #5a1f1f; border-color: #7a2c2c; }\nli { cursor: pointer; }\nli .c { color: var(--muted); }\n', "index.html": '<!DOCTYPE html>\n<html>\n<head>\n  <meta charset="utf-8">\n  <title>AE MCP</title>\n  <link rel="stylesheet" href="css/panel.css">\n</head>\n<body>\n  <header>\n    <span id="dot" class="dot"></span>\n    <div>\n      <div id="title">AE MCP</div>\n      <div id="sub" class="muted">checking\u2026</div>\n    </div>\n  </header>\n  <div id="update" class="banner" hidden>\n    <span id="updateText"></span>\n    <button id="updateBtn">Update</button>\n  </div>\n\n  <section id="approvals" hidden>\n    <div class="label">Waiting for your approval</div>\n    <div id="approvalList"></div>\n  </section>\n\n  <section class="row">\n    <button id="test">Test</button>\n    <button id="diag" title="Copies a report to paste into a bug report or a chat">Copy diagnostics</button>\n    <button id="openLog" title="Show the full activity log file">Open log</button>\n  </section>\n\n  <section class="grid">\n    <label for="perm">Permissions</label>\n    <select id="perm">\n      <option value="full">Full access</option>\n      <option value="ask">Ask before every change</option>\n      <option value="read-only">Read-only</option>\n    </select>\n    <label for="shell">Shell commands</label>\n    <select id="shell">\n      <option value="on">Allowed</option>\n      <option value="off">Blocked</option>\n    </select>\n    <label for="profile">AI tools</label>\n    <select id="profile">\n      <option value="core">Core (faster, recommended)</option>\n      <option value="full">Full (all tools)</option>\n    </select>\n  </section>\n  <div id="note" class="muted small" hidden></div>\n\n  <section>\n    <div class="label">Activity <span class="muted" id="activityHint">(click an entry for details)</span></div>\n    <ul id="log"><li class="muted">No calls yet</li></ul>\n  </section>\n  <footer class="muted" id="foot"></footer>\n  <script src="js/bridge-core.js"></script>\n  <script src="js/panel.js"></script>\n</body>\n</html>\n', "js/bridge-core.js": `/* AE MCP bridge: a tiny HTTP server inside After Effects (CEP + Node) that evaluates
  * ExtendScript sent by the ae-mcp server. Binds to 127.0.0.1 only and requires the
  * shared token from ~/.aemcp/config.json.
  *
@@ -478,13 +478,45 @@ var init_define_AEMCP_CEP_FILES = __esm({
     for (var i = 0; i < 3; i++) { var x = parseInt(pa[i], 10) || 0, y = parseInt(pb[i], 10) || 0; if (x !== y) return x > y ? 1 : -1; }
     return 0;
   }
+  // The standalone install records how to run itself (~/.aemcp/runtime.json); then the panel can
+  // update in place with \`ae-mcp update\`. Otherwise (Claude Desktop .mcpb) it links to the release.
+  function updater() {
+    var rt = readJson(path.join(AEMCP_DIR, "runtime.json"));
+    return rt && rt.node && rt.server && fs.existsSync(rt.node) && fs.existsSync(rt.server) ? rt : null;
+  }
+  var updating = false, updatedTo = null;
   function showUpdate() {
-    var u = readJson(path.join(AEMCP_DIR, "update-check.json"));
-    if (u && u.latest && cmpVersions(u.latest, AEMCPBridge.VERSION) > 0) {
-      $("updateText").textContent = "Update available: v" + u.latest;
-      $("updateBtn").onclick = function () { try { window.cep.util.openURLInDefaultBrowser(u.url); } catch (e) { alert(u.url); } };
+    if (updating) return;
+    if (updatedTo) {
+      $("updateText").textContent = "Updated to v" + updatedTo + ". Restart After Effects and your AI apps.";
+      $("updateBtn").hidden = true;
       $("update").hidden = false;
-    } else $("update").hidden = true;
+      return;
+    }
+    var u = readJson(path.join(AEMCP_DIR, "update-check.json"));
+    if (!(u && u.latest && cmpVersions(u.latest, AEMCPBridge.VERSION) > 0)) { $("update").hidden = true; return; }
+    var rt = updater();
+    $("updateText").textContent = "Update available: v" + u.latest;
+    $("updateBtn").hidden = false;
+    $("updateBtn").disabled = false;
+    $("updateBtn").textContent = rt ? "Update" : "Download";
+    $("updateBtn").onclick = rt ? function () { runUpdate(rt, u.latest); } : function () {
+      try { window.cep.util.openURLInDefaultBrowser(u.url); } catch (e) { alert(u.url); }
+    };
+    $("update").hidden = false;
+  }
+  function runUpdate(rt, latest) {
+    updating = true;
+    $("updateText").textContent = "Updating to v" + latest + "\u2026";
+    $("updateBtn").disabled = true;
+    childProcess.execFile(rt.node, [rt.server, "update", "--json"], { timeout: 180000, windowsHide: true }, function (err, stdout) {
+      updating = false;
+      var r = null;
+      try { r = JSON.parse(String(stdout).trim().split(/\\r?\\n/).pop()); } catch (e) {}
+      if (r && r.ok && r.updated) updatedTo = r.to;
+      else alert((r && r.message) || ("The update did not finish: " + (err ? err.message : "no result")));
+      showUpdate();
+    });
   }
 
   // ---------- diagnostics ----------
@@ -48903,14 +48935,14 @@ var $ZodObject = /* @__PURE__ */ $constructor("$ZodObject", (inst, def) => {
   const desc = Object.getOwnPropertyDescriptor(def, "shape");
   const sh = desc?.get ? desc.get.raw : def.shape ?? {};
   if (sh) {
-    const get = () => {
+    const get2 = () => {
       const newSh = { ...sh };
       Object.defineProperty(def, "shape", { value: newSh });
-      get.raw = newSh;
+      get2.raw = newSh;
       return newSh;
     };
-    get.raw = sh;
-    Object.defineProperty(def, "shape", { get });
+    get2.raw = sh;
+    Object.defineProperty(def, "shape", { get: get2 });
   }
   const _normalized = cached(() => normalizeDef(def));
   defineLazyInternal(inst, "propValues", (zod) => {
@@ -73597,15 +73629,15 @@ import { join as join6 } from "node:path";
 
 // src/bridge.ts
 init_define_AEMCP_CEP_FILES();
-import { readdirSync as readdirSync3, readFileSync as readFileSync4 } from "node:fs";
-import { dirname as dirname3, join as join4 } from "node:path";
+import { readdirSync as readdirSync3, readFileSync as readFileSync5 } from "node:fs";
+import { dirname as dirname4, join as join5 } from "node:path";
 
 // src/cli/setup.ts
 init_define_AEMCP_CEP_FILES();
 import { spawnSync as spawnSync2 } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { existsSync as existsSync2, mkdirSync as mkdirSync2, readdirSync as readdirSync2, readFileSync as readFileSync3, rmSync, statSync, writeFileSync as writeFileSync2 } from "node:fs";
-import { dirname as dirname2, join as join3, relative, sep } from "node:path";
+import { existsSync as existsSync2, mkdirSync as mkdirSync3, readdirSync as readdirSync2, readFileSync as readFileSync4, rmSync, statSync, writeFileSync as writeFileSync3 } from "node:fs";
+import { dirname as dirname3, join as join4, relative, sep } from "node:path";
 
 // src/cli/signature.ts
 init_define_AEMCP_CEP_FILES();
@@ -73631,46 +73663,105 @@ function checkSignature(files) {
   return { signed: true, ok: problems.length === 0, problems };
 }
 
+// src/update.ts
+init_define_AEMCP_CEP_FILES();
+import { mkdirSync, readFileSync as readFileSync2, writeFileSync } from "node:fs";
+import { homedir as homedir2 } from "node:os";
+import { dirname, join as join2 } from "node:path";
+var REPO = "ronyitzhaki/after-effects-mcp";
+var RELEASES_URL = `https://github.com/${REPO}/releases/latest`;
+var CACHE = join2(homedir2(), ".aemcp", "update-check.json");
+var DAY = 24 * 3600 * 1e3;
+function compareVersions(a, b) {
+  const pa = a.replace(/^v/, "").split(/[.-]/).map((x) => parseInt(x, 10) || 0);
+  const pb = b.replace(/^v/, "").split(/[.-]/).map((x) => parseInt(x, 10) || 0);
+  for (let i = 0; i < 3; i++) if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) > (pb[i] ?? 0) ? 1 : -1;
+  return 0;
+}
+function updateCheckEnabled() {
+  return !process.env.AEMCP_NO_UPDATE_CHECK && loadConfig().updateCheck !== false;
+}
+function readCache() {
+  try {
+    return JSON.parse(readFileSync2(CACHE, "utf8"));
+  } catch {
+    return null;
+  }
+}
+var current = null;
+function knownUpdate() {
+  const c = current ?? readCache();
+  if (!c?.latest) return null;
+  return { ...c, current: VERSION, updateAvailable: compareVersions(c.latest, VERSION) > 0 };
+}
+async function checkForUpdate(force = false) {
+  if (!updateCheckEnabled()) return null;
+  const cached2 = readCache();
+  if (!force && cached2 && Date.now() - Date.parse(cached2.checkedAt) < DAY) return current = knownUpdate();
+  try {
+    const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
+      headers: { "user-agent": `ae-mcp/${VERSION}`, accept: "application/vnd.github+json" },
+      signal: AbortSignal.timeout(4e3)
+    });
+    if (!res.ok) return knownUpdate();
+    const rel = await res.json();
+    if (!rel.tag_name) return knownUpdate();
+    const latest = rel.tag_name.replace(/^v/, "");
+    current = { checkedAt: (/* @__PURE__ */ new Date()).toISOString(), current: VERSION, latest, url: rel.html_url || RELEASES_URL, updateAvailable: compareVersions(latest, VERSION) > 0 };
+    mkdirSync(dirname(CACHE), { recursive: true });
+    writeFileSync(CACHE, JSON.stringify(current, null, 2));
+    return current;
+  } catch {
+    return knownUpdate();
+  }
+}
+function updateMessage(u) {
+  return u?.updateAvailable ? `A newer version of AE MCP is available: v${u.latest} (you have v${u.current}). Download: ${u.url}` : null;
+}
+
+// src/cli/setup.ts
+import { fileURLToPath } from "node:url";
+
 // src/cli/util.ts
 init_define_AEMCP_CEP_FILES();
 import { execFileSync, spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync as readFileSync2, writeFileSync } from "node:fs";
-import { homedir as homedir2, platform } from "node:os";
-import { dirname, join as join2 } from "node:path";
+import { copyFileSync, existsSync, mkdirSync as mkdirSync2, readdirSync, readFileSync as readFileSync3, writeFileSync as writeFileSync2 } from "node:fs";
+import { homedir as homedir3, platform } from "node:os";
+import { dirname as dirname2, join as join3 } from "node:path";
 import { createInterface } from "node:readline";
 var isMac = platform() === "darwin";
 var isWin = platform() === "win32";
-var HOME = homedir2();
-var AEMCP_DIR = join2(HOME, ".aemcp");
-var CONFIG_FILE = join2(AEMCP_DIR, "config.json");
-var INSTALLED_SERVER = join2(AEMCP_DIR, "server", "ae-mcp.mjs");
+var HOME = homedir3();
+var AEMCP_DIR = join3(HOME, ".aemcp");
+var CONFIG_FILE = join3(AEMCP_DIR, "config.json");
+var INSTALLED_SERVER = join3(AEMCP_DIR, "server", "ae-mcp.mjs");
 var SERVER_NAME = "after-effects";
 var EXTENSION_ID = "com.aemcp";
 var CSXS_VERSIONS = [9, 10, 11, 12, 13, 14];
-var APPDATA = process.env.APPDATA || join2(HOME, "AppData", "Roaming");
-var LOCALAPPDATA = process.env.LOCALAPPDATA || join2(HOME, "AppData", "Local");
-var cepExtensionsDir = () => isWin ? join2(APPDATA, "Adobe", "CEP", "extensions") : join2(HOME, "Library", "Application Support", "Adobe", "CEP", "extensions");
-var extensionDir = () => join2(cepExtensionsDir(), EXTENSION_ID);
-var claudeDesktopDir = () => isWin ? join2(APPDATA, "Claude") : join2(HOME, "Library", "Application Support", "Claude");
-var claudeDesktopConfig = () => join2(claudeDesktopDir(), "claude_desktop_config.json");
-var claudeCodeConfig = () => join2(HOME, ".claude.json");
-var cursorConfig = () => join2(HOME, ".cursor", "mcp.json");
-var codexConfig = () => join2(process.env.CODEX_HOME || join2(HOME, ".codex"), "config.toml");
+var APPDATA = process.env.APPDATA || join3(HOME, "AppData", "Roaming");
+var LOCALAPPDATA = process.env.LOCALAPPDATA || join3(HOME, "AppData", "Local");
+var cepExtensionsDir = () => isWin ? join3(APPDATA, "Adobe", "CEP", "extensions") : join3(HOME, "Library", "Application Support", "Adobe", "CEP", "extensions");
+var extensionDir = () => join3(cepExtensionsDir(), EXTENSION_ID);
+var claudeDesktopDir = () => isWin ? join3(APPDATA, "Claude") : join3(HOME, "Library", "Application Support", "Claude");
+var claudeDesktopConfig = () => join3(claudeDesktopDir(), "claude_desktop_config.json");
+var claudeCodeConfig = () => join3(HOME, ".claude.json");
+var cursorConfig = () => join3(HOME, ".cursor", "mcp.json");
+var codexConfig = () => join3(process.env.CODEX_HOME || join3(HOME, ".codex"), "config.toml");
 function chatgptDesktopInstalled() {
   if (which("codex")) return true;
   if (isMac)
-    return ["/Applications/ChatGPT.app", "/Applications/Codex.app", join2(HOME, "Applications", "ChatGPT.app")].some((p) => existsSync(p));
+    return ["/Applications/ChatGPT.app", "/Applications/Codex.app", join3(HOME, "Applications", "ChatGPT.app")].some((p) => existsSync(p));
   if (isWin) {
-    if ([join2(LOCALAPPDATA, "Programs", "ChatGPT"), join2(LOCALAPPDATA, "Microsoft", "WindowsApps", "ChatGPT.exe")].some((p) => existsSync(p))) return true;
+    if ([join3(LOCALAPPDATA, "Programs", "ChatGPT"), join3(LOCALAPPDATA, "Microsoft", "WindowsApps", "ChatGPT.exe")].some((p) => existsSync(p))) return true;
     try {
-      return readdirSync(join2(LOCALAPPDATA, "Packages")).some((n) => /^OpenAI\.(ChatGPT|Codex)/i.test(n));
+      return readdirSync(join3(LOCALAPPDATA, "Packages")).some((n) => /^OpenAI\.(ChatGPT|Codex)/i.test(n));
     } catch {
       return false;
     }
   }
   return false;
 }
-var claudeDesktopExe = () => join2(LOCALAPPDATA, "AnthropicClaude", "claude.exe");
+var claudeDesktopExe = () => join3(LOCALAPPDATA, "AnthropicClaude", "claude.exe");
 var useColor = process.stdout.isTTY || isWin;
 var color = (c) => (s) => useColor ? `\x1B[${c}m${s}\x1B[0m` : s;
 var green = color(32);
@@ -73685,15 +73776,15 @@ var step = (m) => console.log(`
 ${bold(m)}`);
 function readJson(file2, fallback) {
   try {
-    return JSON.parse(readFileSync2(file2, "utf8"));
+    return JSON.parse(readFileSync3(file2, "utf8"));
   } catch {
     return fallback;
   }
 }
 function writeJsonWithBackup(file2, data) {
-  mkdirSync(dirname(file2), { recursive: true });
+  mkdirSync2(dirname2(file2), { recursive: true });
   if (existsSync(file2) && !existsSync(file2 + ".aemcp.bak")) copyFileSync(file2, file2 + ".aemcp.bak");
-  writeFileSync(file2, JSON.stringify(data, null, 2) + "\n");
+  writeFileSync2(file2, JSON.stringify(data, null, 2) + "\n");
 }
 function which(cmd) {
   const r = spawnSync(isWin ? "where" : "which", [cmd], { encoding: "utf8" });
@@ -73704,14 +73795,14 @@ function run(cmd, args) {
   return execFileSync(cmd, args, { stdio: "pipe", encoding: "utf8", shell: isWin && /\.(cmd|bat)$/i.test(cmd) });
 }
 function stableNodePath() {
-  if (process.execPath.startsWith(join2(AEMCP_DIR, "node"))) return process.execPath;
+  if (process.execPath.startsWith(join3(AEMCP_DIR, "node"))) return process.execPath;
   const onPath = which("node");
   return onPath && existsSync(onPath) ? onPath : process.execPath;
 }
 function findClaudeCli() {
   const found = which("claude");
   if (found) return found;
-  const candidates = isWin ? [join2(APPDATA, "npm", "claude.cmd"), join2(HOME, ".local", "bin", "claude.exe")] : [join2(HOME, ".local", "bin", "claude"), join2(HOME, ".claude", "local", "claude"), "/opt/homebrew/bin/claude", "/usr/local/bin/claude"];
+  const candidates = isWin ? [join3(APPDATA, "npm", "claude.cmd"), join3(HOME, ".local", "bin", "claude.exe")] : [join3(HOME, ".local", "bin", "claude"), join3(HOME, ".claude", "local", "claude"), "/opt/homebrew/bin/claude", "/usr/local/bin/claude"];
   return candidates.find((c) => existsSync(c)) || null;
 }
 async function ask(question, def = true) {
@@ -73740,7 +73831,7 @@ ${CODEX_END}
 }
 
 // src/cli/setup.ts
-var HASH_FILE = join3(AEMCP_DIR, "extension-hash");
+var HASH_FILE = join4(AEMCP_DIR, "extension-hash");
 var bundledExtensionSigned = SIGNATURE_FILE in define_AEMCP_CEP_FILES_default;
 var lastSetup = null;
 function ensureConfig() {
@@ -73749,30 +73840,39 @@ function ensureConfig() {
   cfg.token ||= randomBytes(24).toString("hex");
   cfg.bridgePort ||= 8765;
   cfg.httpPort ||= 8766;
-  mkdirSync2(AEMCP_DIR, { recursive: true });
-  writeFileSync2(CONFIG_FILE, JSON.stringify(cfg, null, 2) + "\n", { mode: 384 });
+  mkdirSync3(AEMCP_DIR, { recursive: true });
+  writeFileSync3(CONFIG_FILE, JSON.stringify(cfg, null, 2) + "\n", { mode: 384 });
   return true;
 }
-function installedExtensionHash() {
+function readMarker() {
   try {
-    return readFileSync3(HASH_FILE, "utf8").trim();
+    return readFileSync4(HASH_FILE, "utf8").trim().split(/\s+/);
   } catch {
-    return null;
+    return [];
   }
+}
+function installedExtensionHash() {
+  return readMarker()[0] || null;
+}
+function installedExtensionVersion() {
+  return readMarker()[1] || null;
 }
 function ensureExtension(force = false) {
   const dir = extensionDir();
   const current2 = installedExtensionHash();
-  if (!force && current2 === "a79a05286d08" && existsSync2(join3(dir, "CSXS", "manifest.xml"))) return { installed: false, updated: false };
+  const present = existsSync2(join4(dir, "CSXS", "manifest.xml"));
+  if (!force && current2 === "0de817527e56" && present) return { installed: false, updated: false };
+  const installedVersion = installedExtensionVersion();
+  if (!force && present && installedVersion && compareVersions(installedVersion, VERSION) > 0) return { installed: false, updated: false };
   const updated = existsSync2(dir);
   rmSync(dir, { recursive: true, force: true });
   for (const [rel, content] of Object.entries(define_AEMCP_CEP_FILES_default)) {
-    const p = join3(dir, ...rel.split("/"));
-    mkdirSync2(dirname2(p), { recursive: true });
-    writeFileSync2(p, content);
+    const p = join4(dir, ...rel.split("/"));
+    mkdirSync3(dirname3(p), { recursive: true });
+    writeFileSync3(p, content);
   }
-  mkdirSync2(AEMCP_DIR, { recursive: true });
-  writeFileSync2(HASH_FILE, "a79a05286d08");
+  mkdirSync3(AEMCP_DIR, { recursive: true });
+  writeFileSync3(HASH_FILE, `${"0de817527e56"} ${VERSION}`);
   return { installed: true, updated };
 }
 function installedExtensionSignature() {
@@ -73781,9 +73881,9 @@ function installedExtensionSignature() {
   try {
     (function walk(dir) {
       for (const name of readdirSync2(dir)) {
-        const p = join3(dir, name);
+        const p = join4(dir, name);
         if (statSync(p).isDirectory()) walk(p);
-        else files[relative(root, p).split(sep).join("/")] = readFileSync3(p);
+        else files[relative(root, p).split(sep).join("/")] = readFileSync4(p);
       }
     })(root);
   } catch {
@@ -73844,6 +73944,16 @@ function setupHint() {
     return " The After Effects extension was just installed/updated: please restart After Effects once to load it.";
   return "";
 }
+var RUNTIME_FILE = join4(AEMCP_DIR, "runtime.json");
+function recordRuntime() {
+  try {
+    if (fileURLToPath(import.meta.url) !== INSTALLED_SERVER) return;
+    const info = { node: stableNodePath(), server: INSTALLED_SERVER, version: VERSION };
+    if (JSON.stringify(readJson(RUNTIME_FILE, null)) === JSON.stringify(info)) return;
+    writeFileSync3(RUNTIME_FILE, JSON.stringify(info, null, 2));
+  } catch {
+  }
+}
 
 // src/bridge.ts
 var BridgeError = class extends Error {
@@ -73854,7 +73964,7 @@ var BridgeError = class extends Error {
   code;
 };
 var NOT_RUNNING_HELP = "Cannot reach After Effects. Make sure After Effects is running and the AE MCP bridge is loaded (it starts automatically with AE after install; you can also open Window > Extensions > AE MCP to check its status). If you just installed, restart After Effects.";
-var INSTANCES_DIR = () => join4(dirname3(configPath()), "instances");
+var INSTANCES_DIR = () => join5(dirname4(configPath()), "instances");
 var selectedPort = null;
 var cache = null;
 function aeLabel(appVersion = "") {
@@ -73889,7 +73999,7 @@ async function listInstances(force = false) {
       if (!h) return null;
       let file2 = {};
       try {
-        file2 = JSON.parse(readFileSync4(join4(INSTANCES_DIR(), `${port}.json`), "utf8"));
+        file2 = JSON.parse(readFileSync5(join5(INSTANCES_DIR(), `${port}.json`), "utf8"));
       } catch {
       }
       const appVersion = h.host?.appVersion || file2.host?.appVersion || "";
@@ -73989,62 +74099,6 @@ async function evalRaw(script, timeoutMs = 12e4, opts = {}) {
     cancel: opts.cancel
   });
   return String(body.result ?? "");
-}
-
-// src/update.ts
-init_define_AEMCP_CEP_FILES();
-import { mkdirSync as mkdirSync3, readFileSync as readFileSync5, writeFileSync as writeFileSync3 } from "node:fs";
-import { homedir as homedir3 } from "node:os";
-import { dirname as dirname4, join as join5 } from "node:path";
-var REPO = "ronyitzhaki/after-effects-mcp";
-var RELEASES_URL = `https://github.com/${REPO}/releases/latest`;
-var CACHE = join5(homedir3(), ".aemcp", "update-check.json");
-var DAY = 24 * 3600 * 1e3;
-function compareVersions(a, b) {
-  const pa = a.replace(/^v/, "").split(/[.-]/).map((x) => parseInt(x, 10) || 0);
-  const pb = b.replace(/^v/, "").split(/[.-]/).map((x) => parseInt(x, 10) || 0);
-  for (let i = 0; i < 3; i++) if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) > (pb[i] ?? 0) ? 1 : -1;
-  return 0;
-}
-function updateCheckEnabled() {
-  return !process.env.AEMCP_NO_UPDATE_CHECK && loadConfig().updateCheck !== false;
-}
-function readCache() {
-  try {
-    return JSON.parse(readFileSync5(CACHE, "utf8"));
-  } catch {
-    return null;
-  }
-}
-var current = null;
-function knownUpdate() {
-  const c = current ?? readCache();
-  if (!c?.latest) return null;
-  return { ...c, current: VERSION, updateAvailable: compareVersions(c.latest, VERSION) > 0 };
-}
-async function checkForUpdate(force = false) {
-  if (!updateCheckEnabled()) return null;
-  const cached2 = readCache();
-  if (!force && cached2 && Date.now() - Date.parse(cached2.checkedAt) < DAY) return current = knownUpdate();
-  try {
-    const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
-      headers: { "user-agent": `ae-mcp/${VERSION}`, accept: "application/vnd.github+json" },
-      signal: AbortSignal.timeout(4e3)
-    });
-    if (!res.ok) return knownUpdate();
-    const rel = await res.json();
-    if (!rel.tag_name) return knownUpdate();
-    const latest = rel.tag_name.replace(/^v/, "");
-    current = { checkedAt: (/* @__PURE__ */ new Date()).toISOString(), current: VERSION, latest, url: rel.html_url || RELEASES_URL, updateAvailable: compareVersions(latest, VERSION) > 0 };
-    mkdirSync3(dirname4(CACHE), { recursive: true });
-    writeFileSync3(CACHE, JSON.stringify(current, null, 2));
-    return current;
-  } catch {
-    return knownUpdate();
-  }
-}
-function updateMessage(u) {
-  return u?.updateAvailable ? `A newer version of AE MCP is available: v${u.latest} (you have v${u.current}). Download: ${u.url}` : null;
 }
 
 // src/jsx.ts
@@ -78358,7 +78412,7 @@ ${lines.join("\n")}`).join("\n\n") + "\n\n* = not loaded in this chat: run it wi
 init_define_AEMCP_CEP_FILES();
 import { spawn as spawn2 } from "node:child_process";
 import { existsSync as existsSync7 } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath as fileURLToPath2 } from "node:url";
 function chatgpt(argv) {
   ensureConfig();
   const cfg = loadConfig();
@@ -78375,7 +78429,7 @@ function chatgpt(argv) {
     process.exit(0);
   });
   process.on("exit", cleanup);
-  const srv = spawn2(process.execPath, [fileURLToPath(import.meta.url), "--http", "--port", port], { stdio: ["ignore", "inherit", "inherit"] });
+  const srv = spawn2(process.execPath, [fileURLToPath2(import.meta.url), "--http", "--port", port], { stdio: ["ignore", "inherit", "inherit"] });
   children.push(srv);
   srv.on("exit", (code) => {
     fail(`MCP server exited (${code})`);
@@ -78459,7 +78513,7 @@ async function diagnostics() {
   if (cfg) L.push(`config: ${JSON.stringify({ ...cfg, token: cfg.token ? `<set, ${cfg.token.length} chars>` : "MISSING" })}`);
   else L.push(`config: MISSING (${CONFIG_FILE})`);
   L.push(`installed server: ${existsSync8(INSTALLED_SERVER) ? INSTALLED_SERVER : "not installed (fine when using the .mcpb)"}`);
-  L.push(`extension: ${extensionDir()} \xB7 ${existsSync8(join10(extensionDir(), "CSXS", "manifest.xml")) ? `hash ${installedExtensionHash()} (bundled ${"a79a05286d08"})` : "MISSING"}`);
+  L.push(`extension: ${extensionDir()} \xB7 ${existsSync8(join10(extensionDir(), "CSXS", "manifest.xml")) ? `hash ${installedExtensionHash()} (bundled ${"0de817527e56"})` : "MISSING"}`);
   const sig = installedExtensionSignature();
   L.push(`extension signature: ${sig.ok ? "valid" : sig.problems.join("; ")}`);
   L.push(`PlayerDebugMode: ${debugMode()}`);
@@ -78494,7 +78548,7 @@ init_define_AEMCP_CEP_FILES();
 import { spawn as spawn3, spawnSync as spawnSync4 } from "node:child_process";
 import { chmodSync, copyFileSync as copyFileSync3, existsSync as existsSync9, mkdirSync as mkdirSync8, readdirSync as readdirSync5, readFileSync as readFileSync10, writeFileSync as writeFileSync5 } from "node:fs";
 import { dirname as dirname7, join as join11 } from "node:path";
-import { fileURLToPath as fileURLToPath2 } from "node:url";
+import { fileURLToPath as fileURLToPath3 } from "node:url";
 function mcpbInstalled() {
   try {
     return readdirSync5(join11(claudeDesktopDir(), "Claude Extensions")).some((n) => /after-effects/i.test(n) && !n.endsWith(".json"));
@@ -78533,11 +78587,12 @@ After Effects MCP installer v${VERSION}`));
   console.log(dim(`${process.platform} \xB7 node ${process.version}`));
   if (!isMac && !isWin) warn("After Effects only runs on macOS and Windows; continuing anyway.");
   step("1/4  Installing the MCP server");
-  const self2 = fileURLToPath2(import.meta.url);
+  const self2 = fileURLToPath3(import.meta.url);
   mkdirSync8(dirname7(INSTALLED_SERVER), { recursive: true });
   if (self2 !== INSTALLED_SERVER) copyFileSync3(self2, INSTALLED_SERVER);
   if (!isWin) chmodSync(INSTALLED_SERVER, 493);
   ok(`Server: ${INSTALLED_SERVER}`);
+  writeFileSync5(RUNTIME_FILE, JSON.stringify({ node: stableNodePath(), server: INSTALLED_SERVER, version: VERSION }, null, 2));
   ensureConfig();
   ok(`Config: ${CONFIG_FILE}`);
   step("2/4  Installing the After Effects extension");
@@ -78795,7 +78850,9 @@ After Effects MCP self-test v${VERSION}`));
   else bad(`No config at ${CONFIG_FILE}. Run the installer.`);
   const hash2 = installedExtensionHash();
   if (!existsSync11(join13(extensionDir(), "CSXS", "manifest.xml"))) bad(`After Effects extension missing at ${extensionDir()}. Run the installer.`);
-  else if (hash2 !== "a79a05286d08") warn(`Extension at ${extensionDir()} is a different version (${hash2 ?? "unknown"} vs ${"a79a05286d08"}). Re-run the installer.`);
+  else if (hash2 !== "0de817527e56" && compareVersions(installedExtensionVersion() ?? "0", VERSION) > 0)
+    warn(`A newer After Effects extension (v${installedExtensionVersion()}) is installed than this server (v${VERSION}): another copy of AE MCP is newer. Update this one (ae-mcp update, or the latest .mcpb).`);
+  else if (hash2 !== "0de817527e56") warn(`Extension at ${extensionDir()} is a different version (${hash2 ?? "unknown"} vs ${"0de817527e56"}). Re-run the installer.`);
   else ok("After Effects extension installed");
   if (bundledExtensionSigned) {
     const sig = installedExtensionSignature();
@@ -78893,20 +78950,103 @@ ${red(bold(`${failures} problem(s) found.`))} See README > Troubleshooting.`);
   return 1;
 }
 
+// src/cli/update-cmd.ts
+init_define_AEMCP_CEP_FILES();
+import { spawnSync as spawnSync5 } from "node:child_process";
+import { createHash as createHash4 } from "node:crypto";
+import { copyFileSync as copyFileSync4, existsSync as existsSync12, mkdirSync as mkdirSync11, renameSync as renameSync2, rmSync as rmSync2, writeFileSync as writeFileSync7 } from "node:fs";
+import { dirname as dirname8 } from "node:path";
+import { fileURLToPath as fileURLToPath4 } from "node:url";
+var SERVER_ASSET = "ae-mcp.mjs";
+async function get(url2) {
+  const res = await fetch(url2, { headers: { "user-agent": `ae-mcp/${VERSION}`, accept: "application/vnd.github+json" }, signal: AbortSignal.timeout(6e4) });
+  if (!res.ok) throw new Error(`${url2}: HTTP ${res.status}`);
+  return res;
+}
+async function expectedDigest(rel) {
+  const asset = rel.assets.find((a) => a.name === SERVER_ASSET);
+  const m = /^sha256:([0-9a-f]{64})$/i.exec(asset.digest ?? "");
+  if (m) return m[1].toLowerCase();
+  const side = rel.assets.find((a) => a.name === `${SERVER_ASSET}.sha256`);
+  if (!side) throw new Error("the release has no checksum for ae-mcp.mjs");
+  const hex3 = /[0-9a-f]{64}/i.exec(await (await get(side.browser_download_url)).text())?.[0];
+  if (!hex3) throw new Error("unreadable ae-mcp.mjs.sha256");
+  return hex3.toLowerCase();
+}
+async function runUpdate() {
+  const base = { from: VERSION, to: null, updated: false };
+  let rel;
+  try {
+    const api = process.env.AEMCP_RELEASES_API || `https://api.github.com/repos/${REPO}/releases/latest`;
+    rel = await (await get(api)).json();
+  } catch (e) {
+    return { ...base, ok: false, message: `Could not reach GitHub to check for updates (${e.message}).` };
+  }
+  const latest = rel.tag_name.replace(/^v/, "");
+  void checkForUpdate(true);
+  if (compareVersions(latest, VERSION) <= 0) return { ...base, ok: true, to: latest, message: `AE MCP is up to date (v${VERSION}).` };
+  if (!rel.assets.some((a) => a.name === SERVER_ASSET))
+    return { ...base, ok: false, to: latest, url: rel.html_url, message: `v${latest} can't be installed automatically. Download it from ${rel.html_url}` };
+  const tmp = `${INSTALLED_SERVER}.download`;
+  try {
+    const asset = rel.assets.find((a) => a.name === SERVER_ASSET);
+    const [body, want] = await Promise.all([get(asset.browser_download_url).then((r) => r.arrayBuffer()), expectedDigest(rel)]);
+    const bytes = Buffer.from(body);
+    const got = createHash4("sha256").update(bytes).digest("hex");
+    if (got !== want) throw new Error(`checksum mismatch (expected ${want.slice(0, 12)}\u2026, got ${got.slice(0, 12)}\u2026)`);
+    mkdirSync11(dirname8(INSTALLED_SERVER), { recursive: true });
+    writeFileSync7(tmp, bytes);
+    const v = spawnSync5(process.execPath, [tmp, "--version"], { encoding: "utf8", timeout: 3e4 });
+    if (v.status !== 0 || v.stdout.trim() !== latest) throw new Error(`the downloaded server did not start correctly (${(v.stderr || v.stdout).trim().slice(0, 200)})`);
+    if (existsSync12(INSTALLED_SERVER)) copyFileSync4(INSTALLED_SERVER, `${INSTALLED_SERVER}.previous`);
+    renameSync2(tmp, INSTALLED_SERVER);
+  } catch (e) {
+    rmSync2(tmp, { force: true });
+    return { ...base, ok: false, to: latest, url: rel.html_url, message: `Update to v${latest} failed: ${e.message}. Nothing was changed.` };
+  }
+  const setup = spawnSync5(process.execPath, [INSTALLED_SERVER, "setup"], { encoding: "utf8", timeout: 6e4, env: { ...process.env, AEMCP_NO_UPDATE_CHECK: "1" } });
+  let extension = false;
+  try {
+    extension = !!JSON.parse(setup.stdout).extensionInstalled;
+  } catch {
+  }
+  const running = fileURLToPath4(import.meta.url) !== INSTALLED_SERVER;
+  return {
+    ok: true,
+    from: VERSION,
+    to: latest,
+    updated: true,
+    url: rel.html_url,
+    restartAfterEffects: extension,
+    message: `Updated AE MCP from v${VERSION} to v${latest}. ` + (extension ? "Restart After Effects and your AI apps to use it." : "Restart your AI apps to use it.") + (running ? " (If you use the Claude Desktop extension (.mcpb), install the new AE-MCP.mcpb from the release page as well.)" : "")
+  };
+}
+async function updateCommand(args) {
+  const r = await runUpdate();
+  if (args.includes("--json")) console.log(JSON.stringify(r));
+  else {
+    console.log(bold(`
+AE MCP update`));
+    (r.ok ? ok : fail)(r.message);
+    if (!r.ok && r.url) warn(`Release page: ${r.url}`);
+  }
+  process.exitCode = r.ok ? 0 : 1;
+}
+
 // src/cli/uninstall.ts
 init_define_AEMCP_CEP_FILES();
-import { existsSync as existsSync12, readdirSync as readdirSync6, readFileSync as readFileSync12, rmSync as rmSync2, writeFileSync as writeFileSync7 } from "node:fs";
+import { existsSync as existsSync13, readdirSync as readdirSync6, readFileSync as readFileSync12, rmSync as rmSync3, writeFileSync as writeFileSync8 } from "node:fs";
 import { join as join14 } from "node:path";
 function uninstall(argv) {
   console.log(bold("\nAfter Effects MCP uninstaller\n"));
   const keepConfig = argv.includes("--keep-config");
-  if (existsSync12(extensionDir())) {
-    rmSync2(extensionDir(), { recursive: true, force: true });
+  if (existsSync13(extensionDir())) {
+    rmSync3(extensionDir(), { recursive: true, force: true });
     ok(`Removed the After Effects extension`);
   }
-  if (existsSync12(AEMCP_DIR)) {
+  if (existsSync13(AEMCP_DIR)) {
     for (const name of readdirSync6(AEMCP_DIR))
-      if (name !== "node" && !(keepConfig && name === "config.json")) rmSync2(join14(AEMCP_DIR, name), { recursive: true, force: true });
+      if (name !== "node" && !(keepConfig && name === "config.json")) rmSync3(join14(AEMCP_DIR, name), { recursive: true, force: true });
   }
   ok(keepConfig ? "Removed the server (kept ~/.aemcp/config.json)" : `Removed ${AEMCP_DIR}`);
   for (const [label, file2] of [["Claude Desktop", claudeDesktopConfig()], ["Cursor", cursorConfig()], ["Claude Code", claudeCodeConfig()]]) {
@@ -78925,11 +79065,11 @@ function uninstall(argv) {
     } catch {
     }
   }
-  if (existsSync12(codexConfig())) {
+  if (existsSync13(codexConfig())) {
     const t = readFileSync12(codexConfig(), "utf8");
     const n = removeCodexBlock(t);
     if (n !== t) {
-      writeFileSync7(codexConfig(), n.trimEnd() + "\n");
+      writeFileSync8(codexConfig(), n.trimEnd() + "\n");
       ok("Removed from Codex");
     }
   }
@@ -79047,6 +79187,7 @@ Usage:
   ae-mcp activity [n]    the last n tool calls (default 30); full log in ~/.aemcp/activity.jsonl
   ae-mcp chatgpt [--local]
                          HTTP server + public tunnel for ChatGPT
+  ae-mcp update [--json]  install the latest release over this installation (and the AE extension)
   ae-mcp setup           only install/update the After Effects extension and config
 
 Config: ~/.aemcp/config.json  (env: AEMCP_CONFIG, AEMCP_BRIDGE_PORT, AEMCP_TOKEN, AEMCP_HTTP_PORT, AEMCP_HTTP_TOKEN)`;
@@ -79087,6 +79228,8 @@ Full log with arguments and code: ${ACTIVITY_FILE}`);
       return void console.log(await diagnostics());
     case "chatgpt":
       return chatgpt(rest);
+    case "update":
+      return updateCommand(rest);
     case "setup": {
       const r = ensureAeSetup({ forceExtension: rest.includes("--force") });
       console.log(JSON.stringify(r, null, 2));
@@ -79094,6 +79237,7 @@ Full log with arguments and code: ${ACTIVITY_FILE}`);
     }
   }
   autoSetup();
+  recordRuntime();
   void checkForUpdate();
   if (process.argv.includes("--http")) return startHttp();
   const server = createMcpServer();

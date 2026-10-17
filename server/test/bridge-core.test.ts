@@ -1,4 +1,4 @@
-// Runs the real CEP bridge (cep-panel/js/bridge-core.js) in Node against a simulated After Effects.
+// Runs the real CEP bridge (extension/js/bridge-core.js) in Node against a simulated After Effects.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createRequire } from "node:module";
 import { createServer, type Server } from "node:http";
@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const require = createRequire(import.meta.url);
-const SRC = readFileSync(new URL("../../cep-panel/js/bridge-core.js", import.meta.url), "utf8");
+const SRC = readFileSync(new URL("../../extension/js/bridge-core.js", import.meta.url), "utf8");
 
 let home = "";
 let blocker: Server;

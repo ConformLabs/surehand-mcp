@@ -8,7 +8,10 @@ import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 import { checkSignature, SIGNATURE_FILE, type SignatureCheck } from "./signature.js";
-import { AEMCP_DIR, CONFIG_FILE, CSXS_VERSIONS, extensionDir, isMac, isWin, readJson } from "./util.js";
+import { VERSION } from "../config.js";
+import { compareVersions } from "../update.js";
+import { fileURLToPath } from "node:url";
+import { AEMCP_DIR, CONFIG_FILE, CSXS_VERSIONS, INSTALLED_SERVER, extensionDir, isMac, isWin, readJson, stableNodePath } from "./util.js";
 
 // Kept outside the extension folder: an extra file inside it would break the signature.
 const HASH_FILE = join(AEMCP_DIR, "extension-hash");
@@ -38,18 +41,32 @@ export function ensureConfig(): boolean {
   return true;
 }
 
-export function installedExtensionHash(): string | null {
+// "<hash> <version>" of the installed extension. Older releases wrote only the hash.
+function readMarker(): string[] {
   try {
-    return readFileSync(HASH_FILE, "utf8").trim();
+    return readFileSync(HASH_FILE, "utf8").trim().split(/\s+/);
   } catch {
-    return null;
+    return [];
   }
+}
+
+export function installedExtensionHash(): string | null {
+  return readMarker()[0] || null;
+}
+
+export function installedExtensionVersion(): string | null {
+  return readMarker()[1] || null;
 }
 
 export function ensureExtension(force = false): { installed: boolean; updated: boolean } {
   const dir = extensionDir();
   const current = installedExtensionHash();
-  if (!force && current === __AEMCP_CEP_HASH__ && existsSync(join(dir, "CSXS", "manifest.xml"))) return { installed: false, updated: false };
+  const present = existsSync(join(dir, "CSXS", "manifest.xml"));
+  if (!force && current === __AEMCP_CEP_HASH__ && present) return { installed: false, updated: false };
+  // someone may run two copies (e.g. the Claude Desktop extension and the standalone install):
+  // never let the older one replace a newer extension
+  const installedVersion = installedExtensionVersion();
+  if (!force && present && installedVersion && compareVersions(installedVersion, VERSION) > 0) return { installed: false, updated: false };
   const updated = existsSync(dir);
   rmSync(dir, { recursive: true, force: true });
   for (const [rel, content] of Object.entries(__AEMCP_CEP_FILES__)) {
@@ -58,7 +75,7 @@ export function ensureExtension(force = false): { installed: boolean; updated: b
     writeFileSync(p, content);
   }
   mkdirSync(AEMCP_DIR, { recursive: true });
-  writeFileSync(HASH_FILE, __AEMCP_CEP_HASH__);
+  writeFileSync(HASH_FILE, `${__AEMCP_CEP_HASH__} ${VERSION}`);
   return { installed: true, updated };
 }
 
@@ -140,4 +157,17 @@ export function setupHint(): string {
   if (lastSetup && (lastSetup.extensionInstalled || lastSetup.debugModeChanged))
     return " The After Effects extension was just installed/updated: please restart After Effects once to load it.";
   return "";
+}
+
+/** Where the standalone install runs from, for the AE MCP panel's Update button. Only the
+ *  standalone server (~/.aemcp/server) records itself: the Claude Desktop extension is updated
+ *  by installing a new .mcpb. */
+export const RUNTIME_FILE = join(AEMCP_DIR, "runtime.json");
+export function recordRuntime() {
+  try {
+    if (fileURLToPath(import.meta.url) !== INSTALLED_SERVER) return;
+    const info = { node: stableNodePath(), server: INSTALLED_SERVER, version: VERSION };
+    if (JSON.stringify(readJson(RUNTIME_FILE, null)) === JSON.stringify(info)) return;
+    writeFileSync(RUNTIME_FILE, JSON.stringify(info, null, 2));
+  } catch {}
 }

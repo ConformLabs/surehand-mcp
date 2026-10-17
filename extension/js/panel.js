@@ -159,13 +159,45 @@
     for (var i = 0; i < 3; i++) { var x = parseInt(pa[i], 10) || 0, y = parseInt(pb[i], 10) || 0; if (x !== y) return x > y ? 1 : -1; }
     return 0;
   }
+  // The standalone install records how to run itself (~/.aemcp/runtime.json); then the panel can
+  // update in place with `ae-mcp update`. Otherwise (Claude Desktop .mcpb) it links to the release.
+  function updater() {
+    var rt = readJson(path.join(AEMCP_DIR, "runtime.json"));
+    return rt && rt.node && rt.server && fs.existsSync(rt.node) && fs.existsSync(rt.server) ? rt : null;
+  }
+  var updating = false, updatedTo = null;
   function showUpdate() {
-    var u = readJson(path.join(AEMCP_DIR, "update-check.json"));
-    if (u && u.latest && cmpVersions(u.latest, AEMCPBridge.VERSION) > 0) {
-      $("updateText").textContent = "Update available: v" + u.latest;
-      $("updateBtn").onclick = function () { try { window.cep.util.openURLInDefaultBrowser(u.url); } catch (e) { alert(u.url); } };
+    if (updating) return;
+    if (updatedTo) {
+      $("updateText").textContent = "Updated to v" + updatedTo + ". Restart After Effects and your AI apps.";
+      $("updateBtn").hidden = true;
       $("update").hidden = false;
-    } else $("update").hidden = true;
+      return;
+    }
+    var u = readJson(path.join(AEMCP_DIR, "update-check.json"));
+    if (!(u && u.latest && cmpVersions(u.latest, AEMCPBridge.VERSION) > 0)) { $("update").hidden = true; return; }
+    var rt = updater();
+    $("updateText").textContent = "Update available: v" + u.latest;
+    $("updateBtn").hidden = false;
+    $("updateBtn").disabled = false;
+    $("updateBtn").textContent = rt ? "Update" : "Download";
+    $("updateBtn").onclick = rt ? function () { runUpdate(rt, u.latest); } : function () {
+      try { window.cep.util.openURLInDefaultBrowser(u.url); } catch (e) { alert(u.url); }
+    };
+    $("update").hidden = false;
+  }
+  function runUpdate(rt, latest) {
+    updating = true;
+    $("updateText").textContent = "Updating to v" + latest + "…";
+    $("updateBtn").disabled = true;
+    childProcess.execFile(rt.node, [rt.server, "update", "--json"], { timeout: 180000, windowsHide: true }, function (err, stdout) {
+      updating = false;
+      var r = null;
+      try { r = JSON.parse(String(stdout).trim().split(/\r?\n/).pop()); } catch (e) {}
+      if (r && r.ok && r.updated) updatedTo = r.to;
+      else alert((r && r.message) || ("The update did not finish: " + (err ? err.message : "no result")));
+      showUpdate();
+    });
   }
 
   // ---------- diagnostics ----------
