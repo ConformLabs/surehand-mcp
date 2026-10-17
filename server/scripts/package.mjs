@@ -21,7 +21,8 @@ run(process.execPath, ["build.mjs"]);
 
 // tool list for the .mcpb manifest, straight from the server
 const client = new Client({ name: "package", version: "1" });
-await client.connect(new StdioClientTransport({ command: process.execPath, args: [bundle], env: { ...process.env, AEMCP_NO_AUTOSETUP: "1" } }));
+// list every tool (the extension's "Enable all tools" setting exposes them all)
+await client.connect(new StdioClientTransport({ command: process.execPath, args: [bundle, "--tools", "full"], env: { ...process.env, AEMCP_NO_AUTOSETUP: "1", AEMCP_NO_ACTIVITY_LOG: "1" } }));
 const { tools } = await client.listTools();
 await client.close();
 
