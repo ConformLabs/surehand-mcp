@@ -3,7 +3,7 @@ import { chmodSync, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSy
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { VERSION } from "../config.js";
-import { ensureConfig, ensureDebugMode, ensureExtension } from "./setup.js";
+import { bundledExtensionSigned, ensureConfig, ensureDebugMode, ensureExtension } from "./setup.js";
 import {
   CONFIG_FILE, INSTALLED_SERVER, SERVER_NAME, ask, bold, claudeCodeConfig, claudeDesktopConfig, claudeDesktopDir, claudeDesktopExe,
   chatgptDesktopInstalled, codexBlock, codexConfig, cursorConfig, dim, extensionDir, fail, findClaudeCli, isMac, isWin, ok, readJson, removeCodexBlock, run,
@@ -70,11 +70,14 @@ export async function install(argv: string[]) {
     fail(`Could not install the extension: ${e.message}`);
     process.exit(1);
   }
-  try {
-    ensureDebugMode();
-    ok(`Unsigned extensions enabled (PlayerDebugMode, CSXS ${CSXS_VERSIONS[0]}-${CSXS_VERSIONS.at(-1)})`);
-  } catch (e: any) {
-    warn(`${e.message}. The extension will not load until PlayerDebugMode is enabled (see README > Troubleshooting).`);
+  if (bundledExtensionSigned) ok("Extension is signed (no PlayerDebugMode needed)");
+  else {
+    try {
+      ensureDebugMode();
+      ok(`Unsigned extensions enabled (PlayerDebugMode, CSXS ${CSXS_VERSIONS[0]}-${CSXS_VERSIONS.at(-1)})`);
+    } catch (e: any) {
+      warn(`${e.message}. The extension will not load until PlayerDebugMode is enabled (see README > Troubleshooting).`);
+    }
   }
 
   step("3/4  Connecting AI apps");

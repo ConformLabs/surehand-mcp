@@ -1,21 +1,14 @@
 import { build } from "esbuild";
 import { createHash } from "node:crypto";
-import { chmodSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative, sep } from "node:path";
+import { chmodSync, readFileSync } from "node:fs";
+import { readCepFiles } from "./scripts/cep-files.mjs";
 
 const pkg = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8"));
 
 // Embed the After Effects (CEP) extension so the single-file server can install/update it itself.
-const cepRoot = new URL("../cep-panel/", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
-const cepFiles = {};
-(function walk(dir) {
-  for (const name of readdirSync(dir).sort()) {
-    const p = join(dir, name);
-    if (name.startsWith(".")) continue;
-    if (statSync(p).isDirectory()) walk(p);
-    else cepFiles[relative(cepRoot, p).split(sep).join("/")] = readFileSync(p, "utf8").replaceAll("__AEMCP_VERSION__", pkg.version);
-  }
-})(cepRoot);
+// The files include the extension's signature (scripts/sign-extension.mjs), so they are written
+// byte for byte as signed.
+const cepFiles = readCepFiles(pkg.version);
 const cepHash = createHash("sha1").update(JSON.stringify(cepFiles)).digest("hex").slice(0, 12);
 
 await build({

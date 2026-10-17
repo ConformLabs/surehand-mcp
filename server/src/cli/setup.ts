@@ -1,13 +1,20 @@
-// After Effects side of the install: the CEP extension, PlayerDebugMode, and the shared config.
+// After Effects side of the install: the CEP extension and the shared config. The extension is
+// signed, so After Effects loads it without PlayerDebugMode; that is only enabled for an unsigned
+// (development) build.
 // Runs from the installer and (quietly) every time the server starts, so installing only the
 // Claude Desktop extension (.mcpb) is enough.
 import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { dirname, join, relative, sep } from "node:path";
+import { checkSignature, SIGNATURE_FILE, type SignatureCheck } from "./signature.js";
 import { AEMCP_DIR, CONFIG_FILE, CSXS_VERSIONS, extensionDir, isMac, isWin, readJson } from "./util.js";
 
-const HASH_FILE = ".aemcp-hash";
+// Kept outside the extension folder: an extra file inside it would break the signature.
+const HASH_FILE = join(AEMCP_DIR, "extension-hash");
+
+/** True when this build ships a signed extension (always, for release builds). */
+export const bundledExtensionSigned = SIGNATURE_FILE in __AEMCP_CEP_FILES__;
 
 export interface SetupResult {
   extensionInstalled: boolean; // files were written (new install or update)
@@ -33,7 +40,7 @@ export function ensureConfig(): boolean {
 
 export function installedExtensionHash(): string | null {
   try {
-    return readFileSync(join(extensionDir(), HASH_FILE), "utf8").trim();
+    return readFileSync(HASH_FILE, "utf8").trim();
   } catch {
     return null;
   }
@@ -50,8 +57,27 @@ export function ensureExtension(force = false): { installed: boolean; updated: b
     mkdirSync(dirname(p), { recursive: true });
     writeFileSync(p, content);
   }
-  writeFileSync(join(dir, HASH_FILE), __AEMCP_CEP_HASH__);
+  mkdirSync(AEMCP_DIR, { recursive: true });
+  writeFileSync(HASH_FILE, __AEMCP_CEP_HASH__);
   return { installed: true, updated };
+}
+
+/** Checks the installed extension's files against its signature. */
+export function installedExtensionSignature(): SignatureCheck {
+  const root = extensionDir();
+  const files: Record<string, Buffer> = {};
+  try {
+    (function walk(dir: string) {
+      for (const name of readdirSync(dir)) {
+        const p = join(dir, name);
+        if (statSync(p).isDirectory()) walk(p);
+        else files[relative(root, p).split(sep).join("/")] = readFileSync(p);
+      }
+    })(root);
+  } catch {
+    return { signed: false, ok: false, problems: [`extension not found at ${root}`] };
+  }
+  return checkSignature(files);
 }
 
 function debugModeOn(v: number): boolean {
@@ -64,6 +90,10 @@ function debugModeOn(v: number): boolean {
     return r.status === 0 && /PlayerDebugMode\s+REG_SZ\s+1/.test(r.stdout);
   }
   return true;
+}
+
+export function debugModeEnabled(): boolean {
+  return CSXS_VERSIONS.every(debugModeOn);
 }
 
 /** Unsigned CEP extensions only load with PlayerDebugMode=1. Returns true if anything changed. */
@@ -94,10 +124,12 @@ export function ensureAeSetup(opts: { forceExtension?: boolean } = {}): SetupRes
   } catch (e: any) {
     res.errors.push(`extension: ${e.message}`);
   }
-  try {
-    res.debugModeChanged = ensureDebugMode();
-  } catch (e: any) {
-    res.errors.push(`PlayerDebugMode: ${e.message}`);
+  if (!bundledExtensionSigned) {
+    try {
+      res.debugModeChanged = ensureDebugMode();
+    } catch (e: any) {
+      res.errors.push(`PlayerDebugMode: ${e.message}`);
+    }
   }
   lastSetup = res;
   return res;

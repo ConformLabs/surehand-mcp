@@ -7,7 +7,7 @@ import { runJsx } from "../jsx.js";
 import { diagnostics } from "./diagnostics.js";
 import { fullSelftest } from "./fulltest.js";
 import { checkForUpdate, updateCheckEnabled, updateMessage } from "../update.js";
-import { installedExtensionHash } from "./setup.js";
+import { bundledExtensionSigned, debugModeEnabled, installedExtensionHash, installedExtensionSignature } from "./setup.js";
 import {
   AEMCP_DIR, CONFIG_FILE, CSXS_VERSIONS, SERVER_NAME, bold, claudeDesktopConfig, extensionDir, fail, green, isMac, isWin, ok, readJson, red, sleep, warn,
 } from "./util.js";
@@ -35,16 +35,13 @@ export async function selftest(full = false): Promise<number> {
   else if (hash !== __AEMCP_CEP_HASH__) warn(`Extension at ${extensionDir()} is a different version (${hash ?? "unknown"} vs ${__AEMCP_CEP_HASH__}). Re-run the installer.`);
   else ok("After Effects extension installed");
 
-  const offVersions = CSXS_VERSIONS.filter((v) => {
-    const r = isWin
-      ? spawnSync("reg", ["query", `HKCU\\Software\\Adobe\\CSXS.${v}`, "/v", "PlayerDebugMode"], { encoding: "utf8" })
-      : isMac
-        ? spawnSync("defaults", ["read", `com.adobe.CSXS.${v}`, "PlayerDebugMode"], { encoding: "utf8" })
-        : null;
-    return r && !(r.status === 0 && /(^|\s)1\s*$/m.test(r.stdout));
-  });
-  if (offVersions.length) bad(`PlayerDebugMode not enabled for CSXS ${offVersions.join(", ")}. Run the installer.`);
-  else ok("Unsigned extensions allowed (PlayerDebugMode)");
+  if (bundledExtensionSigned) {
+    const sig = installedExtensionSignature();
+    if (sig.ok) ok("Extension signature valid (loads without PlayerDebugMode)");
+    else if (debugModeEnabled()) warn(`Extension signature: ${sig.problems.join("; ")}. It still loads because PlayerDebugMode is on; re-run the installer to fix.`);
+    else bad(`Extension signature: ${sig.problems.join("; ")}. After Effects will not load it. Re-run the installer.`);
+  } else if (debugModeEnabled()) ok("Unsigned extensions allowed (PlayerDebugMode)");
+  else bad(`This is an unsigned development build and PlayerDebugMode is off for some CSXS versions (${CSXS_VERSIONS.join(", ")}). Run the installer.`);
 
   const desktop = readJson<any>(claudeDesktopConfig(), null);
   if (desktop?.mcpServers?.[SERVER_NAME]) {

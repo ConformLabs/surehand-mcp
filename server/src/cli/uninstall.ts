@@ -45,5 +45,5 @@ export function uninstall(argv: string[]) {
   }
   console.log("\nDone. Restart After Effects and your AI apps.");
   console.log("If you installed the Claude Desktop extension (.mcpb), remove it in Claude Desktop > Settings > Extensions.");
-  warn("PlayerDebugMode was left enabled (harmless; other extensions may rely on it).");
+  warn("PlayerDebugMode, if an earlier version enabled it, was left as is (harmless; other extensions may rely on it).");
 }

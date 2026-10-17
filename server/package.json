@@ -15,6 +15,7 @@
     "test": "vitest run",
     "start": "node dist/ae-mcp.mjs",
     "package": "node scripts/package.mjs",
+    "sign": "node scripts/sign-extension.mjs",
     "check": "tsc --noEmit && vitest run && node build.mjs"
   },
   "engines": {

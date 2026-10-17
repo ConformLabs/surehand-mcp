@@ -144,7 +144,11 @@ return aemcp.itemInfo(it);`,
     jsx: `
 if (app.project.dirty && !args.discardChanges) aemcp.fail("Current project has unsaved changes. Save first or pass discardChanges: true.");
 var f = new File(args.path); if (!f.exists) aemcp.fail("File not found: " + args.path);
-app.open(f); return aemcp.projectInfo();`,
+// with unsaved changes app.open would silently do nothing (its save prompt is suppressed)
+if (app.project.dirty) app.project.close(CloseOptions.DO_NOT_SAVE_CHANGES);
+app.open(f);
+if (!app.project.file || app.project.file.fsName !== f.fsName) aemcp.fail("After Effects did not open " + f.fsName + " (is it a valid project for this version?)");
+return aemcp.projectInfo();`,
   },
   {
     name: "ae_new_project",

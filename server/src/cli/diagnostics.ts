@@ -7,7 +7,7 @@ import { VERSION } from "../config.js";
 import { HELPER_VERSION } from "../jsx.js";
 import { resolveProfile } from "../tools/profile.js";
 import { knownUpdate } from "../update.js";
-import { installedExtensionHash } from "./setup.js";
+import { installedExtensionHash, installedExtensionSignature } from "./setup.js";
 import {
   AEMCP_DIR, CONFIG_FILE, CSXS_VERSIONS, INSTALLED_SERVER, SERVER_NAME, claudeCodeConfig, claudeDesktopConfig, codexConfig, cursorConfig, extensionDir,
   isMac, isWin, readJson,
@@ -41,6 +41,8 @@ export async function diagnostics(): Promise<string> {
   else L.push(`config: MISSING (${CONFIG_FILE})`);
   L.push(`installed server: ${existsSync(INSTALLED_SERVER) ? INSTALLED_SERVER : "not installed (fine when using the .mcpb)"}`);
   L.push(`extension: ${extensionDir()} · ${existsSync(join(extensionDir(), "CSXS", "manifest.xml")) ? `hash ${installedExtensionHash()} (bundled ${__AEMCP_CEP_HASH__})` : "MISSING"}`);
+  const sig = installedExtensionSignature();
+  L.push(`extension signature: ${sig.ok ? "valid" : sig.problems.join("; ")}`);
   L.push(`PlayerDebugMode: ${debugMode()}`);
   L.push(`Claude Desktop: ${clientEntry(claudeDesktopConfig())}`);
   L.push(`Claude Code: ${clientEntry(claudeCodeConfig())}`);

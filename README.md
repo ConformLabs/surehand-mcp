@@ -56,8 +56,8 @@ macOS Gatekeeper or Windows SmartScreen blocks the files.
 The installer:
 - uses the Node.js on your PATH, or downloads a private Node.js 22 LTS into `~/.aemcp/node` (checksum-verified)
 - copies the MCP server to `~/.aemcp/server/ae-mcp.mjs` (one self-contained file)
-- installs the After Effects extension (`com.aemcp`) into your user CEP extensions folder and enables
-  unsigned extensions (`PlayerDebugMode`) for CSXS 9-14
+- installs the After Effects extension (`com.aemcp`) into your user CEP extensions folder. The extension
+  is signed, so it loads without enabling unsigned extensions (`PlayerDebugMode`)
 - creates `~/.aemcp/config.json` with a random access token
 - registers the server with **Claude Desktop**, **Claude Code**, **ChatGPT desktop / Codex** (`~/.codex/config.toml`,
   created if the ChatGPT or Codex app is installed) and **Cursor** if they are installed
@@ -86,7 +86,7 @@ x64 emulation on Apple Silicon may be slow, so a real PC is better.
 1. Copy `AE-MCP-<version>.zip` to the PC, right-click > **Extract All**.
 2. Make sure After Effects is **closed**, then open `3. Windows` and double-click **1. Install**.
    - If SmartScreen appears: **More info > Run anyway**.
-   - Expect: Node.js downloads if missing, then check marks for the server, extension, PlayerDebugMode and apps found.
+   - Expect: Node.js downloads if missing, then check marks for the server, the extension ("Extension is signed") and apps found.
 3. Start After Effects and wait for it to finish loading.
 4. Double-click **2. Test Installation** (same folder). All lines should show check marks, ending with
    "All checks passed".
@@ -273,7 +273,7 @@ Please share reports from other versions.
 | Problem | Fix |
 |---|---|
 | "Cannot reach After Effects" | Make sure AE is running. Open **Window > Extensions > AE MCP** to see the bridge status. If **AE MCP** is missing from the menu, re-run the installer and fully restart AE. |
-| Extension missing from the menu | Unsigned extensions must be allowed. The installer sets `PlayerDebugMode=1`; check with `defaults read com.adobe.CSXS.12` (macOS) or in the registry under `HKCU\Software\Adobe\CSXS.12` (Windows). |
+| Extension missing from the menu | Run `selftest`: it checks the extension's files against its signature (After Effects silently skips a signed extension whose files changed). Re-running the installer rewrites them. As a last resort, allowing unsigned extensions also works: set `PlayerDebugMode` to `1` with `defaults write com.adobe.CSXS.12 PlayerDebugMode 1` (macOS) or in the registry under `HKCU\Software\Adobe\CSXS.12` (Windows). |
 | "Port 8765 is already in use" | Only one After Effects instance can host the bridge. Close the other instance, or change `bridgePort` in `~/.aemcp/config.json` and restart AE + your AI app. |
 | "Token mismatch" | Re-run the installer (it keeps the existing token) and restart AE. |
 | Scripts can't write files or use the network | Enable **Settings > Scripting & Expressions > Allow Scripts to Write Files and Access Network** in After Effects. Frame previews and the built-in tools work without it. |
@@ -316,6 +316,8 @@ npm test                 # unit tests only
 npm run build            # -> dist/ae-mcp.mjs
 node scripts/smoke.mjs   # live test: needs After Effects running with the bridge
 npm run package          # -> ../dist-zip/AE-MCP/ (launchers, server, AE-MCP.mcpb) + zip
+npm run sign             # re-sign the After Effects extension after changing cep-panel/ or the version
+                         # (needs the certificate in ~/.aemcp-signing; see scripts/sign-extension.mjs)
 ```
 
 The After Effects extension in `cep-panel/` is embedded in the server bundle at build time, and the server installs

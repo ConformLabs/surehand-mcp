@@ -25,13 +25,15 @@ if (phase === "installed") {
   const cfg = JSON.parse(readFileSync(join(aemcp, "config.json"), "utf8"));
   expect(typeof cfg.token === "string" && cfg.token.length >= 32, "config has a random token");
   expect(existsSync(join(ext, "CSXS", "manifest.xml")), "After Effects extension installed");
-  expect(existsSync(join(ext, ".aemcp-hash")), "extension version marker written");
+  expect(existsSync(join(aemcp, "extension-hash")), "extension version marker written (outside the extension)");
+  expect(!existsSync(join(ext, ".aemcp-hash")), "no extra files inside the signed extension");
+  expect(existsSync(join(ext, "META-INF", "signatures.xml")) && existsSync(join(ext, "mimetype")), "extension signature installed");
   expect(!readFileSync(join(ext, "js", "bridge-core.js"), "utf8").includes("__AEMCP_VERSION__"), "extension version stamped");
   if (process.env.AEMCP_FORCE_NODE_DOWNLOAD) expect(existsSync(join(aemcp, "node", isWin ? "node.exe" : "bin/node")), "private Node.js downloaded");
   if (selftestOutput) {
     const out = readFileSync(selftestOutput, "utf8");
     expect(/After Effects extension installed/.test(out), "selftest: extension check passes");
-    expect(/Unsigned extensions allowed/.test(out), "selftest: PlayerDebugMode check passes");
+    expect(/Extension signature valid/.test(out), "selftest: installed extension matches its signature byte for byte");
     expect(/Bridge not reachable/.test(out), "selftest: reports After Effects not running (expected on CI)");
     expect(/### AE MCP diagnostics/.test(out), "selftest: prints diagnostics on failure");
     expect(!out.includes(cfg.token), "selftest/diagnostics never print the token");
