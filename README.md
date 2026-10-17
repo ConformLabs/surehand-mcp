@@ -22,7 +22,8 @@ Unzip it and open `START HERE.txt`.
 
 ## Requirements
 
-- After Effects 2020 (17.0) or newer on macOS or Windows (tested with AE 2026 on macOS and Windows 11)
+- After Effects 2020 (17.0) or newer on macOS or Windows, in any language (tested with AE 2025 and 2026 on macOS, and
+  AE 2026 on Windows 11)
 - Nothing else: the `.mcpb` uses Claude Desktop's built-in Node.js, and the installer downloads Node.js if it is missing
 
 ## Install
@@ -146,8 +147,10 @@ To rotate the token, delete `token` from `~/.aemcp/config.json` and re-run the i
 | `ae_get_scripting_guide` | ExtendScript cheat sheet for the model (also an MCP resource `aemcp://docs/extendscript`). |
 
 **Tool profiles.** Every tool description is sent to the AI in every chat, so by default only a **core set of
-26 tools** is enabled (about 8k tokens instead of 26k for all 92); everything else is still possible through
-`ae_run_script`. Switch to **Full** in After Effects (**Window > Extensions > AE MCP > AI tools**), in Claude Desktop's
+28 tools** is loaded (about 9k tokens instead of 26k for all 94), and **every other tool stays available on demand**:
+`ae_tools` lists all tools by category (or gives full parameter details of chosen ones), and `ae_call` runs any tool by
+name with the same validation, permissions, change report and activity log. Loading everything up front is optional:
+switch to **Full** in After Effects (**Window > Extensions > AE MCP > AI tools**), in Claude Desktop's
 extension settings ("Enable all tools") for the `.mcpb`, or with `"toolProfile": "full"` in `~/.aemcp/config.json`, then
 restart the AI app. Advanced: `"toolProfile": "core,ae_import_files,ae_render_queue_start"` adds single tools.
 
@@ -155,7 +158,13 @@ Core set: `ae_status`, `ae_run_script`, `ae_get_scripting_guide`, `ae_render_fra
 `ae_get_project_info`, `ae_get_comp_info`, `ae_get_layer_info`, `ae_get_selection`, `ae_get_properties`,
 `ae_find_properties`, `ae_get_layer_bounds`, `ae_get_comp_map`, `ae_create_comp`, `ae_add_layer`, `ae_add_shape`, `ae_set_property`, `ae_set_keyframes`,
 `ae_set_expression`, `ae_apply_effect`, `ae_get_effect_params`, `ae_undo`, `ae_batch`, `ae_checkpoint`, `ae_list_scripts`,
-`ae_run_script_file`.
+`ae_run_script_file`, `ae_tools`, `ae_call`.
+
+**Any After Effects language.** Property, effect and menu names are translated in non-English After Effects. Common
+English names still work everywhere: property paths like `Transform/Opacity`, effects like "Gaussian Blur" and menu
+commands like "Pre-compose..." are mapped to internal match names and command ids, which are the same in every
+language. Match names (`ADBE ...`, as returned by `ae_get_properties` / `ae_get_effect_params`) always work, and an
+unknown effect name gets suggestions.
 
 **All tools (Full profile):**
 
@@ -253,10 +262,11 @@ version or port). Set a permanent preference with `"instance": "2026"` in the co
 If After Effects doesn't answer, the error says what it is busy with and for how long, and suggests checking for an open
 dialog. `ae_status` shows the same.
 
-**Compatibility check.** `ae-mcp selftest --full` runs every major tool (38 steps) against temporary comps (removed afterwards),
-lists which scripting features your After Effects version has, and saves a report to `~/.aemcp/compat/`. Tested on After Effects 2026 (26.5)
-on macOS and Windows 11, and the panel, permissions, approvals and background
-rendering are verified on both; please share reports from other versions.
+**Compatibility check.** `ae-mcp selftest --full` runs every major tool (39 steps) against temporary comps (removed
+afterwards), lists which scripting features your After Effects version has, and saves a report to `~/.aemcp/compat/`.
+All steps pass on After Effects 2025 (25.6) and 2026 (26.5) on macOS and on 2026 on Windows 11, also with 2025 and 2026
+running side by side; the panel, permissions, approvals and background rendering are verified on macOS and Windows.
+Please share reports from other versions.
 
 ## Troubleshooting
 

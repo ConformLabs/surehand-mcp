@@ -278,6 +278,8 @@ var init_define_AEMCP_CEP_FILES = __esm({
     server.on("error", function (e) {
       if (e.code === "EADDRINUSE" && attempt < PORT_RANGE - 1) {
         attempt++;
+        // never take the port reserved for the MCP server's HTTP mode (ChatGPT)
+        if (base + attempt === Number(cfg.httpPort)) attempt++;
         state.port = base + attempt;
         return server.listen(state.port, "127.0.0.1");
       }
@@ -73488,6 +73490,8 @@ var EXTENDSCRIPT_DOC = `# After Effects ExtendScript cheat sheet (for ae_run_scr
 - Only with transpile:false or ae_run_script_file (raw ExtendScript): use var/function only, put parentheses around
   nested ?: (ExtendScript evaluates a ? b : c ? d : e left-to-right), and don't use reserved words such as short, int,
   char, float, class as names.
+- After Effects may run in another language: prefer match names ("ADBE Opacity", "ADBE Glo2") over display names in
+  scripts. The tools accept common English names everywhere.
 - Don't use plain objects as dictionaries keyed by arbitrary names: ExtendScript objects already have members such as
   "+", "-", "*", "reflect", "watch" and "toSource" (operator overloading), so a comp named "-" collides. Prefix keys
   (map["k:" + name]).
@@ -73734,7 +73738,7 @@ function installedExtensionHash() {
 function ensureExtension(force = false) {
   const dir = extensionDir();
   const current2 = installedExtensionHash();
-  if (!force && current2 === "52e59ab422f1" && existsSync2(join3(dir, "CSXS", "manifest.xml"))) return { installed: false, updated: false };
+  if (!force && current2 === "3227945cae12" && existsSync2(join3(dir, "CSXS", "manifest.xml"))) return { installed: false, updated: false };
   const updated = existsSync2(dir);
   rmSync(dir, { recursive: true, force: true });
   for (const [rel, content] of Object.entries(define_AEMCP_CEP_FILES_default)) {
@@ -73742,7 +73746,7 @@ function ensureExtension(force = false) {
     mkdirSync2(dirname2(p), { recursive: true });
     writeFileSync2(p, content);
   }
-  writeFileSync2(join3(dir, HASH_FILE), "52e59ab422f1");
+  writeFileSync2(join3(dir, HASH_FILE), "3227945cae12");
   return { installed: true, updated };
 }
 function debugModeOn(v) {
@@ -74180,6 +74184,37 @@ aemcp = (function () {
     if (!l) A.fail("No layer named '" + ref + "' in comp '" + comp.name + "'");
     return l;
   };
+  // ---------- language independence ----------
+  // Display names (properties, effects, menu commands) are translated in non-English After Effects.
+  // These tables map the English names AI models use to internal match names / command ids, which
+  // are the same in every language. Keys are lowercase and prefixed ("k:") so they never collide
+  // with ExtendScript's built-in object members.
+  function table(o) { var t = {}; for (var k in o) if (o.hasOwnProperty(k)) t["k:" + k] = o[k]; return t; }
+  A.PROP_ALIASES = table({"transform": "ADBE Transform Group", "anchor point": "ADBE Anchor Point", "position": "ADBE Position", "x position": "ADBE Position_0", "y position": "ADBE Position_1", "z position": "ADBE Position_2", "scale": "ADBE Scale", "orientation": "ADBE Orientation", "x rotation": "ADBE Rotate X", "y rotation": "ADBE Rotate Y", "rotation": "ADBE Rotate Z", "z rotation": "ADBE Rotate Z", "opacity": "ADBE Opacity", "effects": "ADBE Effect Parade", "masks": "ADBE Mask Parade", "mask path": "ADBE Mask Shape", "mask feather": "ADBE Mask Feather", "mask opacity": "ADBE Mask Opacity", "mask expansion": "ADBE Mask Offset", "text": "ADBE Text Properties", "source text": "ADBE Text Document", "path options": "ADBE Text Path Options", "more options": "ADBE Text More Options", "animators": "ADBE Text Animators", "contents": "ADBE Root Vectors Group", "material options": "ADBE Material Options Group", "audio": "ADBE Audio Group", "audio levels": "ADBE Audio Levels", "time remap": "ADBE Time Remapping", "marker": "ADBE Marker", "camera options": "ADBE Camera Options Group", "light options": "ADBE Light Options Group", "zoom": "ADBE Camera Zoom", "focus distance": "ADBE Camera Focus Distance", "aperture": "ADBE Camera Aperture", "blur level": "ADBE Camera Blur Level", "intensity": "ADBE Light Intensity", "color": "ADBE Light Color", "layer styles": "ADBE Layer Styles"});
+  A.EFFECT_ALIASES = table({"glow": "ADBE Glo2", "gaussian blur": "ADBE Gaussian Blur 2", "fast box blur": "ADBE Box Blur2", "box blur": "ADBE Box Blur2", "directional blur": "ADBE Motion Blur", "radial blur": "ADBE Radial Blur", "camera lens blur": "ADBE Camera Lens Blur", "drop shadow": "ADBE Drop Shadow", "fill": "ADBE Fill", "tint": "ADBE Tint", "tritone": "ADBE Tritone", "curves": "ADBE CurvesCustom", "levels": "ADBE Easy Levels2", "hue/saturation": "ADBE HUE SATURATION", "brightness & contrast": "ADBE Brightness & Contrast 2", "exposure": "ADBE Exposure2", "lumetri color": "ADBE Lumetri", "black & white": "ADBE Black&White", "change to color": "ADBE Change To Color", "gradient ramp": "ADBE Ramp", "4-color gradient": "ADBE 4ColorGradient", "fractal noise": "ADBE Fractal Noise", "noise": "ADBE Noise", "turbulent displace": "ADBE Turbulent Displace", "displacement map": "ADBE Displacement Map", "corner pin": "ADBE Corner Pin", "transform": "ADBE Geometry2", "stroke": "ADBE Stroke", "linear wipe": "ADBE Linear Wipe", "radial wipe": "ADBE Radial Wipe", "venetian blinds": "ADBE Venetian Blinds", "posterize time": "ADBE Posterize Time", "echo": "ADBE Echo", "slider control": "ADBE Slider Control", "checkbox control": "ADBE Checkbox Control", "color control": "ADBE Color Control", "point control": "ADBE Point Control", "3d point control": "ADBE Point3D Control", "angle control": "ADBE Angle Control", "layer control": "ADBE Layer Control", "dropdown menu control": "ADBE Dropdown Control", "checkerboard": "ADBE Checkerboard", "set matte": "ADBE Set Matte3", "simple choker": "ADBE Simple Choker", "matte choker": "ADBE Matte Choker", "keylight (1.2)": "Keylight 906", "keylight": "Keylight 906", "mosaic": "ADBE Mosaic", "find edges": "ADBE Find Edges", "mesh warp": "ADBE MESH WARP", "bulge": "ADBE Bulge", "wave warp": "ADBE Wave Warp", "offset": "ADBE Offset", "motion tile": "ADBE Tile", "cc force motion blur": "CC Force Motion Blur", "write-on": "ADBE Write-on", "beam": "ADBE Laser", "lens flare": "ADBE Lens Flare", "cc light rays": "CC Light Rays", "invert": "ADBE Invert", "channel combiner": "ADBE Channel Combiner", "colorama": "APC Colorama", "minimax": "ADBE Minimax", "grid": "ADBE Grid", "circle": "ADBE Circle", "audio spectrum": "ADBE AudSpect", "audio waveform": "ADBE AudWave", "time displacement": "ADBE Time Displacement", "timewarp": "ADBE Timewarp", "unsharp mask": "ADBE Unsharp Mask", "sharpen": "ADBE Sharpen", "reduce interlace flicker": "ADBE Reduce Interlace Flicker", "add grain": "VISINF Grain Implant", "median": "ADBE Median", "bilateral blur": "ADBE Bilateral", "compound blur": "ADBE Compound Blur", "channel blur": "ADBE Channel Blur"});
+  A.COMMANDS = table({"undo": 16, "select all": 23, "deselect all": 2004, "pre-compose": 2071, "easy ease": 2509, "easy ease in": 2510, "easy ease out": 2511, "toggle hold keyframe": 2226, "sequence layers": 4217, "center anchor point in layer content": 10312, "fit to comp": 2156, "fit to comp width": 2732, "fit to comp height": 2733, "trim comp to work area": 2360, "crop comp to region of interest": 2997, "split layer": 2158, "duplicate": 2080, "lift work area": 2613, "extract work area": 2614, "convert audio to keyframes": 4218, "convert expression to keyframes": 2639, "increment and save": 3088, "save": 5, "save as": 6, "consolidate all footage": 2107, "remove unused footage": 2109, "reduce project": 2735, "collect files": 2482, "reveal in finder": 2562, "add to render queue": 2161, "add to adobe media encoder queue": 3800, "time-reverse keyframes": 3693, "enable time remapping": 2153, "freeze frame": 3695, "create shapes from vector layer": 3973, "create masks from text": 2933, "create shapes from text": 3781, "auto-trace": 3044, "bring layer to front": 2016, "send layer to back": 2017, "bring layer forward": 2018, "send layer backward": 2019, "time-reverse layer": 2135, "redo": 2035});
+  A.commandId = function (name) {
+    if (typeof name === "number") return name;
+    var id = A.COMMANDS["k:" + String(name).toLowerCase().replace(/\\.\\.\\.$/, "")];
+    return id || app.findMenuCommandId(name);
+  };
+  // match name of an installed effect from a match name, a (localized) display name or an English name
+  A.effectMatchName = function (q) {
+    var all = app.effects, low = String(q).toLowerCase(), alias = A.EFFECT_ALIASES["k:" + low], i;
+    for (i = 0; i < all.length; i++) if (all[i].matchName === q || all[i].displayName.toLowerCase() === low || (alias && all[i].matchName === alias)) return all[i];
+    // not found: suggest close ones
+    // score by word beginnings (4 letters), so typos like "gausian blurr" still find "Gaussian Blur"
+    var sug = [], words = low.split(/[^a-z0-9]+/), scored = [];
+    for (i = 0; i < all.length; i++) {
+      var dn = all[i].displayName.toLowerCase(), mn = all[i].matchName.toLowerCase(), score = 0;
+      for (var w = 0; w < words.length; w++) { var stem = words[w].substr(0, 4); if (stem.length > 2 && (dn.indexOf(stem) >= 0 || mn.indexOf(stem) >= 0)) score++; }
+      if (score) scored.push([score, all[i].displayName + " (" + all[i].matchName + ")"]);
+    }
+    scored.sort(function (x, y) { return y[0] - x[0]; });
+    for (i = 0; i < scored.length && i < 6; i++) sug.push(scored[i][1]);
+    A.fail("Unknown effect '" + q + "'." + (sug.length ? " Did you mean: " + sug.join(", ") + "?" : " Use ae_list_available_effects to search.") + " Match names (\\"ADBE ...\\") work in every language.");
+  };
+
   // path: "Transform/Position" | ["ADBE Transform Group","ADBE Position"] | "Effects/Gaussian Blur/Blurriness"
   // Each segment may be a display name, match name, or 1-based index.
   A.resolveProp = function (layer, path) {
@@ -74192,13 +74227,18 @@ aemcp = (function () {
       if (typeof s === "number" || /^\\d+$/.test(s)) next = cur.property(Number(s));
       else {
         try { next = cur.property(s); } catch (e) { next = null; }
-        if (!next && String(s).toLowerCase() === "effects") next = cur.property("ADBE Effect Parade");
+        var low = String(s).toLowerCase();
         if (!next && cur.numProperties) {
-          var low = String(s).toLowerCase();
           for (var j = 1; j <= cur.numProperties; j++) {
             var c = cur.property(j);
             if (c.name.toLowerCase() === low || c.matchName.toLowerCase() === low) { next = c; break; }
           }
+        }
+        // English names in a translated After Effects: property aliases, then effects by English name
+        if (!next) { var pa = A.PROP_ALIASES["k:" + low]; if (pa) { try { next = cur.property(pa); } catch (e) { next = null; } } }
+        if (!next && cur.matchName === "ADBE Effect Parade") {
+          var ea = A.EFFECT_ALIASES["k:" + low];
+          if (ea) for (var j2 = 1; j2 <= cur.numProperties; j2++) if (cur.property(j2).matchName === ea) { next = cur.property(j2); break; }
         }
       }
       if (!next) A.fail("Property '" + s + "' not found under '" + (cur.name || "layer") + "' (path " + segs.join("/") + ")");
@@ -74672,7 +74712,19 @@ aemcp = (function () {
     for (var id in b.items) {
       if (!b.items.hasOwnProperty(id)) continue;
       var xb = b.items[id], xa = a.items[id], fb = xb.split(SEP);
-      if (xa === undefined) { add(ch.items, ["+", fb[0], raw(fb[2]), fb[1] === "comp" ? Number(fb[14].substr(1)) : undefined]); continue; }
+      if (xa === undefined) {
+        var extra = undefined; // reset explicitly: ES3 'var' keeps the previous iteration's value
+        if (fb[1] === "comp") {
+          // a new comp: list what is in it (names and types of the first layers)
+          extra = { layers: Number(fb[14].substr(1)), names: [] };
+          try {
+            var nc = app.project.itemByID(Number(id.substr(1)));
+            for (var li = 1; li <= Math.min(nc.numLayers, 12); li++) extra.names.push(nc.layer(li).name + " (" + A.layerType(nc.layer(li)) + ")");
+          } catch (e) {}
+        }
+        add(ch.items, ["+", fb[0], raw(fb[2]), extra]);
+        continue;
+      }
       if (xa === xb) continue;
       var fa = xa.split(SEP), labels = ITEM_FIELDS[fb[1]] || ITEM_FIELDS.other, d = [];
       for (var f = 2; f < fb.length; f++) if (fa[f] !== fb[f]) d.push(labels[f - 2] + " " + show(fa[f]) + " -> " + show(fb[f]));
@@ -74866,8 +74918,11 @@ function formatChanges(ch) {
   if (ch.error) return `Changes: (could not be determined: ${ch.error})`;
   const lines = [];
   for (const [op, type, name, extra] of ch.items) {
-    if (op === "+") lines.push(`+ ${type} "${name}"${type === "comp" && extra !== void 0 ? ` (${extra} layers)` : ""}`);
-    else if (op === "-") lines.push(`- ${type} "${name}"`);
+    if (op === "+") {
+      const e = extra;
+      const inside = typeof e === "object" && e ? ` (${e.layers} layer${e.layers === 1 ? "" : "s"}${e.names.length ? `: ${e.names.join(", ")}${e.layers > e.names.length ? ", ..." : ""}` : ""})` : typeof e === "number" ? ` (${e} layers)` : "";
+      lines.push(`+ ${type} "${name}"${inside}`);
+    } else if (op === "-") lines.push(`- ${type} "${name}"`);
     else if (type === "project") lines.push(`~ project settings: ${extra}`);
     else lines.push(`~ ${type} "${name}": ${extra}`);
   }
@@ -75080,7 +75135,7 @@ try {
     bg.property("ADBE Transform Group").property("ADBE Position").setValue([W / 2, H / 2]);
     if (checker) {
       var cb = bg.property("ADBE Effect Parade").addProperty("ADBE Checkerboard");
-      try { cb.property("Width").setValue(Math.max(4, Math.round(Math.max(W, H) / 64))); cb.property("Color").setValue([0.6, 0.6, 0.6]); } catch (e) {}
+      try { cb.property("ADBE Checkerboard-0004").setValue(Math.max(4, Math.round(Math.max(W, H) / 64))); cb.property("ADBE Checkerboard-0010").setValue([0.6, 0.6, 0.6]); } catch (e) {} // Width, Color
     }
   }
   // only some layers: hide the others for the render (restored in finally)
@@ -75685,11 +75740,11 @@ var appTools = [
   {
     name: "ae_execute_menu_command",
     title: "Execute menu command",
-    description: 'Run any After Effects menu command by its exact menu name (e.g. "Pre-compose...", "Easy Ease", "Center Anchor Point in Layer Content", "Fit to Comp", "Sequence Layers...") or numeric command id. Acts on the current selection.',
+    description: 'Run any After Effects menu command by its exact menu name (e.g. "Pre-compose...", "Easy Ease", "Center Anchor Point in Layer Content", "Fit to Comp", "Sequence Layers...") or numeric command id. Acts on the current selection. Common commands work by their English name in any AE language.',
     input: { command: external_exports.union([external_exports.string(), external_exports.number().int()]) },
     jsx: `
-var id = typeof args.command === "number" ? args.command : app.findMenuCommandId(args.command);
-if (!id) aemcp.fail("Menu command not found: " + args.command);
+var id = aemcp.commandId(args.command); // English names work in any AE language for common commands
+if (!id) aemcp.fail("Menu command not found: " + args.command + " (menu names are translated in non-English After Effects; pass the command id instead)");
 app.executeCommand(id); return { executed: args.command, id: id };`
   },
   {
@@ -75970,13 +76025,7 @@ if (args.layer !== undefined) {
   var efx = aemcp.resolveProp(ll, ["ADBE Effect Parade", args.effect]);
   return { effect: efx.name, matchName: efx.matchName, layer: ll.name, params: describe(efx) };
 }
-var mn = null, q = String(args.effect).toLowerCase(), info = null;
-var all = app.effects; // read once: every access rebuilds the whole list
-for (var k = 0; k < all.length; k++) {
-  var e = all[k];
-  if (e.matchName.toLowerCase() === q || e.displayName.toLowerCase() === q) { mn = e.matchName; info = e; break; }
-}
-if (!mn) aemcp.fail("Unknown effect '" + args.effect + "'. Use ae_list_available_effects (or app.effects) to search.");
+var info = aemcp.effectMatchName(args.effect), mn = info.matchName;
 var c = app.project.items.addComp("__aemcp_inspect", 100, 100, 1, 1, 30);
 try {
   var s = c.layers.addSolid([0, 0, 0], "tmp", 100, 100, 1);
@@ -75995,13 +76044,7 @@ return res;`
     input: { comp: compRef, layer: layerRef, effect: external_exports.string(), name: external_exports.string().optional().describe("Rename the effect instance."), params },
     jsx: `${setParams}
 var c = aemcp.findComp(args.comp), l = aemcp.findLayer(c, args.layer), parade = l.property("ADBE Effect Parade");
-var mn = args.effect;
-if (!parade.canAddProperty(mn)) {
-  mn = null;
-  var all = app.effects; // read once: every access rebuilds the whole list
-  for (var i = 0; i < all.length; i++) if (all[i].displayName.toLowerCase() === String(args.effect).toLowerCase()) { mn = all[i].matchName; break; }
-  if (!mn) aemcp.fail("Unknown effect '" + args.effect + "'. Use ae_list_available_effects to find the match name.");
-}
+var mn = parade.canAddProperty(args.effect) ? args.effect : aemcp.effectMatchName(args.effect).matchName;
 var fx = parade.addProperty(mn);
 if (args.name) fx.name = args.name;
 var set = args.params ? setParams(fx, args.params) : {};
@@ -77351,11 +77394,11 @@ c.openInViewer();
 for (var i = 1; i <= c.numLayers; i++) c.layer(i).selected = false;
 L.selected = true;
 var before = c.numLayers;
-app.executeCommand(app.findMenuCommandId("Convert Audio to Keyframes"));
+app.executeCommand(aemcp.commandId("convert audio to keyframes")); // command id: works in any AE language
 if (c.numLayers === before) aemcp.fail("Convert Audio to Keyframes did not run (is the comp open and the layer's audio enabled?)");
 var amp = c.layer(1), fx = amp.property("ADBE Effect Parade"), out = { layer: amp.name, sliders: [] };
 for (var j = 1; j <= fx.numProperties; j++) { var s = fx.property(j).property(1); out.sliders.push({ name: fx.property(j).name, keyframes: s.numKeys, path: "Effects/" + fx.property(j).name + "/Slider" }); }
-out.hint = 'Use in an expression: thisComp.layer("' + amp.name + '").effect("Both Channels")("Slider")';
+out.hint = 'Use in an expression: thisComp.layer("' + amp.name + '").effect("' + fx.property(fx.numProperties).name + '")(1)';
 return out;`
   },
   {
@@ -77379,11 +77422,12 @@ c.openInViewer();
 for (var i = 1; i <= c.numLayers; i++) c.layer(i).selected = false;
 L.selected = true;
 var before = c.numLayers;
-app.executeCommand(app.findMenuCommandId("Convert Audio to Keyframes"));
+app.executeCommand(aemcp.commandId("convert audio to keyframes")); // command id: works in any AE language
 if (c.numLayers === before) aemcp.fail("Convert Audio to Keyframes did not run");
 var amp = c.layer(1), fx = amp.property("ADBE Effect Parade");
-var chName = { both: "Both Channels", left: "Left Channel", right: "Right Channel" }[args.channel || "both"];
-var sl = fx.property(chName).property(1), n = sl.numKeys, vals = [], times = [], max = 0;
+// the amplitude null's effects are Left, Right, Both Channels in that order (by index: their names are translated)
+var chIndex = { left: 1, right: 2, both: 3 }[args.channel || "both"];
+var sl = fx.property(chIndex).property(1), n = sl.numKeys, vals = [], times = [], max = 0;
 for (var k = 1; k <= n; k++) { var v = sl.keyValue(k); vals.push(v); times.push(sl.keyTime(k)); if (v > max) max = v; }
 var thr = (args.threshold || 0.6) * max, gap = args.minGap || 0.25, lim = args.maxMarkers || 300, beats = [], last = -1e9;
 for (var q = 1; q < n - 1; q++) {
@@ -78059,6 +78103,9 @@ The original project file was not changed.` }] };
   );
 }
 
+// src/tools/ondemand.ts
+init_define_AEMCP_CEP_FILES();
+
 // src/tools/profile.ts
 init_define_AEMCP_CEP_FILES();
 
@@ -78123,7 +78170,10 @@ var CORE_TOOLS = /* @__PURE__ */ new Set([
   "ae_batch",
   "ae_checkpoint",
   "ae_list_scripts",
-  "ae_run_script_file"
+  "ae_run_script_file",
+  // every other tool, on demand
+  "ae_tools",
+  "ae_call"
 ]);
 function resolveProfile(argv = process.argv) {
   const i = argv.indexOf("--tools");
@@ -78136,9 +78186,9 @@ function resolveProfile(argv = process.argv) {
   return { name: "custom", allows: (t) => CORE_TOOLS.has(t) || extra.has(t) };
 }
 function applyProfile(server, profile) {
+  const catalog = /* @__PURE__ */ new Map();
   const original = server.registerTool.bind(server);
   server.registerTool = (name, config2, cb) => {
-    if (!profile.allows(name)) return void 0;
     const wrapped = async (args, extra) => {
       const t0 = Date.now();
       let result;
@@ -78160,8 +78210,97 @@ function applyProfile(server, profile) {
         });
       }
     };
-    return original(name, config2, wrapped);
+    const direct = profile.allows(name);
+    catalog.set(name, { name, config: config2, run: wrapped, direct });
+    return direct ? original(name, config2, wrapped) : void 0;
   };
+  return catalog;
+}
+var CATEGORIES = {
+  "status & app": ["ae_status", "ae_system_info", "ae_execute_menu_command", "ae_undo", "ae_redo", "ae_purge", "ae_get_fonts", "ae_reload_helpers", "ae_get_scripting_guide"],
+  scripts: ["ae_run_script", "ae_run_script_file", "ae_list_scripts", "ae_batch", "ae_checkpoint"],
+  project: ["ae_get_project_info", "ae_list_items", "ae_get_item_info", "ae_import_files", "ae_create_folder", "ae_move_items", "ae_rename_item", "ae_remove_items", "ae_replace_footage", "ae_save_project", "ae_open_project", "ae_new_project", "ae_project_health", "ae_color_settings"],
+  comps: ["ae_list_comps", "ae_get_comp_info", "ae_create_comp", "ae_set_comp_settings", "ae_duplicate_comp", "ae_open_comp", "ae_precompose", "ae_add_comp_marker", "ae_get_comp_map"],
+  layers: ["ae_get_layer_info", "ae_add_layer", "ae_set_layer_attributes", "ae_delete_layers", "ae_duplicate_layer", "ae_split_layer", "ae_get_selection", "ae_select_layers", "ae_set_time_remap"],
+  "properties & keyframes": ["ae_get_properties", "ae_find_properties", "ae_set_property", "ae_set_keyframes", "ae_edit_keyframes", "ae_copy_keyframes", "ae_remove_keyframes", "ae_set_expression", "ae_get_expressions", "ae_check_expression", "ae_replace_in_expressions"],
+  "effects, shapes & masks": ["ae_list_available_effects", "ae_get_effect_params", "ae_apply_effect", "ae_set_effect_params", "ae_remove_effect", "ae_apply_preset", "ae_add_shape", "ae_add_mask"],
+  text: ["ae_set_text", "ae_style_text_range", "ae_set_paragraph", "ae_add_text_animator"],
+  "3D": ["ae_set_camera", "ae_set_light", "ae_set_material"],
+  audio: ["ae_audio_to_keyframes", "ae_audio_markers"],
+  footage: ["ae_set_footage_interpretation", "ae_set_proxy", "ae_relink_footage"],
+  "see & measure": ["ae_render_frame", "ae_render_contact_sheet", "ae_get_layer_bounds", "ae_sample_pixels"],
+  "essential graphics": ["ae_essential_graphics", "ae_export_mogrt"],
+  render: ["ae_list_render_queue", "ae_add_to_render_queue", "ae_get_render_settings", "ae_set_render_settings", "ae_queue_in_media_encoder", "ae_render_background", "ae_render_jobs", "ae_render_queue_start", "ae_clear_render_queue"]
+};
+
+// src/tools/ondemand.ts
+var SELF = /* @__PURE__ */ new Set(["ae_tools", "ae_call"]);
+function firstSentence(d = "") {
+  const s = d.split(/(?<=[.!?])\s|\n/)[0] ?? "";
+  return s.length > 150 ? s.slice(0, 147) + "..." : s;
+}
+function registerOnDemandTools(server, catalog) {
+  const category = (name) => Object.entries(CATEGORIES).find(([, names]) => names.includes(name))?.[0] ?? "other";
+  server.registerTool(
+    "ae_tools",
+    {
+      title: "More tools",
+      description: "Discover every After Effects tool, including ones not loaded in this chat: list them by category (one line each), or describe chosen tools (full parameters). Then run any of them with ae_call. Categories: " + Object.keys(CATEGORIES).join(", ") + ".",
+      inputSchema: {
+        describe: external_exports.array(external_exports.string()).max(10).optional().describe("Tool names to get full parameter details for."),
+        category: external_exports.string().optional().describe("Only list this category.")
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false }
+    },
+    async ({ describe: describe3, category: only }) => {
+      if (describe3?.length) {
+        const out = describe3.map((name) => {
+          const t = catalog.get(name);
+          if (!t || SELF.has(name)) return { name, error: "unknown tool (use ae_tools without arguments to list them)" };
+          let input2 = {};
+          try {
+            input2 = external_exports.toJSONSchema(external_exports.object(t.config.inputSchema ?? {}));
+          } catch {
+            input2 = "(schema unavailable)";
+          }
+          return { name, title: t.config.title, description: t.config.description, input: input2, callDirectly: t.direct };
+        });
+        return { content: [{ type: "text", text: JSON.stringify(out) }] };
+      }
+      const groups = {};
+      for (const t of catalog.values()) {
+        if (SELF.has(t.name)) continue;
+        const cat = category(t.name);
+        if (only && cat.toLowerCase() !== only.toLowerCase()) continue;
+        (groups[cat] ||= []).push(`${t.name}${t.direct ? "" : "*"}: ${firstSentence(t.config.description)}`);
+      }
+      const text = Object.entries(groups).map(([cat, lines]) => `## ${cat}
+${lines.join("\n")}`).join("\n\n") + "\n\n* = not loaded in this chat: run it with ae_call (use ae_tools {describe: [...]} for its parameters).";
+      return { content: [{ type: "text", text }] };
+    }
+  );
+  server.registerTool(
+    "ae_call",
+    {
+      title: "Run any tool",
+      description: "Run any After Effects tool by name with its arguments, e.g. tools listed by ae_tools that aren't loaded in this chat. Same validation, permissions, change report and activity log as calling the tool directly. Get the parameters with ae_tools {describe: [name]}.",
+      inputSchema: {
+        tool: external_exports.string().describe('Tool name, e.g. "ae_set_camera".'),
+        args: external_exports.record(external_exports.string(), external_exports.any()).optional().describe("The tool's arguments.")
+      },
+      annotations: { destructiveHint: true, openWorldHint: false }
+    },
+    async ({ tool, args }, extra) => {
+      const t = catalog.get(tool);
+      if (!t || SELF.has(tool)) return errorResult(`Unknown tool "${tool}". Use ae_tools to list the available tools.`);
+      const parsed = external_exports.object(t.config.inputSchema ?? {}).safeParse(args ?? {});
+      if (!parsed.success) {
+        const issues = parsed.error.issues.map((i) => `${i.path.join(".") || "(args)"}: ${i.message}`).join("; ");
+        return errorResult(`Invalid arguments for ${tool}: ${issues}. Use ae_tools {describe: ["${tool}"]} for its parameters.`);
+      }
+      return t.run(parsed.data, extra);
+    }
+  );
 }
 
 // src/cli/chatgpt.ts
@@ -78269,7 +78408,7 @@ async function diagnostics() {
   if (cfg) L.push(`config: ${JSON.stringify({ ...cfg, token: cfg.token ? `<set, ${cfg.token.length} chars>` : "MISSING" })}`);
   else L.push(`config: MISSING (${CONFIG_FILE})`);
   L.push(`installed server: ${existsSync8(INSTALLED_SERVER) ? INSTALLED_SERVER : "not installed (fine when using the .mcpb)"}`);
-  L.push(`extension: ${extensionDir()} \xB7 ${existsSync8(join10(extensionDir(), "CSXS", "manifest.xml")) ? `hash ${installedExtensionHash()} (bundled ${"52e59ab422f1"})` : "MISSING"}`);
+  L.push(`extension: ${extensionDir()} \xB7 ${existsSync8(join10(extensionDir(), "CSXS", "manifest.xml")) ? `hash ${installedExtensionHash()} (bundled ${"3227945cae12"})` : "MISSING"}`);
   L.push(`PlayerDebugMode: ${debugMode()}`);
   L.push(`Claude Desktop: ${clientEntry(claudeDesktopConfig())}`);
   L.push(`Claude Code: ${clientEntry(claudeCodeConfig())}`);
@@ -78496,8 +78635,10 @@ Full self-test: every major tool against this After Effects (temporary comps, re
     { name: "copy keyframes", tool: "ae_copy_keyframes", args: { from: { comp: C, layer: "Title", path: "Transform/Position" }, to: [{ comp: C, layer: "Rig", path: "Transform/Position" }] } },
     { name: "expression", tool: "ae_set_expression", args: { comp: C, layer: "Dot", path: "Transform/Rotation", expression: "time * 90" }, check: (r) => r.result?.error ? "expression error" : null },
     { name: "list expressions", tool: "ae_get_expressions", args: { comp: C } },
-    { name: "apply effect + params", tool: "ae_apply_effect", args: { comp: C, layer: "Title", effect: "ADBE Drop Shadow", params: { Distance: 10 } } },
-    { name: "inspect effect", tool: "ae_get_effect_params", args: { effect: "Glow" } },
+    { name: "apply effect + params", tool: "ae_apply_effect", args: { comp: C, layer: "Title", effect: "ADBE Drop Shadow", params: { "ADBE Drop Shadow-0004": 10 } } },
+    // Distance, by match name
+    { name: "inspect effect", tool: "ae_get_effect_params", args: { effect: "ADBE Glo2" } },
+    { name: "English names (any AE language)", tool: "ae_get_effect_params", args: { effect: "glow" } },
     { name: "mask", tool: "ae_add_mask", args: { comp: C, layer: "BG", shape: "ellipse", feather: 50 } },
     { name: "parent + blend", tool: "ae_set_layer_attributes", args: { comp: C, layer: "Dot", parent: "Rig", blendingMode: "SCREEN" } },
     { name: "style text range", tool: "ae_style_text_range", args: { comp: C, layer: "Title", match: "Self", style: { fillColor: "#ff3b30" } }, needs: "perCharacterText" },
@@ -78599,7 +78740,7 @@ After Effects MCP self-test v${VERSION}`));
   else bad(`No config at ${CONFIG_FILE}. Run the installer.`);
   const hash2 = installedExtensionHash();
   if (!existsSync11(join13(extensionDir(), "CSXS", "manifest.xml"))) bad(`After Effects extension missing at ${extensionDir()}. Run the installer.`);
-  else if (hash2 !== "52e59ab422f1") warn(`Extension at ${extensionDir()} is a different version (${hash2 ?? "unknown"} vs ${"52e59ab422f1"}). Re-run the installer.`);
+  else if (hash2 !== "3227945cae12") warn(`Extension at ${extensionDir()} is a different version (${hash2 ?? "unknown"} vs ${"3227945cae12"}). Re-run the installer.`);
   else ok("After Effects extension installed");
   const offVersions = CSXS_VERSIONS.filter((v) => {
     const r = isWin ? spawnSync5("reg", ["query", `HKCU\\Software\\Adobe\\CSXS.${v}`, "/v", "PlayerDebugMode"], { encoding: "utf8" }) : isMac ? spawnSync5("defaults", ["read", `com.adobe.CSXS.${v}`, "PlayerDebugMode"], { encoding: "utf8" }) : null;
@@ -78744,9 +78885,9 @@ function uninstall(argv) {
 // src/index.ts
 function createMcpServer() {
   const profile = resolveProfile();
-  const instructions = INSTRUCTIONS + (profile.name === "full" ? "" : '\n- This is the core tool set. Anything else (render queue, import, project/folder management, masks, markers, fonts, menu commands...) is done with ae_run_script. The user can enable every tool by setting "toolProfile": "full" (AE MCP panel or ~/.aemcp/config.json).');
+  const instructions = INSTRUCTIONS + (profile.name === "full" ? "" : "\n- This chat has the core tools loaded. Many more (3D, audio, text styling, footage, render settings, masks, Essential Graphics, project management...) are available on demand: ae_tools lists them, ae_tools {describe: [...]} gives parameters, ae_call runs them. ae_run_script can do anything else.");
   const server = new McpServer({ name: "after-effects", title: "Adobe After Effects", version: VERSION }, { instructions });
-  applyProfile(server, profile);
+  const catalog = applyProfile(server, profile);
   registerCoreTools(server);
   registerJsxTools(server, ALL_JSX_TOOLS);
   registerRenderJobs(server);
@@ -78767,6 +78908,7 @@ function createMcpServer() {
     },
     async () => ({ content: [{ type: "text", text: EXTENDSCRIPT_DOC }] })
   );
+  registerOnDemandTools(server, catalog);
   server.registerPrompt(
     "after-effects-assistant",
     { title: "After Effects assistant", description: "Primes the model with how to work with this server." },

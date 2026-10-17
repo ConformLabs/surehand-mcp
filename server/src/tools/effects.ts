@@ -76,13 +76,7 @@ if (args.layer !== undefined) {
   var efx = aemcp.resolveProp(ll, ["ADBE Effect Parade", args.effect]);
   return { effect: efx.name, matchName: efx.matchName, layer: ll.name, params: describe(efx) };
 }
-var mn = null, q = String(args.effect).toLowerCase(), info = null;
-var all = app.effects; // read once: every access rebuilds the whole list
-for (var k = 0; k < all.length; k++) {
-  var e = all[k];
-  if (e.matchName.toLowerCase() === q || e.displayName.toLowerCase() === q) { mn = e.matchName; info = e; break; }
-}
-if (!mn) aemcp.fail("Unknown effect '" + args.effect + "'. Use ae_list_available_effects (or app.effects) to search.");
+var info = aemcp.effectMatchName(args.effect), mn = info.matchName;
 var c = app.project.items.addComp("__aemcp_inspect", 100, 100, 1, 1, 30);
 try {
   var s = c.layers.addSolid([0, 0, 0], "tmp", 100, 100, 1);
@@ -102,13 +96,7 @@ return res;`,
     input: { comp: compRef, layer: layerRef, effect: z.string(), name: z.string().optional().describe("Rename the effect instance."), params },
     jsx: `${setParams}
 var c = aemcp.findComp(args.comp), l = aemcp.findLayer(c, args.layer), parade = l.property("ADBE Effect Parade");
-var mn = args.effect;
-if (!parade.canAddProperty(mn)) {
-  mn = null;
-  var all = app.effects; // read once: every access rebuilds the whole list
-  for (var i = 0; i < all.length; i++) if (all[i].displayName.toLowerCase() === String(args.effect).toLowerCase()) { mn = all[i].matchName; break; }
-  if (!mn) aemcp.fail("Unknown effect '" + args.effect + "'. Use ae_list_available_effects to find the match name.");
-}
+var mn = parade.canAddProperty(args.effect) ? args.effect : aemcp.effectMatchName(args.effect).matchName;
 var fx = parade.addProperty(mn);
 if (args.name) fx.name = args.name;
 var set = args.params ? setParams(fx, args.params) : {};

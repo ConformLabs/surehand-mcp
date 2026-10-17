@@ -7,11 +7,11 @@ export const appTools: JsxTool[] = [
     name: "ae_execute_menu_command",
     title: "Execute menu command",
     description:
-      'Run any After Effects menu command by its exact menu name (e.g. "Pre-compose...", "Easy Ease", "Center Anchor Point in Layer Content", "Fit to Comp", "Sequence Layers...") or numeric command id. Acts on the current selection.',
+      'Run any After Effects menu command by its exact menu name (e.g. "Pre-compose...", "Easy Ease", "Center Anchor Point in Layer Content", "Fit to Comp", "Sequence Layers...") or numeric command id. Acts on the current selection. Common commands work by their English name in any AE language.',
     input: { command: z.union([z.string(), z.number().int()]) },
     jsx: `
-var id = typeof args.command === "number" ? args.command : app.findMenuCommandId(args.command);
-if (!id) aemcp.fail("Menu command not found: " + args.command);
+var id = aemcp.commandId(args.command); // English names work in any AE language for common commands
+if (!id) aemcp.fail("Menu command not found: " + args.command + " (menu names are translated in non-English After Effects; pass the command id instead)");
 app.executeCommand(id); return { executed: args.command, id: id };`,
   },
   {

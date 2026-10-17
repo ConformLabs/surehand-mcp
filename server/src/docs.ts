@@ -23,6 +23,8 @@ export const EXTENDSCRIPT_DOC = `# After Effects ExtendScript cheat sheet (for a
 - Only with transpile:false or ae_run_script_file (raw ExtendScript): use var/function only, put parentheses around
   nested ?: (ExtendScript evaluates a ? b : c ? d : e left-to-right), and don't use reserved words such as short, int,
   char, float, class as names.
+- After Effects may run in another language: prefer match names ("ADBE Opacity", "ADBE Glo2") over display names in
+  scripts. The tools accept common English names everywhere.
 - Don't use plain objects as dictionaries keyed by arbitrary names: ExtendScript objects already have members such as
   "+", "-", "*", "reflect", "watch" and "toSource" (operator overloading), so a comp named "-" collides. Prefix keys
   (map["k:" + name]).

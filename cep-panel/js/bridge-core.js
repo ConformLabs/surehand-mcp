@@ -229,6 +229,8 @@
     server.on("error", function (e) {
       if (e.code === "EADDRINUSE" && attempt < PORT_RANGE - 1) {
         attempt++;
+        // never take the port reserved for the MCP server's HTTP mode (ChatGPT)
+        if (base + attempt === Number(cfg.httpPort)) attempt++;
         state.port = base + attempt;
         return server.listen(state.port, "127.0.0.1");
       }

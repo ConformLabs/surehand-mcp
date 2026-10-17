@@ -148,7 +148,12 @@ export function formatChanges(ch: Changes | undefined): string | null {
   if (ch.error) return `Changes: (could not be determined: ${ch.error})`;
   const lines: string[] = [];
   for (const [op, type, name, extra] of ch.items) {
-    if (op === "+") lines.push(`+ ${type} "${name}"${type === "comp" && extra !== undefined ? ` (${extra} layers)` : ""}`);
+    if (op === "+") {
+      const e = extra as { layers: number; names: string[] } | number | undefined;
+      const inside =
+        typeof e === "object" && e ? ` (${e.layers} layer${e.layers === 1 ? "" : "s"}${e.names.length ? `: ${e.names.join(", ")}${e.layers > e.names.length ? ", ..." : ""}` : ""})` : typeof e === "number" ? ` (${e} layers)` : "";
+      lines.push(`+ ${type} "${name}"${inside}`);
+    }
     else if (op === "-") lines.push(`- ${type} "${name}"`);
     else if (type === "project") lines.push(`~ project settings: ${extra}`);
     else lines.push(`~ ${type} "${name}": ${extra}`);

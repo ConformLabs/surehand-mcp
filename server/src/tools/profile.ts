@@ -37,6 +37,9 @@ export const CORE_TOOLS = new Set([
   "ae_checkpoint",
   "ae_list_scripts",
   "ae_run_script_file",
+  // every other tool, on demand
+  "ae_tools",
+  "ae_call",
 ]);
 
 export interface ToolProfile {
@@ -62,15 +65,23 @@ export function resolveProfile(argv = process.argv): ToolProfile {
   return { name: "custom", allows: (t) => CORE_TOOLS.has(t) || extra.has(t) };
 }
 
+export interface CatalogEntry {
+  name: string;
+  config: { title?: string; description?: string; inputSchema?: Record<string, any>; annotations?: Record<string, unknown> };
+  /** the instrumented handler (call context + activity log), same as when the tool is called directly */
+  run: (args: any, extra: any) => Promise<any>;
+  direct: boolean;
+}
+
 /**
- * Wraps server.registerTool so that tools outside the profile are never registered, and every
- * registered tool call runs with a call context (tool name + the AI app's cancel signal) and is
- * written to the activity log.
+ * Wraps server.registerTool: every tool call runs with a call context (tool name + the AI app's
+ * cancel signal) and is written to the activity log. Every tool goes into a catalog; only tools in
+ * the profile are registered with the AI app directly, the rest stay reachable through ae_call.
  */
-export function applyProfile(server: McpServer, profile: ToolProfile) {
+export function applyProfile(server: McpServer, profile: ToolProfile): Map<string, CatalogEntry> {
+  const catalog = new Map<string, CatalogEntry>();
   const original = server.registerTool.bind(server) as (...a: any[]) => any;
   (server as any).registerTool = (name: string, config: any, cb: (...a: any[]) => any) => {
-    if (!profile.allows(name)) return undefined;
     const wrapped = async (args: any, extra: any) => {
       const t0 = Date.now();
       let result: any;
@@ -92,6 +103,27 @@ export function applyProfile(server: McpServer, profile: ToolProfile) {
         });
       }
     };
-    return original(name, config, wrapped);
+    const direct = profile.allows(name);
+    catalog.set(name, { name, config, run: wrapped, direct });
+    return direct ? original(name, config, wrapped) : undefined;
   };
+  return catalog;
 }
+
+/** Tool categories for ae_tools (anything not listed falls under "other"). */
+export const CATEGORIES: Record<string, string[]> = {
+  "status & app": ["ae_status", "ae_system_info", "ae_execute_menu_command", "ae_undo", "ae_redo", "ae_purge", "ae_get_fonts", "ae_reload_helpers", "ae_get_scripting_guide"],
+  scripts: ["ae_run_script", "ae_run_script_file", "ae_list_scripts", "ae_batch", "ae_checkpoint"],
+  project: ["ae_get_project_info", "ae_list_items", "ae_get_item_info", "ae_import_files", "ae_create_folder", "ae_move_items", "ae_rename_item", "ae_remove_items", "ae_replace_footage", "ae_save_project", "ae_open_project", "ae_new_project", "ae_project_health", "ae_color_settings"],
+  comps: ["ae_list_comps", "ae_get_comp_info", "ae_create_comp", "ae_set_comp_settings", "ae_duplicate_comp", "ae_open_comp", "ae_precompose", "ae_add_comp_marker", "ae_get_comp_map"],
+  layers: ["ae_get_layer_info", "ae_add_layer", "ae_set_layer_attributes", "ae_delete_layers", "ae_duplicate_layer", "ae_split_layer", "ae_get_selection", "ae_select_layers", "ae_set_time_remap"],
+  "properties & keyframes": ["ae_get_properties", "ae_find_properties", "ae_set_property", "ae_set_keyframes", "ae_edit_keyframes", "ae_copy_keyframes", "ae_remove_keyframes", "ae_set_expression", "ae_get_expressions", "ae_check_expression", "ae_replace_in_expressions"],
+  "effects, shapes & masks": ["ae_list_available_effects", "ae_get_effect_params", "ae_apply_effect", "ae_set_effect_params", "ae_remove_effect", "ae_apply_preset", "ae_add_shape", "ae_add_mask"],
+  text: ["ae_set_text", "ae_style_text_range", "ae_set_paragraph", "ae_add_text_animator"],
+  "3D": ["ae_set_camera", "ae_set_light", "ae_set_material"],
+  audio: ["ae_audio_to_keyframes", "ae_audio_markers"],
+  footage: ["ae_set_footage_interpretation", "ae_set_proxy", "ae_relink_footage"],
+  "see & measure": ["ae_render_frame", "ae_render_contact_sheet", "ae_get_layer_bounds", "ae_sample_pixels"],
+  "essential graphics": ["ae_essential_graphics", "ae_export_mogrt"],
+  render: ["ae_list_render_queue", "ae_add_to_render_queue", "ae_get_render_settings", "ae_set_render_settings", "ae_queue_in_media_encoder", "ae_render_background", "ae_render_jobs", "ae_render_queue_start", "ae_clear_render_queue"],
+};

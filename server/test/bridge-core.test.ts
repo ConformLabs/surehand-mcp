@@ -63,7 +63,8 @@ beforeAll(async () => {
   await new Promise<void>((r) => blocker.listen(0, "127.0.0.1", () => r()));
   basePort = (blocker.address() as any).port;
   mkdirSync(join(home, ".aemcp"), { recursive: true });
-  writeFileSync(join(home, ".aemcp", "config.json"), JSON.stringify({ token, bridgePort: basePort, httpPort: 1 }));
+  // httpPort sits right after the busy base port: the bridges must skip it
+  writeFileSync(join(home, ".aemcp", "config.json"), JSON.stringify({ token, bridgePort: basePort, httpPort: basePort + 1 }));
   bridgeA = loadBridge("26.5");
   bridgeA.start();
   await waitFor(() => bridgeA.state.listening);
@@ -82,6 +83,7 @@ describe("CEP bridge", () => {
   it("skips busy ports and registers each After Effects instance", () => {
     // the configured port is taken, so each bridge moves up to a free one (other tests may hold some ports too)
     expect(bridgeA.state.port).toBeGreaterThan(basePort);
+    expect([bridgeA.state.port, bridgeB.state.port]).not.toContain(basePort + 1); // the HTTP (ChatGPT) port
     expect(bridgeB.state.port).toBeGreaterThan(bridgeA.state.port);
     expect(bridgeB.state.port).toBeLessThan(basePort + 10);
     const a = JSON.parse(readFileSync(join(home, ".aemcp", "instances", `${bridgeA.state.port}.json`), "utf8"));
@@ -125,7 +127,7 @@ describe("CEP bridge", () => {
 
   it("in ask mode holds edits until approved in the panel, and denies on request", async () => {
     const cfgFile = join(home, ".aemcp", "config.json");
-    writeFileSync(cfgFile, JSON.stringify({ token, bridgePort: basePort, httpPort: 1, permissions: { mode: "ask" } }));
+    writeFileSync(cfgFile, JSON.stringify({ token, bridgePort: basePort, httpPort: basePort + 1, permissions: { mode: "ask" } }));
     const port = bridgeA.state.port;
     const before = opened;
     const pending = req(port, "/eval", { script: "edit 1", approval: { tool: "Set property", summary: "{...}" } });
@@ -146,7 +148,7 @@ describe("CEP bridge", () => {
 
     // reads are never held
     expect((await req(port, "/eval", { script: "read" })).body.result).toBe("result:read");
-    writeFileSync(cfgFile, JSON.stringify({ token, bridgePort: basePort, httpPort: 1 }));
+    writeFileSync(cfgFile, JSON.stringify({ token, bridgePort: basePort, httpPort: basePort + 1 }));
   });
 });
 

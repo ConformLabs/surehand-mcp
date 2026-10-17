@@ -8,6 +8,7 @@ import { EXTENDSCRIPT_DOC, INSTRUCTIONS } from "./docs.js";
 import { registerCoreTools } from "./tools/core.js";
 import { registerRenderJobs } from "./tools/renderjobs.js";
 import { registerWorkflowTools } from "./tools/workflow.js";
+import { registerOnDemandTools } from "./tools/ondemand.js";
 import { registerJsxTools } from "./tools/registry.js";
 import { ALL_JSX_TOOLS } from "./tools/all.js";
 import { ensureAeSetup } from "./cli/setup.js";
@@ -28,10 +29,11 @@ export function createMcpServer(): McpServer {
     INSTRUCTIONS +
     (profile.name === "full"
       ? ""
-      : "\n- This is the core tool set. Anything else (render queue, import, project/folder management, masks, markers, fonts, menu commands...) " +
-        "is done with ae_run_script. The user can enable every tool by setting \"toolProfile\": \"full\" (AE MCP panel or ~/.aemcp/config.json).");
+      : "\n- This chat has the core tools loaded. Many more (3D, audio, text styling, footage, render settings, masks, Essential Graphics, " +
+        "project management...) are available on demand: ae_tools lists them, ae_tools {describe: [...]} gives parameters, ae_call runs them. " +
+        "ae_run_script can do anything else.");
   const server = new McpServer({ name: "after-effects", title: "Adobe After Effects", version: VERSION }, { instructions });
-  applyProfile(server, profile);
+  const catalog = applyProfile(server, profile);
   registerCoreTools(server);
   registerJsxTools(server, ALL_JSX_TOOLS);
   registerRenderJobs(server);
@@ -53,6 +55,7 @@ export function createMcpServer(): McpServer {
     },
     async () => ({ content: [{ type: "text", text: EXTENDSCRIPT_DOC }] }),
   );
+  registerOnDemandTools(server, catalog); // last: the catalog is complete by now
   server.registerPrompt(
     "after-effects-assistant",
     { title: "After Effects assistant", description: "Primes the model with how to work with this server." },

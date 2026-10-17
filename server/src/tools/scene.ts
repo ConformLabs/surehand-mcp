@@ -168,11 +168,11 @@ c.openInViewer();
 for (var i = 1; i <= c.numLayers; i++) c.layer(i).selected = false;
 L.selected = true;
 var before = c.numLayers;
-app.executeCommand(app.findMenuCommandId("Convert Audio to Keyframes"));
+app.executeCommand(aemcp.commandId("convert audio to keyframes")); // command id: works in any AE language
 if (c.numLayers === before) aemcp.fail("Convert Audio to Keyframes did not run (is the comp open and the layer's audio enabled?)");
 var amp = c.layer(1), fx = amp.property("ADBE Effect Parade"), out = { layer: amp.name, sliders: [] };
 for (var j = 1; j <= fx.numProperties; j++) { var s = fx.property(j).property(1); out.sliders.push({ name: fx.property(j).name, keyframes: s.numKeys, path: "Effects/" + fx.property(j).name + "/Slider" }); }
-out.hint = 'Use in an expression: thisComp.layer("' + amp.name + '").effect("Both Channels")("Slider")';
+out.hint = 'Use in an expression: thisComp.layer("' + amp.name + '").effect("' + fx.property(fx.numProperties).name + '")(1)';
 return out;`,
   },
   {
@@ -198,11 +198,12 @@ c.openInViewer();
 for (var i = 1; i <= c.numLayers; i++) c.layer(i).selected = false;
 L.selected = true;
 var before = c.numLayers;
-app.executeCommand(app.findMenuCommandId("Convert Audio to Keyframes"));
+app.executeCommand(aemcp.commandId("convert audio to keyframes")); // command id: works in any AE language
 if (c.numLayers === before) aemcp.fail("Convert Audio to Keyframes did not run");
 var amp = c.layer(1), fx = amp.property("ADBE Effect Parade");
-var chName = { both: "Both Channels", left: "Left Channel", right: "Right Channel" }[args.channel || "both"];
-var sl = fx.property(chName).property(1), n = sl.numKeys, vals = [], times = [], max = 0;
+// the amplitude null's effects are Left, Right, Both Channels in that order (by index: their names are translated)
+var chIndex = { left: 1, right: 2, both: 3 }[args.channel || "both"];
+var sl = fx.property(chIndex).property(1), n = sl.numKeys, vals = [], times = [], max = 0;
 for (var k = 1; k <= n; k++) { var v = sl.keyValue(k); vals.push(v); times.push(sl.keyTime(k)); if (v > max) max = v; }
 var thr = (args.threshold || 0.6) * max, gap = args.minGap || 0.25, lim = args.maxMarkers || 300, beats = [], last = -1e9;
 for (var q = 1; q < n - 1; q++) {

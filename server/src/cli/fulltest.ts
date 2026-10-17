@@ -49,8 +49,9 @@ export async function fullSelftest(): Promise<number> {
     { name: "copy keyframes", tool: "ae_copy_keyframes", args: { from: { comp: C, layer: "Title", path: "Transform/Position" }, to: [{ comp: C, layer: "Rig", path: "Transform/Position" }] } },
     { name: "expression", tool: "ae_set_expression", args: { comp: C, layer: "Dot", path: "Transform/Rotation", expression: "time * 90" }, check: (r) => ((r.result as any)?.error ? "expression error" : null) },
     { name: "list expressions", tool: "ae_get_expressions", args: { comp: C } },
-    { name: "apply effect + params", tool: "ae_apply_effect", args: { comp: C, layer: "Title", effect: "ADBE Drop Shadow", params: { Distance: 10 } } },
-    { name: "inspect effect", tool: "ae_get_effect_params", args: { effect: "Glow" } },
+    { name: "apply effect + params", tool: "ae_apply_effect", args: { comp: C, layer: "Title", effect: "ADBE Drop Shadow", params: { "ADBE Drop Shadow-0004": 10 } } }, // Distance, by match name
+    { name: "inspect effect", tool: "ae_get_effect_params", args: { effect: "ADBE Glo2" } },
+    { name: "English names (any AE language)", tool: "ae_get_effect_params", args: { effect: "glow" } },
     { name: "mask", tool: "ae_add_mask", args: { comp: C, layer: "BG", shape: "ellipse", feather: 50 } },
     { name: "parent + blend", tool: "ae_set_layer_attributes", args: { comp: C, layer: "Dot", parent: "Rig", blendingMode: "SCREEN" } },
     { name: "style text range", tool: "ae_style_text_range", args: { comp: C, layer: "Title", match: "Self", style: { fillColor: "#ff3b30" } }, needs: "perCharacterText" },

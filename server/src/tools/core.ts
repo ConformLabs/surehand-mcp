@@ -38,7 +38,7 @@ try {
     bg.property("ADBE Transform Group").property("ADBE Position").setValue([W / 2, H / 2]);
     if (checker) {
       var cb = bg.property("ADBE Effect Parade").addProperty("ADBE Checkerboard");
-      try { cb.property("Width").setValue(Math.max(4, Math.round(Math.max(W, H) / 64))); cb.property("Color").setValue([0.6, 0.6, 0.6]); } catch (e) {}
+      try { cb.property("ADBE Checkerboard-0004").setValue(Math.max(4, Math.round(Math.max(W, H) / 64))); cb.property("ADBE Checkerboard-0010").setValue([0.6, 0.6, 0.6]); } catch (e) {} // Width, Color
     }
   }
   // only some layers: hide the others for the render (restored in finally)

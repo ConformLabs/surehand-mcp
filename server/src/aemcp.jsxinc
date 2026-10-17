@@ -177,6 +177,37 @@ aemcp = (function () {
     if (!l) A.fail("No layer named '" + ref + "' in comp '" + comp.name + "'");
     return l;
   };
+  // ---------- language independence ----------
+  // Display names (properties, effects, menu commands) are translated in non-English After Effects.
+  // These tables map the English names AI models use to internal match names / command ids, which
+  // are the same in every language. Keys are lowercase and prefixed ("k:") so they never collide
+  // with ExtendScript's built-in object members.
+  function table(o) { var t = {}; for (var k in o) if (o.hasOwnProperty(k)) t["k:" + k] = o[k]; return t; }
+  A.PROP_ALIASES = table({"transform": "ADBE Transform Group", "anchor point": "ADBE Anchor Point", "position": "ADBE Position", "x position": "ADBE Position_0", "y position": "ADBE Position_1", "z position": "ADBE Position_2", "scale": "ADBE Scale", "orientation": "ADBE Orientation", "x rotation": "ADBE Rotate X", "y rotation": "ADBE Rotate Y", "rotation": "ADBE Rotate Z", "z rotation": "ADBE Rotate Z", "opacity": "ADBE Opacity", "effects": "ADBE Effect Parade", "masks": "ADBE Mask Parade", "mask path": "ADBE Mask Shape", "mask feather": "ADBE Mask Feather", "mask opacity": "ADBE Mask Opacity", "mask expansion": "ADBE Mask Offset", "text": "ADBE Text Properties", "source text": "ADBE Text Document", "path options": "ADBE Text Path Options", "more options": "ADBE Text More Options", "animators": "ADBE Text Animators", "contents": "ADBE Root Vectors Group", "material options": "ADBE Material Options Group", "audio": "ADBE Audio Group", "audio levels": "ADBE Audio Levels", "time remap": "ADBE Time Remapping", "marker": "ADBE Marker", "camera options": "ADBE Camera Options Group", "light options": "ADBE Light Options Group", "zoom": "ADBE Camera Zoom", "focus distance": "ADBE Camera Focus Distance", "aperture": "ADBE Camera Aperture", "blur level": "ADBE Camera Blur Level", "intensity": "ADBE Light Intensity", "color": "ADBE Light Color", "layer styles": "ADBE Layer Styles"});
+  A.EFFECT_ALIASES = table({"glow": "ADBE Glo2", "gaussian blur": "ADBE Gaussian Blur 2", "fast box blur": "ADBE Box Blur2", "box blur": "ADBE Box Blur2", "directional blur": "ADBE Motion Blur", "radial blur": "ADBE Radial Blur", "camera lens blur": "ADBE Camera Lens Blur", "drop shadow": "ADBE Drop Shadow", "fill": "ADBE Fill", "tint": "ADBE Tint", "tritone": "ADBE Tritone", "curves": "ADBE CurvesCustom", "levels": "ADBE Easy Levels2", "hue/saturation": "ADBE HUE SATURATION", "brightness & contrast": "ADBE Brightness & Contrast 2", "exposure": "ADBE Exposure2", "lumetri color": "ADBE Lumetri", "black & white": "ADBE Black&White", "change to color": "ADBE Change To Color", "gradient ramp": "ADBE Ramp", "4-color gradient": "ADBE 4ColorGradient", "fractal noise": "ADBE Fractal Noise", "noise": "ADBE Noise", "turbulent displace": "ADBE Turbulent Displace", "displacement map": "ADBE Displacement Map", "corner pin": "ADBE Corner Pin", "transform": "ADBE Geometry2", "stroke": "ADBE Stroke", "linear wipe": "ADBE Linear Wipe", "radial wipe": "ADBE Radial Wipe", "venetian blinds": "ADBE Venetian Blinds", "posterize time": "ADBE Posterize Time", "echo": "ADBE Echo", "slider control": "ADBE Slider Control", "checkbox control": "ADBE Checkbox Control", "color control": "ADBE Color Control", "point control": "ADBE Point Control", "3d point control": "ADBE Point3D Control", "angle control": "ADBE Angle Control", "layer control": "ADBE Layer Control", "dropdown menu control": "ADBE Dropdown Control", "checkerboard": "ADBE Checkerboard", "set matte": "ADBE Set Matte3", "simple choker": "ADBE Simple Choker", "matte choker": "ADBE Matte Choker", "keylight (1.2)": "Keylight 906", "keylight": "Keylight 906", "mosaic": "ADBE Mosaic", "find edges": "ADBE Find Edges", "mesh warp": "ADBE MESH WARP", "bulge": "ADBE Bulge", "wave warp": "ADBE Wave Warp", "offset": "ADBE Offset", "motion tile": "ADBE Tile", "cc force motion blur": "CC Force Motion Blur", "write-on": "ADBE Write-on", "beam": "ADBE Laser", "lens flare": "ADBE Lens Flare", "cc light rays": "CC Light Rays", "invert": "ADBE Invert", "channel combiner": "ADBE Channel Combiner", "colorama": "APC Colorama", "minimax": "ADBE Minimax", "grid": "ADBE Grid", "circle": "ADBE Circle", "audio spectrum": "ADBE AudSpect", "audio waveform": "ADBE AudWave", "time displacement": "ADBE Time Displacement", "timewarp": "ADBE Timewarp", "unsharp mask": "ADBE Unsharp Mask", "sharpen": "ADBE Sharpen", "reduce interlace flicker": "ADBE Reduce Interlace Flicker", "add grain": "VISINF Grain Implant", "median": "ADBE Median", "bilateral blur": "ADBE Bilateral", "compound blur": "ADBE Compound Blur", "channel blur": "ADBE Channel Blur"});
+  A.COMMANDS = table({"undo": 16, "select all": 23, "deselect all": 2004, "pre-compose": 2071, "easy ease": 2509, "easy ease in": 2510, "easy ease out": 2511, "toggle hold keyframe": 2226, "sequence layers": 4217, "center anchor point in layer content": 10312, "fit to comp": 2156, "fit to comp width": 2732, "fit to comp height": 2733, "trim comp to work area": 2360, "crop comp to region of interest": 2997, "split layer": 2158, "duplicate": 2080, "lift work area": 2613, "extract work area": 2614, "convert audio to keyframes": 4218, "convert expression to keyframes": 2639, "increment and save": 3088, "save": 5, "save as": 6, "consolidate all footage": 2107, "remove unused footage": 2109, "reduce project": 2735, "collect files": 2482, "reveal in finder": 2562, "add to render queue": 2161, "add to adobe media encoder queue": 3800, "time-reverse keyframes": 3693, "enable time remapping": 2153, "freeze frame": 3695, "create shapes from vector layer": 3973, "create masks from text": 2933, "create shapes from text": 3781, "auto-trace": 3044, "bring layer to front": 2016, "send layer to back": 2017, "bring layer forward": 2018, "send layer backward": 2019, "time-reverse layer": 2135, "redo": 2035});
+  A.commandId = function (name) {
+    if (typeof name === "number") return name;
+    var id = A.COMMANDS["k:" + String(name).toLowerCase().replace(/\.\.\.$/, "")];
+    return id || app.findMenuCommandId(name);
+  };
+  // match name of an installed effect from a match name, a (localized) display name or an English name
+  A.effectMatchName = function (q) {
+    var all = app.effects, low = String(q).toLowerCase(), alias = A.EFFECT_ALIASES["k:" + low], i;
+    for (i = 0; i < all.length; i++) if (all[i].matchName === q || all[i].displayName.toLowerCase() === low || (alias && all[i].matchName === alias)) return all[i];
+    // not found: suggest close ones
+    // score by word beginnings (4 letters), so typos like "gausian blurr" still find "Gaussian Blur"
+    var sug = [], words = low.split(/[^a-z0-9]+/), scored = [];
+    for (i = 0; i < all.length; i++) {
+      var dn = all[i].displayName.toLowerCase(), mn = all[i].matchName.toLowerCase(), score = 0;
+      for (var w = 0; w < words.length; w++) { var stem = words[w].substr(0, 4); if (stem.length > 2 && (dn.indexOf(stem) >= 0 || mn.indexOf(stem) >= 0)) score++; }
+      if (score) scored.push([score, all[i].displayName + " (" + all[i].matchName + ")"]);
+    }
+    scored.sort(function (x, y) { return y[0] - x[0]; });
+    for (i = 0; i < scored.length && i < 6; i++) sug.push(scored[i][1]);
+    A.fail("Unknown effect '" + q + "'." + (sug.length ? " Did you mean: " + sug.join(", ") + "?" : " Use ae_list_available_effects to search.") + " Match names (\"ADBE ...\") work in every language.");
+  };
+
   // path: "Transform/Position" | ["ADBE Transform Group","ADBE Position"] | "Effects/Gaussian Blur/Blurriness"
   // Each segment may be a display name, match name, or 1-based index.
   A.resolveProp = function (layer, path) {
@@ -189,13 +220,18 @@ aemcp = (function () {
       if (typeof s === "number" || /^\d+$/.test(s)) next = cur.property(Number(s));
       else {
         try { next = cur.property(s); } catch (e) { next = null; }
-        if (!next && String(s).toLowerCase() === "effects") next = cur.property("ADBE Effect Parade");
+        var low = String(s).toLowerCase();
         if (!next && cur.numProperties) {
-          var low = String(s).toLowerCase();
           for (var j = 1; j <= cur.numProperties; j++) {
             var c = cur.property(j);
             if (c.name.toLowerCase() === low || c.matchName.toLowerCase() === low) { next = c; break; }
           }
+        }
+        // English names in a translated After Effects: property aliases, then effects by English name
+        if (!next) { var pa = A.PROP_ALIASES["k:" + low]; if (pa) { try { next = cur.property(pa); } catch (e) { next = null; } } }
+        if (!next && cur.matchName === "ADBE Effect Parade") {
+          var ea = A.EFFECT_ALIASES["k:" + low];
+          if (ea) for (var j2 = 1; j2 <= cur.numProperties; j2++) if (cur.property(j2).matchName === ea) { next = cur.property(j2); break; }
         }
       }
       if (!next) A.fail("Property '" + s + "' not found under '" + (cur.name || "layer") + "' (path " + segs.join("/") + ")");
@@ -669,7 +705,19 @@ aemcp = (function () {
     for (var id in b.items) {
       if (!b.items.hasOwnProperty(id)) continue;
       var xb = b.items[id], xa = a.items[id], fb = xb.split(SEP);
-      if (xa === undefined) { add(ch.items, ["+", fb[0], raw(fb[2]), fb[1] === "comp" ? Number(fb[14].substr(1)) : undefined]); continue; }
+      if (xa === undefined) {
+        var extra = undefined; // reset explicitly: ES3 'var' keeps the previous iteration's value
+        if (fb[1] === "comp") {
+          // a new comp: list what is in it (names and types of the first layers)
+          extra = { layers: Number(fb[14].substr(1)), names: [] };
+          try {
+            var nc = app.project.itemByID(Number(id.substr(1)));
+            for (var li = 1; li <= Math.min(nc.numLayers, 12); li++) extra.names.push(nc.layer(li).name + " (" + A.layerType(nc.layer(li)) + ")");
+          } catch (e) {}
+        }
+        add(ch.items, ["+", fb[0], raw(fb[2]), extra]);
+        continue;
+      }
       if (xa === xb) continue;
       var fa = xa.split(SEP), labels = ITEM_FIELDS[fb[1]] || ITEM_FIELDS.other, d = [];
       for (var f = 2; f < fb.length; f++) if (fa[f] !== fb[f]) d.push(labels[f - 2] + " " + show(fa[f]) + " -> " + show(fb[f]));
