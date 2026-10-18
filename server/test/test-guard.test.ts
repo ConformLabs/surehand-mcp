@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { tmpdir, userInfo } from "node:os";
 import { join } from "node:path";
-import { acquireLock, buildInfo, describeBuild, interruptedBy, sha256File } from "../scripts/test-guard.mjs";
+import { acquireLock, buildInfo, describeBuild, interruptedBy, realHome, sha256File } from "../scripts/test-guard.mjs";
 
 const tmp = () => mkdtempSync(join(tmpdir(), "aemcp-guard-"));
 const quiet = () => {};
@@ -75,6 +75,26 @@ describe("build provenance", () => {
       "fix/x @ 4849391e6ffa (+ uncommitted changes)",
     );
     expect(describeBuild(buildInfo(tmp()))).toBe("? @ unknown commit");
+  });
+});
+
+describe("real home folder", () => {
+  it("ignores a temp $HOME", () => {
+    const fake = tmp();
+    const guard = new URL("../scripts/test-guard.mjs", import.meta.url).href;
+    const r = spawnSync(process.execPath, ["--input-type=module", "-e", `import { realHome } from ${JSON.stringify(guard)}; process.stdout.write(realHome())`], {
+      encoding: "utf8",
+      env: { ...process.env, HOME: fake },
+    });
+    expect(r.stdout).toBe(userInfo().homedir);
+    expect(r.stdout).not.toBe(fake);
+  });
+
+  it("falls back to $HOME when the account has no entry", () => {
+    const missing = () => {
+      throw new Error("ENOENT");
+    };
+    expect(realHome(missing)).toBe(process.env.HOME);
   });
 });
 

@@ -3,6 +3,7 @@ export interface BuildInfo {
   commit: string | null;
   dirty: boolean | null;
 }
+export function realHome(info?: () => { homedir: string }): string;
 export function sha256File(file: string): string;
 export function buildInfo(dir: string): BuildInfo;
 export function describeBuild(info: BuildInfo): string;

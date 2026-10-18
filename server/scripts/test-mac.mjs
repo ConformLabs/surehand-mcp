@@ -11,12 +11,14 @@
 // The installed server, the extension and the open After Effects are shared by every checkout
 // on this Mac, so one run at a time: a run waits (up to --wait-minutes, default 30) while another
 // holds ~/.aemcp/test-mac.lock, and fails if the installed server stops being its own build.
+//
+// "~" is the user's real home folder even when $HOME points elsewhere (agent runners set it to a
+// temp folder): that is where the installed server, the extension and After Effects are.
 import { spawnSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { acquireLock, buildInfo, describeBuild, interruptedBy, sha256File } from "./test-guard.mjs";
+import { acquireLock, buildInfo, describeBuild, interruptedBy, realHome, sha256File } from "./test-guard.mjs";
 
 if (process.platform !== "darwin") {
   console.error("test-mac runs on macOS only.");
@@ -27,13 +29,14 @@ const waitArg = process.argv.indexOf("--wait-minutes");
 const waitMinutes = waitArg > 0 && Number.isFinite(Number(process.argv[waitArg + 1])) ? Number(process.argv[waitArg + 1]) : 30;
 const bundle = fileURLToPath(new URL("../dist/ae-mcp.mjs", import.meta.url));
 const buildVersion = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
-const installed = join(homedir(), ".aemcp", "server", "ae-mcp.mjs");
+const home = realHome();
+const installed = join(home, ".aemcp", "server", "ae-mcp.mjs");
 const plain = (s) => s.replace(/\x1b\[[0-9;]*m/g, "");
 const build = describeBuild(buildInfo(dirname(bundle)));
 const bundleSha = sha256File(bundle);
 const tested = `${build}, dist/ae-mcp.mjs sha256 ${bundleSha}`;
 const node = (args, env = {}) => {
-  const r = spawnSync(process.execPath, args, { encoding: "utf8", env: { ...process.env, ...env }, maxBuffer: 32 * 1024 * 1024 });
+  const r = spawnSync(process.execPath, args, { encoding: "utf8", env: { ...process.env, HOME: home, ...env }, maxBuffer: 32 * 1024 * 1024 });
   const sig = interruptedBy(r);
   if (sig) {
     // stop here: an interrupted step is not a test failure, and the rest of the run would not be a result
@@ -43,10 +46,11 @@ const node = (args, env = {}) => {
   return { status: r.status, out: plain((r.stdout || "") + (r.stderr || "")) };
 };
 console.log(`Mac test (v${buildVersion}): ${tested}`);
+console.log(`Home folder: ${home}${process.env.HOME && process.env.HOME !== home ? ` (not $HOME ${process.env.HOME})` : ""}`);
 
 for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"]) process.on(sig, () => process.exit(130)); // while waiting for the lock; the exit hook releases it
 try {
-  await acquireLock(join(homedir(), ".aemcp", "test-mac.lock"), { owner: { build, bundleSha, cwd: process.cwd() }, waitMs: waitMinutes * 60_000 });
+  await acquireLock(join(home, ".aemcp", "test-mac.lock"), { owner: { build, bundleSha, cwd: process.cwd() }, waitMs: waitMinutes * 60_000 });
 } catch (e) {
   console.error(`\n${e.message}. Run again later (or pass --wait-minutes N).`);
   process.exit(1);
@@ -78,7 +82,7 @@ const alive = (pid) => {
     return e.code === "EPERM";
   }
 };
-const dir = join(homedir(), ".aemcp", "instances");
+const dir = join(home, ".aemcp", "instances");
 let instances = [];
 try {
   instances = readdirSync(dir)
