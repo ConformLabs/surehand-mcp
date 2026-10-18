@@ -5,7 +5,21 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { homedir, userInfo } from "node:os";
 import { join } from "node:path";
+
+/**
+ * The user's own home folder from the account database, not $HOME: agent runners set $HOME to a
+ * temp folder, but the installed server, the extension and After Effects live in the real one.
+ * Falls back to $HOME when the account has no database entry.
+ */
+export function realHome(info = userInfo) {
+  try {
+    return info().homedir || homedir();
+  } catch {
+    return homedir();
+  }
+}
 
 export const sha256File = (file) => createHash("sha256").update(readFileSync(file)).digest("hex");
 
