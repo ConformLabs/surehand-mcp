@@ -14,11 +14,17 @@ export interface JsxTool {
   /** ExtendScript function body. Sees `args` (validated input) and `log()`; has the `aemcp` helpers. */
   jsx: string;
   readOnly?: boolean;
-  destructive?: boolean;
   /** Mutating, but must not run inside an undo group (open/close project, undo itself...). */
   noUndo?: boolean;
   /** Read-only for the user, but creates and removes temporary items: wrap them in one undo step. */
   tempItems?: boolean;
+  // Hints for AI apps only (permissions use readOnly / tempItems); meanings in test/annotations.test.ts.
+  /** May delete content, overwrite files, close the project or clear the undo history. */
+  destructive?: boolean;
+  /** Repeating the call with the same arguments has no further effect (implied by readOnly). */
+  idempotent?: boolean;
+  /** Allowed in read-only mode, but changes what the user sees (viewer, selection): not hinted read-only. */
+  uiState?: boolean;
   /** Include a change report (default: for every tool that edits, i.e. not readOnly / noUndo). */
   report?: boolean;
   timeoutMs?: number;
@@ -85,6 +91,12 @@ export function errorResult(e: unknown): CallToolResult {
   return { isError: true, content: [{ type: "text", text: msg }] };
 }
 
+/** The MCP hints sent to AI apps for a JsxTool. Temporary items and UI changes are not read-only. */
+export function jsxAnnotations(t: JsxTool) {
+  const readOnlyHint = !!t.readOnly && !t.tempItems && !t.uiState;
+  return { readOnlyHint, destructiveHint: !readOnlyHint && !!t.destructive, idempotentHint: !!t.readOnly || !!t.idempotent, openWorldHint: false };
+}
+
 export function registerJsxTools(server: McpServer, tools: JsxTool[]) {
   for (const t of tools) {
     server.registerTool(
@@ -93,7 +105,7 @@ export function registerJsxTools(server: McpServer, tools: JsxTool[]) {
         title: t.title,
         description: t.description,
         inputSchema: t.input,
-        annotations: { readOnlyHint: !!t.readOnly, destructiveHint: !!t.destructive, openWorldHint: false },
+        annotations: jsxAnnotations(t),
       },
       async (args: Record<string, unknown>) => {
         try {

@@ -26,7 +26,7 @@ export function registerOnDemandTools(server: McpServer, catalog: Map<string, Ca
         describe: z.array(z.string()).max(10).optional().describe("Tool names to get full parameter details for."),
         category: z.string().optional().describe("Only list this category."),
       },
-      annotations: { readOnlyHint: true, openWorldHint: false },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ describe, category: only }) => {
       if (describe?.length) {
@@ -69,7 +69,8 @@ export function registerOnDemandTools(server: McpServer, catalog: Map<string, Ca
         tool: z.string().describe('Tool name, e.g. "ae_set_camera".'),
         args: z.record(z.string(), z.any()).optional().describe("The tool's arguments."),
       },
-      annotations: { destructiveHint: true, openWorldHint: false },
+      // runs any tool, including ae_run_script
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },
     async ({ tool, args }, extra) => {
       const t = catalog.get(tool);

@@ -107,6 +107,7 @@ return { layer: l.name, effectIndex: fx.propertyIndex, effect: aemcp.propInfo(fx
     title: "Set effect parameters",
     description: "Set parameters on an effect already applied to a layer (effect by name, match name or 1-based index in the effect stack).",
     input: { comp: compRef, layer: layerRef, effect: z.union([z.string(), z.number().int()]), params: params.unwrap(), enabled: z.boolean().optional() },
+    idempotent: true,
     jsx: `${setParams}
 var c = aemcp.findComp(args.comp), l = aemcp.findLayer(c, args.layer);
 var fx = aemcp.resolveProp(l, ["ADBE Effect Parade", args.effect]);

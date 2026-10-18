@@ -94,6 +94,7 @@ return out;`,
     title: "Move items to folder",
     description: "Move project items into a folder (use folder 'root' for the project root).",
     input: { items: z.array(itemRef).min(1), folder: itemRef },
+    idempotent: true,
     jsx: `
 var dest = args.folder === "root" ? app.project.rootFolder : aemcp.findItem(args.folder);
 if (!(dest instanceof FolderItem)) aemcp.fail("Destination is not a folder");
@@ -105,6 +106,7 @@ return { moved: out, to: dest.name };`,
     title: "Rename item",
     description: "Rename a project item and/or set its comment and label color (0-16).",
     input: { item: itemRef, name: z.string().optional(), comment: z.string().optional(), label: z.number().int().min(0).max(16).optional() },
+    idempotent: true,
     jsx: `var it = aemcp.findItem(args.item); if (args.name !== undefined) it.name = args.name; if (args.comment !== undefined) it.comment = args.comment; if (args.label !== undefined) it.label = args.label; return aemcp.itemInfo(it);`,
   },
   {
@@ -120,6 +122,7 @@ return { moved: out, to: dest.name };`,
     title: "Replace footage",
     description: "Replace the source file of a footage item (relinks every layer using it).",
     input: { item: itemRef, path: z.string(), sequence: z.boolean().optional() },
+    idempotent: true,
     jsx: `
 var it = aemcp.findItem(args.item); if (!(it instanceof FootageItem)) aemcp.fail("Not a footage item");
 var f = new File(args.path); if (!f.exists) aemcp.fail("File not found: " + args.path);
@@ -134,6 +137,8 @@ return aemcp.itemInfo(it);`,
       path: z.string().optional().describe("Absolute .aep path for Save As."),
       overwrite: z.boolean().optional().describe("Save As over an existing file at path (default false: refuse)."),
     },
+    destructive: true,
+    idempotent: true,
     noUndo: true,
     jsx: `
 if (args.path) {

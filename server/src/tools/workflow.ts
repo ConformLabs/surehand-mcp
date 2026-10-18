@@ -165,7 +165,8 @@ export function registerWorkflowTools(server: McpServer) {
         checkpoint: z.boolean().optional().describe("Save a project checkpoint before running (see ae_checkpoint)."),
         verbose: z.boolean().optional().describe("Return each step's full result (default: short summaries)."),
       },
-      annotations: { destructiveHint: true, openWorldHint: false },
+      // steps can be ae_run_script
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },
     async ({ steps, atomic, name, checkpoint, verbose }) => {
       try {
@@ -257,7 +258,8 @@ return { steps: __out, failed: __failed };`;
         id: z.string().optional().describe("Checkpoint id to restore (from list)."),
         discardChanges: z.boolean().optional().describe("Restore even if the open project has unsaved changes (they are discarded)."),
       },
-      annotations: { destructiveHint: false, openWorldHint: false },
+      // save overwrites the .aep; restore closes the open project
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     },
     async ({ action, label, id, discardChanges }) => {
       try {
@@ -294,7 +296,7 @@ return { steps: __out, failed: __failed };`;
         "List the user's own After Effects scripts: AE's Scripts folder (and ScriptUI Panels) plus folders configured as \"scriptFolders\" " +
         "in ~/.aemcp/config.json, with each script's description from its header comment. Run one with ae_run_script_file.",
       inputSchema: { nameContains: z.string().optional() },
-      annotations: { readOnlyHint: true, openWorldHint: false },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ nameContains }) => {
       try {

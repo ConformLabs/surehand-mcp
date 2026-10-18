@@ -78,7 +78,8 @@ export function registerRenderJobs(server: McpServer) {
         endFrame: z.number().int().optional(),
         save: z.boolean().optional().describe("Save the open project first (needed if it has unsaved changes)."),
       },
-      annotations: { destructiveHint: false, openWorldHint: false },
+      // writes the output file; save:true saves the project
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     },
     async (args) => {
       try {
@@ -180,7 +181,8 @@ return { project: p.file.fsName, comp: name, frames: frames, app: Folder.appPack
         id: z.string().optional().describe("Only this job."),
         cancel: z.string().optional().describe("Cancel this job id."),
       },
-      annotations: { readOnlyHint: true, openWorldHint: false },
+      // cancel stops a render
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
     async ({ id, cancel }) => {
       if (cancel) {

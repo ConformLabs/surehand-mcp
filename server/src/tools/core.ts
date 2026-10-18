@@ -206,7 +206,8 @@ export function registerCoreTools(server: McpServer) {
         transpile: z.boolean().optional().describe("Convert modern JS for ExtendScript (default true). Set false to send the code exactly as written."),
         report: z.boolean().optional().describe("List what the script changed in the project (default true). Set false for read-only queries on huge projects."),
       },
-      annotations: { destructiveHint: true, openWorldHint: false },
+      // arbitrary code, incl. shell commands and the network
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },
     async ({ code, args, undoGroup, depth, timeoutSeconds, transpile, report }) => {
       try {
@@ -263,7 +264,7 @@ export function registerCoreTools(server: McpServer) {
         args: z.record(z.string(), z.any()).optional(),
         timeoutSeconds: z.number().min(1).max(3600).optional(),
       },
-      annotations: { destructiveHint: true, openWorldHint: false },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },
     async ({ path, args, timeoutSeconds }) => {
       try {
@@ -303,7 +304,7 @@ export function registerCoreTools(server: McpServer) {
       inputSchema: {
         instance: z.string().optional().describe('Switch to another running After Effects: "2026", "26.5", or a bridge port. Omit to keep the current one.'),
       },
-      annotations: { readOnlyHint: true, openWorldHint: false },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ instance }) => {
       try {
@@ -364,7 +365,7 @@ export function registerCoreTools(server: McpServer) {
       title: "Reload helper library",
       description: "Force re-loading the aemcp ExtendScript helper library into After Effects (normally automatic).",
       inputSchema: {},
-      annotations: { readOnlyHint: true, openWorldHint: false },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async () => {
       try {
@@ -398,7 +399,8 @@ export function registerCoreTools(server: McpServer) {
         outputPath: z.string().optional().describe("Optional absolute path to also save the PNG to."),
         overwrite: z.boolean().optional().describe("Replace an existing file at outputPath (default false: refuse)."),
       },
-      annotations: { readOnlyHint: true, openWorldHint: false },
+      // not read-only: a temporary comp in an undo step, and outputPath replaces an existing file
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
     async (args) => {
       try {
@@ -438,7 +440,8 @@ export function registerCoreTools(server: McpServer) {
         outputPath: z.string().optional().describe("Optional absolute path to also save the PNG to."),
         overwrite: z.boolean().optional().describe("Replace an existing file at outputPath (default false: refuse)."),
       },
-      annotations: { readOnlyHint: true, openWorldHint: false },
+      // as ae_render_frame
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
     async (args) => {
       try {

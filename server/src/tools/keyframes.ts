@@ -57,6 +57,7 @@ export const keyframeTools: JsxTool[] = [
         .optional(),
       remove: z.array(z.union([z.number().int(), z.object({ time: z.number() })])).optional().describe("Keyframes to delete: indices or {time}."),
     },
+    destructive: true,
     jsx: `${findKey}
 var c = aemcp.findComp(args.comp), l = aemcp.findLayer(c, args.layer), p = aemcp.resolveProp(l, args.path);
 if (p.propertyType !== PropertyType.PROPERTY) aemcp.fail("'" + p.name + "' is a group");
@@ -111,6 +112,7 @@ return { property: p.name, numKeys: p.numKeys, keyframes: aemcp.keyframes(p) };`
       offset: z.number().optional().describe("Shift the copies by this many seconds (e.g. to place them at the target's time)."),
       replace: z.boolean().optional().describe("Remove the target's existing keyframes first."),
     },
+    destructive: true,
     jsx: `
 var sc = aemcp.findComp(args.from.comp), src = aemcp.resolveProp(aemcp.findLayer(sc, args.from.layer), args.from.path);
 if (!src.numKeys) aemcp.fail("'" + src.name + "' has no keyframes");
@@ -143,6 +145,8 @@ return { copied: keys.length, targets: out };`,
       keyframes: z.array(z.object({ time: z.number(), sourceTime: z.number(), interpolation: interp.optional() })).optional(),
       freezeAt: z.number().optional().describe("Freeze on this source time (seconds) for the whole layer."),
     },
+    destructive: true,
+    idempotent: true,
     jsx: `
 var c = aemcp.findComp(args.comp), l = aemcp.findLayer(c, args.layer);
 if (!l.canSetTimeRemapEnabled) aemcp.fail("Layer '" + l.name + "' can't be time-remapped (only footage and precomp layers)");
