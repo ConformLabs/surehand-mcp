@@ -8297,7 +8297,7 @@ var require_babel_min = __commonJS({
       function C2(e10, a10) {
         return E("ArrayExpression", e10, a10);
       }
-      function P(e10, a10) {
+      function P2(e10, a10) {
         return E("AssignmentExpression", e10, a10);
       }
       function A(e10, a10) {
@@ -11285,7 +11285,7 @@ var require_babel_min = __commonJS({
         var n10, t10 = false;
         if (Wa(e10)) t10 = true, n10 = "ClassDeclaration";
         else if (Na(e10)) t10 = true, n10 = "FunctionDeclaration";
-        else if (P(e10)) return Xr(e10);
+        else if (P2(e10)) return Xr(e10);
         if (t10 && !e10.id && (n10 = false), !n10) {
           if (a10) return false;
           throw new Error("cannot turn " + e10.type + " to a statement");
@@ -11377,7 +11377,7 @@ var require_babel_min = __commonJS({
         for (var r10 = [].concat(e10), i10 = /* @__PURE__ */ Object.create(null); r10.length; ) {
           var o10 = r10.shift();
           if (o10) {
-            if (!t10 || !(P(o10) || ne(o10) || te(o10))) if (F(o10)) a10 ? (i10[o10.name] = i10[o10.name] || []).push(o10) : i10[o10.name] = o10;
+            if (!t10 || !(P2(o10) || ne(o10) || te(o10))) if (F(o10)) a10 ? (i10[o10.name] = i10[o10.name] || []).push(o10) : i10[o10.name] = o10;
             else if (!Ha(o10) || pe(o10)) {
               if (n10) {
                 if (j(o10)) {
@@ -11405,7 +11405,7 @@ var require_babel_min = __commonJS({
       function zh(e10, a10) {
         if ("id" in e10 && e10.id) return { name: e10.id.name, originalNode: e10.id };
         var n10, t10 = "";
-        if (Y(a10, { value: e10 }) ? n10 = Jh(a10) : X(e10) || Se(e10) ? (n10 = Jh(e10), "get" === e10.kind ? t10 = "get " : "set" === e10.kind && (t10 = "set ")) : ie(a10) && a10.init === e10 ? n10 = a10.id : P(a10, { operator: "=", right: e10 }) && (n10 = a10.left), !n10) return null;
+        if (Y(a10, { value: e10 }) ? n10 = Jh(a10) : X(e10) || Se(e10) ? (n10 = Jh(e10), "get" === e10.kind ? t10 = "get " : "set" === e10.kind && (t10 = "set ")) : ie(a10) && a10.init === e10 ? n10 = a10.id : P2(a10, { operator: "=", right: e10 }) && (n10 = a10.left), !n10) return null;
         var r10 = Ma(n10) ? (function(e11) {
           return W(e11) ? "null" : H(e11) ? "/" + e11.pattern + "/" + e11.flags : Pe(e11) ? e11.quasis.map(function(e12) {
             return e12.value.raw;
@@ -12140,7 +12140,7 @@ var require_babel_min = __commonJS({
         return !!e10 && ("ClassAccessorProperty" === e10.type && (null == a10 || S(e10, a10)));
       }, isAnyTypeAnnotation: Le, isArgumentPlaceholder: function(e10, a10) {
         return E("ArgumentPlaceholder", e10, a10);
-      }, isArrayExpression: C2, isArrayPattern: se, isArrayTypeAnnotation: Ue, isArrowFunctionExpression: de, isAssignmentExpression: P, isAssignmentPattern: oe, isAwaitExpression: _e, isBigIntLiteral: ke, isBigIntLiteralTypeAnnotation: function(e10, a10) {
+      }, isArrayExpression: C2, isArrayPattern: se, isArrayTypeAnnotation: Ue, isArrowFunctionExpression: de, isAssignmentExpression: P2, isAssignmentPattern: oe, isAwaitExpression: _e, isBigIntLiteral: ke, isBigIntLiteralTypeAnnotation: function(e10, a10) {
         return E("BigIntLiteralTypeAnnotation", e10, a10);
       }, isBinary: Aa, isBinaryExpression: function(e10, a10) {
         return E("BinaryExpression", e10, a10);
@@ -23301,7 +23301,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
       function tD() {
         if (this.removed) throw this.buildCodeFrameError("NodePath has been removed so is read-only.");
       }
-      var rD = Bi, iD = rf, oD = jr, sD = Ur, dD = Wr, uD = vf, cD = Xr, lD = P, pD = _, gD = fe, fD = Pa, hD = F, mD = Z, RD = we, yD = Si;
+      var rD = Bi, iD = rf, oD = jr, sD = Ur, dD = Wr, uD = vf, cD = Xr, lD = P2, pD = _, gD = fe, fD = Pa, hD = F, mD = Z, RD = we, yD = Si;
       function vD(e10, a10) {
         var n10;
         TD.call(this, e10, a10.length);
@@ -29424,7 +29424,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
       }
       function TH(e10, a10, n10) {
         if (!(F(e10) && a10.hasUid(e10.name))) {
-          if (P(e10, { operator: "=" }) && F(e10.left) && a10.hasUid(e10.left.name)) return vf(e10);
+          if (P2(e10, { operator: "=" }) && F(e10.left) && a10.hasUid(e10.left.name)) return vf(e10);
           var t10 = ai(n10);
           return a10.push({ id: t10, kind: "let" }), jr("=", vf(t10), e10);
         }
@@ -29687,7 +29687,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
                       Xe2 = kH(Ze2);
                       var ta2 = rG(x10, "get_" + ke2), ra2 = rG(x10, "set_" + ke2);
                       VH(na2, He2, ta2, ra2, Ge2), ze2 = [ea2, ta2, ra2];
-                    } else _H(e10, r10), DH(e10.node.id, na2, vf(He2), P(He2) ? vf(He2.left) : vf(He2), Ze2, De2, Ge2), ze2 = [ea2];
+                    } else _H(e10, r10), DH(e10.node.id, na2, vf(He2), P2(He2) ? vf(He2.left) : vf(He2), Ze2, De2, Ge2), ze2 = [ea2];
                   } else if (0 === Je2) {
                     var ia2 = rG(x10, "init_" + ke2), oa2 = Ee2.get("value"), sa2 = Ge2 ? [] : [Si()];
                     oa2.node && sa2.push(oa2.node), oa2.replaceWith(Wr(vf(ia2), sa2)), ze2 = [ia2], Ke2 && (Xe2 = kH(He2));
@@ -32628,10 +32628,10 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
         var e10 = VK()();
         return e10.addRange(67648, 67669).addRange(67671, 67679), w2.characters = e10, w2;
       }
-      var P2, A2 = {};
+      var P22, A2 = {};
       function _2() {
-        if (P2) return A2;
-        P2 = 1;
+        if (P22) return A2;
+        P22 = 1;
         var e10 = VK()(783, 786, 815, 7673, 66045);
         return e10.addRange(788, 802).addRange(806, 812).addRange(818, 833).addRange(835, 836).addRange(838, 855).addRange(857, 861).addRange(863, 866).addRange(2387, 2388).addRange(6832, 6896).addRange(7618, 7671).addRange(7675, 7679).addRange(8204, 8205).addRange(8400, 8431).addRange(65024, 65039).addRange(65056, 65069).addRange(118528, 118573).addRange(118576, 118598).addRange(119079, 119080).addRange(119143, 119145).addRange(119163, 119170).addRange(119173, 119179).addRange(119210, 119213).addRange(119387, 119388).addRange(917760, 917999), A2.characters = e10, A2;
       }
@@ -35968,7 +35968,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
           e11.skip();
         }, YieldExpression: function(e11) {
           var a11, n11;
-          a11 = e11.parent, n11 = this.sentId, P(a11) && F(a11.left, { name: n11 }) || e11.replaceWith(jr("=", ai(this.sentId), e11.node));
+          a11 = e11.parent, n11 = this.sentId, P2(a11) && F(a11.left, { name: n11 }) || e11.replaceWith(jr("=", ai(this.sentId), e11.node));
         }, MetaProperty: function(e11) {
           a10(e11.node) && e11.replaceWith(ai(this.sentId));
         } };
@@ -36154,8 +36154,8 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
               else if (Pe(d12)) n12.push(vf(d12)), r12 = true;
               else if (Ma(d12)) n12.push(ri(String(d12.value)));
               else {
-                P(d12) && F(d12.left) ? n12.push(vf(d12.left)) : n12.push(vf(d12));
-                var u12 = P(d12) ? d12.right : d12;
+                P2(d12) && F(d12.left) ? n12.push(vf(d12.left)) : n12.push(vf(d12));
+                var u12 = P2(d12) ? d12.right : d12;
                 G(u12, { computed: false }) && F(u12.object, { name: "Symbol" }) || _(u12) && en(u12.callee, "Symbol.for") || (t12 = false);
               }
             }
@@ -36248,7 +36248,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
               var d12 = w10(s12, e12.scope);
               s12.forEach(function(e13) {
                 var a12 = e13.get("key"), n12 = a12.node;
-                P(a12.node) && (n12 = a12.node.left), o10 = ci(o10, vf(n12), e13.node.computed || Ma(a12.node));
+                P2(a12.node) && (n12 = a12.node.left), o10 = ci(o10, vf(n12), e13.node.computed || Ma(a12.node));
               });
               var u12 = e12.parentPath, c11 = m(C10(u12, a11, o10), 3), l11 = c11[0], p10 = c11[1], g11 = c11[2];
               v10 && (function(e13) {
@@ -39040,7 +39040,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
           }
         }, ExpressionStatement: function(e11, a11) {
           var r10 = a11.file, i10 = e11.node.expression;
-          P(i10, { operator: "=" }) && n10(i10.left) && e11.replaceWith(t10(i10, i10.left.object, r10));
+          P2(i10, { operator: "=" }) && n10(i10.left) && e11.replaceWith(t10(i10, i10.left.object, r10));
         }, ObjectExpression: function(e11, n11) {
           for (var t11, r10 = n11.file, i10 = e11.node, o10 = i10.properties, s10 = 0; s10 < o10.length; s10++) {
             var d10 = o10[s10];
@@ -74747,13 +74747,15 @@ aemcp = (function () {
     }
     walk(L, "", 0);
   }
-  function snapComp(c, budget) {
+  // light: layer attributes and order only, no properties (the slow part)
+  function snapComp(c, budget, light) {
     var o = { name: c.name, layers: {}, order: [] };
+    if (light) o.light = true;
     budget.time = c.time;
     for (var i = 1; i <= c.numLayers; i++) {
       var L = c.layer(i), k = layerKey(L);
       var e = { sig: layerSig(L), props: {}, groups: {} };
-      snapProps(L, e.props, e.groups, budget);
+      if (!light) snapProps(L, e.props, e.groups, budget);
       o.layers[k] = e; o.order.push(k);
     }
     if (budget.over) o.partial = true;
@@ -74788,8 +74790,9 @@ aemcp = (function () {
     return [enc(g("bitsPerChannel")), enc(g("workingSpace")), enc(g("linearBlending")), enc(g("linearizeWorkingSpace")), enc(g("compensateForSceneReferredProfiles")),
       enc(g("colorManagementSystem") === 1 ? "OCIO" : "Adobe"), enc(g("ocioConfigurationFile")), enc(g("workingColorSpace")), enc(g("displayColorSpace")), enc(g("expressionEngine")), enc(g("timeDisplayType"))].join(SEP);
   }
-  A.snapshot = function (scopeRefs) {
+  A.snapshot = function (scopeRefs, light) {
     var p = app.project, snap = { items: {}, comps: {}, project: projectSig(p) }, budget = { n: PROP_BUDGET, over: false };
+    if (light) snap.light = true;
     for (var i = 1; i <= p.numItems; i++) { var it = p.item(i); snap.items["i" + it.id] = itemSig(it); }
     var ids = {};
     // a call that names a comp is compared there only; otherwise the active comp is compared
@@ -74799,9 +74802,25 @@ aemcp = (function () {
       if (scopeRefs[r] === "*") { for (var ai = 1; ai <= p.numItems; ai++) if (p.item(ai) instanceof CompItem) ids["c" + p.item(ai).id] = true; continue; } // every comp
       try { ids["c" + A.findComp(scopeRefs[r]).id] = true; } catch (e) {}
     }
-    for (var id in ids) { if (!ids.hasOwnProperty(id)) continue; var c = p.itemByID(Number(id.substr(1))); if (c) snap.comps[id] = snapComp(c, budget); }
+    for (var id in ids) { if (!ids.hasOwnProperty(id)) continue; var c = p.itemByID(Number(id.substr(1))); if (c) snap.comps[id] = snapComp(c, budget, light); }
     return snap;
   };
+  // app.project.revision goes up with every edit (also undo/redo, and writing an unchanged value) and
+  // not on selection, viewer, time-indicator or preview changes or scripts that only read (AE 25/26).
+  // It does NOT move for some attributes: item comment/label/folder, work area, expression engine, and
+  // blend mode on some layers. So an unchanged revision only proves no property changed; items and layer attributes still
+  // have to be compared (cheap). null when this AE has no project.revision.
+  A.revision = function () {
+    try { var r = app.project.revision; return typeof r === "number" ? r : null; } catch (e) { return null; }
+  };
+  // The change report for a call that started with snapshot \`before\` and revision \`rev0\`.
+  function changesSince(before, rev0, scope) {
+    var rev1 = rev0 === null ? null : A.revision(), ch;
+    if (rev1 !== null && rev1 === rev0) { ch = A.diff(before, A.snapshot(scope, true)); ch.fast = true; return ch; }
+    // a light "before" (read-only check) has no properties to compare against: only say that something changed
+    if (before.light) return { items: [], layers: [], props: [], scope: [], fast: true, unlisted: true };
+    return A.diff(before, A.snapshot(scope));
+  }
   A.diff = function (a, b) {
     var ch = { items: [], layers: [], props: [], scope: [], partial: false }, MAX = 80, n = 0;
     function add(list, v) { if (n++ < MAX) list.push(v); else ch.truncated = true; }
@@ -74838,6 +74857,7 @@ aemcp = (function () {
       if (!ca) continue; // comp entered the scope during the call (e.g. newly opened): reported as an item
       ch.scope.push(cb.name);
       if (ca.partial || cb.partial) ch.partial = true;
+      var noProps = ca.light || cb.light;
       for (var k in cb.layers) {
         if (!cb.layers.hasOwnProperty(k)) continue;
         var lb = cb.layers[k], la = ca.layers[k], lbs = lb.sig.split(SEP), lname = raw(lbs[0]);
@@ -74847,6 +74867,7 @@ aemcp = (function () {
           for (var g = 0; g < lbs.length; g++) if (las[g] !== lbs[g]) ld.push(LAYER_FIELDS[g] + " " + show(las[g]) + " -> " + show(lbs[g]));
           if (ld.length) add(ch.layers, ["~", cb.name, lname, ld.join("; ")]);
         }
+        if (noProps) continue;
         // added/removed groups (effects, masks, shape groups...): report only the outermost one
         var addedG = [], removedG = [];
         for (var gp in lb.groups) {
@@ -74906,15 +74927,16 @@ aemcp = (function () {
     try {
       if (opts.suppressDialogs !== false) { try { app.beginSuppressDialogs(); } catch (e) {} }
       if (undo) app.beginUndoGroup(opts.undoGroup || "AE MCP");
-      var before = null;
-      if (opts.report) { try { before = A.snapshot(opts.report); } catch (e) { before = null; } }
+      var before = null, rev0 = opts.report ? A.revision() : null;
+      // checkOnly (read-only mode): with project.revision, no property snapshot at all
+      if (opts.report) { try { before = A.snapshot(opts.report, !!opts.checkOnly && rev0 !== null); } catch (e) { before = null; } }
       var r = fn(args || {}, log);
       res = { ok: true, result: opts.raw ? r : A.serialize(r, opts.depth || 4), logs: logs };
-      if (before) { try { res.changes = A.diff(before, A.snapshot(opts.report)); } catch (e) { res.changes = { error: e.message }; } }
+      if (before) { try { res.changes = changesSince(before, rev0, opts.report); } catch (e) { res.changes = { error: e.message }; } }
     } catch (e) {
       res = { ok: false, error: { message: e.message || String(e), name: e.name, line: e.line, user: !!e.aemcpUser }, logs: logs };
       // a failed script may have changed things before it stopped: report those too
-      if (before) { try { res.changes = A.diff(before, A.snapshot(opts.report)); } catch (e2) {} }
+      if (before) { try { res.changes = changesSince(before, rev0, opts.report); } catch (e2) {} }
     } finally {
       if (undo) { try { app.endUndoGroup(); } catch (e) {} }
       if (opts.suppressDialogs !== false) { try { app.endSuppressDialogs(false); } catch (e) {} }
@@ -74952,7 +74974,7 @@ function toJsLiteral(v) {
   return (JSON.stringify(v ?? null) ?? "null").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
 }
 function wrapBody(body, args, opts = {}) {
-  const runOpts = { undoGroup: opts.undoGroup === void 0 ? "AE MCP" : opts.undoGroup, depth: opts.depth, report: opts.report };
+  const runOpts = { undoGroup: opts.undoGroup === void 0 ? "AE MCP" : opts.undoGroup, depth: opts.depth, report: opts.report, checkOnly: opts.checkOnly || void 0 };
   return `(function(){
 if (typeof aemcp === 'undefined' || aemcp.version !== ${toJsLiteral(HELPER_VERSION)}) return ${toJsLiteral(NEED_HELPERS)};
 return aemcp.run(function(args, log){
@@ -75017,6 +75039,7 @@ async function runJsx(body, args = {}, opts = {}) {
 function formatChanges(ch) {
   if (!ch) return null;
   if (ch.error) return `Changes: (could not be determined: ${ch.error})`;
+  if (ch.unlisted) return "Changes: the project changed (not listed)";
   const lines = [];
   for (const [op, type, name, extra] of ch.items) {
     if (op === "+") {
@@ -75396,12 +75419,14 @@ function registerCoreTools(server) {
           depth,
           timeoutMs: (timeoutSeconds ?? 120) * 1e3,
           report: readOnly ? ["*"] : report === false ? void 0 : reportScope(args),
+          checkOnly: readOnly,
           bridge: perm.mode === "ask" ? { approval: { tool: "Run script", summary: approvalSummary("ae_run_script", { code }) } } : void 0
         });
         if (readOnly && r.changes && formatChanges(r.changes) !== "Changes: none") {
           await evalRaw("app.executeCommand(16); 'undone'", 3e4);
           return errorResult(
-            `${READ_ONLY_REFUSAL}
+            r.changes.unlisted ? `${READ_ONLY_REFUSAL}
+This script changed the project, so its changes were undone.` : `${READ_ONLY_REFUSAL}
 This script changed the project, so its changes were undone:
 ${formatChanges(r.changes)}`
           );
@@ -75823,6 +75848,7 @@ try {
   f.keyframeLabels = has(op, "setLabelAtKey");
   f.layerIds = has(t, "id");
   f.anyLayerTrackMatte = has(t, "setTrackMatte");
+  f.revision = (function () { try { return typeof app.project.revision === "number"; } catch (e) { return false; } })();
   f.expressionEngine = app.project.expressionEngine;
   f.scriptsCanWriteFiles = (function () { try { return app.preferences.getPrefAsLong("Main Pref Section", "Pref_SCRIPTING_FILE_NETWORK_SECURITY") === 1; } catch (e) { return null; } })();
 } finally { c.remove(); }
@@ -75838,7 +75864,8 @@ var FEATURE_NOTES = {
   missingFontsApi: "missing-font check in ae_project_health (AE 24.0+)",
   keyframeLabels: "keyframe color labels in ae_edit_keyframes (AE 22.6+)",
   layerIds: "stable layer ids for the change report (AE 22.0+; older versions match layers by index+name)",
-  anyLayerTrackMatte: "track matte to any layer in ae_set_layer_attributes (AE 23.0+)"
+  anyLayerTrackMatte: "track matte to any layer in ae_set_layer_attributes (AE 23.0+)",
+  revision: "fast read-only mode and change reports: property snapshots are skipped when nothing changed (app.project.revision)"
 };
 
 // src/tools/app.ts
@@ -78756,6 +78783,94 @@ init_define_AEMCP_CEP_FILES();
 import { existsSync as existsSync10, mkdirSync as mkdirSync9, readFileSync as readFileSync11, rmSync as rmSync2, statSync as statSync5, unlinkSync as unlinkSync3, writeFileSync as writeFileSync6 } from "node:fs";
 import { homedir as homedir8 } from "node:os";
 import { basename as basename2, dirname as dirname8, join as join12 } from "node:path";
+
+// src/cli/fulltest-revision.ts
+init_define_AEMCP_CEP_FILES();
+var P = "__aemcp_fulltest_rev";
+var COMPS = 30;
+var LAYERS = 12;
+var READ_ONLY = { undoGroup: "AE MCP Script (read-only check)", report: ["*"], checkOnly: true, timeoutMs: 3e5 };
+var user = (code) => evalBody(`(function(args, log){${code}
+})`);
+var findComp = `var c = null; for (var i = 1; i <= app.project.numItems; i++) if (app.project.item(i).name === "${P}") c = app.project.item(i);`;
+async function revisionSteps(features, say) {
+  const fast = !!features.revision;
+  const out = [];
+  const step2 = async (name, fn, bench2) => {
+    const t0 = Date.now();
+    let problem;
+    try {
+      problem = await fn();
+    } catch (e) {
+      problem = e.message;
+    }
+    const ms = Date.now() - t0;
+    out.push({ step: name, ok: !problem, ms, error: problem ?? void 0, bench: bench2 });
+    say(!problem, problem ? `${name}: ${problem}` : `${name} (${ms} ms)${bench2 ? ": " + Object.entries(bench2).map(([k, v]) => `${k} ${v} ms`).join(", ") : ""}`);
+  };
+  const check2 = (r) => r.ok ? null : `script failed: ${r.error?.message}`;
+  await step2(`build ${COMPS} comps x ${LAYERS} layers`, async () => {
+    const r = await runJsx(
+      `for (var k = 0; k < args.comps; k++) {
+  var c = app.project.items.addComp(k ? "${P}_" + k : "${P}", 1280, 720, 1, 4, 25);
+  for (var j = 0; j < args.layers; j++) {
+    var L = c.layers.addShape(); L.name = "S" + j;
+    L.property("ADBE Root Vectors Group").addProperty("ADBE Vector Shape - Ellipse");
+    L.property("ADBE Effect Parade").addProperty("ADBE Gaussian Blur 2");
+    L.property("ADBE Transform Group").property("ADBE Position").setValueAtTime(1, [j, j]);
+  }
+}
+return app.project.numItems;`,
+      { comps: COMPS, layers: LAYERS },
+      { undoGroup: "AE MCP self-test", timeoutMs: 3e5 }
+    );
+    return check2(r);
+  });
+  await step2("read-only check: a script that only reads", async () => {
+    const r = await runJsx(user("var n = 0; for (var i = 1; i <= app.project.numItems; i++) n += app.project.item(i).name.length; return n;"), {}, READ_ONLY);
+    if (!r.ok) return check2(r);
+    if (formatChanges(r.changes) !== "Changes: none") return `reported ${formatChanges(r.changes)}`;
+    return fast && !r.changes?.fast ? "app.project.revision is available but the fast path wasn't used" : null;
+  });
+  await step2("read-only check: catches a property edit", async () => {
+    const r = await runJsx(user(`${findComp} c.layer(1).property("ADBE Transform Group").property("ADBE Opacity").setValue(40); return 1;`), {}, READ_ONLY);
+    if (!r.ok) return check2(r);
+    const text = formatChanges(r.changes);
+    if (fast) return r.changes?.unlisted ? null : `expected "the project changed (not listed)", got ${text}`;
+    return /Opacity: 100 -> 40/.test(text ?? "") ? null : `the edit wasn't listed: ${text}`;
+  });
+  await step2("read-only check: catches a label and comment change", async () => {
+    const r = await runJsx(user(`${findComp} c.label = 5; c.comment = "x"; return 1;`), {}, READ_ONLY);
+    if (!r.ok) return check2(r);
+    const text = formatChanges(r.changes) ?? "";
+    return /label/.test(text) && /comment/.test(text) ? null : `not reported: ${text}`;
+  });
+  const bench = {};
+  await step2(
+    `read-only query on ${COMPS + 1}+ comps: fast path vs full snapshot`,
+    async () => {
+      const query = user("var n = 0; for (var i = 1; i <= app.project.numItems; i++) n += app.project.item(i).name.length; return n;");
+      const time3 = async (opts) => {
+        const xs = [];
+        for (let i = 0; i < 3; i++) {
+          const t0 = Date.now();
+          const r = await runJsx(query, {}, opts);
+          if (!r.ok) throw new Error(`query failed: ${r.error?.message}`);
+          xs.push(Date.now() - t0);
+        }
+        return xs.sort((a, b) => a - b)[1];
+      };
+      bench.fullSnapshot = await time3({ ...READ_ONLY, checkOnly: false });
+      bench.readOnly = await time3(READ_ONLY);
+      bench.noReport = await time3({ undoGroup: false });
+      return null;
+    },
+    bench
+  );
+  return out;
+}
+
+// src/cli/fulltest.ts
 var ALL = ALL_JSX_TOOLS;
 var C = "__aemcp_fulltest";
 var jsxOf = (tool) => ALL.find((t) => t.name === tool).jsx;
@@ -78932,6 +79047,7 @@ Full self-test: every major tool against this After Effects (temporary comps, re
     results.push({ step: s.name, ok: !problem, ms, error: problem ?? void 0 });
     problem ? fail(`${s.name}: ${problem}`) : ok(`${s.name} (${ms} ms)`);
   }
+  results.push(...await revisionSteps(features, (good, line) => (good ? ok : fail)(line)));
   await runJsx(
     `var p = app.project, rq = p.renderQueue;
 for (var r = rq.numItems; r > args.rq; r--) rq.item(r).remove();
