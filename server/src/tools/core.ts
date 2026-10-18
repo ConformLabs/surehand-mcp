@@ -9,7 +9,7 @@ import { lastSetup } from "../cli/setup.js";
 import { checkForUpdate, updateMessage } from "../update.js";
 import { VERSION } from "../config.js";
 import { codeExcerpt, ensureHelpers, errorHint, evalBody, formatChanges, rollbackProblem, runJsx, type RunOptions, type RunResult } from "../jsx.js";
-import { reservedGlobalsHint, transpileUserCode } from "../transpile.js";
+import { reservedGlobalsHint, transpileUserCode, withoutComments } from "../transpile.js";
 import { approvalSummary, permissions, READ_ONLY_REFUSAL, SHELL_REFUSAL, usesShell } from "../permissions.js";
 import { compRef, errorResult, formatResult, layerRef, reportScope } from "./registry.js";
 
@@ -181,17 +181,37 @@ async function renderPng(body: string, args: Record<string, unknown>): Promise<{
   return { info, data };
 }
 
-// Undo-stack calls in a script (its own undo groups, Edit > Undo/Redo, purging the undo history): one
-// undo may then not revert all of it, and only a full comparison can tell.
-const UNDO_STACK_CALLS = /\b(?:begin|end)UndoGroup\b|\bexecuteCommand\b|\bpurge\b/;
+// Undo-stack calls in a script: its own undo groups, Edit > Undo/Redo (executeCommand), purging the undo
+// history. They change the undo history outside AE MCP's control, so in read-only mode such a script is
+// refused before it runs. A text check, comments ignored (a name inside a string counts too): a call
+// built at runtime (app["execute" + "Command"]) gets past it, and the guarded rollback is the backstop.
+const UNDO_STACK_CALLS = /\b(?:begin|end)UndoGroup\b|\bexecuteCommand\b|\bpurge\b/g;
+
+/** The undo-stack calls named in the code (comments ignored), each once. */
+export function undoStackCalls(code: string): string[] {
+  return [...new Set(withoutComments(code).match(UNDO_STACK_CALLS) ?? [])];
+}
+
+/** Read-only mode: the refusal for a script that calls the undo stack (nothing has run yet), else null. */
+export function undoStackRefusal(code: string): string | null {
+  const calls = undoStackCalls(code);
+  if (!calls.length) return null;
+  return (
+    `Nothing ran. AE MCP is in read-only mode, and this script calls ${calls.join(", ")}. ` +
+    "executeCommand, beginUndoGroup, endUndoGroup and purge change the undo history outside AE MCP's control, " +
+    "so read-only mode couldn't reliably put the project back afterwards; scripts that call them are refused. " +
+    "To run it on purpose, the user can switch to edit mode (Full access, or Ask before every change) in " +
+    "After Effects: Window > Extensions > AE MCP > Permissions."
+  );
+}
 
 /**
- * How ae_run_script runs a script in read-only mode: in its own undo group, compared over every comp,
- * and undone in the same call if it changed anything (aemcp.jsxinc). Only items and layer attributes are
- * compared where AE has app.project.revision, unless the script touches the undo stack itself.
+ * How ae_run_script runs a script in read-only mode (after undoStackRefusal): in its own undo group,
+ * compared over every comp, and undone in the same call if it changed anything (aemcp.jsxinc). Only items
+ * and layer attributes are compared where AE has app.project.revision.
  */
 export function readOnlyRunOptions(code: string): RunOptions {
-  return { undoGroup: "AE MCP Script (read-only check)", report: ["*"], checkOnly: !UNDO_STACK_CALLS.test(code), rollback: "changes" };
+  return { undoGroup: "AE MCP Script (read-only check)", report: ["*"], checkOnly: !undoStackCalls(code).length, rollback: "changes" };
 }
 
 /** The refusal for a read-only script that changed the project (or may have), else null. */
@@ -236,6 +256,8 @@ export function registerCoreTools(server: McpServer) {
         const perm = permissions();
         if (!perm.allowShell && usesShell(code)) return errorResult(SHELL_REFUSAL);
         const readOnly = perm.mode === "read-only";
+        const undoStack = readOnly ? undoStackRefusal(code) : null;
+        if (undoStack) return errorResult(undoStack);
         const t = transpileUserCode(code, transpile !== false);
         const r = await runJsx(evalBody(t.source), args ?? {}, {
           ...(readOnly

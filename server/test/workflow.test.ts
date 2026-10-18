@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { evalBody, formatChanges, runJsx, type RunResult } from "../src/jsx.js";
-import { readOnlyRefusal, readOnlyRunOptions } from "../src/tools/core.js";
+import { readOnlyRefusal, readOnlyRunOptions, registerCoreTools, undoStackCalls } from "../src/tools/core.js";
 import { _internal, runBatch } from "../src/tools/workflow.js";
 import { transpileUserCode } from "../src/transpile.js";
 import { fakeAE, loadHelpers, type Fake } from "./fake-ae.js";
@@ -258,6 +258,60 @@ describe("ae_run_script in read-only mode", () => {
     expect(refusal).toContain("Opacity: 50 -> 80");
     expect(refusal).toContain("It was not undone again");
     expect(fake.undos.n).toBe(1);
+  });
+});
+
+describe("ae_run_script in read-only mode: undo-stack calls are refused before anything runs", () => {
+  // the real ae_run_script handler, with the permission mode from a temporary config file
+  const runScript = async (mode: string, code: string) => {
+    const dir = mkdtempSync(join(tmpdir(), "aemcp-perm-"));
+    writeFileSync(join(dir, "config.json"), JSON.stringify({ token: "x", permissions: { mode } }));
+    const prev = process.env.AEMCP_CONFIG;
+    process.env.AEMCP_CONFIG = join(dir, "config.json");
+    try {
+      let handler: any;
+      registerCoreTools({ registerTool: (name: string, _def: unknown, h: unknown) => void (name === "ae_run_script" && (handler = h)) } as any);
+      const r = await handler({ code });
+      return { isError: !!r.isError, text: String(r.content?.[0]?.text ?? "") };
+    } finally {
+      if (prev === undefined) delete process.env.AEMCP_CONFIG;
+      else process.env.AEMCP_CONFIG = prev;
+    }
+  };
+
+  for (const call of ["app.executeCommand(16);", "app.beginUndoGroup('x');", "app.endUndoGroup();", "app.purge(PurgeTarget.UNDO_CACHES);"]) {
+    it(`refuses ${call.replace(/\(.*/, "")}: nothing ran, the user's edit and the undo stack are untouched`, async () => {
+      withManualEdit();
+      const { isError, text } = await runScript("read-only", `${OP} op.setValue(80);\n${call}\nreturn 1;`);
+      expect(isError).toBe(true);
+      expect(text).toMatch(/^Nothing ran\./);
+      expect(text).toContain(call.replace(/^app\.|\(.*/g, ""));
+      expect(text).toMatch(/undo history outside AE MCP's control/);
+      expect(text).toMatch(/edit mode/);
+      expect(opacity()).toBe(50);
+      expect(fake.undos.n).toBe(0);
+      expect(fake.undoStack()).toEqual(["user: opacity 50"]);
+    });
+  }
+
+  it("a name only in a comment isn't refused (the script runs)", async () => {
+    withManualEdit();
+    const { isError, text } = await runScript("read-only", `// never app.executeCommand(16) here\n/* or app.endUndoGroup(),\n   beginUndoGroup, purge */\n${OP} return op.value;`);
+    expect(isError).toBe(false);
+    expect(text).toContain("50");
+    expect(fake.undos.n).toBe(0);
+  });
+
+  it("a comment marker inside a string doesn't hide a call after it", () => {
+    expect(undoStackCalls('var u = "http://x"; app.executeCommand(16); // done')).toEqual(["executeCommand"]);
+    expect(undoStackCalls("var r = /\\/*/; app.endUndoGroup();")).toEqual(["endUndoGroup"]);
+  });
+
+  it("edit mode is unaffected: the same calls run", async () => {
+    withManualEdit();
+    const { isError } = await runScript("full", `${OP} app.endUndoGroup(); app.beginUndoGroup("mine"); op.setValue(80); return 1;`);
+    expect(isError).toBe(false);
+    expect(opacity()).toBe(80);
   });
 });
 
