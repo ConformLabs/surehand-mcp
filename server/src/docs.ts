@@ -7,6 +7,7 @@ export const INSTRUCTIONS = `This server controls a running Adobe After Effects 
   ae_render_contact_sheet (motion over time). Check layout numerically with ae_get_layer_bounds.
 - Every edit returns a "Changes" list of exactly what changed in the project; use it to confirm the edit did what you meant.
 - Every tool call is one undo step; ae_undo reverts it.
+- Tools never replace an existing file silently: ae_save_project (Save As), ae_render_frame and ae_render_contact_sheet (outputPath) refuse and say so. Pass overwrite: true only when replacing it is intended.
 - Read the resource aemcp://docs/extendscript before writing non-trivial ExtendScript.`;
 
 export const EXTENDSCRIPT_DOC = `# After Effects ExtendScript cheat sheet (for ae_run_script)

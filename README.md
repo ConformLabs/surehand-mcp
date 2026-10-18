@@ -183,6 +183,8 @@ unknown effect name gets suggestions.
 - **Seeing the result:** `ae_render_frame` (a frame as an image; options: zoom into a region, render only some layers,
   transparency on a checkerboard or a color, difference image against another time or comp), `ae_render_contact_sheet`
   (a grid of frames across time, labelled with time and frame number, to judge motion and easing)
+- **Existing files are not replaced silently:** Save As in `ae_save_project` and the `outputPath` of `ae_render_frame` and
+  `ae_render_contact_sheet` refuse when a file is already there, and the error says to pass `overwrite: true` to replace it
 - **Measuring:** `ae_get_layer_bounds` (exact on-screen boxes after transforms, parenting, 3D and camera; in-frame and
   action/title-safe checks), `ae_sample_pixels` (rendered RGBA/hex at points), `ae_get_comp_map` (nested precomps,
   parenting, track mattes, expression references)
