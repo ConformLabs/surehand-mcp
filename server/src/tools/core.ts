@@ -8,12 +8,24 @@ import { aeLabel, evalRaw, health, listInstances, matchInstance, resolvePort, se
 import { lastSetup } from "../cli/setup.js";
 import { checkForUpdate, updateMessage } from "../update.js";
 import { VERSION } from "../config.js";
-import { codeExcerpt, ensureHelpers, errorHint, evalBody, formatChanges, runJsx } from "../jsx.js";
+import { codeExcerpt, ensureHelpers, errorHint, evalBody, formatChanges, runJsx, type RunResult } from "../jsx.js";
 import { reservedGlobalsHint, transpileUserCode } from "../transpile.js";
 import { approvalSummary, permissions, READ_ONLY_REFUSAL, SHELL_REFUSAL, usesShell } from "../permissions.js";
 import { compRef, errorResult, formatResult, layerRef, reportScope } from "./registry.js";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Read-only mode: when a script (run with checkOnly) changed the project, undoes it and returns the
+ * refusal; null when it changed nothing. Exported for the self-test's undo-safety cases.
+ */
+export async function undoReadOnlyChanges(r: RunResult): Promise<string | null> {
+  if (!r.changes || formatChanges(r.changes) === "Changes: none") return null;
+  await evalRaw("app.executeCommand(16); 'undone'", 30_000); // Edit > Undo: reverts this script's undo group
+  return r.changes.unlisted
+    ? `${READ_ONLY_REFUSAL}\nThis script changed the project, so its changes were undone.`
+    : `${READ_ONLY_REFUSAL}\nThis script changed the project, so its changes were undone:\n${formatChanges(r.changes)}`;
+}
 
 // A preview never replaces an existing file at outputPath unless overwrite is true
 const OUTPUT_GUARD_JSX = `
@@ -224,14 +236,8 @@ export function registerCoreTools(server: McpServer) {
           checkOnly: readOnly,
           bridge: perm.mode === "ask" ? { approval: { tool: "Run script", summary: approvalSummary("ae_run_script", { code }) } } : undefined,
         });
-        if (readOnly && r.changes && formatChanges(r.changes) !== "Changes: none") {
-          await evalRaw("app.executeCommand(16); 'undone'", 30_000); // Edit > Undo: reverts this script's undo group
-          return errorResult(
-            r.changes.unlisted
-              ? `${READ_ONLY_REFUSAL}\nThis script changed the project, so its changes were undone.`
-              : `${READ_ONLY_REFUSAL}\nThis script changed the project, so its changes were undone:\n${formatChanges(r.changes)}`,
-          );
-        }
+        const refusal = readOnly ? await undoReadOnlyChanges(r) : null;
+        if (refusal) return errorResult(refusal);
         if (!r.ok && r.error) {
           // AE rejected code that wasn't valid JavaScript either: Babel's message is far clearer
           if (t.syntaxError && /does not have a value|syntax|expected|illegal|unterminated/i.test(r.error.message)) {
