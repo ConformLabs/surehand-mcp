@@ -16,7 +16,6 @@ const READ_ONLY: RunOptions = { undoGroup: "AE MCP Script (read-only check)", re
 const user = (code: string) => evalBody(`(function(args, log){${code}\n})`);
 const findComp = `var c = null; for (var i = 1; i <= app.project.numItems; i++) if (app.project.item(i).name === "${P}") c = app.project.item(i);`;
 const U = `${P}_undo`;
-const findLayer = `var c = null; for (var i = 1; i <= app.project.numItems; i++) if (app.project.item(i).name === "${U}") c = app.project.item(i); var L = c.layer(1);`;
 const UNDO = 16;
 const REDO = 2035;
 
@@ -80,40 +79,46 @@ return app.project.numItems;`,
 
   // Read-only mode undoes a script with one Edit > Undo whenever the project changed (with the fast path,
   // whenever app.project.revision moved, even if nothing is listed). That Undo must revert the script,
-  // never the user's previous edit. Each case: a "user" rename as its own undo step, then a read-only
-  // script; afterwards the layer must be exactly as the user left it.
-  const state = async () => {
-    const r = await runJsx(`${findLayer} return [L.name, L.opacity.value, L.rotation.value].join(" | ");`, {}, { undoGroup: false });
-    if (!r.ok) throw new Error(`couldn't read the test layer: ${r.error?.message}`);
-    return String(r.result);
-  };
-  let n = 0;
-  const userRename = async () => {
-    const r = await runJsx(`${findLayer} L.name = args.name; return 1;`, { name: `user rename ${++n}` }, { undoGroup: "AE MCP self-test: user edit" });
-    if (!r.ok) throw new Error(`user edit failed: ${r.error?.message}`);
-  };
-  const undoSafe = (name: string, script: string, setup: () => Promise<void> = userRename) =>
+  // never the user's earlier edits. Each case has its own comp (made as its own undo step), then a
+  // "user" rename as another undo step, then the read-only script; afterwards the layer must be
+  // exactly as the user left it.
+  let k = 0;
+  // `took`: the layer name the script must see right after its own command (proves the command ran)
+  const undoSafe = (name: string, script: string, opts: { userUndoes?: boolean; took?: string } = {}) =>
     step(`read-only undo keeps the user's last edit: ${name}`, async () => {
-      await setup();
+      const comp = `${U}_${++k}`;
+      const findLayer = `var c = null; for (var i = 1; i <= app.project.numItems; i++) if (app.project.item(i).name === "${comp}") c = app.project.item(i); var L = c && c.layer(1);`;
+      const edit = async (code: string, label: string) => {
+        const r = await runJsx(code, {}, { undoGroup: `AE MCP self-test: ${label}` });
+        if (!r.ok) throw new Error(`${label} failed: ${r.error?.message}`);
+      };
+      const state = async () => {
+        const r = await runJsx(`${findLayer} return L ? [L.name, L.opacity.value, L.rotation.value].join(" | ") : "the test comp is gone";`, {}, { undoGroup: false });
+        if (!r.ok) throw new Error(`couldn't read the test layer: ${r.error?.message}`);
+        return String(r.result);
+      };
+      await edit(`app.project.items.addComp("${comp}", 320, 180, 1, 4, 25).layers.addSolid([1, 0, 0], "solid", 320, 180, 1); return 1;`, "make comp");
+      await edit(`${findLayer} L.name = "user rename 1"; return 1;`, "user rename");
+      if (opts.userUndoes) {
+        // a second rename that the user undoes: Redo would bring it back
+        await edit(`${findLayer} L.name = "user rename 2"; return 1;`, "user rename");
+        await evalRaw(`app.executeCommand(${UNDO}); 1`, 30_000);
+      }
       const before = await state();
-      const r = await runJsx(user(`${findLayer}\n${script}\nreturn 1;`), {}, READ_ONLY);
-      await undoReadOnlyChanges(r);
+      if (!before.startsWith("user rename 1 |")) return `setup didn't leave the user's rename: ${before}`;
+      const r = await runJsx(user(`${findLayer}\n${script}\nreturn L ? L.name : null;`), {}, READ_ONLY);
+      const refusal = await undoReadOnlyChanges(r);
       const after = await state();
-      return after === before ? null : `before the script: ${before}; after the refusal: ${after}`;
+      if (after !== before) return `before the script: ${before}; after the ${refusal ? "refusal and Undo" : "script (not refused)"}: ${after}`;
+      if (opts.took !== undefined && r.result !== opts.took) return `the script's command didn't take effect (layer name ${r.result}, expected ${opts.took})`;
+      return null;
     });
 
-  await step("undo-safety test comp", async () =>
-    check(await runJsx(`app.project.items.addComp("${U}", 320, 180, 1, 4, 25).layers.addSolid([1, 0, 0], "solid", 320, 180, 1); return 1;`, {}, { undoGroup: "AE MCP self-test" })),
-  );
-  await undoSafe("script calls Edit > Undo", `app.executeCommand(${UNDO});`);
-  await undoSafe("script calls Edit > Redo", `app.executeCommand(${REDO});`, async () => {
-    await userRename();
-    await userRename();
-    await evalRaw(`app.executeCommand(${UNDO}); 1`, 30_000); // the user undoes the second rename: Redo would bring it back
-  });
+  await undoSafe("script calls Edit > Undo", `app.executeCommand(${UNDO});`, { took: "solid" });
+  await undoSafe("script calls Edit > Redo", `app.executeCommand(${REDO});`, { userUndoes: true, took: "user rename 2" });
   await undoSafe("script sets a property to its current value", "L.opacity.setValue(L.opacity.value);");
-  await undoSafe("script ends the undo group early, then edits", `app.endUndoGroup(); L.opacity.setValue(33);`);
-  await undoSafe("script edits, ends the undo group, edits again", `L.opacity.setValue(33); app.endUndoGroup(); L.rotation.setValue(10);`);
+  await undoSafe("script ends the undo group early, then edits", "app.endUndoGroup(); L.opacity.setValue(33);");
+  await undoSafe("script edits, ends the undo group, edits again", "L.opacity.setValue(33); app.endUndoGroup(); L.rotation.setValue(10);");
   await undoSafe("script only ends the undo group early", "app.endUndoGroup();");
 
   // a read-only query on a project with many comps, the way ae_run_script runs it (median of 3)
