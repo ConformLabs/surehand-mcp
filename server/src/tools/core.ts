@@ -15,8 +15,13 @@ import { compRef, errorResult, formatResult, layerRef, reportScope } from "./reg
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+// A preview never replaces an existing file at outputPath unless overwrite is true
+const OUTPUT_GUARD_JSX = `
+if (args.outputPath && !args.overwrite && new File(args.outputPath).exists)
+  aemcp.fail("A file already exists at " + new File(args.outputPath).fsName + ". Nothing was rendered. To replace it, pass overwrite: true (or choose another outputPath).");`;
+
 // ExtendScript bodies of the preview tools (exported so tests can check them)
-export const RENDER_FRAME_JSX = `
+export const RENDER_FRAME_JSX = `${OUTPUT_GUARD_JSX}
 var c = aemcp.findComp(args.comp);
 var t = args.time === undefined ? c.time : args.time;
 var max = args.maxSize || 1280, par = c.pixelAspect;
@@ -84,7 +89,7 @@ try {
 }
 return info;`;
 
-export const CONTACT_SHEET_JSX = `
+export const CONTACT_SHEET_JSX = `${OUTPUT_GUARD_JSX}
 var c = aemcp.findComp(args.comp);
 var fd = c.frameDuration, times = [];
 if (args.times) { for (var k = 0; k < args.times.length; k++) times.push(args.times[k]); }
@@ -391,6 +396,7 @@ export function registerCoreTools(server: McpServer) {
           .optional()
           .describe("Difference image against another time and/or comp (black where identical)."),
         outputPath: z.string().optional().describe("Optional absolute path to also save the PNG to."),
+        overwrite: z.boolean().optional().describe("Replace an existing file at outputPath (default false: refuse)."),
       },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
@@ -430,6 +436,7 @@ export function registerCoreTools(server: McpServer) {
         columns: z.number().int().min(1).max(12).optional().describe("Grid columns (default: square-ish)."),
         width: z.number().int().min(320).max(4096).optional().describe("Width of the returned image in pixels (default 1600)."),
         outputPath: z.string().optional().describe("Optional absolute path to also save the PNG to."),
+        overwrite: z.boolean().optional().describe("Replace an existing file at outputPath (default false: refuse)."),
       },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
