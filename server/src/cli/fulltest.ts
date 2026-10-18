@@ -181,6 +181,18 @@ export async function fullSelftest(before?: ProjectState): Promise<number> {
       args: {},
       check: (r) => (Number(r.result) >= 1 ? null : `unexpected result ${JSON.stringify(r.result)}`),
     },
+    {
+      name: "ES3 reserved word as a name",
+      jsx: evalBody(transpileUserCode("const int = 1; return int;").source),
+      args: {},
+      check: (r) => (r.result === 1 ? null : `unexpected result ${JSON.stringify(r.result)}`),
+    },
+    {
+      name: "keyword property names",
+      jsx: evalBody(transpileUserCode("const o = { default: 1, class: 2 }; o.default += o.class; return o.default;").source),
+      args: {},
+      check: (r) => (r.result === 3 ? null : `unexpected result ${JSON.stringify(r.result)}`),
+    },
   ];
 
   const results: StepResult[] = await projectSafetyTests(tmpDir, before ?? (await projectState()));
