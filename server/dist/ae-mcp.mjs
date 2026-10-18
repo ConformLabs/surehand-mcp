@@ -74973,6 +74973,7 @@ function errorHint(message) {
   if (/out of range|index.*range/i.test(m)) return "AE collections are 1-based: app.project.item(1..numItems), comp.layer(1..numLayers), prop.property(1..numProperties).";
   if (/Function .+ is undefined/i.test(m)) return "That method doesn't exist on this object in ExtendScript. Check the object type (ae_get_scripting_guide) or use aemcp helpers.";
   if (/undefined is not an object|null is not an object/i.test(m)) return "Something is undefined: a lookup returned nothing (names are case-sensitive; activeItem may not be a comp).";
+  if (/Illegal use of reserved word/i.test(m)) return `ExtendScript (ES3) reserves words such as int, short, char, float, double, long, byte, boolean, class, default. Don't use them as names or as .property names (write o["default"]); ae_run_script renames declared names automatically unless transpile is false.`;
   if (/does not have a value/i.test(m)) return "Syntax error (ExtendScript reports these as '... does not have a value').";
   if (/Can not .* to a (layer|property)|cannot set|not settable|read.?only/i.test(m)) return "That attribute is read-only or can't be set in this state (e.g. the layer is locked, or the property has expressions/keyframes).";
   return null;
