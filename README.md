@@ -310,6 +310,7 @@ server/              MCP server (TypeScript) -> bundled into server/dist/ae-mcp.
   scripts/release.mjs  cuts a release: version, sign, check, Windows test, package, CI, GitHub release
   scripts/test-mac.mjs      installs the build on this Mac and runs the full self-test on each open After Effects
   scripts/test-windows.mjs  the same on a Windows PC over SSH
+  scripts/test-guard.mjs    lock and build checks so parallel test:mac runs don't test each other's build
   scripts/sign-extension.mjs  signs the After Effects extension
   scripts/ci-check.mjs assertions for the CI install / uninstall dry runs
 extension/           After Effects extension (signed): invisible bridge (auto-starts) + status panel
@@ -330,6 +331,7 @@ npm run package          # -> ../dist-zip/AE-MCP/ (launchers, server, AE-MCP.mcp
 npm run sign             # re-sign the After Effects extension after changing extension/ or the version
                          # (needs the certificate in ~/.aemcp-signing; see scripts/sign-extension.mjs)
 npm run test:mac         # install this build here and run the full self-test on each open After Effects
+                         # (one run per Mac at a time: waits for ~/.aemcp/test-mac.lock; reports the commit tested)
 npm run test:windows     # the same on the Windows PC over SSH
 npm run release -- 1.4.0 --notes notes.md   # everything above, then commit, CI and the GitHub release
 ```
