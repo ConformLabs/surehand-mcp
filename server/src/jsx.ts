@@ -12,6 +12,11 @@ export const helperSource = helperTemplate.replace("__AEMCP_VERSION__", HELPER_V
 export interface RunOptions {
   /** Report what changed: comps (refs) to compare layer by layer besides the active comp. */
   report?: unknown[];
+  /**
+   * Read-only check: where AE has app.project.revision, take no property snapshot and only say whether
+   * the project changed (`changes.unlisted`). Older AE versions get the full report.
+   */
+  checkOnly?: boolean;
   /** Undo group name; false = no undo group (read-only tools). */
   undoGroup?: string | false;
   /** Serialization depth for the returned value. */
@@ -29,6 +34,10 @@ export interface Changes {
   partial?: boolean;
   truncated?: boolean;
   error?: string;
+  /** app.project.revision was used: properties weren't snapshotted after the call (they hadn't changed) */
+  fast?: boolean;
+  /** the project changed, but nothing was snapshotted to list what (checkOnly) */
+  unlisted?: boolean;
 }
 
 export interface RunResult {
@@ -49,7 +58,7 @@ export function toJsLiteral(v: unknown): string {
  * The body sees `args` (the JSON args) and `log(...)`.
  */
 export function wrapBody(body: string, args: unknown, opts: RunOptions = {}): string {
-  const runOpts = { undoGroup: opts.undoGroup === undefined ? "AE MCP" : opts.undoGroup, depth: opts.depth, report: opts.report };
+  const runOpts = { undoGroup: opts.undoGroup === undefined ? "AE MCP" : opts.undoGroup, depth: opts.depth, report: opts.report, checkOnly: opts.checkOnly || undefined };
   return (
     "(function(){\n" +
     `if (typeof aemcp === 'undefined' || aemcp.version !== ${toJsLiteral(HELPER_VERSION)}) return ${toJsLiteral(NEED_HELPERS)};\n` +
@@ -147,6 +156,7 @@ export async function runJsx(body: string, args: unknown = {}, opts: RunOptions 
 export function formatChanges(ch: Changes | undefined): string | null {
   if (!ch) return null;
   if (ch.error) return `Changes: (could not be determined: ${ch.error})`;
+  if (ch.unlisted) return "Changes: the project changed (not listed)";
   const lines: string[] = [];
   for (const [op, type, name, extra] of ch.items) {
     if (op === "+") {

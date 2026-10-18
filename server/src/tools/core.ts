@@ -221,12 +221,15 @@ export function registerCoreTools(server: McpServer) {
           depth,
           timeoutMs: (timeoutSeconds ?? 120) * 1000,
           report: readOnly ? ["*"] : report === false ? undefined : reportScope(args),
+          checkOnly: readOnly,
           bridge: perm.mode === "ask" ? { approval: { tool: "Run script", summary: approvalSummary("ae_run_script", { code }) } } : undefined,
         });
         if (readOnly && r.changes && formatChanges(r.changes) !== "Changes: none") {
           await evalRaw("app.executeCommand(16); 'undone'", 30_000); // Edit > Undo: reverts this script's undo group
           return errorResult(
-            `${READ_ONLY_REFUSAL}\nThis script changed the project, so its changes were undone:\n${formatChanges(r.changes)}`,
+            r.changes.unlisted
+              ? `${READ_ONLY_REFUSAL}\nThis script changed the project, so its changes were undone.`
+              : `${READ_ONLY_REFUSAL}\nThis script changed the project, so its changes were undone:\n${formatChanges(r.changes)}`,
           );
         }
         if (!r.ok && r.error) {

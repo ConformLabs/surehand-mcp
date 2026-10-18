@@ -639,13 +639,15 @@ aemcp = (function () {
     }
     walk(L, "", 0);
   }
-  function snapComp(c, budget) {
+  // light: layer attributes and order only, no properties (the slow part)
+  function snapComp(c, budget, light) {
     var o = { name: c.name, layers: {}, order: [] };
+    if (light) o.light = true;
     budget.time = c.time;
     for (var i = 1; i <= c.numLayers; i++) {
       var L = c.layer(i), k = layerKey(L);
       var e = { sig: layerSig(L), props: {}, groups: {} };
-      snapProps(L, e.props, e.groups, budget);
+      if (!light) snapProps(L, e.props, e.groups, budget);
       o.layers[k] = e; o.order.push(k);
     }
     if (budget.over) o.partial = true;
@@ -680,8 +682,9 @@ aemcp = (function () {
     return [enc(g("bitsPerChannel")), enc(g("workingSpace")), enc(g("linearBlending")), enc(g("linearizeWorkingSpace")), enc(g("compensateForSceneReferredProfiles")),
       enc(g("colorManagementSystem") === 1 ? "OCIO" : "Adobe"), enc(g("ocioConfigurationFile")), enc(g("workingColorSpace")), enc(g("displayColorSpace")), enc(g("expressionEngine")), enc(g("timeDisplayType"))].join(SEP);
   }
-  A.snapshot = function (scopeRefs) {
+  A.snapshot = function (scopeRefs, light) {
     var p = app.project, snap = { items: {}, comps: {}, project: projectSig(p) }, budget = { n: PROP_BUDGET, over: false };
+    if (light) snap.light = true;
     for (var i = 1; i <= p.numItems; i++) { var it = p.item(i); snap.items["i" + it.id] = itemSig(it); }
     var ids = {};
     // a call that names a comp is compared there only; otherwise the active comp is compared
@@ -691,9 +694,25 @@ aemcp = (function () {
       if (scopeRefs[r] === "*") { for (var ai = 1; ai <= p.numItems; ai++) if (p.item(ai) instanceof CompItem) ids["c" + p.item(ai).id] = true; continue; } // every comp
       try { ids["c" + A.findComp(scopeRefs[r]).id] = true; } catch (e) {}
     }
-    for (var id in ids) { if (!ids.hasOwnProperty(id)) continue; var c = p.itemByID(Number(id.substr(1))); if (c) snap.comps[id] = snapComp(c, budget); }
+    for (var id in ids) { if (!ids.hasOwnProperty(id)) continue; var c = p.itemByID(Number(id.substr(1))); if (c) snap.comps[id] = snapComp(c, budget, light); }
     return snap;
   };
+  // app.project.revision goes up with every edit (also undo/redo, and writing an unchanged value) and
+  // not on selection, viewer, time-indicator or preview changes or scripts that only read (AE 25/26).
+  // It does NOT move for some attributes: item comment/label/folder, work area, expression engine, and
+  // blend mode on some layers. So an unchanged revision only proves no property changed; items and layer attributes still
+  // have to be compared (cheap). null when this AE has no project.revision.
+  A.revision = function () {
+    try { var r = app.project.revision; return typeof r === "number" ? r : null; } catch (e) { return null; }
+  };
+  // The change report for a call that started with snapshot `before` and revision `rev0`.
+  function changesSince(before, rev0, scope) {
+    var rev1 = rev0 === null ? null : A.revision(), ch;
+    if (rev1 !== null && rev1 === rev0) { ch = A.diff(before, A.snapshot(scope, true)); ch.fast = true; return ch; }
+    // a light "before" (read-only check) has no properties to compare against: only say that something changed
+    if (before.light) return { items: [], layers: [], props: [], scope: [], fast: true, unlisted: true };
+    return A.diff(before, A.snapshot(scope));
+  }
   A.diff = function (a, b) {
     var ch = { items: [], layers: [], props: [], scope: [], partial: false }, MAX = 80, n = 0;
     function add(list, v) { if (n++ < MAX) list.push(v); else ch.truncated = true; }
@@ -730,6 +749,7 @@ aemcp = (function () {
       if (!ca) continue; // comp entered the scope during the call (e.g. newly opened): reported as an item
       ch.scope.push(cb.name);
       if (ca.partial || cb.partial) ch.partial = true;
+      var noProps = ca.light || cb.light;
       for (var k in cb.layers) {
         if (!cb.layers.hasOwnProperty(k)) continue;
         var lb = cb.layers[k], la = ca.layers[k], lbs = lb.sig.split(SEP), lname = raw(lbs[0]);
@@ -739,6 +759,7 @@ aemcp = (function () {
           for (var g = 0; g < lbs.length; g++) if (las[g] !== lbs[g]) ld.push(LAYER_FIELDS[g] + " " + show(las[g]) + " -> " + show(lbs[g]));
           if (ld.length) add(ch.layers, ["~", cb.name, lname, ld.join("; ")]);
         }
+        if (noProps) continue;
         // added/removed groups (effects, masks, shape groups...): report only the outermost one
         var addedG = [], removedG = [];
         for (var gp in lb.groups) {
@@ -798,15 +819,16 @@ aemcp = (function () {
     try {
       if (opts.suppressDialogs !== false) { try { app.beginSuppressDialogs(); } catch (e) {} }
       if (undo) app.beginUndoGroup(opts.undoGroup || "AE MCP");
-      var before = null;
-      if (opts.report) { try { before = A.snapshot(opts.report); } catch (e) { before = null; } }
+      var before = null, rev0 = opts.report ? A.revision() : null;
+      // checkOnly (read-only mode): with project.revision, no property snapshot at all
+      if (opts.report) { try { before = A.snapshot(opts.report, !!opts.checkOnly && rev0 !== null); } catch (e) { before = null; } }
       var r = fn(args || {}, log);
       res = { ok: true, result: opts.raw ? r : A.serialize(r, opts.depth || 4), logs: logs };
-      if (before) { try { res.changes = A.diff(before, A.snapshot(opts.report)); } catch (e) { res.changes = { error: e.message }; } }
+      if (before) { try { res.changes = changesSince(before, rev0, opts.report); } catch (e) { res.changes = { error: e.message }; } }
     } catch (e) {
       res = { ok: false, error: { message: e.message || String(e), name: e.name, line: e.line, user: !!e.aemcpUser }, logs: logs };
       // a failed script may have changed things before it stopped: report those too
-      if (before) { try { res.changes = A.diff(before, A.snapshot(opts.report)); } catch (e2) {} }
+      if (before) { try { res.changes = changesSince(before, rev0, opts.report); } catch (e2) {} }
     } finally {
       if (undo) { try { app.endUndoGroup(); } catch (e) {} }
       if (opts.suppressDialogs !== false) { try { app.endSuppressDialogs(false); } catch (e) {} }

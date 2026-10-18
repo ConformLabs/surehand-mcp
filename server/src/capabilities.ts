@@ -19,6 +19,7 @@ try {
   f.keyframeLabels = has(op, "setLabelAtKey");
   f.layerIds = has(t, "id");
   f.anyLayerTrackMatte = has(t, "setTrackMatte");
+  f.revision = (function () { try { return typeof app.project.revision === "number"; } catch (e) { return false; } })();
   f.expressionEngine = app.project.expressionEngine;
   f.scriptsCanWriteFiles = (function () { try { return app.preferences.getPrefAsLong("Main Pref Section", "Pref_SCRIPTING_FILE_NETWORK_SECURITY") === 1; } catch (e) { return null; } })();
 } finally { c.remove(); }
@@ -36,4 +37,5 @@ export const FEATURE_NOTES: Record<string, string> = {
   keyframeLabels: "keyframe color labels in ae_edit_keyframes (AE 22.6+)",
   layerIds: "stable layer ids for the change report (AE 22.0+; older versions match layers by index+name)",
   anyLayerTrackMatte: "track matte to any layer in ae_set_layer_attributes (AE 23.0+)",
+  revision: "fast read-only mode and change reports: property snapshots are skipped when nothing changed (app.project.revision)",
 };
