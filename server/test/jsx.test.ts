@@ -187,6 +187,7 @@ return { doubled, a, rest, label, area: new Box(3).area(), sum, maybe, spread: [
     expect(codeExcerpt("a\nb\nc\nd\ne", 3)).toBe("  1 | a\n  2 | b\n> 3 | c\n  4 | d\n  5 | e");
     expect(errorHint("After Effects error: Object is invalid")).toMatch(/no longer exists/);
     expect(errorHint("index out of range")).toMatch(/1-based/);
+    expect(errorHint("Illegal use of reserved word")).toMatch(/o\["default"\]/);
   });
 });
 
