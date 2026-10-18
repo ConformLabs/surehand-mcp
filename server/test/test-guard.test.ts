@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { acquireLock, buildInfo, describeBuild, sha256File } from "../scripts/test-guard.mjs";
+import { acquireLock, buildInfo, describeBuild, interruptedBy, sha256File } from "../scripts/test-guard.mjs";
 
 const tmp = () => mkdtempSync(join(tmpdir(), "aemcp-guard-"));
 const quiet = () => {};
@@ -75,5 +75,20 @@ describe("build provenance", () => {
       "fix/x @ 4849391e6ffa (+ uncommitted changes)",
     );
     expect(describeBuild(buildInfo(tmp()))).toBe("? @ unknown commit");
+  });
+});
+
+describe("interrupted child", () => {
+  const child = (code: string) => spawnSync(process.execPath, ["-e", code], { encoding: "utf8" });
+
+  it("reports a child stopped by Ctrl-C or kill", () => {
+    expect(interruptedBy(child("process.kill(process.pid, 'SIGINT')"))).toBe("SIGINT");
+    expect(interruptedBy(child("process.kill(process.pid, 'SIGTERM')"))).toBe("SIGTERM");
+    expect(interruptedBy(child("process.exit(130)"))).toBe("SIGINT");
+  });
+
+  it("does not treat a failing or passing child as interrupted", () => {
+    expect(interruptedBy(child("process.exit(1)"))).toBeNull();
+    expect(interruptedBy(child(""))).toBeNull();
   });
 });

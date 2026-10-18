@@ -10,3 +10,4 @@ export function acquireLock(
   dir: string,
   opts?: { owner?: Record<string, unknown>; waitMs?: number; pollMs?: number; log?: (line: string) => void },
 ): Promise<() => void>;
+export function interruptedBy(r: { status: number | null; signal: string | null }): "SIGINT" | "SIGTERM" | "SIGHUP" | null;

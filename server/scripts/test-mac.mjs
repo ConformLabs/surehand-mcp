@@ -16,7 +16,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { acquireLock, buildInfo, describeBuild, sha256File } from "./test-guard.mjs";
+import { acquireLock, buildInfo, describeBuild, interruptedBy, sha256File } from "./test-guard.mjs";
 
 if (process.platform !== "darwin") {
   console.error("test-mac runs on macOS only.");
@@ -29,17 +29,22 @@ const bundle = fileURLToPath(new URL("../dist/ae-mcp.mjs", import.meta.url));
 const buildVersion = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
 const installed = join(homedir(), ".aemcp", "server", "ae-mcp.mjs");
 const plain = (s) => s.replace(/\x1b\[[0-9;]*m/g, "");
-const node = (args, env = {}) => {
-  const r = spawnSync(process.execPath, args, { encoding: "utf8", env: { ...process.env, ...env }, maxBuffer: 32 * 1024 * 1024 });
-  return { status: r.status, out: plain((r.stdout || "") + (r.stderr || "")) };
-};
-
 const build = describeBuild(buildInfo(dirname(bundle)));
 const bundleSha = sha256File(bundle);
 const tested = `${build}, dist/ae-mcp.mjs sha256 ${bundleSha}`;
+const node = (args, env = {}) => {
+  const r = spawnSync(process.execPath, args, { encoding: "utf8", env: { ...process.env, ...env }, maxBuffer: 32 * 1024 * 1024 });
+  const sig = interruptedBy(r);
+  if (sig) {
+    // stop here: an interrupted step is not a test failure, and the rest of the run would not be a result
+    console.error(`\nInterrupted (${sig}): no result for ${tested}.`);
+    process.exit(130);
+  }
+  return { status: r.status, out: plain((r.stdout || "") + (r.stderr || "")) };
+};
 console.log(`Mac test (v${buildVersion}): ${tested}`);
 
-for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"]) process.on(sig, () => process.exit(130)); // so the lock is released
+for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"]) process.on(sig, () => process.exit(130)); // while waiting for the lock; the exit hook releases it
 try {
   await acquireLock(join(homedir(), ".aemcp", "test-mac.lock"), { owner: { build, bundleSha, cwd: process.cwd() }, waitMs: waitMinutes * 60_000 });
 } catch (e) {

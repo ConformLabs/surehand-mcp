@@ -23,6 +23,18 @@ export function buildInfo(dir) {
 export const describeBuild = ({ branch, commit, dirty }) =>
   `${branch ?? "?"} @ ${commit ? commit.slice(0, 12) : "unknown commit"}${dirty ? " (+ uncommitted changes)" : ""}`;
 
+/**
+ * The signal that stopped a spawnSync() child when the user interrupted the run (Ctrl-C, kill),
+ * else null. A synchronous script never gets to run its own signal handlers while it waits on
+ * the child, so it has to check this after every child and stop.
+ */
+export function interruptedBy(r) {
+  if (["SIGINT", "SIGTERM", "SIGHUP"].includes(r.signal)) return r.signal;
+  if (r.status === 130) return "SIGINT"; // the child caught it and exited the conventional way
+  if (r.status === 143) return "SIGTERM";
+  return null;
+}
+
 const alive = (pid) => {
   try {
     return process.kill(pid, 0);
