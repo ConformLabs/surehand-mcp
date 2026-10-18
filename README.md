@@ -22,8 +22,7 @@ Unzip it and open `START HERE.txt`.
 
 ## Requirements
 
-- After Effects 2020 (17.0) or newer on macOS or Windows, in any language (tested with AE 2025 and 2026 on macOS, and
-  AE 2026 on Windows 11)
+- After Effects 2020 (17.0) or newer on macOS or Windows, in any language (tested on After Effects 2025-2026; older versions best effort)
 - Nothing else: the `.mcpb` uses Claude Desktop's built-in Node.js, and the installer downloads Node.js if it is missing
 
 ## Install
