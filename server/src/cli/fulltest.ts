@@ -11,6 +11,7 @@ import { ALL_JSX_TOOLS } from "../tools/all.js";
 import { CONTACT_SHEET_JSX, RENDER_FRAME_JSX } from "../tools/core.js";
 import { restoreCheckpoint, saveCheckpoint } from "../tools/workflow.js";
 import { revisionSteps } from "./fulltest-revision.js";
+import { rollbackSteps } from "./fulltest-rollback.js";
 import { bold, fail, green, ok, red, warn } from "./util.js";
 
 const ALL = ALL_JSX_TOOLS;
@@ -219,6 +220,7 @@ export async function fullSelftest(before?: ProjectState): Promise<number> {
   }
 
   results.push(...(await revisionSteps(features, (good, line) => (good ? ok : fail)(line))));
+  results.push(...(await rollbackSteps((good, line) => (good ? ok : fail)(line))));
 
   // clean up everything the test created
   await runJsx(

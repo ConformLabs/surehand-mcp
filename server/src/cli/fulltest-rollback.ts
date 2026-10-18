@@ -1,0 +1,100 @@
+// `ae-mcp selftest --full`: the guarded rollback of an atomic batch and of read-only mode, in a real
+// After Effects. Each case first makes a "manual edit" in its own undo step (the user's last action)
+// and checks it survives. Everything it creates is named __aemcp_fulltest_rb and removed by the full
+// self-test's cleanup.
+import { evalBody, runJsx } from "../jsx.js";
+import { readOnlyRefusal, readOnlyRunOptions } from "../tools/core.js";
+import { runBatch } from "../tools/workflow.js";
+import { transpileUserCode } from "../transpile.js";
+
+export interface RollbackStep { step: string; ok: boolean; ms: number; error?: string }
+
+const P = "__aemcp_fulltest_rb";
+const OP = `var c = null; for (var i = 1; i <= app.project.numItems; i++) if (app.project.item(i).name === "${P}") c = app.project.item(i);
+var op = c.layer(1).property("ADBE Transform Group").property("ADBE Opacity");`;
+const FULL = { mode: "full", allowShell: false };
+
+async function state(): Promise<{ opacity: number; revision: number | null }> {
+  const r = await runJsx(`${OP} return { opacity: op.value, revision: aemcp.revision() };`, {}, { undoGroup: false });
+  if (!r.ok) throw new Error(`couldn't read the test comp: ${r.error?.message}`);
+  return r.result as { opacity: number; revision: number | null };
+}
+
+/** The user's last action: Opacity -> value, as an undo step of its own. */
+async function manualEdit(value: number) {
+  const r = await runJsx(`${OP} op.setValue(args.value); return 1;`, { value }, { undoGroup: "AE MCP self-test: manual edit" });
+  if (!r.ok) throw new Error(`manual edit failed: ${r.error?.message}`);
+}
+
+const text = (r: { content: unknown[] }) => (r.content[0] as { text?: string })?.text ?? "";
+const script = (code: string) => ({ tool: "ae_run_script", args: { code } });
+const readOnly = async (code: string) => readOnlyRefusal(await runJsx(evalBody(transpileUserCode(code).source), {}, readOnlyRunOptions(code)));
+
+export async function rollbackSteps(say: (ok: boolean, line: string) => void): Promise<RollbackStep[]> {
+  const out: RollbackStep[] = [];
+  const step = async (name: string, fn: () => Promise<string | null>) => {
+    const t0 = Date.now();
+    let problem: string | null;
+    try {
+      problem = await fn();
+    } catch (e: any) {
+      problem = e.message;
+    }
+    const ms = Date.now() - t0;
+    out.push({ step: name, ok: !problem, ms, error: problem ?? undefined });
+    say(!problem, problem ? `${name}: ${problem}` : `${name} (${ms} ms)`);
+  };
+
+  await step("rollback: set up", async () => {
+    const r = await runJsx(`var c = app.project.items.addComp("${P}", 640, 360, 1, 4, 25); c.layers.addSolid([0.2, 0.4, 0.6], "${P} solid", 64, 64, 1); return 1;`, {}, { undoGroup: "AE MCP self-test" });
+    return r.ok ? null : `couldn't create the test comp: ${r.error?.message}`;
+  });
+
+  await step("rollback: manual edit, then an atomic batch that fails at step 1: the manual edit survives", async () => {
+    await manualEdit(37);
+    const before = await state();
+    const r = await runBatch({ steps: [script('throw new Error("fails before changing anything")'), script(`${OP} op.setValue(5);`)] }, FULL);
+    const after = await state();
+    if (!/nothing to undo/.test(text(r))) return `unexpected reply: ${text(r)}`;
+    if (after.opacity !== 37) return `the manual edit was reverted: Opacity is ${after.opacity}, expected 37`;
+    if (before.revision !== null && after.revision !== before.revision) return `the undo stack was touched (revision ${before.revision} -> ${after.revision})`;
+    return null;
+  });
+
+  await step("rollback: atomic batch that edits, then fails at step 2: rolled back once, the manual edit survives", async () => {
+    await manualEdit(41);
+    const r = await runBatch({ steps: [script(`${OP} op.setValue(5);`), script('throw new Error("fails after an edit")')], name: "AE MCP self-test batch" }, FULL);
+    const after = await state();
+    if (!/was rolled back \(nothing changed\)/.test(text(r))) return `unexpected reply: ${text(r)}`;
+    return after.opacity === 41 ? null : `Opacity is ${after.opacity}, expected 41 (5 = not rolled back, 100/37 = undone twice)`;
+  });
+
+  await step("rollback: read-only script that edits is reverted exactly once", async () => {
+    await manualEdit(43);
+    const refusal = await readOnly(`${OP} op.setValue(80); return 1;`);
+    const after = await state();
+    if (!refusal || !/its changes were undone/.test(refusal)) return `unexpected reply: ${refusal}`;
+    return after.opacity === 43 ? null : `Opacity is ${after.opacity}, expected 43 (80 = not reverted, 41 = undone twice)`;
+  });
+
+  await step("rollback: read-only script that only reads leaves the undo stack alone", async () => {
+    await manualEdit(47);
+    const before = await state();
+    const refusal = await readOnly(`${OP} return op.value;`);
+    const after = await state();
+    if (refusal) return `refused a script that only reads: ${refusal}`;
+    if (after.opacity !== 47) return `Opacity is ${after.opacity}, expected 47`;
+    return before.revision !== null && after.revision !== before.revision ? `revision moved ${before.revision} -> ${after.revision}` : null;
+  });
+
+  await step("rollback: read-only script that closes its own undo group: reported, not undone again", async () => {
+    await manualEdit(53);
+    const refusal = await readOnly(`${OP} op.setValue(80); app.endUndoGroup(); op.setValue(90); return 1;`);
+    const after = await state();
+    if (!refusal || !/not undone again/.test(refusal)) return `unexpected reply: ${refusal}`;
+    // one undo reverts only the last edit (90 -> 80); a second undo would have taken it to 53
+    return after.opacity === 80 ? null : `Opacity is ${after.opacity}, expected 80 (one undo)`;
+  });
+
+  return out;
+}
