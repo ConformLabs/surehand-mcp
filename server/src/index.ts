@@ -1,18 +1,9 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { timingSafeEqual } from "node:crypto";
 import { loadConfig, VERSION } from "./config.js";
-import { EXTENDSCRIPT_DOC, INSTRUCTIONS } from "./docs.js";
-import { registerCoreTools } from "./tools/core.js";
-import { registerRenderJobs } from "./tools/renderjobs.js";
-import { registerWorkflowTools } from "./tools/workflow.js";
-import { registerOnDemandTools } from "./tools/ondemand.js";
-import { registerJsxTools } from "./tools/registry.js";
-import { ALL_JSX_TOOLS } from "./tools/all.js";
 import { ensureAeSetup } from "./cli/setup.js";
-import { applyProfile, resolveProfile } from "./tools/profile.js";
 import { checkForUpdate } from "./update.js";
 // CLI commands are imported statically: lazily imported modules made esbuild initialize shared
 // dependencies (zod) too late for the MCP SDK, crashing the bundle at startup.
@@ -24,47 +15,7 @@ import { selftest } from "./cli/selftest.js";
 import { updateCommand } from "./cli/update-cmd.js";
 import { recordRuntime } from "./cli/setup.js";
 import { uninstall } from "./cli/uninstall.js";
-
-export function createMcpServer(): McpServer {
-  const profile = resolveProfile();
-  const instructions =
-    INSTRUCTIONS +
-    (profile.name === "full"
-      ? ""
-      : "\n- This chat has the core tools loaded. Many more (3D, audio, text styling, footage, render settings, masks, Essential Graphics, " +
-        "project management...) are available on demand: ae_tools lists them, ae_tools {describe: [...]} gives parameters, ae_call runs them. " +
-        "ae_run_script can do anything else.");
-  const server = new McpServer({ name: "after-effects", title: "Adobe After Effects", version: VERSION }, { instructions });
-  const catalog = applyProfile(server, profile);
-  registerCoreTools(server);
-  registerJsxTools(server, ALL_JSX_TOOLS);
-  registerRenderJobs(server);
-  registerWorkflowTools(server);
-  server.registerResource(
-    "extendscript-cheatsheet",
-    "aemcp://docs/extendscript",
-    { title: "After Effects ExtendScript cheat sheet", description: "API reference and ES3 rules for writing scripts for ae_run_script.", mimeType: "text/markdown" },
-    async (uri) => ({ contents: [{ uri: uri.href, mimeType: "text/markdown", text: EXTENDSCRIPT_DOC }] }),
-  );
-  // Some clients (e.g. ChatGPT) don't surface resources, so expose the doc as a tool too.
-  server.registerTool(
-    "ae_get_scripting_guide",
-    {
-      title: "ExtendScript guide",
-      description: "Returns the After Effects ExtendScript cheat sheet (ES3 rules, helpers, common match names). Read before writing complex ae_run_script code.",
-      inputSchema: {},
-      annotations: { readOnlyHint: true, openWorldHint: false },
-    },
-    async () => ({ content: [{ type: "text", text: EXTENDSCRIPT_DOC }] }),
-  );
-  registerOnDemandTools(server, catalog); // last: the catalog is complete by now
-  server.registerPrompt(
-    "after-effects-assistant",
-    { title: "After Effects assistant", description: "Primes the model with how to work with this server." },
-    async () => ({ messages: [{ role: "user", content: { type: "text", text: INSTRUCTIONS + "\n\n" + EXTENDSCRIPT_DOC } }] }),
-  );
-  return server;
-}
+import { createMcpServer } from "./server.js";
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(name);
