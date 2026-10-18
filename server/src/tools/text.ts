@@ -41,6 +41,7 @@ export const textTools: JsxTool[] = [
       style: charStyle,
       time: z.number().optional().describe("Apply at this time (Source Text keyframe) when the text is animated."),
     },
+    idempotent: true,
     jsx: `
 var c = aemcp.findComp(args.comp), l = aemcp.findLayer(c, args.layer);
 var tp = l.property("ADBE Text Properties"); if (!tp) aemcp.fail("'" + l.name + "' is not a text layer");
@@ -85,6 +86,7 @@ return { layer: l.name, text: text, styled: ranges };`,
       spaceAfter: z.number().optional(),
       boxSize: z.array(z.number()).length(2).optional().describe("Paragraph (box) text only: [width, height]."),
     },
+    idempotent: true,
     jsx: `
 var c = aemcp.findComp(args.comp), l = aemcp.findLayer(c, args.layer);
 var tp = l.property("ADBE Text Properties"); if (!tp) aemcp.fail("'" + l.name + "' is not a text layer");
@@ -238,6 +240,8 @@ return { comp: c.name, templateName: c.motionGraphicsTemplateName, controllers: 
       folder: z.string().optional().describe("Absolute output folder (default: the Essential Graphics local templates folder)."),
       overwrite: z.boolean().optional(),
     },
+    destructive: true,
+    idempotent: true,
     noUndo: true,
     jsx: `
 var c = aemcp.findComp(args.comp);

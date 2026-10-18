@@ -115,6 +115,7 @@ return aemcp.layerInfo(l, false);`,
       moveTo: z.number().int().optional().describe("New 1-based stacking index."),
       selected: z.boolean().optional(),
     },
+    idempotent: true,
     jsx: `
 var c = aemcp.findComp(args.comp), l = aemcp.findLayer(c, args.layer);
 var keys = ["name","enabled","audioEnabled","solo","locked","shy","motionBlur","adjustmentLayer","guideLayer","collapseTransformation","inPoint","outPoint","startTime","stretch","label","comment","selected"];
@@ -186,6 +187,7 @@ return o;`,
     title: "Select layers",
     description: "Select layers in a composition (deselects others unless add is true).",
     input: { comp: compRef, layers: z.array(layerRef), add: z.boolean().optional() },
+    uiState: true,
     readOnly: true,
     jsx: `
 var c = aemcp.findComp(args.comp);
@@ -198,6 +200,7 @@ return { selected: c.selectedLayers.length };`,
     title: "Set text",
     description: "Change the text content and/or character/paragraph style of a text layer (optionally at a time, creating a keyframe).",
     input: { comp: compRef, layer: layerRef, text: z.string().optional(), ...textStyle, time: z.number().optional().describe("Set as a Source Text keyframe at this time.") },
+    idempotent: true,
     jsx: `
 var c = aemcp.findComp(args.comp), l = aemcp.findLayer(c, args.layer);
 var p = l.property("ADBE Text Properties"); if (!p) aemcp.fail("Layer '" + l.name + "' is not a text layer");

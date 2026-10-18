@@ -37,7 +37,7 @@ export function createMcpServer(profile: ToolProfile = resolveProfile()): McpSer
       title: "ExtendScript guide",
       description: "Returns the After Effects ExtendScript cheat sheet (ES3 rules, helpers, common match names). Read before writing complex ae_run_script code.",
       inputSchema: {},
-      annotations: { readOnlyHint: true, openWorldHint: false },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async () => ({ content: [{ type: "text", text: EXTENDSCRIPT_DOC }] }),
   );

@@ -82,6 +82,7 @@ return aemcp.compInfo(c, false);`,
       renderer: z.string().optional().describe('e.g. "ADBE Advanced 3d" (Classic 3D), "ADBE Ernst" (Cinema 4D), "ADBE Calder" (Advanced 3D).'),
       resolutionFactor: z.array(z.number().int()).length(2).optional().describe("Preview resolution, [1,1]=Full, [2,2]=Half."),
     },
+    idempotent: true,
     jsx: `
 var c = aemcp.findComp(args.comp), keys = ["name","width","height","pixelAspect","duration","frameRate","displayStartTime","motionBlur","shutterAngle","renderer","resolutionFactor"];
 for (var i = 0; i < keys.length; i++) if (args[keys[i]] !== undefined) c[keys[i]] = args[keys[i]];
@@ -103,6 +104,7 @@ return aemcp.compInfo(c, false);`,
     title: "Open composition",
     description: "Open a composition in the Composition viewer / timeline and make it active.",
     input: { comp: compRef },
+    uiState: true,
     readOnly: true,
     jsx: `var c = aemcp.findComp(args.comp); c.openInViewer(); return { opened: c.name, id: c.id };`,
   },

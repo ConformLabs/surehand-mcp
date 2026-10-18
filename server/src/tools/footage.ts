@@ -32,6 +32,7 @@ export const footageTools: JsxTool[] = [
       loop: z.number().int().min(1).optional(),
       pixelAspect: z.number().optional(),
     },
+    idempotent: true,
     jsx: `${interpretation}
 var out = [];
 for (var i = 0; i < args.items.length; i++) {
@@ -66,6 +67,8 @@ return out;`,
       remove: z.boolean().optional().describe("Remove the proxy."),
       useProxy: z.boolean().optional().describe("Use the proxy (true) or the original (false)."),
     },
+    destructive: true,
+    idempotent: true,
     jsx: `${interpretation}
 var it = aemcp.findItem(args.item);
 if (!(it instanceof FootageItem || it instanceof CompItem)) aemcp.fail("'" + it.name + "' is not footage or a comp");
@@ -88,6 +91,7 @@ return it instanceof FootageItem ? interp(it) : { item: it.name, useProxy: it.us
       items: z.array(itemRef).optional(),
       maxFiles: z.number().int().min(100).max(500000).optional().describe("Stop scanning after this many files (default 50000)."),
     },
+    idempotent: true,
     jsx: `
 var root = new Folder(args.searchFolder);
 if (!root.exists) aemcp.fail("Folder not found: " + args.searchFolder);

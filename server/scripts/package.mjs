@@ -25,6 +25,10 @@ const client = new Client({ name: "package", version: "1" });
 await client.connect(new StdioClientTransport({ command: process.execPath, args: [bundle, "--tools", "full"], env: { ...process.env, AEMCP_NO_AUTOSETUP: "1", AEMCP_NO_ACTIVITY_LOG: "1" } }));
 const { tools } = await client.listTools();
 await client.close();
+// every tool carries all four hints (the expected values are in test/annotations.test.ts)
+const HINTS = ["readOnlyHint", "destructiveHint", "idempotentHint", "openWorldHint"];
+const unhinted = tools.filter((t) => HINTS.some((h) => typeof t.annotations?.[h] !== "boolean")).map((t) => t.name);
+if (unhinted.length) throw new Error(`Tools without explicit hints: ${unhinted.join(", ")}`);
 
 rmSync(OUT_BASE, { recursive: true, force: true });
 

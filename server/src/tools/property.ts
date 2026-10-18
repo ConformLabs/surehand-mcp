@@ -74,6 +74,7 @@ return { comp: c.name, count: out.length, truncated: truncated, results: out };`
       "Set the value of any property (transform, effect parameter, shape attribute, text...). If `time` is given (or the property already has keyframes) a keyframe is set at that time. " +
       'Examples: path "Transform/Opacity" value 50; "Transform/Position" [960,540]; "Transform/Scale" [50,50]; "Effects/Fill/Color" "#ff0000".',
     input: { comp: compRef, layer: layerRef, path: propPath, value: anyValue, time: z.number().optional() },
+    idempotent: true,
     jsx: `
 var c = aemcp.findComp(args.comp), l = aemcp.findLayer(c, args.layer), p = aemcp.resolveProp(l, args.path);
 if (p.propertyType !== PropertyType.PROPERTY) aemcp.fail("'" + p.name + "' is a group, not a property");
@@ -109,6 +110,8 @@ return aemcp.propInfo(p, {});`,
       clearExisting: z.boolean().optional().describe("Remove existing keyframes first."),
       easyEase: z.boolean().optional().describe("Apply easy ease (33%) to all new keyframes that don't specify easing."),
     },
+    destructive: true,
+    idempotent: true,
     jsx: `
 var c = aemcp.findComp(args.comp), l = aemcp.findLayer(c, args.layer), p = aemcp.resolveProp(l, args.path);
 if (!p.canVaryOverTime) aemcp.fail("Property '" + p.name + "' cannot be animated");
@@ -135,6 +138,7 @@ return { property: p.name, numKeys: p.numKeys, keyframes: aemcp.keyframes(p) };`
     title: "Remove keyframes",
     description: "Remove keyframes from a property: all of them, or those at specific times.",
     input: { comp: compRef, layer: layerRef, path: propPath, times: z.array(z.number()).optional().describe("Omit to remove all keyframes.") },
+    idempotent: true,
     destructive: true,
     jsx: `
 var c = aemcp.findComp(args.comp), l = aemcp.findLayer(c, args.layer), p = aemcp.resolveProp(l, args.path), n = 0;
@@ -147,6 +151,8 @@ return { removed: n, remaining: p.numKeys };`,
     title: "Set expression",
     description: "Set (or clear with an empty string) an expression on a property. Returns any expression error AE reports.",
     input: { comp: compRef, layer: layerRef, path: propPath, expression: z.string(), enabled: z.boolean().optional() },
+    destructive: true,
+    idempotent: true,
     jsx: `
 var c = aemcp.findComp(args.comp), l = aemcp.findLayer(c, args.layer), p = aemcp.resolveProp(l, args.path);
 if (!p.canSetExpression) aemcp.fail("Property '" + p.name + "' cannot have an expression");

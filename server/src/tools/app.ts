@@ -9,6 +9,7 @@ export const appTools: JsxTool[] = [
     description:
       'Run any After Effects menu command by its exact menu name (e.g. "Pre-compose...", "Easy Ease", "Center Anchor Point in Layer Content", "Fit to Comp", "Sequence Layers...") or numeric command id. Acts on the current selection. Common commands work by their English name in any AE language.',
     input: { command: z.union([z.string(), z.number().int()]) },
+    destructive: true,
     jsx: `
 var id = aemcp.commandId(args.command); // English names work in any AE language for common commands
 if (!id) aemcp.fail("Menu command not found: " + args.command + " (menu names are translated in non-English After Effects; pass the command id instead)");
@@ -37,6 +38,8 @@ app.executeCommand(id); return { executed: args.command, id: id };`,
     title: "Purge caches",
     description: "Purge memory/disk caches (all memory, undo history, image caches, snapshot).",
     input: { target: z.enum(["ALL_CACHES", "ALL_MEMORY_CACHES", "UNDO_CACHES", "SNAPSHOT_CACHES", "IMAGE_CACHES"]).optional() },
+    destructive: true,
+    idempotent: true,
     noUndo: true,
     jsx: `app.purge(PurgeTarget[args.target || "ALL_MEMORY_CACHES"]); return { purged: args.target || "ALL_MEMORY_CACHES" };`,
   },

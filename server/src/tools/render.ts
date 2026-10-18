@@ -73,6 +73,7 @@ return { index: args.index || rq.numItems, comp: it.comp.name, status: aemcp.enu
       renderSettingsTemplate: z.string().optional().describe("Apply a template first."),
       outputModuleTemplate: z.string().optional().describe("Apply a template first."),
     },
+    idempotent: true,
     jsx: `
 var rq = app.project.renderQueue; if (!rq.numItems) aemcp.fail("Render queue is empty");
 var it = rq.item(args.index || rq.numItems), om = it.outputModule(args.outputModuleIndex || 1);
@@ -87,6 +88,7 @@ return { comp: it.comp.name, renderSettings: it.getSettings(GetSettingsFormat.ST
     title: "Queue in Media Encoder",
     description: "Send the queued render queue items to Adobe Media Encoder (Composition > Add to Adobe Media Encoder Queue), optionally starting the encode.",
     input: { start: z.boolean().optional().describe("Start encoding immediately in Media Encoder (default false).") },
+    destructive: true,
     noUndo: true,
     jsx: `
 var rq = app.project.renderQueue;
@@ -101,6 +103,7 @@ return { sentToMediaEncoder: true, started: !!args.start };`,
     description:
       "Render all queued items (blocks After Effects until finished). Use timeoutSeconds for long renders. For background renders prefer aerender via a shell.",
     input: { timeoutSeconds: z.number().min(10).max(86400).optional().describe("Default 3600.") },
+    destructive: true,
     timeoutMs: 3600 * 1000,
     noUndo: true,
     jsx: `
@@ -114,6 +117,7 @@ return out;`,
     title: "Clear render queue",
     description: "Remove items from the render queue (all, or only finished ones).",
     input: { onlyFinished: z.boolean().optional() },
+    idempotent: true,
     destructive: true,
     jsx: `
 var rq = app.project.renderQueue, n = 0;

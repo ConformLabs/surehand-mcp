@@ -133,6 +133,7 @@ return out;`,
       indexOfRefraction: z.number().optional(),
       lightTransmission: z.number().optional(),
     },
+    idempotent: true,
     jsx: `
 var c = aemcp.findComp(args.comp), done = [];
 var tri = { off: 0, on: 1, only: 2 };
@@ -311,6 +312,7 @@ return { dryRun: !!args.dryRun, matches: hits.length, changed: args.dryRun ? 0 :
       displayColorSpace: z.string().optional().describe("OCIO display color space."),
       listProfiles: z.boolean().optional(),
     },
+    idempotent: true,
     jsx: `
 var P = app.project, skipped = [];
 function set(k, v) { if (v === undefined) return; try { P[k] = v; } catch (e) { skipped.push(k + ": " + e.message.replace(/^After Effects error: /, "")); } }
