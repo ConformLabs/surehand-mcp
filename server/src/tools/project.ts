@@ -129,10 +129,21 @@ return aemcp.itemInfo(it);`,
   {
     name: "ae_save_project",
     title: "Save project",
-    description: "Save the project (optionally Save As to a new .aep path).",
-    input: { path: z.string().optional().describe("Absolute .aep path for Save As.") },
+    description: "Save the project (optionally Save As to a new .aep path). Save As never replaces an existing file unless overwrite is true.",
+    input: {
+      path: z.string().optional().describe("Absolute .aep path for Save As."),
+      overwrite: z.boolean().optional().describe("Save As over an existing file at path (default false: refuse)."),
+    },
     noUndo: true,
-    jsx: `if (args.path) app.project.save(new File(args.path)); else if (app.project.file) app.project.save(); else aemcp.fail("Project has never been saved: pass a path"); return { file: app.project.file ? app.project.file.fsName : null };`,
+    jsx: `
+if (args.path) {
+  var f = new File(args.path);
+  // saving onto the project's own file is a plain save, not an overwrite
+  var own = app.project.file && app.project.file.fsName === f.fsName;
+  if (f.exists && !own && !args.overwrite) aemcp.fail("A file already exists at " + f.fsName + ". Nothing was saved. To replace it, call ae_save_project again with overwrite: true (or choose another path).");
+  app.project.save(f);
+} else if (app.project.file) app.project.save(); else aemcp.fail("Project has never been saved: pass a path");
+return { file: app.project.file ? app.project.file.fsName : null };`,
   },
   {
     name: "ae_open_project",

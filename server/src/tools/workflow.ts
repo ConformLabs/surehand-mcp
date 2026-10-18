@@ -2,7 +2,7 @@
 // and the user's own script library.
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { createHash } from "node:crypto";
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { constants, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
 import { z } from "zod";
@@ -63,6 +63,50 @@ return p.file.fsName;`,
   }
   writeFileSync(join(dir, "index.json"), JSON.stringify(index, null, 2));
   return index[index.length - 1];
+}
+
+/** A restore target next to the project that does not exist yet (an earlier restore is never overwritten). */
+function restoreTarget(project: string, id: string) {
+  const base = join(dirname(project), `${basename(project, extname(project))} (restored ${id}`);
+  for (let n = 1; ; n++) {
+    const target = `${base}${n > 1 ? ` ${n}` : ""}).aep`;
+    if (!existsSync(target)) return target;
+  }
+}
+
+export const RESTORE_JSX = `
+var f = new File(args.path);
+if (app.project.dirty) {
+  if (!args.discardChanges) aemcp.fail("The open project has unsaved changes. Save it (or checkpoint it) first, or pass discardChanges: true.");
+  // with unsaved changes app.open would silently do nothing (its save prompt is suppressed)
+  app.project.close(CloseOptions.DO_NOT_SAVE_CHANGES);
+}
+app.open(f);
+if (!app.project.file || app.project.file.fsName !== f.fsName) aemcp.fail("After Effects did not open the restored copy " + f.fsName + ".");
+return app.project.file.fsName;`;
+
+/**
+ * Copy a checkpoint next to the project under a new name and open it. Succeeds only when the
+ * copy is verified to be the open project; otherwise the copy is removed again.
+ */
+export async function restoreCheckpoint(project: string, cp: Checkpoint, discardChanges?: boolean): Promise<string> {
+  // check before copying, so a refused restore leaves no file behind
+  const dirty = await runJsx("return app.project.dirty;", {}, { undoGroup: false });
+  if (dirty.result === true && !discardChanges) throw new Error("The open project has unsaved changes. Save it (or checkpoint it) first, or pass discardChanges: true.");
+  const target = restoreTarget(project, cp.id);
+  copyFileSync(cp.file, target, constants.COPYFILE_EXCL);
+  let problem: string | undefined;
+  try {
+    const o = await runJsx(RESTORE_JSX, { path: target, discardChanges: !!discardChanges }, { undoGroup: false, timeoutMs: 300_000 });
+    if (!o.ok) problem = o.error?.message || "After Effects did not open the restored copy";
+  } catch (e: any) {
+    problem = e?.message || String(e);
+  }
+  if (problem === undefined) return target;
+  try {
+    unlinkSync(target);
+  } catch {}
+  throw new Error(`${problem} Nothing was restored (the checkpoint is unchanged: ${cp.file}).`);
 }
 
 // ---------- user scripts ----------
@@ -204,12 +248,12 @@ return { steps: __out, failed: __failed };`;
       title: "Project checkpoints",
       description:
         "Safety copies of the project: save (saves the open project, then keeps a timestamped copy), list the checkpoints of this project, " +
-        "or restore one (opens it as a NEW file next to the original; the original file is never overwritten). Use before large or risky changes.",
+        "or restore one (opens it as a NEW file next to the original; neither the original nor an earlier restore is ever overwritten). Use before large or risky changes.",
       inputSchema: {
         action: z.enum(["save", "list", "restore"]),
         label: z.string().optional().describe("Short label for a new checkpoint."),
         id: z.string().optional().describe("Checkpoint id to restore (from list)."),
-        discardChanges: z.boolean().optional().describe("Restore even if the open project has unsaved changes."),
+        discardChanges: z.boolean().optional().describe("Restore even if the open project has unsaved changes (they are discarded)."),
       },
       annotations: { destructiveHint: false, openWorldHint: false },
     },
@@ -231,14 +275,7 @@ return { steps: __out, failed: __failed };`;
         if (permissions().mode === "read-only") return errorResult(READ_ONLY_REFUSAL);
         const cp = id ? index.find((c) => c.id === id) : index[index.length - 1];
         if (!cp || !existsSync(cp.file)) return errorResult(`Checkpoint ${id ?? "(latest)"} not found. Use action "list".`);
-        // check before copying, so a refused restore leaves no file behind
-        const dirty = await runJsx("return app.project.dirty;", {}, { undoGroup: false });
-        if (dirty.result === true && !discardChanges)
-          return errorResult("The open project has unsaved changes. Save it (or checkpoint it) first, or pass discardChanges: true.");
-        const target = join(dirname(project), `${basename(project, extname(project))} (restored ${cp.id}).aep`);
-        copyFileSync(cp.file, target);
-        const o = await runJsx(`app.open(new File(args.path)); return app.project.file.fsName;`, { path: target }, { undoGroup: false, timeoutMs: 300_000 });
-        if (!o.ok) return formatResult(o);
+        const target = await restoreCheckpoint(project, cp, discardChanges);
         return { content: [{ type: "text", text: `Restored checkpoint ${cp.id}${cp.label ? ` (${cp.label})` : ""} as a new file and opened it: ${target}\nThe original project file was not changed.` }] };
       } catch (e) {
         return errorResult(e);
@@ -287,4 +324,4 @@ return { steps: __out, failed: __failed };`;
 }
 
 // exported for tests
-export const _internal = { projectDir, scanScripts };
+export const _internal = { projectDir, restoreTarget, scanScripts };
