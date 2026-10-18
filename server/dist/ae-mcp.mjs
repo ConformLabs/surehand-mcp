@@ -78761,9 +78761,9 @@ var C = "__aemcp_fulltest";
 var jsxOf = (tool) => ALL.find((t) => t.name === tool).jsx;
 var run2 = (body, args = {}) => runJsx(body, args, { undoGroup: false, timeoutMs: 12e4 });
 var PROJECT_STATE = "return { file: app.project.file ? app.project.file.fsName : null, dirty: app.project.dirty };";
-async function projectSafetyTests(tmpDir) {
+var projectState = async () => (await run2(PROJECT_STATE)).result;
+async function projectSafetyTests(tmpDir, before) {
   const names = ["Save As refuses to overwrite", "restore checkpoint over a dirty project"];
-  const before = (await run2(PROJECT_STATE)).result;
   if (before?.dirty !== false) {
     for (const n of names) warn(`${n}: skipped (the open project has unsaved changes; save it to run this)`);
     return names.map((step3) => ({ step: step3, ok: true, ms: 0, skipped: true }));
@@ -78789,7 +78789,10 @@ async function projectSafetyTests(tmpDir) {
   let checkpointDir;
   let switched = false;
   try {
-    const sw = await run2(`if (app.project.dirty) aemcp.fail("the open project has unsaved changes"); app.project.close(CloseOptions.DO_NOT_SAVE_CHANGES); app.newProject(); return true;`);
+    const sw = await run2(
+      `if (String(app.project.file && app.project.file.fsName) !== String(args.file)) aemcp.fail("a different project is open now"); app.project.close(CloseOptions.DO_NOT_SAVE_CHANGES); app.newProject(); return true;`,
+      { file: before.file }
+    );
     if (!sw.ok) throw new Error(`could not switch to a scratch project: ${sw.error?.message}`);
     switched = true;
     await step2(names[0], async () => {
@@ -78839,7 +78842,7 @@ async function projectSafetyTests(tmpDir) {
   }
   return results;
 }
-async function fullSelftest() {
+async function fullSelftest(before) {
   console.log(bold(`
 Full self-test: every major tool against this After Effects (temporary comps, removed afterwards)
 `));
@@ -78908,7 +78911,7 @@ Full self-test: every major tool against this After Effects (temporary comps, re
       check: (r) => Number(r.result) >= 1 ? null : `unexpected result ${JSON.stringify(r.result)}`
     }
   ];
-  const results = await projectSafetyTests(tmpDir);
+  const results = await projectSafetyTests(tmpDir, before ?? await projectState());
   for (const s of steps) {
     if (s.needs && !features[s.needs]) {
       results.push({ step: s.name, ok: true, ms: 0, skipped: true });
@@ -79024,6 +79027,7 @@ After Effects MCP self-test v${VERSION}`));
   const tmpDir = join13(AEMCP_DIR, "tmp");
   mkdirSync10(tmpDir, { recursive: true });
   const png = join13(tmpDir, `selftest_${Date.now()}.png`);
+  const before = full ? await projectState() : void 0;
   const job = await runJsx(
     `var c = app.project.items.addComp("__aemcp_selftest", 640, 360, 1, 2, 30);
 var t = c.layers.addText("AE MCP OK");
@@ -79059,7 +79063,7 @@ return r;`,
     }
   }
   if (full && !failures) {
-    failures += await fullSelftest();
+    failures += await fullSelftest(before);
   }
   return summary(failures);
 }

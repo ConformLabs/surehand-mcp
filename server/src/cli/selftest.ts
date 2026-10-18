@@ -5,7 +5,7 @@ import { health } from "../bridge.js";
 import { loadConfig, VERSION } from "../config.js";
 import { runJsx } from "../jsx.js";
 import { diagnostics } from "./diagnostics.js";
-import { fullSelftest } from "./fulltest.js";
+import { fullSelftest, projectState } from "./fulltest.js";
 import { checkForUpdate, compareVersions, updateCheckEnabled, updateMessage } from "../update.js";
 import { bundledExtensionSigned, debugModeEnabled, installedExtensionHash, installedExtensionSignature, installedExtensionVersion } from "./setup.js";
 import {
@@ -86,6 +86,8 @@ export async function selftest(full = false): Promise<number> {
   const tmpDir = join(AEMCP_DIR, "tmp");
   mkdirSync(tmpDir, { recursive: true });
   const png = join(tmpDir, `selftest_${Date.now()}.png`);
+  // before the test job below marks the project as changed
+  const before = full ? await projectState() : undefined;
   const job = await runJsx(
     `var c = app.project.items.addComp("__aemcp_selftest", 640, 360, 1, 2, 30);
 var t = c.layers.addText("AE MCP OK");
@@ -118,7 +120,7 @@ return r;`,
     }
   }
   if (full && !failures) {
-    failures += await fullSelftest();
+    failures += await fullSelftest(before);
   }
   return summary(failures);
 }

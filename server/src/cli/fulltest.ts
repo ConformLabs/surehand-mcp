@@ -20,15 +20,17 @@ interface StepResult { step: string; ok: boolean; ms: number; error?: string; sk
 
 const jsxOf = (tool: string) => ALL.find((t) => t.name === tool)!.jsx;
 const run = (body: string, args: Record<string, unknown> = {}) => runJsx(body, args, { undoGroup: false, timeoutMs: 120_000 });
+type ProjectState = { file: string | null; dirty: boolean };
 const PROJECT_STATE = "return { file: app.project.file ? app.project.file.fsName : null, dirty: app.project.dirty };";
+export const projectState = async () => (await run(PROJECT_STATE)).result as ProjectState | undefined;
 
 /**
  * Save As refusal and checkpoint restore of a dirty project, in a scratch project. They need to
- * switch projects, so they run only when the open project has no unsaved changes; it is reopened afterwards.
+ * switch projects, so they run only if the project had no unsaved changes before the self-test
+ * (the self-test's own edits are removed again); that project is reopened afterwards.
  */
-async function projectSafetyTests(tmpDir: string): Promise<StepResult[]> {
+async function projectSafetyTests(tmpDir: string, before: ProjectState | undefined): Promise<StepResult[]> {
   const names = ["Save As refuses to overwrite", "restore checkpoint over a dirty project"];
-  const before = (await run(PROJECT_STATE)).result as { file: string | null; dirty: boolean };
   if (before?.dirty !== false) {
     for (const n of names) warn(`${n}: skipped (the open project has unsaved changes; save it to run this)`);
     return names.map((step) => ({ step, ok: true, ms: 0, skipped: true }));
@@ -54,7 +56,10 @@ async function projectSafetyTests(tmpDir: string): Promise<StepResult[]> {
   let checkpointDir: string | undefined;
   let switched = false;
   try {
-    const sw = await run(`if (app.project.dirty) aemcp.fail("the open project has unsaved changes"); app.project.close(CloseOptions.DO_NOT_SAVE_CHANGES); app.newProject(); return true;`);
+    const sw = await run(
+      `if (String(app.project.file && app.project.file.fsName) !== String(args.file)) aemcp.fail("a different project is open now"); app.project.close(CloseOptions.DO_NOT_SAVE_CHANGES); app.newProject(); return true;`,
+      { file: before.file },
+    );
     if (!sw.ok) throw new Error(`could not switch to a scratch project: ${sw.error?.message}`);
     switched = true;
 
@@ -109,7 +114,8 @@ async function projectSafetyTests(tmpDir: string): Promise<StepResult[]> {
   return results;
 }
 
-export async function fullSelftest(): Promise<number> {
+/** `before`: the project state before any self-test edits (the project-switching checks need it). */
+export async function fullSelftest(before?: ProjectState): Promise<number> {
   console.log(bold(`\nFull self-test: every major tool against this After Effects (temporary comps, removed afterwards)\n`));
   const caps = await runJsx(CAPABILITIES_JSX, {}, { undoGroup: "AE MCP self-test", timeoutMs: 60_000 });
   if (!caps.ok) {
@@ -177,7 +183,7 @@ export async function fullSelftest(): Promise<number> {
     },
   ];
 
-  const results: StepResult[] = await projectSafetyTests(tmpDir);
+  const results: StepResult[] = await projectSafetyTests(tmpDir, before ?? (await projectState()));
   for (const s of steps) {
     if (s.needs && !features[s.needs]) {
       results.push({ step: s.name, ok: true, ms: 0, skipped: true });
