@@ -1,20 +1,113 @@
 // `ae-mcp selftest --full`: exercises every major tool against the connected After Effects in
 // temporary comps (removed afterwards) and saves a compatibility report for this AE version.
-import { existsSync, mkdirSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { CAPABILITIES_JSX, FEATURE_NOTES } from "../capabilities.js";
 import { VERSION } from "../config.js";
 import { evalBody, runJsx, type RunResult } from "../jsx.js";
 import { transpileUserCode } from "../transpile.js";
 import { ALL_JSX_TOOLS } from "../tools/all.js";
 import { CONTACT_SHEET_JSX, RENDER_FRAME_JSX } from "../tools/core.js";
+import { restoreCheckpoint, saveCheckpoint } from "../tools/workflow.js";
 import { bold, fail, green, ok, red, warn } from "./util.js";
 
 const ALL = ALL_JSX_TOOLS;
 const C = "__aemcp_fulltest";
 
 interface Step { name: string; tool?: string; args?: Record<string, unknown>; jsx?: string; needs?: string; check?: (r: RunResult) => string | null }
+interface StepResult { step: string; ok: boolean; ms: number; error?: string; skipped?: boolean }
+
+const jsxOf = (tool: string) => ALL.find((t) => t.name === tool)!.jsx;
+const run = (body: string, args: Record<string, unknown> = {}) => runJsx(body, args, { undoGroup: false, timeoutMs: 120_000 });
+const PROJECT_STATE = "return { file: app.project.file ? app.project.file.fsName : null, dirty: app.project.dirty };";
+
+/**
+ * Save As refusal and checkpoint restore of a dirty project, in a scratch project. They need to
+ * switch projects, so they run only when the open project has no unsaved changes; it is reopened afterwards.
+ */
+async function projectSafetyTests(tmpDir: string): Promise<StepResult[]> {
+  const names = ["Save As refuses to overwrite", "restore checkpoint over a dirty project"];
+  const before = (await run(PROJECT_STATE)).result as { file: string | null; dirty: boolean };
+  if (before?.dirty !== false) {
+    for (const n of names) warn(`${n}: skipped (the open project has unsaved changes; save it to run this)`);
+    return names.map((step) => ({ step, ok: true, ms: 0, skipped: true }));
+  }
+  const dir = join(tmpDir, `fulltest_project_${Date.now()}`);
+  mkdirSync(dir, { recursive: true });
+  const scratch = join(dir, "scratch.aep");
+  const existing = join(dir, "existing.aep");
+  writeFileSync(existing, "not a project: must not be overwritten");
+  const results: StepResult[] = [];
+  const step = async (name: string, fn: () => Promise<string | null>) => {
+    const t0 = Date.now();
+    let problem: string | null;
+    try {
+      problem = await fn();
+    } catch (e: any) {
+      problem = e?.message ?? String(e);
+    }
+    const ms = Date.now() - t0;
+    results.push({ step: name, ok: !problem, ms, error: problem ?? undefined });
+    problem ? fail(`${name}: ${problem}`) : ok(`${name} (${ms} ms)`);
+  };
+  let checkpointDir: string | undefined;
+  let switched = false;
+  try {
+    const sw = await run(`if (app.project.dirty) aemcp.fail("the open project has unsaved changes"); app.project.close(CloseOptions.DO_NOT_SAVE_CHANGES); app.newProject(); return true;`);
+    if (!sw.ok) throw new Error(`could not switch to a scratch project: ${sw.error?.message}`);
+    switched = true;
+
+    await step(names[0], async () => {
+      const saved = await run(jsxOf("ae_save_project"), { path: scratch });
+      if (!saved.ok) return `Save As to a new file failed: ${saved.error?.message}`;
+      const refused = await run(jsxOf("ae_save_project"), { path: existing });
+      if (refused.ok) return "Save As overwrote an existing file without overwrite: true";
+      if (!/overwrite: true/.test(refused.error?.message ?? "")) return `refusal does not say to pass overwrite: true: ${refused.error?.message}`;
+      if (readFileSync(existing, "utf8") !== "not a project: must not be overwritten") return "the existing file was changed";
+      const now = (await run(PROJECT_STATE)).result as { file: string };
+      return now.file === scratch ? null : `the open project moved to ${now.file}`;
+    });
+
+    await step(names[1], async () => {
+      const cp = await saveCheckpoint("fulltest");
+      checkpointDir = dirname(cp.file);
+      const dirty = await run(`app.project.items.addFolder("__aemcp_fulltest_unsaved"); return app.project.dirty;`);
+      if (dirty.result !== true) return "could not make the scratch project dirty";
+      const refused = await restoreCheckpoint(scratch, cp).then(() => "restored over unsaved changes without discardChanges", (e) => (/discardChanges: true/.test(e.message) ? null : e.message));
+      if (refused) return refused;
+      const first = await restoreCheckpoint(scratch, cp, true);
+      let now = (await run(PROJECT_STATE)).result as { file: string; dirty: boolean };
+      if (now.file !== first || now.dirty) return `after restore the open project is ${now.file}${now.dirty ? " (unsaved)" : ""}, not ${first}`;
+      // restoring the same checkpoint again must not overwrite the first restore
+      const back = await run(jsxOf("ae_open_project"), { path: scratch, discardChanges: true });
+      if (!back.ok) return `could not reopen the scratch project: ${back.error?.message}`;
+      await run(`app.project.items.addFolder("__aemcp_fulltest_unsaved"); return true;`);
+      const second = await restoreCheckpoint(scratch, cp, true);
+      now = (await run(PROJECT_STATE)).result as { file: string; dirty: boolean };
+      if (second === first || !existsSync(first)) return `second restore reused ${basename(first)}`;
+      return now.file === second ? null : `after the second restore the open project is ${now.file}, not ${second}`;
+    });
+  } catch (e: any) {
+    const done = new Set(results.map((r) => r.step));
+    for (const n of names.filter((n) => !done.has(n))) {
+      results.push({ step: n, ok: false, ms: 0, error: e?.message ?? String(e) });
+      fail(`${n}: ${e?.message ?? e}`);
+    }
+  } finally {
+    // back to the project that was open before (only discards the scratch project, never the user's)
+    if (switched) {
+      const r = before.file ? await run(jsxOf("ae_open_project"), { path: before.file, discardChanges: true }) : await run(jsxOf("ae_new_project"), { discardChanges: true });
+      if (!r.ok) {
+        results.push({ step: "reopen the original project", ok: false, ms: 0, error: r.error?.message });
+        fail(`Could not reopen ${before.file ?? "an empty project"}: ${r.error?.message}`);
+      }
+    }
+    rmSync(dir, { recursive: true, force: true });
+    if (checkpointDir) rmSync(checkpointDir, { recursive: true, force: true });
+  }
+  return results;
+}
 
 export async function fullSelftest(): Promise<number> {
   console.log(bold(`\nFull self-test: every major tool against this After Effects (temporary comps, removed afterwards)\n`));
@@ -84,7 +177,7 @@ export async function fullSelftest(): Promise<number> {
     },
   ];
 
-  const results: { step: string; ok: boolean; ms: number; error?: string; skipped?: boolean }[] = [];
+  const results: StepResult[] = await projectSafetyTests(tmpDir);
   for (const s of steps) {
     if (s.needs && !features[s.needs]) {
       results.push({ step: s.name, ok: true, ms: 0, skipped: true });

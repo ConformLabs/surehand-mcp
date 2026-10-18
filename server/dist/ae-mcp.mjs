@@ -976,11 +976,11 @@ var require_codegen = __commonJS({
         const rhs = this.rhs === void 0 ? "" : ` = ${this.rhs}`;
         return `${varKind} ${this.name}${rhs};` + _n;
       }
-      optimizeNames(names, constants2) {
+      optimizeNames(names, constants3) {
         if (!names[this.name.str])
           return;
         if (this.rhs)
-          this.rhs = optimizeExpr(this.rhs, names, constants2);
+          this.rhs = optimizeExpr(this.rhs, names, constants3);
         return this;
       }
       get names() {
@@ -997,10 +997,10 @@ var require_codegen = __commonJS({
       render({ _n }) {
         return `${this.lhs} = ${this.rhs};` + _n;
       }
-      optimizeNames(names, constants2) {
+      optimizeNames(names, constants3) {
         if (this.lhs instanceof code_1.Name && !names[this.lhs.str] && !this.sideEffects)
           return;
-        this.rhs = optimizeExpr(this.rhs, names, constants2);
+        this.rhs = optimizeExpr(this.rhs, names, constants3);
         return this;
       }
       get names() {
@@ -1061,8 +1061,8 @@ var require_codegen = __commonJS({
       optimizeNodes() {
         return `${this.code}` ? this : void 0;
       }
-      optimizeNames(names, constants2) {
-        this.code = optimizeExpr(this.code, names, constants2);
+      optimizeNames(names, constants3) {
+        this.code = optimizeExpr(this.code, names, constants3);
         return this;
       }
       get names() {
@@ -1091,12 +1091,12 @@ var require_codegen = __commonJS({
         }
         return nodes.length > 0 ? this : void 0;
       }
-      optimizeNames(names, constants2) {
+      optimizeNames(names, constants3) {
         const { nodes } = this;
         let i = nodes.length;
         while (i--) {
           const n = nodes[i];
-          if (n.optimizeNames(names, constants2))
+          if (n.optimizeNames(names, constants3))
             continue;
           subtractNames(names, n.names);
           nodes.splice(i, 1);
@@ -1149,12 +1149,12 @@ var require_codegen = __commonJS({
           return void 0;
         return this;
       }
-      optimizeNames(names, constants2) {
+      optimizeNames(names, constants3) {
         var _a3;
-        this.else = (_a3 = this.else) === null || _a3 === void 0 ? void 0 : _a3.optimizeNames(names, constants2);
-        if (!(super.optimizeNames(names, constants2) || this.else))
+        this.else = (_a3 = this.else) === null || _a3 === void 0 ? void 0 : _a3.optimizeNames(names, constants3);
+        if (!(super.optimizeNames(names, constants3) || this.else))
           return;
-        this.condition = optimizeExpr(this.condition, names, constants2);
+        this.condition = optimizeExpr(this.condition, names, constants3);
         return this;
       }
       get names() {
@@ -1177,10 +1177,10 @@ var require_codegen = __commonJS({
       render(opts) {
         return `for(${this.iteration})` + super.render(opts);
       }
-      optimizeNames(names, constants2) {
-        if (!super.optimizeNames(names, constants2))
+      optimizeNames(names, constants3) {
+        if (!super.optimizeNames(names, constants3))
           return;
-        this.iteration = optimizeExpr(this.iteration, names, constants2);
+        this.iteration = optimizeExpr(this.iteration, names, constants3);
         return this;
       }
       get names() {
@@ -1216,10 +1216,10 @@ var require_codegen = __commonJS({
       render(opts) {
         return `for(${this.varKind} ${this.name} ${this.loop} ${this.iterable})` + super.render(opts);
       }
-      optimizeNames(names, constants2) {
-        if (!super.optimizeNames(names, constants2))
+      optimizeNames(names, constants3) {
+        if (!super.optimizeNames(names, constants3))
           return;
-        this.iterable = optimizeExpr(this.iterable, names, constants2);
+        this.iterable = optimizeExpr(this.iterable, names, constants3);
         return this;
       }
       get names() {
@@ -1261,11 +1261,11 @@ var require_codegen = __commonJS({
         (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNodes();
         return this;
       }
-      optimizeNames(names, constants2) {
+      optimizeNames(names, constants3) {
         var _a3, _b;
-        super.optimizeNames(names, constants2);
-        (_a3 = this.catch) === null || _a3 === void 0 ? void 0 : _a3.optimizeNames(names, constants2);
-        (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNames(names, constants2);
+        super.optimizeNames(names, constants3);
+        (_a3 = this.catch) === null || _a3 === void 0 ? void 0 : _a3.optimizeNames(names, constants3);
+        (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNames(names, constants3);
         return this;
       }
       get names() {
@@ -1566,7 +1566,7 @@ var require_codegen = __commonJS({
     function addExprNames(names, from) {
       return from instanceof code_1._CodeOrName ? addNames(names, from.names) : names;
     }
-    function optimizeExpr(expr, names, constants2) {
+    function optimizeExpr(expr, names, constants3) {
       if (expr instanceof code_1.Name)
         return replaceName(expr);
       if (!canOptimize(expr))
@@ -1581,14 +1581,14 @@ var require_codegen = __commonJS({
         return items;
       }, []));
       function replaceName(n) {
-        const c = constants2[n.str];
+        const c = constants3[n.str];
         if (c === void 0 || names[n.str] !== 1)
           return n;
         delete names[n.str];
         return c;
       }
       function canOptimize(e) {
-        return e instanceof code_1._Code && e._items.some((c) => c instanceof code_1.Name && names[c.str] === 1 && constants2[c.str] !== void 0);
+        return e instanceof code_1._Code && e._items.some((c) => c instanceof code_1.Name && names[c.str] === 1 && constants3[c.str] !== void 0);
       }
     }
     function subtractNames(names, from) {
@@ -62525,7 +62525,7 @@ function visit(schema, fnOrHandlers) {
     return h ? h(node2, rewritten) : node2;
   };
   const cache2 = /* @__PURE__ */ new Map();
-  function run2(s) {
+  function run3(s) {
     const cached2 = cache2.get(s);
     if (cached2 === RESOLVING) {
       return new $ZodLazy({
@@ -62551,21 +62551,21 @@ function visit(schema, fnOrHandlers) {
         let changed = false;
         const newShape = {};
         for (const k of keys) {
-          const mapped = run2(oldShape[k]);
+          const mapped = run3(oldShape[k]);
           if (mapped !== oldShape[k])
             changed = true;
           newShape[k] = mapped;
         }
         let newCatchall = def.catchall;
         if (def.catchall) {
-          newCatchall = run2(def.catchall);
+          newCatchall = run3(def.catchall);
           if (newCatchall !== def.catchall)
             changed = true;
         }
         return changed ? clone(s, { ...def, shape: newShape, catchall: newCatchall }) : s;
       }
       case "array": {
-        const mapped = run2(def.element);
+        const mapped = run3(def.element);
         return mapped === def.element ? s : clone(s, { ...def, element: mapped });
       }
       case "tuple": {
@@ -62573,14 +62573,14 @@ function visit(schema, fnOrHandlers) {
         let changed = false;
         const newItems = [];
         for (const item of oldItems) {
-          const mapped = run2(item);
+          const mapped = run3(item);
           if (mapped !== item)
             changed = true;
           newItems.push(mapped);
         }
         let newRest = def.rest;
         if (def.rest) {
-          newRest = run2(def.rest);
+          newRest = run3(def.rest);
           if (newRest !== def.rest)
             changed = true;
         }
@@ -62588,12 +62588,12 @@ function visit(schema, fnOrHandlers) {
       }
       case "record":
       case "map": {
-        const newKey = run2(def.keyType);
-        const newVal = run2(def.valueType);
+        const newKey = run3(def.keyType);
+        const newVal = run3(def.valueType);
         return newKey === def.keyType && newVal === def.valueType ? s : clone(s, { ...def, keyType: newKey, valueType: newVal });
       }
       case "set": {
-        const newVal = run2(def.valueType);
+        const newVal = run3(def.valueType);
         return newVal === def.valueType ? s : clone(s, { ...def, valueType: newVal });
       }
       case "union": {
@@ -62601,7 +62601,7 @@ function visit(schema, fnOrHandlers) {
         let changed = false;
         const newOptions = [];
         for (const opt of oldOptions) {
-          const mapped = run2(opt);
+          const mapped = run3(opt);
           if (mapped !== opt)
             changed = true;
           newOptions.push(mapped);
@@ -62609,8 +62609,8 @@ function visit(schema, fnOrHandlers) {
         return changed ? clone(s, { ...def, options: newOptions }) : s;
       }
       case "intersection": {
-        const newLeft = run2(def.left);
-        const newRight = run2(def.right);
+        const newLeft = run3(def.left);
+        const newRight = run3(def.right);
         return newLeft === def.left && newRight === def.right ? s : clone(s, { ...def, left: newLeft, right: newRight });
       }
       case "optional":
@@ -62622,23 +62622,23 @@ function visit(schema, fnOrHandlers) {
       case "nonoptional":
       case "promise":
       case "success": {
-        const newInner = run2(def.innerType);
+        const newInner = run3(def.innerType);
         return newInner === def.innerType ? s : clone(s, { ...def, innerType: newInner });
       }
       case "pipe": {
-        const newIn = run2(def.in);
-        const newOut = run2(def.out);
+        const newIn = run3(def.in);
+        const newOut = run3(def.out);
         return newIn === def.in && newOut === def.out ? s : clone(s, { ...def, in: newIn, out: newOut });
       }
       case "function": {
-        const newInput = run2(def.input);
-        const newOutput = run2(def.output);
+        const newInput = run3(def.input);
+        const newOutput = run3(def.output);
         return newInput === def.input && newOutput === def.output ? s : clone(s, { ...def, input: newInput, output: newOutput });
       }
       case "lazy": {
         const original = def.getter;
         const { _cachedInner, ...rest } = def;
-        return clone(s, { ...rest, getter: () => run2(original()) });
+        return clone(s, { ...rest, getter: () => run3(original()) });
       }
       // A leaf by choice: `parts` are regex fragments, not data positions.
       case "template_literal":
@@ -62669,7 +62669,7 @@ function visit(schema, fnOrHandlers) {
       }
     }
   }
-  return run2(schema);
+  return run3(schema);
 }
 
 // node_modules/@modelcontextprotocol/sdk/dist/esm/server/zod-compat.js
@@ -75214,7 +75214,10 @@ function registerJsxTools(server, tools) {
 
 // src/tools/core.ts
 var sleep2 = (ms) => new Promise((r) => setTimeout(r, ms));
-var RENDER_FRAME_JSX = `
+var OUTPUT_GUARD_JSX = `
+if (args.outputPath && !args.overwrite && new File(args.outputPath).exists)
+  aemcp.fail("A file already exists at " + new File(args.outputPath).fsName + ". Nothing was rendered. To replace it, pass overwrite: true (or choose another outputPath).");`;
+var RENDER_FRAME_JSX = `${OUTPUT_GUARD_JSX}
 var c = aemcp.findComp(args.comp);
 var t = args.time === undefined ? c.time : args.time;
 var max = args.maxSize || 1280, par = c.pixelAspect;
@@ -75281,7 +75284,7 @@ try {
   try { tmp.remove(); } catch (e) {}
 }
 return info;`;
-var CONTACT_SHEET_JSX = `
+var CONTACT_SHEET_JSX = `${OUTPUT_GUARD_JSX}
 var c = aemcp.findComp(args.comp);
 var fd = c.frameDuration, times = [];
 if (args.times) { for (var k = 0; k < args.times.length; k++) times.push(args.times[k]); }
@@ -75549,7 +75552,8 @@ Tell the user about this update.` });
         layers: external_exports.array(layerRef).optional().describe("Render only these layers (others are hidden for the render and restored)."),
         background: external_exports.string().optional().describe('"checkerboard" to show transparency, or a color like "#808080" behind the comp.'),
         compareWith: external_exports.object({ comp: external_exports.union([external_exports.number().int(), external_exports.string()]).optional(), time: external_exports.number().optional() }).optional().describe("Difference image against another time and/or comp (black where identical)."),
-        outputPath: external_exports.string().optional().describe("Optional absolute path to also save the PNG to.")
+        outputPath: external_exports.string().optional().describe("Optional absolute path to also save the PNG to."),
+        overwrite: external_exports.boolean().optional().describe("Replace an existing file at outputPath (default false: refuse).")
       },
       annotations: { readOnlyHint: true, openWorldHint: false }
     },
@@ -75584,7 +75588,8 @@ Tell the user about this update.` });
         times: external_exports.array(external_exports.number()).min(1).max(36).optional().describe("Exact times (seconds) instead of evenly spaced frames."),
         columns: external_exports.number().int().min(1).max(12).optional().describe("Grid columns (default: square-ish)."),
         width: external_exports.number().int().min(320).max(4096).optional().describe("Width of the returned image in pixels (default 1600)."),
-        outputPath: external_exports.string().optional().describe("Optional absolute path to also save the PNG to.")
+        outputPath: external_exports.string().optional().describe("Optional absolute path to also save the PNG to."),
+        overwrite: external_exports.boolean().optional().describe("Replace an existing file at outputPath (default false: refuse).")
       },
       annotations: { readOnlyHint: true, openWorldHint: false }
     },
@@ -75787,7 +75792,7 @@ Check progress with ae_render_jobs. Log: ${logPath}`
 // src/tools/workflow.ts
 init_define_AEMCP_CEP_FILES();
 import { createHash as createHash3 } from "node:crypto";
-import { copyFileSync as copyFileSync2, existsSync as existsSync5, mkdirSync as mkdirSync6, readdirSync as readdirSync4, readFileSync as readFileSync7, statSync as statSync3, unlinkSync as unlinkSync2, writeFileSync as writeFileSync4 } from "node:fs";
+import { constants as constants2, copyFileSync as copyFileSync2, existsSync as existsSync5, mkdirSync as mkdirSync6, readdirSync as readdirSync4, readFileSync as readFileSync7, statSync as statSync3, unlinkSync as unlinkSync2, writeFileSync as writeFileSync4 } from "node:fs";
 import { homedir as homedir6 } from "node:os";
 import { basename, dirname as dirname6, extname, join as join8 } from "node:path";
 
@@ -77026,10 +77031,21 @@ return aemcp.itemInfo(it);`
   {
     name: "ae_save_project",
     title: "Save project",
-    description: "Save the project (optionally Save As to a new .aep path).",
-    input: { path: external_exports.string().optional().describe("Absolute .aep path for Save As.") },
+    description: "Save the project (optionally Save As to a new .aep path). Save As never replaces an existing file unless overwrite is true.",
+    input: {
+      path: external_exports.string().optional().describe("Absolute .aep path for Save As."),
+      overwrite: external_exports.boolean().optional().describe("Save As over an existing file at path (default false: refuse).")
+    },
     noUndo: true,
-    jsx: `if (args.path) app.project.save(new File(args.path)); else if (app.project.file) app.project.save(); else aemcp.fail("Project has never been saved: pass a path"); return { file: app.project.file ? app.project.file.fsName : null };`
+    jsx: `
+if (args.path) {
+  var f = new File(args.path);
+  // saving onto the project's own file is a plain save, not an overwrite
+  var own = app.project.file && app.project.file.fsName === f.fsName;
+  if (f.exists && !own && !args.overwrite) aemcp.fail("A file already exists at " + f.fsName + ". Nothing was saved. To replace it, call ae_save_project again with overwrite: true (or choose another path).");
+  app.project.save(f);
+} else if (app.project.file) app.project.save(); else aemcp.fail("Project has never been saved: pass a path");
+return { file: app.project.file ? app.project.file.fsName : null };`
   },
   {
     name: "ae_open_project",
@@ -78002,6 +78018,42 @@ return p.file.fsName;`,
   writeFileSync4(join8(dir, "index.json"), JSON.stringify(index, null, 2));
   return index[index.length - 1];
 }
+function restoreTarget(project, id) {
+  const base = join8(dirname6(project), `${basename(project, extname(project))} (restored ${id}`);
+  for (let n = 1; ; n++) {
+    const target = `${base}${n > 1 ? ` ${n}` : ""}).aep`;
+    if (!existsSync5(target)) return target;
+  }
+}
+var RESTORE_JSX = `
+var f = new File(args.path);
+if (app.project.dirty) {
+  if (!args.discardChanges) aemcp.fail("The open project has unsaved changes. Save it (or checkpoint it) first, or pass discardChanges: true.");
+  // with unsaved changes app.open would silently do nothing (its save prompt is suppressed)
+  app.project.close(CloseOptions.DO_NOT_SAVE_CHANGES);
+}
+app.open(f);
+if (!app.project.file || app.project.file.fsName !== f.fsName) aemcp.fail("After Effects did not open the restored copy " + f.fsName + ".");
+return app.project.file.fsName;`;
+async function restoreCheckpoint(project, cp, discardChanges) {
+  const dirty = await runJsx("return app.project.dirty;", {}, { undoGroup: false });
+  if (dirty.result === true && !discardChanges) throw new Error("The open project has unsaved changes. Save it (or checkpoint it) first, or pass discardChanges: true.");
+  const target = restoreTarget(project, cp.id);
+  copyFileSync2(cp.file, target, constants2.COPYFILE_EXCL);
+  let problem;
+  try {
+    const o = await runJsx(RESTORE_JSX, { path: target, discardChanges: !!discardChanges }, { undoGroup: false, timeoutMs: 3e5 });
+    if (!o.ok) problem = o.error?.message || "After Effects did not open the restored copy";
+  } catch (e) {
+    problem = e?.message || String(e);
+  }
+  if (problem === void 0) return target;
+  try {
+    unlinkSync2(target);
+  } catch {
+  }
+  throw new Error(`${problem} Nothing was restored (the checkpoint is unchanged: ${cp.file}).`);
+}
 var SCRIPT_EXT = /\.(jsx|jsxbin|js)$/i;
 function scanScripts(root, origin, depth = 2, out = []) {
   let entries = [];
@@ -78132,12 +78184,12 @@ ${changes}` : ""}` }] };
     "ae_checkpoint",
     {
       title: "Project checkpoints",
-      description: "Safety copies of the project: save (saves the open project, then keeps a timestamped copy), list the checkpoints of this project, or restore one (opens it as a NEW file next to the original; the original file is never overwritten). Use before large or risky changes.",
+      description: "Safety copies of the project: save (saves the open project, then keeps a timestamped copy), list the checkpoints of this project, or restore one (opens it as a NEW file next to the original; neither the original nor an earlier restore is ever overwritten). Use before large or risky changes.",
       inputSchema: {
         action: external_exports.enum(["save", "list", "restore"]),
         label: external_exports.string().optional().describe("Short label for a new checkpoint."),
         id: external_exports.string().optional().describe("Checkpoint id to restore (from list)."),
-        discardChanges: external_exports.boolean().optional().describe("Restore even if the open project has unsaved changes.")
+        discardChanges: external_exports.boolean().optional().describe("Restore even if the open project has unsaved changes (they are discarded).")
       },
       annotations: { destructiveHint: false, openWorldHint: false }
     },
@@ -78159,13 +78211,7 @@ ${changes}` : ""}` }] };
         if (permissions().mode === "read-only") return errorResult(READ_ONLY_REFUSAL);
         const cp = id ? index.find((c) => c.id === id) : index[index.length - 1];
         if (!cp || !existsSync5(cp.file)) return errorResult(`Checkpoint ${id ?? "(latest)"} not found. Use action "list".`);
-        const dirty = await runJsx("return app.project.dirty;", {}, { undoGroup: false });
-        if (dirty.result === true && !discardChanges)
-          return errorResult("The open project has unsaved changes. Save it (or checkpoint it) first, or pass discardChanges: true.");
-        const target = join8(dirname6(project), `${basename(project, extname(project))} (restored ${cp.id}).aep`);
-        copyFileSync2(cp.file, target);
-        const o = await runJsx(`app.open(new File(args.path)); return app.project.file.fsName;`, { path: target }, { undoGroup: false, timeoutMs: 3e5 });
-        if (!o.ok) return formatResult(o);
+        const target = await restoreCheckpoint(project, cp, discardChanges);
         return { content: [{ type: "text", text: `Restored checkpoint ${cp.id}${cp.label ? ` (${cp.label})` : ""} as a new file and opened it: ${target}
 The original project file was not changed.` }] };
       } catch (e) {
@@ -78702,16 +78748,97 @@ ${registered.includes("ChatGPT desktop") ? "  ChatGPT desktop app: restart it; a
 
 // src/cli/selftest.ts
 init_define_AEMCP_CEP_FILES();
-import { existsSync as existsSync11, mkdirSync as mkdirSync10, readFileSync as readFileSync11, statSync as statSync6, unlinkSync as unlinkSync4 } from "node:fs";
+import { existsSync as existsSync11, mkdirSync as mkdirSync10, readFileSync as readFileSync12, statSync as statSync6, unlinkSync as unlinkSync4 } from "node:fs";
 import { join as join13 } from "node:path";
 
 // src/cli/fulltest.ts
 init_define_AEMCP_CEP_FILES();
-import { existsSync as existsSync10, mkdirSync as mkdirSync9, statSync as statSync5, unlinkSync as unlinkSync3, writeFileSync as writeFileSync6 } from "node:fs";
+import { existsSync as existsSync10, mkdirSync as mkdirSync9, readFileSync as readFileSync11, rmSync as rmSync2, statSync as statSync5, unlinkSync as unlinkSync3, writeFileSync as writeFileSync6 } from "node:fs";
 import { homedir as homedir8 } from "node:os";
-import { join as join12 } from "node:path";
+import { basename as basename2, dirname as dirname8, join as join12 } from "node:path";
 var ALL = ALL_JSX_TOOLS;
 var C = "__aemcp_fulltest";
+var jsxOf = (tool) => ALL.find((t) => t.name === tool).jsx;
+var run2 = (body, args = {}) => runJsx(body, args, { undoGroup: false, timeoutMs: 12e4 });
+var PROJECT_STATE = "return { file: app.project.file ? app.project.file.fsName : null, dirty: app.project.dirty };";
+async function projectSafetyTests(tmpDir) {
+  const names = ["Save As refuses to overwrite", "restore checkpoint over a dirty project"];
+  const before = (await run2(PROJECT_STATE)).result;
+  if (before?.dirty !== false) {
+    for (const n of names) warn(`${n}: skipped (the open project has unsaved changes; save it to run this)`);
+    return names.map((step3) => ({ step: step3, ok: true, ms: 0, skipped: true }));
+  }
+  const dir = join12(tmpDir, `fulltest_project_${Date.now()}`);
+  mkdirSync9(dir, { recursive: true });
+  const scratch = join12(dir, "scratch.aep");
+  const existing = join12(dir, "existing.aep");
+  writeFileSync6(existing, "not a project: must not be overwritten");
+  const results = [];
+  const step2 = async (name, fn) => {
+    const t0 = Date.now();
+    let problem;
+    try {
+      problem = await fn();
+    } catch (e) {
+      problem = e?.message ?? String(e);
+    }
+    const ms = Date.now() - t0;
+    results.push({ step: name, ok: !problem, ms, error: problem ?? void 0 });
+    problem ? fail(`${name}: ${problem}`) : ok(`${name} (${ms} ms)`);
+  };
+  let checkpointDir;
+  let switched = false;
+  try {
+    const sw = await run2(`if (app.project.dirty) aemcp.fail("the open project has unsaved changes"); app.project.close(CloseOptions.DO_NOT_SAVE_CHANGES); app.newProject(); return true;`);
+    if (!sw.ok) throw new Error(`could not switch to a scratch project: ${sw.error?.message}`);
+    switched = true;
+    await step2(names[0], async () => {
+      const saved = await run2(jsxOf("ae_save_project"), { path: scratch });
+      if (!saved.ok) return `Save As to a new file failed: ${saved.error?.message}`;
+      const refused = await run2(jsxOf("ae_save_project"), { path: existing });
+      if (refused.ok) return "Save As overwrote an existing file without overwrite: true";
+      if (!/overwrite: true/.test(refused.error?.message ?? "")) return `refusal does not say to pass overwrite: true: ${refused.error?.message}`;
+      if (readFileSync11(existing, "utf8") !== "not a project: must not be overwritten") return "the existing file was changed";
+      const now = (await run2(PROJECT_STATE)).result;
+      return now.file === scratch ? null : `the open project moved to ${now.file}`;
+    });
+    await step2(names[1], async () => {
+      const cp = await saveCheckpoint("fulltest");
+      checkpointDir = dirname8(cp.file);
+      const dirty = await run2(`app.project.items.addFolder("__aemcp_fulltest_unsaved"); return app.project.dirty;`);
+      if (dirty.result !== true) return "could not make the scratch project dirty";
+      const refused = await restoreCheckpoint(scratch, cp).then(() => "restored over unsaved changes without discardChanges", (e) => /discardChanges: true/.test(e.message) ? null : e.message);
+      if (refused) return refused;
+      const first = await restoreCheckpoint(scratch, cp, true);
+      let now = (await run2(PROJECT_STATE)).result;
+      if (now.file !== first || now.dirty) return `after restore the open project is ${now.file}${now.dirty ? " (unsaved)" : ""}, not ${first}`;
+      const back = await run2(jsxOf("ae_open_project"), { path: scratch, discardChanges: true });
+      if (!back.ok) return `could not reopen the scratch project: ${back.error?.message}`;
+      await run2(`app.project.items.addFolder("__aemcp_fulltest_unsaved"); return true;`);
+      const second = await restoreCheckpoint(scratch, cp, true);
+      now = (await run2(PROJECT_STATE)).result;
+      if (second === first || !existsSync10(first)) return `second restore reused ${basename2(first)}`;
+      return now.file === second ? null : `after the second restore the open project is ${now.file}, not ${second}`;
+    });
+  } catch (e) {
+    const done = new Set(results.map((r) => r.step));
+    for (const n of names.filter((n2) => !done.has(n2))) {
+      results.push({ step: n, ok: false, ms: 0, error: e?.message ?? String(e) });
+      fail(`${n}: ${e?.message ?? e}`);
+    }
+  } finally {
+    if (switched) {
+      const r = before.file ? await run2(jsxOf("ae_open_project"), { path: before.file, discardChanges: true }) : await run2(jsxOf("ae_new_project"), { discardChanges: true });
+      if (!r.ok) {
+        results.push({ step: "reopen the original project", ok: false, ms: 0, error: r.error?.message });
+        fail(`Could not reopen ${before.file ?? "an empty project"}: ${r.error?.message}`);
+      }
+    }
+    rmSync2(dir, { recursive: true, force: true });
+    if (checkpointDir) rmSync2(checkpointDir, { recursive: true, force: true });
+  }
+  return results;
+}
 async function fullSelftest() {
   console.log(bold(`
 Full self-test: every major tool against this After Effects (temporary comps, removed afterwards)
@@ -78781,7 +78908,7 @@ Full self-test: every major tool against this After Effects (temporary comps, re
       check: (r) => Number(r.result) >= 1 ? null : `unexpected result ${JSON.stringify(r.result)}`
     }
   ];
-  const results = [];
+  const results = await projectSafetyTests(tmpDir);
   for (const s of steps) {
     if (s.needs && !features[s.needs]) {
       results.push({ step: s.name, ok: true, ms: 0, skipped: true });
@@ -78922,7 +79049,7 @@ return r;`,
     {
       for (let i = 0; i < 50 && !(existsSync11(png) && statSync6(png).size > 0); i++) await sleep(100);
       if (existsSync11(png) && statSync6(png).size > 0) {
-        const sig = readFileSync11(png).subarray(1, 4).toString();
+        const sig = readFileSync12(png).subarray(1, 4).toString();
         sig === "PNG" ? ok("Rendered a frame preview") : bad("Frame preview is not a valid PNG");
         try {
           unlinkSync4(png);
@@ -78954,8 +79081,8 @@ ${red(bold(`${failures} problem(s) found.`))} See README > Troubleshooting.`);
 init_define_AEMCP_CEP_FILES();
 import { spawnSync as spawnSync5 } from "node:child_process";
 import { createHash as createHash4 } from "node:crypto";
-import { copyFileSync as copyFileSync4, existsSync as existsSync12, mkdirSync as mkdirSync11, renameSync as renameSync2, rmSync as rmSync2, writeFileSync as writeFileSync7 } from "node:fs";
-import { dirname as dirname8 } from "node:path";
+import { copyFileSync as copyFileSync4, existsSync as existsSync12, mkdirSync as mkdirSync11, renameSync as renameSync2, rmSync as rmSync3, writeFileSync as writeFileSync7 } from "node:fs";
+import { dirname as dirname9 } from "node:path";
 import { fileURLToPath as fileURLToPath4 } from "node:url";
 var SERVER_ASSET = "ae-mcp.mjs";
 async function get(url2) {
@@ -78994,14 +79121,14 @@ async function runUpdate() {
     const bytes = Buffer.from(body);
     const got = createHash4("sha256").update(bytes).digest("hex");
     if (got !== want) throw new Error(`checksum mismatch (expected ${want.slice(0, 12)}\u2026, got ${got.slice(0, 12)}\u2026)`);
-    mkdirSync11(dirname8(INSTALLED_SERVER), { recursive: true });
+    mkdirSync11(dirname9(INSTALLED_SERVER), { recursive: true });
     writeFileSync7(tmp, bytes);
     const v = spawnSync5(process.execPath, [tmp, "--version"], { encoding: "utf8", timeout: 3e4 });
     if (v.status !== 0 || v.stdout.trim() !== latest) throw new Error(`the downloaded server did not start correctly (${(v.stderr || v.stdout).trim().slice(0, 200)})`);
     if (existsSync12(INSTALLED_SERVER)) copyFileSync4(INSTALLED_SERVER, `${INSTALLED_SERVER}.previous`);
     renameSync2(tmp, INSTALLED_SERVER);
   } catch (e) {
-    rmSync2(tmp, { force: true });
+    rmSync3(tmp, { force: true });
     return { ...base, ok: false, to: latest, url: rel.html_url, message: `Update to v${latest} failed: ${e.message}. Nothing was changed.` };
   }
   const setup = spawnSync5(process.execPath, [INSTALLED_SERVER, "setup"], { encoding: "utf8", timeout: 6e4, env: { ...process.env, AEMCP_NO_UPDATE_CHECK: "1" } });
@@ -79035,18 +79162,18 @@ AE MCP update`));
 
 // src/cli/uninstall.ts
 init_define_AEMCP_CEP_FILES();
-import { existsSync as existsSync13, readdirSync as readdirSync6, readFileSync as readFileSync12, rmSync as rmSync3, writeFileSync as writeFileSync8 } from "node:fs";
+import { existsSync as existsSync13, readdirSync as readdirSync6, readFileSync as readFileSync13, rmSync as rmSync4, writeFileSync as writeFileSync8 } from "node:fs";
 import { join as join14 } from "node:path";
 function uninstall(argv) {
   console.log(bold("\nAfter Effects MCP uninstaller\n"));
   const keepConfig = argv.includes("--keep-config");
   if (existsSync13(extensionDir())) {
-    rmSync3(extensionDir(), { recursive: true, force: true });
+    rmSync4(extensionDir(), { recursive: true, force: true });
     ok(`Removed the After Effects extension`);
   }
   if (existsSync13(AEMCP_DIR)) {
     for (const name of readdirSync6(AEMCP_DIR))
-      if (name !== "node" && !(keepConfig && name === "config.json")) rmSync3(join14(AEMCP_DIR, name), { recursive: true, force: true });
+      if (name !== "node" && !(keepConfig && name === "config.json")) rmSync4(join14(AEMCP_DIR, name), { recursive: true, force: true });
   }
   ok(keepConfig ? "Removed the server (kept ~/.aemcp/config.json)" : `Removed ${AEMCP_DIR}`);
   for (const [label, file2] of [["Claude Desktop", claudeDesktopConfig()], ["Cursor", cursorConfig()], ["Claude Code", claudeCodeConfig()]]) {
@@ -79066,7 +79193,7 @@ function uninstall(argv) {
     }
   }
   if (existsSync13(codexConfig())) {
-    const t = readFileSync12(codexConfig(), "utf8");
+    const t = readFileSync13(codexConfig(), "utf8");
     const n = removeCodexBlock(t);
     if (n !== t) {
       writeFileSync8(codexConfig(), n.trimEnd() + "\n");
