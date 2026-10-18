@@ -1,10 +1,11 @@
 // `ae-mcp selftest --full`: the read-only check and change report with app.project.revision (fast path),
-// whether read-only mode's Edit > Undo only ever reverts the script (never the user's last edit),
+// whether read-only mode's rollback only ever reverts the script (never the user's last edit),
 // plus a timing of a read-only query on a project with many comps, fast path vs the full snapshot.
 // Everything it creates is named __aemcp_fulltest_rev* and removed by the full self-test's cleanup.
 import { evalRaw } from "../bridge.js";
 import { evalBody, formatChanges, runJsx, type RunOptions, type RunResult } from "../jsx.js";
-import { undoReadOnlyChanges } from "../tools/core.js";
+import { readOnlyRefusal, readOnlyRunOptions } from "../tools/core.js";
+import { transpileUserCode } from "../transpile.js";
 
 export interface RevisionStep { step: string; ok: boolean; ms: number; error?: string; skipped?: boolean; bench?: Record<string, number> }
 
@@ -77,9 +78,8 @@ return app.project.numItems;`,
     return /label/.test(text) && /comment/.test(text) ? null : `not reported: ${text}`;
   });
 
-  // Read-only mode undoes a script with one Edit > Undo whenever the project changed (with the fast path,
-  // whenever app.project.revision moved, even if nothing is listed). That Undo must revert the script,
-  // never the user's earlier edits. Each case has its own comp (made as its own undo step), then a
+  // Read-only mode undoes a script that changed the project, in the same call (aemcp.run's guarded
+  // rollback, the path ae_run_script takes). That must revert the script, never the user's earlier edits. Each case has its own comp (made as its own undo step), then a
   // "user" rename as another undo step, then the read-only script; afterwards the layer must be
   // exactly as the user left it.
   let k = 0;
@@ -106,8 +106,9 @@ return app.project.numItems;`,
       }
       const before = await state();
       if (!before.startsWith("user rename 1 |")) return `setup didn't leave the user's rename: ${before}`;
-      const r = await runJsx(user(`${findLayer}\n${script}\nreturn L ? L.name : null;`), {}, READ_ONLY);
-      const refusal = await undoReadOnlyChanges(r);
+      const code = `${findLayer}\n${script}\nreturn L ? L.name : null;`;
+      const r = await runJsx(evalBody(transpileUserCode(code).source), {}, { ...readOnlyRunOptions(code), timeoutMs: 300_000 });
+      const refusal = readOnlyRefusal(r);
       const after = await state();
       if (after !== before) return `before the script: ${before}; after the ${refusal ? "refusal and Undo" : "script (not refused)"}: ${after}`;
       if (opts.took !== undefined && r.result !== opts.took) return `the script's command didn't take effect (layer name ${r.result}, expected ${opts.took})`;

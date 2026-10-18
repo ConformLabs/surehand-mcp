@@ -4,28 +4,16 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import { aeLabel, evalRaw, health, listInstances, matchInstance, resolvePort, selectInstance } from "../bridge.js";
+import { aeLabel, health, listInstances, matchInstance, resolvePort, selectInstance } from "../bridge.js";
 import { lastSetup } from "../cli/setup.js";
 import { checkForUpdate, updateMessage } from "../update.js";
 import { VERSION } from "../config.js";
-import { codeExcerpt, ensureHelpers, errorHint, evalBody, formatChanges, runJsx, type RunResult } from "../jsx.js";
+import { codeExcerpt, ensureHelpers, errorHint, evalBody, formatChanges, rollbackProblem, runJsx, type RunOptions, type RunResult } from "../jsx.js";
 import { reservedGlobalsHint, transpileUserCode } from "../transpile.js";
 import { approvalSummary, permissions, READ_ONLY_REFUSAL, SHELL_REFUSAL, usesShell } from "../permissions.js";
 import { compRef, errorResult, formatResult, layerRef, reportScope } from "./registry.js";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-/**
- * Read-only mode: when a script (run with checkOnly) changed the project, undoes it and returns the
- * refusal; null when it changed nothing. Exported for the self-test's undo-safety cases.
- */
-export async function undoReadOnlyChanges(r: RunResult): Promise<string | null> {
-  if (!r.changes || formatChanges(r.changes) === "Changes: none") return null;
-  await evalRaw("app.executeCommand(16); 'undone'", 30_000); // Edit > Undo: reverts this script's undo group
-  return r.changes.unlisted
-    ? `${READ_ONLY_REFUSAL}\nThis script changed the project, so its changes were undone.`
-    : `${READ_ONLY_REFUSAL}\nThis script changed the project, so its changes were undone:\n${formatChanges(r.changes)}`;
-}
 
 // A preview never replaces an existing file at outputPath unless overwrite is true
 const OUTPUT_GUARD_JSX = `
@@ -193,6 +181,28 @@ async function renderPng(body: string, args: Record<string, unknown>): Promise<{
   return { info, data };
 }
 
+// Undo-stack calls in a script (its own undo groups, Edit > Undo/Redo, purging the undo history): one
+// undo may then not revert all of it, and only a full comparison can tell.
+const UNDO_STACK_CALLS = /\b(?:begin|end)UndoGroup\b|\bexecuteCommand\b|\bpurge\b/;
+
+/**
+ * How ae_run_script runs a script in read-only mode: in its own undo group, compared over every comp,
+ * and undone in the same call if it changed anything (aemcp.jsxinc). Only items and layer attributes are
+ * compared where AE has app.project.revision, unless the script touches the undo stack itself.
+ */
+export function readOnlyRunOptions(code: string): RunOptions {
+  return { undoGroup: "AE MCP Script (read-only check)", report: ["*"], checkOnly: !UNDO_STACK_CALLS.test(code), rollback: "changes" };
+}
+
+/** The refusal for a read-only script that changed the project (or may have), else null. */
+export function readOnlyRefusal(r: RunResult): string | null {
+  const rb = r.rollback;
+  if (!rb || (!rb.undone && rb.verified)) return null;
+  if (!rb.verified) return `${READ_ONLY_REFUSAL}\n${rollbackProblem(rb, "the script")}`;
+  const changes = r.changes && !r.changes.unlisted ? formatChanges(r.changes) : null;
+  return `${READ_ONLY_REFUSAL}\nThis script changed the project, so its changes were undone${changes ? `:\n${changes}` : "."}`;
+}
+
 export function registerCoreTools(server: McpServer) {
   server.registerTool(
     "ae_run_script",
@@ -228,15 +238,14 @@ export function registerCoreTools(server: McpServer) {
         const readOnly = perm.mode === "read-only";
         const t = transpileUserCode(code, transpile !== false);
         const r = await runJsx(evalBody(t.source), args ?? {}, {
-          // read-only mode needs a named undo group (to undo the script) and a report over every comp
-          undoGroup: readOnly ? "AE MCP Script (read-only check)" : undoGroup === "" ? false : undoGroup || "AE MCP Script",
+          ...(readOnly
+            ? readOnlyRunOptions(code)
+            : { undoGroup: undoGroup === "" ? false : undoGroup || "AE MCP Script", report: report === false ? undefined : reportScope(args) }),
           depth,
           timeoutMs: (timeoutSeconds ?? 120) * 1000,
-          report: readOnly ? ["*"] : report === false ? undefined : reportScope(args),
-          checkOnly: readOnly,
           bridge: perm.mode === "ask" ? { approval: { tool: "Run script", summary: approvalSummary("ae_run_script", { code }) } } : undefined,
         });
-        const refusal = readOnly ? await undoReadOnlyChanges(r) : null;
+        const refusal = readOnly ? readOnlyRefusal(r) : null;
         if (refusal) return errorResult(refusal);
         if (!r.ok && r.error) {
           // AE rejected code that wasn't valid JavaScript either: Babel's message is far clearer

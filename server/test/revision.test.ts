@@ -1,72 +1,7 @@
 // The change report's app.project.revision fast path, run against a small fake After Effects.
 import { describe, expect, it } from "vitest";
-import { formatChanges, helperSource, type Changes } from "../src/jsx.js";
-
-// ---------- a fake After Effects: just what the snapshot reads ----------
-class CompItem {}
-class FolderItem {}
-class FootageItem {}
-class SolidSource {}
-class PlaceholderSource {}
-class AVLayer {}
-const PropertyType = { PROPERTY: 6212, INDEXED_GROUP: 6213, NAMED_GROUP: 6214 };
-const PropertyValueType = { NO_VALUE: 6412, OneD: 6417, TEXT_DOCUMENT: 6420 };
-const BlendingMode = { NORMAL: 5212, ADD: 5220 };
-const TrackMatteType = { NO_TRACK_MATTE: 5012 };
-
-interface Fake {
-  app: any;
-  comp: any;
-  layer: any;
-  opacity: any;
-  /** property values read so far (what makes a snapshot slow) */
-  reads: { n: number };
-  /** an edit: bumps the revision like AE does */
-  edit: (f: () => void) => void;
-}
-
-function fakeAE(opts: { revision?: boolean } = {}): Fake {
-  const reads = { n: 0 };
-  let revision = 1;
-  let opacityValue = 100;
-  const opacity: any = {
-    name: "Opacity",
-    propertyType: PropertyType.PROPERTY,
-    propertyValueType: PropertyValueType.OneD,
-    canSetExpression: true,
-    expression: "",
-    numKeys: 0,
-    get value() {
-      reads.n++;
-      return opacityValue;
-    },
-    set value(v: number) {
-      opacityValue = v;
-    },
-  };
-  const transform: any = { name: "Transform", propertyType: PropertyType.NAMED_GROUP, numProperties: 1, property: () => opacity };
-  const layer: any = Object.assign(new AVLayer(), {
-    id: 7, name: "BG", inPoint: 0, outPoint: 4, startTime: 0, stretch: 100, parent: null, enabled: true, solo: false, locked: false,
-    shy: false, label: 1, threeDLayer: false, blendingMode: BlendingMode.NORMAL, trackMatteType: TrackMatteType.NO_TRACK_MATTE,
-    adjustmentLayer: false, motionBlur: false, guideLayer: false, audioEnabled: false, numProperties: 1, property: () => transform,
-  });
-  const comp: any = Object.assign(new CompItem(), {
-    id: 1, name: "Main", parentFolder: { name: "Root" }, label: 1, comment: "", width: 1920, height: 1080, duration: 4, frameRate: 25,
-    pixelAspect: 1, bgColor: [0, 0, 0], workAreaStart: 0, workAreaDuration: 4, numLayers: 1, useProxy: false, time: 0,
-    layer: () => layer,
-  });
-  const project: any = { numItems: 1, item: () => comp, itemByID: (id: number) => (id === 1 ? comp : null), activeItem: comp, bitsPerChannel: 8 };
-  if (opts.revision !== false) Object.defineProperty(project, "revision", { get: () => revision });
-  const app = { project, beginSuppressDialogs() {}, endSuppressDialogs() {} };
-  return { app, comp, layer, opacity, reads, edit: (f) => (f(), revision++) };
-}
-
-function loadHelpers(f: Fake): any {
-  const globals = { CompItem, FolderItem, FootageItem, SolidSource, PlaceholderSource, AVLayer, PropertyType, PropertyValueType, BlendingMode, TrackMatteType };
-  const names = Object.keys(globals);
-  const $ = { global: { ...globals } };
-  return new Function("$", "app", ...names, "var aemcp;\n" + helperSource + "\nreturn aemcp;")($, f.app, ...names.map((n) => (globals as any)[n]));
-}
+import { formatChanges, type Changes } from "../src/jsx.js";
+import { BlendingMode, fakeAE, loadHelpers, type Fake } from "./fake-ae.js";
 
 /** aemcp.run with a change report, as the server calls it; returns the parsed result. */
 function run(f: Fake, fn: () => void, opts: Record<string, unknown> = {}): { ok: boolean; changes: Changes } {

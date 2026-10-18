@@ -640,10 +640,11 @@ aemcp = (function () {
     walk(L, "", 0);
   }
   // light: layer attributes and order only, no properties (the slow part)
-  function snapComp(c, budget, light) {
-    var o = { name: c.name, layers: {}, order: [] };
+  // time: compare at this time instead of the comp's current time (see snapshotAgain)
+  function snapComp(c, budget, light, time) {
+    var o = { name: c.name, layers: {}, order: [], time: time === undefined ? c.time : time };
     if (light) o.light = true;
-    budget.time = c.time;
+    budget.time = o.time;
     for (var i = 1; i <= c.numLayers; i++) {
       var L = c.layer(i), k = layerKey(L);
       var e = { sig: layerSig(L), props: {}, groups: {} };
@@ -697,6 +698,15 @@ aemcp = (function () {
     for (var id in ids) { if (!ids.hasOwnProperty(id)) continue; var c = p.itemByID(Number(id.substr(1))); if (c) snap.comps[id] = snapComp(c, budget, light); }
     return snap;
   };
+  // A new snapshot comparable with `a`: the same comps at the same times, as light as `a`
+  // (an undo doesn't move the time indicator, and the active comp may have changed meanwhile).
+  function snapshotAgain(a) {
+    var p = app.project, snap = { items: {}, comps: {}, project: projectSig(p) }, budget = { n: PROP_BUDGET, over: false };
+    if (a.light) snap.light = true;
+    for (var i = 1; i <= p.numItems; i++) { var it = p.item(i); snap.items["i" + it.id] = itemSig(it); }
+    for (var id in a.comps) { if (!a.comps.hasOwnProperty(id)) continue; var c = p.itemByID(Number(id.substr(1))); if (c) snap.comps[id] = snapComp(c, budget, a.light, a.comps[id].time); }
+    return snap;
+  }
   // app.project.revision goes up with every edit (also undo/redo, and writing an unchanged value) and
   // not on selection, viewer, time-indicator or preview changes or scripts that only read (AE 25/26).
   // It does NOT move for some attributes: item comment/label/folder, work area, expression engine, and
@@ -806,6 +816,28 @@ aemcp = (function () {
   };
 
   // ---------- runner ----------
+  function listed(ch) { return !!(ch && (ch.items.length || ch.layers.length || ch.props.length || ch.unlisted)); }
+  // Undo what this call changed (opts.rollback). It runs in the same script as the call, right after its
+  // undo group closed, so nothing else can land on the undo stack in between. Only when the call changed
+  // something: an empty undo group is not an undo step, and Edit > Undo would revert the user's previous
+  // action instead. Undo moves app.project.revision forward (it doesn't restore it), so the check
+  // afterwards compares a new snapshot with the one from before the call. Never undoes a second time.
+  function rollback(before, rev0, rev1, ch) {
+    var moved = rev0 !== null && rev1 !== null && rev1 !== rev0;
+    if (!moved) {
+      if (!before || !ch || ch.error) return { undone: false, verified: false, problem: "unknown" }; // can't tell: leave it
+      if (!listed(ch)) return { undone: false, verified: true }; // nothing changed: the undo stack is left alone
+    }
+    app.executeCommand(16); // Edit > Undo: this call's undo group
+    var out = { undone: true, verified: true };
+    if (moved && A.revision() === rev1) { out.verified = false; out.problem = "undo did nothing"; return out; }
+    if (!before) { out.verified = false; out.problem = "not checked"; return out; }
+    try {
+      var d = A.diff(before, snapshotAgain(before));
+      if (listed(d)) { out.verified = false; out.problem = "not back"; out.remaining = d; }
+    } catch (e) { out.verified = false; out.problem = "not checked: " + (e.message || e); }
+    return out;
+  }
   A.run = function (fn, args, opts) {
     opts = opts || {};
     var logs = [];
@@ -815,22 +847,36 @@ aemcp = (function () {
       logs.push(parts.join(" "));
     }
     var undo = opts.undoGroup !== false && opts.undoGroup !== "";
-    var res;
+    // rollback: "changes" = undo whatever the call changed (read-only mode);
+    // "requested" = only when the call returns { rollback: true } (atomic batch)
+    var res, before = null, rev0 = null, rev1 = null, back = false;
     try {
       if (opts.suppressDialogs !== false) { try { app.beginSuppressDialogs(); } catch (e) {} }
-      if (undo) app.beginUndoGroup(opts.undoGroup || "AE MCP");
-      var before = null, rev0 = opts.report ? A.revision() : null;
-      // checkOnly (read-only mode): with project.revision, no property snapshot at all
-      if (opts.report) { try { before = A.snapshot(opts.report, !!opts.checkOnly && rev0 !== null); } catch (e) { before = null; } }
-      var r = fn(args || {}, log);
-      res = { ok: true, result: opts.raw ? r : A.serialize(r, opts.depth || 4), logs: logs };
-      if (before) { try { res.changes = changesSince(before, rev0, opts.report); } catch (e) { res.changes = { error: e.message }; } }
-    } catch (e) {
-      res = { ok: false, error: { message: e.message || String(e), name: e.name, line: e.line, user: !!e.aemcpUser }, logs: logs };
-      // a failed script may have changed things before it stopped: report those too
-      if (before) { try { res.changes = changesSince(before, rev0, opts.report); } catch (e2) {} }
+      try {
+        if (undo) app.beginUndoGroup(opts.undoGroup || "AE MCP");
+        rev0 = opts.report || opts.rollback ? A.revision() : null;
+        // checkOnly (read-only mode): with project.revision, no property snapshot at all
+        if (opts.report) { try { before = A.snapshot(opts.report, !!opts.checkOnly && rev0 !== null); } catch (e) { before = null; } }
+        try {
+          var r = fn(args || {}, log);
+          back = opts.rollback === "changes" || (opts.rollback === "requested" && !!r && r.rollback === true);
+          res = { ok: true, result: opts.raw ? r : A.serialize(r, opts.depth || 4), logs: logs };
+          if (before) { try { res.changes = changesSince(before, rev0, opts.report); } catch (e) { res.changes = { error: e.message }; } }
+        } catch (e) {
+          back = opts.rollback === "changes";
+          res = { ok: false, error: { message: e.message || String(e), name: e.name, line: e.line, user: !!e.aemcpUser }, logs: logs };
+          // a failed script may have changed things before it stopped: report those too
+          if (before) { try { res.changes = changesSince(before, rev0, opts.report); } catch (e2) {} }
+        }
+        rev1 = rev0 === null ? null : A.revision();
+      } finally {
+        if (undo) { try { app.endUndoGroup(); } catch (e) {} }
+      }
+      if (back) {
+        if (!undo) res.rollback = { undone: false, verified: false, problem: "no undo group" };
+        else { try { res.rollback = rollback(before, rev0, rev1, res.changes); } catch (e) { res.rollback = { undone: false, verified: false, problem: "failed: " + (e.message || e) }; } }
+      }
     } finally {
-      if (undo) { try { app.endUndoGroup(); } catch (e) {} }
       if (opts.suppressDialogs !== false) { try { app.endSuppressDialogs(false); } catch (e) {} }
     }
     return A.stringify(res);

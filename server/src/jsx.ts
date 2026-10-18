@@ -19,6 +19,12 @@ export interface RunOptions {
   checkOnly?: boolean;
   /** Undo group name; false = no undo group (read-only tools). */
   undoGroup?: string | false;
+  /**
+   * Undo this call in the same script, only if it changed something, and check the project is back
+   * (`RunResult.rollback`). "changes": whenever it changed something (read-only mode); "requested": only
+   * when the body returns `{ rollback: true }` (atomic batch). Needs an undo group.
+   */
+  rollback?: "changes" | "requested";
   /** Serialization depth for the returned value. */
   depth?: number;
   timeoutMs?: number;
@@ -40,10 +46,27 @@ export interface Changes {
   unlisted?: boolean;
 }
 
+/** What the guarded rollback did (aemcp.jsxinc). */
+export interface Rollback {
+  /** Edit > Undo was run once */
+  undone: boolean;
+  /** nothing changed (not undone), or undone and the project is back to how it was before the call */
+  verified: boolean;
+  /**
+   * "unknown": couldn't tell whether the call changed anything, so nothing was undone;
+   * "undo did nothing"; "not back": still different after the undo (see `remaining`);
+   * "not checked...": undone but couldn't compare; "no undo group"; "failed: ...".
+   */
+  problem?: string;
+  /** what still differs from before the call, after the undo */
+  remaining?: Changes;
+}
+
 export interface RunResult {
   ok: boolean;
   result?: unknown;
   changes?: Changes;
+  rollback?: Rollback;
   logs: string[];
   error?: { message: string; name?: string; line?: number; user?: boolean };
 }
@@ -58,7 +81,7 @@ export function toJsLiteral(v: unknown): string {
  * The body sees `args` (the JSON args) and `log(...)`.
  */
 export function wrapBody(body: string, args: unknown, opts: RunOptions = {}): string {
-  const runOpts = { undoGroup: opts.undoGroup === undefined ? "AE MCP" : opts.undoGroup, depth: opts.depth, report: opts.report, checkOnly: opts.checkOnly || undefined };
+  const runOpts = { undoGroup: opts.undoGroup === undefined ? "AE MCP" : opts.undoGroup, depth: opts.depth, report: opts.report, checkOnly: opts.checkOnly || undefined, rollback: opts.rollback };
   return (
     "(function(){\n" +
     `if (typeof aemcp === 'undefined' || aemcp.version !== ${toJsLiteral(HELPER_VERSION)}) return ${toJsLiteral(NEED_HELPERS)};\n` +
@@ -185,4 +208,22 @@ export function formatChanges(ch: Changes | undefined): string | null {
   if (ch.partial) notes.push("very large comp: some properties not compared");
   if (ch.truncated) notes.push("more changes not listed");
   return `Changes${notes.length ? ` (${notes.join("; ")})` : ""}:\n${lines.join("\n")}`;
+}
+
+/**
+ * What to tell the user when a guarded rollback isn't verified ("" when it is). `what` names the
+ * call: "the script", "the batch".
+ */
+export function rollbackProblem(rb: Rollback, what: string): string {
+  if (rb.verified) return "";
+  const check = "Check the project before going on (Edit > Undo and Edit > Redo still work step by step).";
+  if (!rb.undone)
+    return `It couldn't be checked whether ${what} changed the project${rb.problem && rb.problem !== "unknown" ? ` (${rb.problem})` : ""}, so nothing was undone. ${check}`;
+  const why =
+    rb.problem === "not back"
+      ? `the project still isn't how it was before ${what}:\n${(formatChanges(rb.remaining) ?? "").replace(/^Changes[^\n]*:\n/, "")}`
+      : rb.problem === "undo did nothing"
+        ? "After Effects didn't undo anything."
+        : `the result couldn't be checked (${rb.problem}).`;
+  return `The undo step of ${what} was undone once, but ${why}\nIt was not undone again, so nothing else in the undo history was reverted. ${check}`;
 }
