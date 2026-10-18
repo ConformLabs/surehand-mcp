@@ -16,15 +16,19 @@ const token = "t".repeat(48);
 const evaluated: string[] = [];
 let opened = 0;
 
-function loadBridge(appVersion: string, delayMs = 20) {
+type EvalScript = (script: string, cb: (r: string) => void) => void;
+
+function loadBridge(appVersion: string, delayMs = 20, evalScript?: EvalScript) {
   const win: any = {
     __adobe_cep__: {
       getHostEnvironment: () => JSON.stringify({ appName: "AEFT", appVersion }),
       // simulated ExtendScript: asynchronous, one script at a time
-      evalScript: (script: string, cb: (r: string) => void) => {
-        evaluated.push(script);
-        setTimeout(() => cb(script.startsWith("slow") ? "slow done" : "result:" + script), script.startsWith("slow") ? 400 : delayMs);
-      },
+      evalScript:
+        evalScript ??
+        ((script: string, cb: (r: string) => void) => {
+          evaluated.push(script);
+          setTimeout(() => cb(script.startsWith("slow") ? "slow done" : "result:" + script), script.startsWith("slow") ? 400 : delayMs);
+        }),
       requestOpenExtension: () => opened++,
       addEventListener: () => {},
     },
@@ -149,6 +153,83 @@ describe("CEP bridge", () => {
     // reads are never held
     expect((await req(port, "/eval", { script: "read" })).body.result).toBe("result:read");
     writeFileSync(cfgFile, JSON.stringify({ token, bridgePort: basePort, httpPort: basePort + 1 }));
+  });
+});
+
+// A simulated After Effects that a modal dialog can block: CEP still accepts scripts, but
+// ExtendScript runs none of them (and answers none) until the dialog closes.
+function blockableAE() {
+  const ae = {
+    blocked: false,
+    ran: [] as string[],
+    held: [] as Array<() => void>,
+    evalScript(script: string, cb: (r: string) => void) {
+      const run = () => {
+        ae.ran.push(script);
+        setTimeout(() => cb("result:" + script), script.startsWith("late") ? 1500 : 5);
+      };
+      if (ae.blocked) ae.held.push(run);
+      else run();
+    },
+    closeDialog() {
+      ae.blocked = false;
+      ae.held.splice(0).forEach((run) => run());
+    },
+  };
+  return ae;
+}
+
+describe("stale jobs", () => {
+  let ae: ReturnType<typeof blockableAE>;
+  let bridge: any;
+  beforeAll(async () => {
+    ae = blockableAE();
+    bridge = loadBridge("26.5", 20, ae.evalScript);
+    bridge.start();
+    await waitFor(() => bridge.state.listening);
+  });
+  afterAll(() => bridge?.state.server.close());
+  const log = async () => (await req(bridge.state.port, "/log")).body.log as any[];
+
+  it("never runs a job after it timed out while a dialog blocked After Effects", async () => {
+    ae.blocked = true;
+    const first = await req(bridge.state.port, "/eval", { script: "edit 1", label: "ae_set_property", timeoutMs: 1000 });
+    expect(first.status).toBe(504);
+    expect(first.body.error).toMatch(/did not run and will not run/);
+    // queued behind it in the bridge: also given up on
+    const second = await req(bridge.state.port, "/eval", { script: "edit 2", timeoutMs: 1000 });
+    expect(second.status).toBe(504);
+    ae.closeDialog();
+    await waitFor(() => !bridge.state.busy && !bridge.state.queue.length);
+    expect(ae.ran).not.toContain("edit 1");
+    expect(ae.ran).not.toContain("edit 2");
+    expect((await log()).find((e) => e.label === "ae_set_property")).toMatchObject({ ok: false, skipped: true });
+    // and the bridge carries on normally
+    expect((await req(bridge.state.port, "/eval", { script: "after" })).body).toEqual({ ok: true, result: "result:after" });
+  });
+
+  it("never runs a job the client cancelled while a dialog blocked After Effects", async () => {
+    ae.blocked = true;
+    const ctrl = new AbortController();
+    const call = req(bridge.state.port, "/eval", { script: "edit 3" }, ctrl.signal).catch(() => "aborted");
+    await waitFor(() => bridge.state.busy);
+    ctrl.abort();
+    expect(await call).toBe("aborted");
+    await new Promise((r) => setTimeout(r, 50));
+    ae.closeDialog();
+    await waitFor(() => !bridge.state.busy);
+    expect(ae.ran).not.toContain("edit 3");
+    expect((await req(bridge.state.port, "/eval", { script: "after 2" })).body.result).toBe("result:after 2");
+  });
+
+  it("logs a script that After Effects had started and finished after the AI gave up", async () => {
+    const r = await req(bridge.state.port, "/eval", { script: "late edit", label: "ae_run_script", timeoutMs: 1000 });
+    expect(r.status).toBe(504);
+    expect(r.body.error).toMatch(/already started/);
+    await waitFor(() => !bridge.state.busy);
+    const entry = (await log()).find((e) => e.label === "ae_run_script");
+    expect(entry).toMatchObject({ ok: true, late: true });
+    expect(entry.preview).toMatch(/^ran after the AI gave up/);
   });
 });
 

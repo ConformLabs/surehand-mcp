@@ -80,22 +80,47 @@
     try { if (state.listening) fs.unlinkSync(instanceFile()); } catch (e) {}
   }
 
+  // CEP accepts scripts even while a dialog (Project Settings, a render...) blocks ExtendScript,
+  // and After Effects runs them whenever it is free again: possibly long after the AI gave up.
+  // So each job first sends this no-op, and the job itself is only sent once it has come back
+  // (AE is free right now) and only if the job is still wanted.
+  var READY_SCRIPT = "'aemcp-ready'";
+
+  // the client gave up on it (timeout or cancel), or its deadline has passed
+  function dead(job) { return job.cancelled || Date.now() >= job.deadline; }
+
+  function skip(job) {
+    addLog({ at: new Date().toISOString(), ms: 0, ok: false, skipped: true, size: job.script.length, label: job.label, preview: "not run: the AI gave up before After Effects was free" });
+  }
+
   // ExtendScript is single threaded: run one script at a time.
   function pump() {
     if (state.busy || !state.queue.length) return;
     var job = state.queue.shift();
-    if (job.cancelled) return pump();
+    if (dead(job)) { skip(job); return pump(); }
     state.busy = true;
-    var t0 = Date.now();
-    state.current = { startedAt: t0, label: job.label };
-    evalScript(job.script, function (result) {
-      state.busy = false;
-      state.current = null;
-      var ms = Date.now() - t0;
-      var ok = result !== "EvalScript error." && result.indexOf('{"ok":false') !== 0;
-      addLog({ at: new Date().toISOString(), ms: ms, ok: ok, size: job.script.length, label: job.label, preview: String(result).slice(0, 160) });
-      job.done(result);
-      pump();
+    state.current = { startedAt: Date.now(), label: job.label };
+    evalScript(READY_SCRIPT, function () {
+      if (dead(job)) {
+        state.busy = false;
+        state.current = null;
+        skip(job);
+        return pump();
+      }
+      job.started = true;
+      var t0 = Date.now();
+      evalScript(job.script, function (result) {
+        state.busy = false;
+        state.current = null;
+        var ms = Date.now() - t0;
+        var ok = result !== "EvalScript error." && result.indexOf('{"ok":false') !== 0;
+        // a script AE has started can't be interrupted: say so if the client had given up meanwhile
+        var late = !!job.cancelled;
+        var preview = (late ? "ran after the AI gave up: " : "") + String(result).slice(0, 160);
+        addLog({ at: new Date().toISOString(), ms: ms, ok: ok, late: late || undefined, size: job.script.length, label: job.label, preview: preview });
+        job.done(result);
+        pump();
+      });
     });
   }
 
@@ -149,11 +174,18 @@
     var timeoutMs = Math.max(1000, Math.min(Number(body.timeoutMs) || 120000, 24 * 3600 * 1000));
     var timer = null;
     var startTimer = function () {
+      job.deadline = Date.now() + timeoutMs; // never start it after this
       timer = setTimeout(function () {
         if (finished) return;
         finished = true;
         job.cancelled = true; // drop it if it has not started yet
-        send(res, 504, { ok: false, error: "Timed out after " + Math.round(timeoutMs / 1000) + "s waiting for After Effects (it may be busy, rendering, or showing a dialog)." });
+        send(res, 504, {
+          ok: false,
+          error: "Timed out after " + Math.round(timeoutMs / 1000) + "s waiting for After Effects (it may be busy, rendering, or showing a dialog). " +
+            (job.started
+              ? "The script had already started: it can't be interrupted and will finish on its own."
+              : "The script did not run and will not run later."),
+        });
       }, timeoutMs);
     };
     // client went away (or the AI app cancelled the request) before we answered: don't run it if still queued
