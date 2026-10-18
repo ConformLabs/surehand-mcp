@@ -1062,7 +1062,7 @@ var require_babel_min = __commonJS({
       function C2(e10, a10) {
         return E("ArrayExpression", e10, a10);
       }
-      function P(e10, a10) {
+      function P2(e10, a10) {
         return E("AssignmentExpression", e10, a10);
       }
       function A(e10, a10) {
@@ -1101,7 +1101,7 @@ var require_babel_min = __commonJS({
       function L(e10, a10) {
         return E("LabeledStatement", e10, a10);
       }
-      function U(e10, a10) {
+      function U2(e10, a10) {
         return E("StringLiteral", e10, a10);
       }
       function q(e10, a10) {
@@ -2097,7 +2097,7 @@ var require_babel_min = __commonJS({
         for (var s10 = 0, d10 = i10.length - 1; s10 < r10.length; s10++, d10--) {
           var u10 = i10[d10], c10 = void 0;
           if (F(u10)) c10 = u10.name;
-          else if (U(u10)) c10 = u10.value;
+          else if (U2(u10)) c10 = u10.value;
           else if (ae(u10)) c10 = "this";
           else if (we(u10)) c10 = "super";
           else {
@@ -4043,14 +4043,14 @@ var require_babel_min = __commonJS({
       }
       function Lh(e10, a10) {
         var n10;
-        return void 0 === a10 && (a10 = e10.key), "method" === e10.kind ? Lh.increment() + "" : (n10 = F(a10) ? a10.name : U(a10) ? JSON.stringify(a10.value) : JSON.stringify(Mh(vf(a10))), e10.computed && (n10 = "[" + n10 + "]"), e10.static && (n10 = "static:" + n10), n10);
+        return void 0 === a10 && (a10 = e10.key), "method" === e10.kind ? Lh.increment() + "" : (n10 = F(a10) ? a10.name : U2(a10) ? JSON.stringify(a10.value) : JSON.stringify(Mh(vf(a10))), e10.computed && (n10 = "[" + n10 + "]"), e10.static && (n10 = "static:" + n10), n10);
       }
       function Uh(e10, a10) {
         if (Da(e10)) return e10;
         var n10, t10 = false;
         if (Wa(e10)) t10 = true, n10 = "ClassDeclaration";
         else if (Na(e10)) t10 = true, n10 = "FunctionDeclaration";
-        else if (P(e10)) return Xr(e10);
+        else if (P2(e10)) return Xr(e10);
         if (t10 && !e10.id && (n10 = false), !n10) {
           if (a10) return false;
           throw new Error("cannot turn " + e10.type + " to a statement");
@@ -4142,7 +4142,7 @@ var require_babel_min = __commonJS({
         for (var r10 = [].concat(e10), i10 = /* @__PURE__ */ Object.create(null); r10.length; ) {
           var o10 = r10.shift();
           if (o10) {
-            if (!t10 || !(P(o10) || ne(o10) || te(o10))) if (F(o10)) a10 ? (i10[o10.name] = i10[o10.name] || []).push(o10) : i10[o10.name] = o10;
+            if (!t10 || !(P2(o10) || ne(o10) || te(o10))) if (F(o10)) a10 ? (i10[o10.name] = i10[o10.name] || []).push(o10) : i10[o10.name] = o10;
             else if (!Ha(o10) || pe(o10)) {
               if (n10) {
                 if (j(o10)) {
@@ -4170,7 +4170,7 @@ var require_babel_min = __commonJS({
       function zh(e10, a10) {
         if ("id" in e10 && e10.id) return { name: e10.id.name, originalNode: e10.id };
         var n10, t10 = "";
-        if (Y(a10, { value: e10 }) ? n10 = Jh(a10) : X(e10) || Se(e10) ? (n10 = Jh(e10), "get" === e10.kind ? t10 = "get " : "set" === e10.kind && (t10 = "set ")) : ie(a10) && a10.init === e10 ? n10 = a10.id : P(a10, { operator: "=", right: e10 }) && (n10 = a10.left), !n10) return null;
+        if (Y(a10, { value: e10 }) ? n10 = Jh(a10) : X(e10) || Se(e10) ? (n10 = Jh(e10), "get" === e10.kind ? t10 = "get " : "set" === e10.kind && (t10 = "set ")) : ie(a10) && a10.init === e10 ? n10 = a10.id : P2(a10, { operator: "=", right: e10 }) && (n10 = a10.left), !n10) return null;
         var r10 = Ma(n10) ? (function(e11) {
           return W(e11) ? "null" : H(e11) ? "/" + e11.pattern + "/" + e11.flags : Pe(e11) ? e11.quasis.map(function(e12) {
             return e12.value.raw;
@@ -4905,7 +4905,7 @@ var require_babel_min = __commonJS({
         return !!e10 && ("ClassAccessorProperty" === e10.type && (null == a10 || S(e10, a10)));
       }, isAnyTypeAnnotation: Le, isArgumentPlaceholder: function(e10, a10) {
         return E("ArgumentPlaceholder", e10, a10);
-      }, isArrayExpression: C2, isArrayPattern: se, isArrayTypeAnnotation: Ue, isArrowFunctionExpression: de, isAssignmentExpression: P, isAssignmentPattern: oe, isAwaitExpression: _e, isBigIntLiteral: ke, isBigIntLiteralTypeAnnotation: function(e10, a10) {
+      }, isArrayExpression: C2, isArrayPattern: se, isArrayTypeAnnotation: Ue, isArrowFunctionExpression: de, isAssignmentExpression: P2, isAssignmentPattern: oe, isAwaitExpression: _e, isBigIntLiteral: ke, isBigIntLiteralTypeAnnotation: function(e10, a10) {
         return E("BigIntLiteralTypeAnnotation", e10, a10);
       }, isBinary: Aa, isBinaryExpression: function(e10, a10) {
         return E("BinaryExpression", e10, a10);
@@ -5420,7 +5420,7 @@ var require_babel_min = __commonJS({
             return false;
         }
         return null == a10 || S(e10, a10);
-      }, isStatement: Da, isStaticBlock: Me, isStringLiteral: U, isStringLiteralTypeAnnotation: function(e10, a10) {
+      }, isStatement: Da, isStaticBlock: Me, isStringLiteral: U2, isStringLiteralTypeAnnotation: function(e10, a10) {
         return E("StringLiteralTypeAnnotation", e10, a10);
       }, isStringTypeAnnotation: Je, isSuper: we, isSwitchCase: function(e10, a10) {
         return E("SwitchCase", e10, a10);
@@ -11636,7 +11636,7 @@ var require_babel_min = __commonJS({
       function Ib(e10, a10, n10) {
         return void 0 === n10 && (n10 = {}), kb(e10, a10, n10);
       }
-      var Bb = _, Nb = I, jb = Na, Ob = F, Fb = ta, Mb = K, Lb = ua, Ub = Da, qb = U, Wb = Mh, Vb = Xh, Hb = /^[_$A-Z0-9]+$/;
+      var Bb = _, Nb = I, jb = Na, Ob = F, Fb = ta, Mb = K, Lb = ua, Ub = Da, qb = U2, Wb = Mh, Vb = Xh, Hb = /^[_$A-Z0-9]+$/;
       function Gb(e10, a10, n10) {
         var t10 = n10.placeholderAllowlist, r10 = n10.placeholderPattern, i10 = n10.preserveComments, o10 = void 0 !== i10 && i10, s10 = n10.syntacticPlaceholders, d10 = (function(e11, a11, n11) {
           var t11 = (a11.plugins || []).slice();
@@ -11683,7 +11683,7 @@ var require_babel_min = __commonJS({
           }, isDuplicate: p10.has(r10) }), p10.add(r10);
         }
       }
-      var Jb = Ur, zb = vf, Xb = zr, Yb = Xr, $b = ai, Qb = Da, Zb = U, ex = ri, ax = _r;
+      var Jb = Ur, zb = vf, Xb = zr, Yb = Xr, $b = ai, Qb = Da, Zb = U2, ex = ri, ax = _r;
       function nx(e10, a10) {
         var n10 = zb(e10.ast);
         return a10 && (e10.placeholders.forEach(function(e11) {
@@ -12726,7 +12726,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
             }
             return true;
           }
-          return ME(e11) ? HE(e11.tag, "String.raw") && !this.hasBinding("String", { noGlobals: true }) && this.isPure(e11.quasi, a11) : _E2(e11) ? !e11.computed && CE(e11.object) && "Symbol" === e11.object.name && CE(e11.property) && "for" !== e11.property.name && !this.hasBinding("Symbol", { noGlobals: true }) : yE(e11) ? HE(e11.callee, "Symbol.for") && !this.hasBinding("Symbol", { noGlobals: true }) && 1 === e11.arguments.length && U(e11.arguments[0]) : jE(e11);
+          return ME(e11) ? HE(e11.tag, "String.raw") && !this.hasBinding("String", { noGlobals: true }) && this.isPure(e11.quasi, a11) : _E2(e11) ? !e11.computed && CE(e11.object) && "Symbol" === e11.object.name && CE(e11.property) && "for" !== e11.property.name && !this.hasBinding("Symbol", { noGlobals: true }) : yE(e11) ? HE(e11.callee, "Symbol.for") && !this.hasBinding("Symbol", { noGlobals: true }) && 1 === e11.arguments.length && U2(e11.arguments[0]) : jE(e11);
         }, a10.setData = function(e11, a11) {
           return this.data[e11] = a11;
         }, a10.getData = function(e11) {
@@ -16066,7 +16066,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
       function tD() {
         if (this.removed) throw this.buildCodeFrameError("NodePath has been removed so is read-only.");
       }
-      var rD = Bi, iD = rf, oD = jr, sD = Ur, dD = Wr, uD = vf, cD = Xr, lD = P, pD = _, gD = fe, fD = Pa, hD = F, mD = Z, RD = we, yD = Si;
+      var rD = Bi, iD = rf, oD = jr, sD = Ur, dD = Wr, uD = vf, cD = Xr, lD = P2, pD = _, gD = fe, fD = Pa, hD = F, mD = Z, RD = we, yD = Si;
       function vD(e10, a10) {
         var n10;
         TD.call(this, e10, a10.length);
@@ -16531,7 +16531,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
         var n10 = a10.newTargetPaths;
         e10.get("meta").isIdentifier({ name: "new" }) && e10.get("property").isIdentifier({ name: "target" }) && n10.push(e10);
       } });
-      var Zk = On, eI = Qn, aI = A, nI = Pa, tI = F, rI = Ma, iI = U, oI = tn, sI = en, dI = Dh;
+      var Zk = On, eI = Qn, aI = A, nI = Pa, tI = F, rI = Ma, iI = U2, oI = tn, sI = en, dI = Dh;
       function uI(e10) {
         return e10.isProgram() ? e10 : (e10.parentPath.scope.getFunctionParent() || e10.parentPath.scope.getProgramParent()).path;
       }
@@ -22189,7 +22189,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
       }
       function TH(e10, a10, n10) {
         if (!(F(e10) && a10.hasUid(e10.name))) {
-          if (P(e10, { operator: "=" }) && F(e10.left) && a10.hasUid(e10.left.name)) return vf(e10);
+          if (P2(e10, { operator: "=" }) && F(e10.left) && a10.hasUid(e10.left.name)) return vf(e10);
           var t10 = ai(n10);
           return a10.push({ id: t10, kind: "let" }), jr("=", vf(t10), e10);
         }
@@ -22452,7 +22452,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
                       Xe2 = kH(Ze2);
                       var ta2 = rG(x10, "get_" + ke2), ra2 = rG(x10, "set_" + ke2);
                       VH(na2, He2, ta2, ra2, Ge2), ze2 = [ea2, ta2, ra2];
-                    } else _H(e10, r10), DH(e10.node.id, na2, vf(He2), P(He2) ? vf(He2.left) : vf(He2), Ze2, De2, Ge2), ze2 = [ea2];
+                    } else _H(e10, r10), DH(e10.node.id, na2, vf(He2), P2(He2) ? vf(He2.left) : vf(He2), Ze2, De2, Ge2), ze2 = [ea2];
                   } else if (0 === Je2) {
                     var ia2 = rG(x10, "init_" + ke2), oa2 = Ee2.get("value"), sa2 = Ge2 ? [] : [Si()];
                     oa2.node && sa2.push(oa2.node), oa2.replaceWith(Wr(vf(ia2), sa2)), ze2 = [ia2], Ke2 && (Xe2 = kH(He2));
@@ -25393,10 +25393,10 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
         var e10 = VK()();
         return e10.addRange(67648, 67669).addRange(67671, 67679), w2.characters = e10, w2;
       }
-      var P2, A2 = {};
+      var P22, A2 = {};
       function _2() {
-        if (P2) return A2;
-        P2 = 1;
+        if (P22) return A2;
+        P22 = 1;
         var e10 = VK()(783, 786, 815, 7673, 66045);
         return e10.addRange(788, 802).addRange(806, 812).addRange(818, 833).addRange(835, 836).addRange(838, 855).addRange(857, 861).addRange(863, 866).addRange(2387, 2388).addRange(6832, 6896).addRange(7618, 7671).addRange(7675, 7679).addRange(8204, 8205).addRange(8400, 8431).addRange(65024, 65039).addRange(65056, 65069).addRange(118528, 118573).addRange(118576, 118598).addRange(119079, 119080).addRange(119143, 119145).addRange(119163, 119170).addRange(119173, 119179).addRange(119210, 119213).addRange(119387, 119388).addRange(917760, 917999), A2.characters = e10, A2;
       }
@@ -25421,12 +25421,12 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
         var e10 = VK()();
         return e10.addRange(43392, 43469).addRange(43471, 43481).addRange(43486, 43487), F2.characters = e10, F2;
       }
-      var L2, U2 = {};
+      var L2, U22 = {};
       function q2() {
-        if (L2) return U2;
+        if (L2) return U22;
         L2 = 1;
         var e10 = VK()();
-        return e10.addRange(101888, 102801).addRange(102816, 102866), U2.characters = e10, U2;
+        return e10.addRange(101888, 102801).addRange(102816, 102866), U22.characters = e10, U22;
       }
       var W2, V2 = {};
       function H2() {
@@ -28733,7 +28733,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
           e11.skip();
         }, YieldExpression: function(e11) {
           var a11, n11;
-          a11 = e11.parent, n11 = this.sentId, P(a11) && F(a11.left, { name: n11 }) || e11.replaceWith(jr("=", ai(this.sentId), e11.node));
+          a11 = e11.parent, n11 = this.sentId, P2(a11) && F(a11.left, { name: n11 }) || e11.replaceWith(jr("=", ai(this.sentId), e11.node));
         }, MetaProperty: function(e11) {
           a10(e11.node) && e11.replaceWith(ai(this.sentId));
         } };
@@ -28919,8 +28919,8 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
               else if (Pe(d12)) n12.push(vf(d12)), r12 = true;
               else if (Ma(d12)) n12.push(ri(String(d12.value)));
               else {
-                P(d12) && F(d12.left) ? n12.push(vf(d12.left)) : n12.push(vf(d12));
-                var u12 = P(d12) ? d12.right : d12;
+                P2(d12) && F(d12.left) ? n12.push(vf(d12.left)) : n12.push(vf(d12));
+                var u12 = P2(d12) ? d12.right : d12;
                 G(u12, { computed: false }) && F(u12.object, { name: "Symbol" }) || _(u12) && en(u12.callee, "Symbol.for") || (t12 = false);
               }
             }
@@ -29013,7 +29013,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
               var d12 = w10(s12, e12.scope);
               s12.forEach(function(e13) {
                 var a12 = e13.get("key"), n12 = a12.node;
-                P(a12.node) && (n12 = a12.node.left), o10 = ci(o10, vf(n12), e13.node.computed || Ma(a12.node));
+                P2(a12.node) && (n12 = a12.node.left), o10 = ci(o10, vf(n12), e13.node.computed || Ma(a12.node));
               });
               var u12 = e12.parentPath, c11 = m(C10(u12, a11, o10), 3), l11 = c11[0], p10 = c11[1], g11 = c11[2];
               v10 && (function(e13) {
@@ -30115,7 +30115,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
                     return false;
                   })(e12)) return;
                   var n12 = e12.static ? "static" : "instance", t13 = s10.methods[n12], i11 = "method" === e12.kind ? "value" : e12.kind, o11 = q(e12.key) || ke(e12.key) ? ri(String(e12.key.value)) : Dh(e12);
-                  t13.hasComputed = !U(o11);
+                  t13.hasComputed = !U2(o11);
                   var u13, c12 = null != a11 ? a11 : kh(e12);
                   if (!t13.hasComputed && t13.map.has(o11.value)) (u13 = t13.map.get(o11.value))[i11] = c12, "value" === i11 ? (u13.get = null, u13.set = null) : u13.value = null;
                   else {
@@ -30706,7 +30706,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
         return r10 || (f10 = n10 ? function(e11, a11) {
           throw a11.buildCodeFrameError(e11, "Cannot compile to CommonJS, since it would require top-level await.");
         } : t10), { buildFetch: f10, buildFetchAsync: function(e11, a11) {
-          return U(e11) ? gx.expression.ast(ope || (ope = R(["\n        Promise.resolve().then(() => ", ")\n      "])), t10(e11, a11)) : gx.expression.ast(spe || (spe = R(["\n        Promise.resolve(`${", "}`).then((s) => ", ")\n      "], ["\n        Promise.resolve(\\`\\${", "}\\`).then((s) => ", ")\n      "])), e11, t10(ai("s"), a11));
+          return U2(e11) ? gx.expression.ast(ope || (ope = R(["\n        Promise.resolve().then(() => ", ")\n      "])), t10(e11, a11)) : gx.expression.ast(spe || (spe = R(["\n        Promise.resolve(`${", "}`).then((s) => ", ")\n      "], ["\n        Promise.resolve(\\`\\${", "}\\`).then((s) => ", ")\n      "])), e11, t10(ai("s"), a11));
         }, needsAwait: !r10 };
       }
       var mpe, Rpe, ype, vpe, bpe, xpe = /* @__PURE__ */ new WeakMap();
@@ -31120,7 +31120,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
       }
       function ige(e10, a10, n10, t10) {
         var r10 = _(e10) ? e10.arguments[0] : e10.source;
-        if (U(r10) || Pe(r10) && 0 === r10.quasis.length) return a10 ? gx.expression.ast(_pe || (_pe = R(["\n        Promise.resolve().then(() => ", ")\n      "])), t10(r10)) : t10(r10);
+        if (U2(r10) || Pe(r10) && 0 === r10.quasis.length) return a10 ? gx.expression.ast(_pe || (_pe = R(["\n        Promise.resolve().then(() => ", ")\n      "])), t10(r10)) : t10(r10);
         var i10 = Pe(r10) ? ai("specifier") : Zi([Qi({ raw: "" }), Qi({ raw: "" })], [ai("specifier")]);
         return a10 ? gx.expression.ast(Dpe || (Dpe = R(["\n      (specifier =>\n        new Promise(r => r(", "))\n          .then(s => ", ")\n      )(", ")\n    "])), i10, t10(ai("s")), r10) : n10 ? gx.expression.ast(kpe || (kpe = R(["\n      (specifier =>\n        new Promise(r => r(", "))\n      )(", ")\n    "])), t10(i10), r10) : gx.expression.ast(Ipe || (Ipe = R(["\n      (specifier => ", ")(", ")\n    "])), t10(i10), r10);
       }
@@ -31627,7 +31627,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
                 if (pe(b11)) R11 = true;
                 else if (he(b11)) {
                   var x11 = Bge(b11.exported, u10);
-                  h11.push(x11), m11.push(ci(ai(s11), b11.local, U(b11.local)));
+                  h11.push(x11), m11.push(ci(ai(s11), b11.local, U2(b11.local)));
                 }
               }
               t11.push.apply(t11, y(jge(e11, ai(i11), h11, m11, R11 ? ai(s11) : null, u10)));
@@ -31788,11 +31788,11 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
         } } } };
       }, Gge = function(e10) {
         function a10(e11) {
-          return !Te(e11) && U(Dh(e11, e11.key), { value: "__proto__" });
+          return !Te(e11) && U2(Dh(e11, e11.key), { value: "__proto__" });
         }
         function n10(e11) {
           var a11 = e11;
-          return G(a11) && U(Dh(a11, a11.property), { value: "__proto__" });
+          return G(a11) && U2(Dh(a11, a11.property), { value: "__proto__" });
         }
         function t10(e11, a11, n11) {
           return Xr(Wr(n11.addHelper("defaults"), [a11, e11.right]));
@@ -31805,7 +31805,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
           }
         }, ExpressionStatement: function(e11, a11) {
           var r10 = a11.file, i10 = e11.node.expression;
-          P(i10, { operator: "=" }) && n10(i10.left) && e11.replaceWith(t10(i10, i10.left.object, r10));
+          P2(i10, { operator: "=" }) && n10(i10.left) && e11.replaceWith(t10(i10, i10.left.object, r10));
         }, ObjectExpression: function(e11, n11) {
           for (var t11, r10 = n11.file, i10 = e11.node, o10 = i10.properties, s10 = 0; s10 < o10.length; s10++) {
             var d10 = o10[s10];
@@ -31905,7 +31905,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
           for (var n11 = a11.arguments[0].properties, t11 = true, r10 = 0; r10 < n11.length; r10++) {
             var i10 = n11[r10];
             if (!Te(i10)) {
-              if (U(Dh(i10), { value: "displayName" })) {
+              if (U2(Dh(i10), { value: "displayName" })) {
                 t11 = false;
                 break;
               }
@@ -31937,7 +31937,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
             return !!n11;
           }), n11 && (G(n11) && (n11 = n11.property), F(n11) && a10(n11.name, r10)));
         } } };
-      }, zge = si, Xge = Wr, Yge = Vh, $ge = F, Qge = na, Zge = ta, efe = ra, afe = ia, nfe = sa, tfe = em, rfe = U, ife = Cn, ofe = ci, sfe = oi, dfe = gi, ufe = hi, cfe = im, lfe = Xi, pfe = ri, gfe = Si;
+      }, zge = si, Xge = Wr, Yge = Vh, $ge = F, Qge = na, Zge = ta, efe = ra, afe = ia, nfe = sa, tfe = em, rfe = U2, ife = Cn, ofe = ci, sfe = oi, dfe = gi, ufe = hi, cfe = im, lfe = Xi, pfe = ri, gfe = Si;
       function ffe(e10) {
         var a10 = { JSXNamespacedName: function(a11) {
           if (e10.throwIfNamespace) throw a11.buildCodeFrameError("Namespace tags are not supported by default. React's JSX doesn't support namespace tags. You can set `throwIfNamespace: false` to bypass this warning.");
@@ -32194,12 +32194,12 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
             if (sa(a11.node)) {
               var n11 = a11.node.argument;
               return z2(n11) && !n11.properties.some(function(e13) {
-                return Y(e13, { computed: false, shorthand: false }) && (F(e13.key, { name: "__proto__" }) || U(e13.key, { value: "__proto__" }));
+                return Y(e13, { computed: false, shorthand: false }) && (F(e13.key, { name: "__proto__" }) || U2(e13.key, { value: "__proto__" }));
               }) ? e12.push.apply(e12, y(n11.properties)) : e12.push(Xi(n11)), e12;
             }
             var t11, r11 = T10("key" !== a11.node.name.name ? a11.node.value || si(true) : a11.node.value);
             if ("key" === a11.node.name.name && null === r11) throw a11.buildCodeFrameError('Please provide an explicit key value. Using "key" as a shorthand for "key={true}" is not allowed.');
-            U(r11) && !na(a11.node.value) && (r11.value = r11.value.replace(/\n\s+/g, " "), null == (t11 = r11.extra) || delete t11.raw);
+            U2(r11) && !na(a11.node.value) && (r11.value = r11.value.replace(/\n\s+/g, " "), null == (t11 = r11.extra) || delete t11.raw);
             return ia(a11.node.name) ? a11.node.name = ri(a11.node.name.namespace.name + ":" + a11.node.name.name.name) : Cn(a11.node.name.name, false) ? a11.node.name.type = "Identifier" : a11.node.name = ri(a11.node.name.name), e12.push(Vh(hi(a11.node.name, r11), a11.node)), e12;
           }
           function P10(e12) {
@@ -32213,7 +32213,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
           }
           function A10(e12) {
             var a11, n11 = E10(e12.node.name, e12.node);
-            return F(n11) ? a11 = n11.name : U(n11) && (a11 = n11.value), im.isCompatTag(a11) ? ri(a11) : n11;
+            return F(n11) ? a11 = n11.name : U2(n11) && (a11 = n11.value), im.isCompatTag(a11) ? ri(a11) : n11;
           }
           function _10(e12, a11, n11) {
             var t11 = Tfe(e12, "runtime"), r11 = [], i11 = /* @__PURE__ */ Object.create(null);
@@ -32653,7 +32653,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
             var s10 = [], d10 = [];
             o10.get("body").forEach(function(e11) {
               var a11 = e11.node;
-              I(a11) && U(a11.expression) || null != (null == a11 ? void 0 : a11._blockHoist) ? s10.push(a11) : d10.push(a11);
+              I(a11) && U2(a11.expression) || null != (null == a11 ? void 0 : a11._blockHoist) ? s10.push(a11) : d10.push(a11);
             }), s10.length > 0 && (o10.node.body = d10);
             var u10 = (function(e11, a11) {
               var n11 = a11.node;
@@ -32820,13 +32820,13 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
             var n10 = ei(null, a10.params, a10.body, a10.generator, a10.async);
             n10.returnType = a10.returnType;
             var t10 = Dh(a10);
-            U(t10, { value: "__proto__" }) ? e11.replaceWith(hi(t10, n10, true)) : e11.replaceWith(hi(a10.key, n10, a10.computed));
+            U2(t10, { value: "__proto__" }) ? e11.replaceWith(hi(t10, n10, true)) : e11.replaceWith(hi(a10.key, n10, a10.computed));
           }
         }, ObjectProperty: function(e11) {
           var a10 = e11.node;
           if (a10.shorthand) {
             var n10 = Dh(a10);
-            U(n10, { value: "__proto__" }) ? e11.replaceWith(hi(n10, a10.value, true)) : a10.shorthand = false;
+            U2(n10, { value: "__proto__" }) ? e11.replaceWith(hi(n10, a10.value, true)) : a10.shorthand = false;
           }
         } } };
       }, she = function(e10, a10) {
@@ -32926,10 +32926,10 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
               var d10 = a11.value;
               if (d10.value.cooked && n11.push(ri(d10.value.cooked)), i11 < t11.length) {
                 var u10 = t11[i11++].node;
-                U(u10, { value: "" }) || n11.push(u10);
+                U2(u10, { value: "" }) || n11.push(u10);
               }
             }
-            U(n11[0]) || r10 && U(n11[1]) || n11.unshift(ri(""));
+            U2(n11[0]) || r10 && U2(n11[1]) || n11.unshift(ri(""));
             var c10, l10 = n11[0];
             if (r10) for (var p10 = 1; p10 < n11.length; p10++) l10 = Or("+", l10, n11[p10]);
             else n11.length > 1 && (c10 = true, l10 = n11.reduce(function(e12, a12) {
@@ -33106,7 +33106,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
         function r10(e11, a11, n11) {
           if (e11.isMemberExpression()) {
             var t11 = e11.node, r11 = t11.object, i10 = t11.property;
-            if (!F(r11) || (t11.computed ? !U(i10) : !F(i10))) return;
+            if (!F(r11) || (t11.computed ? !U2(i10) : !F(i10))) return;
             var o10 = e11.scope.getBindingIdentifier(r11.name), s10 = phe.get(o10);
             if (!s10) return;
             return s10.get(i10.computed ? i10.value : i10.name);
@@ -33877,7 +33877,7 @@ This problem is likely caused by another plugin injecting
         } }) };
       };
       function xme(e10) {
-        return F(e10) ? "name" === e10.name || "length" === e10.name : !!U(e10) && ("name" === e10.value || "length" === e10.value);
+        return F(e10) ? "name" === e10.name || "length" === e10.name : !!U2(e10) && ("name" === e10.value || "length" === e10.value);
       }
       function Sme(e10) {
         return (je(e10) || Oe(e10)) && e10.static && !!e10.value;
@@ -66595,13 +66595,15 @@ aemcp = (function () {
     }
     walk(L, "", 0);
   }
-  function snapComp(c, budget) {
+  // light: layer attributes and order only, no properties (the slow part)
+  function snapComp(c, budget, light) {
     var o = { name: c.name, layers: {}, order: [] };
+    if (light) o.light = true;
     budget.time = c.time;
     for (var i = 1; i <= c.numLayers; i++) {
       var L = c.layer(i), k = layerKey(L);
       var e = { sig: layerSig(L), props: {}, groups: {} };
-      snapProps(L, e.props, e.groups, budget);
+      if (!light) snapProps(L, e.props, e.groups, budget);
       o.layers[k] = e; o.order.push(k);
     }
     if (budget.over) o.partial = true;
@@ -66636,8 +66638,9 @@ aemcp = (function () {
     return [enc(g("bitsPerChannel")), enc(g("workingSpace")), enc(g("linearBlending")), enc(g("linearizeWorkingSpace")), enc(g("compensateForSceneReferredProfiles")),
       enc(g("colorManagementSystem") === 1 ? "OCIO" : "Adobe"), enc(g("ocioConfigurationFile")), enc(g("workingColorSpace")), enc(g("displayColorSpace")), enc(g("expressionEngine")), enc(g("timeDisplayType"))].join(SEP);
   }
-  A.snapshot = function (scopeRefs) {
+  A.snapshot = function (scopeRefs, light) {
     var p = app.project, snap = { items: {}, comps: {}, project: projectSig(p) }, budget = { n: PROP_BUDGET, over: false };
+    if (light) snap.light = true;
     for (var i = 1; i <= p.numItems; i++) { var it = p.item(i); snap.items["i" + it.id] = itemSig(it); }
     var ids = {};
     // a call that names a comp is compared there only; otherwise the active comp is compared
@@ -66647,9 +66650,25 @@ aemcp = (function () {
       if (scopeRefs[r] === "*") { for (var ai = 1; ai <= p.numItems; ai++) if (p.item(ai) instanceof CompItem) ids["c" + p.item(ai).id] = true; continue; } // every comp
       try { ids["c" + A.findComp(scopeRefs[r]).id] = true; } catch (e) {}
     }
-    for (var id in ids) { if (!ids.hasOwnProperty(id)) continue; var c = p.itemByID(Number(id.substr(1))); if (c) snap.comps[id] = snapComp(c, budget); }
+    for (var id in ids) { if (!ids.hasOwnProperty(id)) continue; var c = p.itemByID(Number(id.substr(1))); if (c) snap.comps[id] = snapComp(c, budget, light); }
     return snap;
   };
+  // app.project.revision goes up with every edit (also undo/redo, and writing an unchanged value) and
+  // not on selection, viewer, time-indicator or preview changes or scripts that only read (AE 25/26).
+  // It does NOT move for some attributes: item comment/label/folder, work area, expression engine, and
+  // blend mode on some layers. So an unchanged revision only proves no property changed; items and layer attributes still
+  // have to be compared (cheap). null when this AE has no project.revision.
+  A.revision = function () {
+    try { var r = app.project.revision; return typeof r === "number" ? r : null; } catch (e) { return null; }
+  };
+  // The change report for a call that started with snapshot \`before\` and revision \`rev0\`.
+  function changesSince(before, rev0, scope) {
+    var rev1 = rev0 === null ? null : A.revision(), ch;
+    if (rev1 !== null && rev1 === rev0) { ch = A.diff(before, A.snapshot(scope, true)); ch.fast = true; return ch; }
+    // a light "before" (read-only check) has no properties to compare against: only say that something changed
+    if (before.light) return { items: [], layers: [], props: [], scope: [], fast: true, unlisted: true };
+    return A.diff(before, A.snapshot(scope));
+  }
   A.diff = function (a, b) {
     var ch = { items: [], layers: [], props: [], scope: [], partial: false }, MAX = 80, n = 0;
     function add(list, v) { if (n++ < MAX) list.push(v); else ch.truncated = true; }
@@ -66686,6 +66705,7 @@ aemcp = (function () {
       if (!ca) continue; // comp entered the scope during the call (e.g. newly opened): reported as an item
       ch.scope.push(cb.name);
       if (ca.partial || cb.partial) ch.partial = true;
+      var noProps = ca.light || cb.light;
       for (var k in cb.layers) {
         if (!cb.layers.hasOwnProperty(k)) continue;
         var lb = cb.layers[k], la = ca.layers[k], lbs = lb.sig.split(SEP), lname = raw(lbs[0]);
@@ -66695,6 +66715,7 @@ aemcp = (function () {
           for (var g = 0; g < lbs.length; g++) if (las[g] !== lbs[g]) ld.push(LAYER_FIELDS[g] + " " + show(las[g]) + " -> " + show(lbs[g]));
           if (ld.length) add(ch.layers, ["~", cb.name, lname, ld.join("; ")]);
         }
+        if (noProps) continue;
         // added/removed groups (effects, masks, shape groups...): report only the outermost one
         var addedG = [], removedG = [];
         for (var gp in lb.groups) {
@@ -66754,15 +66775,16 @@ aemcp = (function () {
     try {
       if (opts.suppressDialogs !== false) { try { app.beginSuppressDialogs(); } catch (e) {} }
       if (undo) app.beginUndoGroup(opts.undoGroup || "AE MCP");
-      var before = null;
-      if (opts.report) { try { before = A.snapshot(opts.report); } catch (e) { before = null; } }
+      var before = null, rev0 = opts.report ? A.revision() : null;
+      // checkOnly (read-only mode): with project.revision, no property snapshot at all
+      if (opts.report) { try { before = A.snapshot(opts.report, !!opts.checkOnly && rev0 !== null); } catch (e) { before = null; } }
       var r = fn(args || {}, log);
       res = { ok: true, result: opts.raw ? r : A.serialize(r, opts.depth || 4), logs: logs };
-      if (before) { try { res.changes = A.diff(before, A.snapshot(opts.report)); } catch (e) { res.changes = { error: e.message }; } }
+      if (before) { try { res.changes = changesSince(before, rev0, opts.report); } catch (e) { res.changes = { error: e.message }; } }
     } catch (e) {
       res = { ok: false, error: { message: e.message || String(e), name: e.name, line: e.line, user: !!e.aemcpUser }, logs: logs };
       // a failed script may have changed things before it stopped: report those too
-      if (before) { try { res.changes = A.diff(before, A.snapshot(opts.report)); } catch (e2) {} }
+      if (before) { try { res.changes = changesSince(before, rev0, opts.report); } catch (e2) {} }
     } finally {
       if (undo) { try { app.endUndoGroup(); } catch (e) {} }
       if (opts.suppressDialogs !== false) { try { app.endSuppressDialogs(false); } catch (e) {} }
@@ -66800,7 +66822,7 @@ function toJsLiteral(v) {
   return (JSON.stringify(v ?? null) ?? "null").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
 }
 function wrapBody(body, args, opts = {}) {
-  const runOpts = { undoGroup: opts.undoGroup === void 0 ? "AE MCP" : opts.undoGroup, depth: opts.depth, report: opts.report };
+  const runOpts = { undoGroup: opts.undoGroup === void 0 ? "AE MCP" : opts.undoGroup, depth: opts.depth, report: opts.report, checkOnly: opts.checkOnly || void 0 };
   return `(function(){
 if (typeof aemcp === 'undefined' || aemcp.version !== ${toJsLiteral(HELPER_VERSION)}) return ${toJsLiteral(NEED_HELPERS)};
 return aemcp.run(function(args, log){
@@ -66866,6 +66888,7 @@ async function runJsx(body, args = {}, opts = {}) {
 function formatChanges(ch) {
   if (!ch) return null;
   if (ch.error) return `Changes: (could not be determined: ${ch.error})`;
+  if (ch.unlisted) return "Changes: the project changed (not listed)";
   const lines = [];
   for (const [op, type, name, extra] of ch.items) {
     if (op === "+") {
@@ -67231,6 +67254,7 @@ try {
   f.keyframeLabels = has(op, "setLabelAtKey");
   f.layerIds = has(t, "id");
   f.anyLayerTrackMatte = has(t, "setTrackMatte");
+  f.revision = (function () { try { return typeof app.project.revision === "number"; } catch (e) { return false; } })();
   f.expressionEngine = app.project.expressionEngine;
   f.scriptsCanWriteFiles = (function () { try { return app.preferences.getPrefAsLong("Main Pref Section", "Pref_SCRIPTING_FILE_NETWORK_SECURITY") === 1; } catch (e) { return null; } })();
 } finally { c.remove(); }
@@ -67246,7 +67270,8 @@ var FEATURE_NOTES = {
   missingFontsApi: "missing-font check in ae_project_health (AE 24.0+)",
   keyframeLabels: "keyframe color labels in ae_edit_keyframes (AE 22.6+)",
   layerIds: "stable layer ids for the change report (AE 22.0+; older versions match layers by index+name)",
-  anyLayerTrackMatte: "track matte to any layer in ae_set_layer_attributes (AE 23.0+)"
+  anyLayerTrackMatte: "track matte to any layer in ae_set_layer_attributes (AE 23.0+)",
+  revision: "fast read-only mode and change reports: property snapshots are skipped when nothing changed (app.project.revision)"
 };
 
 // src/transpile.ts
@@ -69628,6 +69653,14 @@ import { existsSync as existsSync7, mkdirSync as mkdirSync6, readFileSync as rea
 import { homedir as homedir5 } from "node:os";
 import { join as join9 } from "node:path";
 var sleep2 = (ms) => new Promise((r) => setTimeout(r, ms));
+async function undoReadOnlyChanges(r) {
+  if (!r.changes || formatChanges(r.changes) === "Changes: none") return null;
+  await evalRaw("app.executeCommand(16); 'undone'", 3e4);
+  return r.changes.unlisted ? `${READ_ONLY_REFUSAL}
+This script changed the project, so its changes were undone.` : `${READ_ONLY_REFUSAL}
+This script changed the project, so its changes were undone:
+${formatChanges(r.changes)}`;
+}
 var OUTPUT_GUARD_JSX = `
 if (args.outputPath && !args.overwrite && new File(args.outputPath).exists)
   aemcp.fail("A file already exists at " + new File(args.outputPath).fsName + ". Nothing was rendered. To replace it, pass overwrite: true (or choose another outputPath).");`;
@@ -69811,16 +69844,11 @@ function registerCoreTools(server) {
           depth,
           timeoutMs: (timeoutSeconds ?? 120) * 1e3,
           report: readOnly ? ["*"] : report === false ? void 0 : reportScope(args),
+          checkOnly: readOnly,
           bridge: perm.mode === "ask" ? { approval: { tool: "Run script", summary: approvalSummary("ae_run_script", { code }) } } : void 0
         });
-        if (readOnly && r.changes && formatChanges(r.changes) !== "Changes: none") {
-          await evalRaw("app.executeCommand(16); 'undone'", 3e4);
-          return errorResult(
-            `${READ_ONLY_REFUSAL}
-This script changed the project, so its changes were undone:
-${formatChanges(r.changes)}`
-          );
-        }
+        const refusal = readOnly ? await undoReadOnlyChanges(r) : null;
+        if (refusal) return errorResult(refusal);
         if (!r.ok && r.error) {
           if (t.syntaxError && /does not have a value|syntax|expected|illegal|unterminated/i.test(r.error.message)) {
             return { isError: true, content: [{ type: "text", text: `Syntax error: ${t.syntaxError}` }] };
@@ -70321,6 +70349,131 @@ The original project file was not changed.` }] };
   );
 }
 
+// src/cli/fulltest-revision.ts
+init_define_AEMCP_CEP_FILES();
+var P = "__aemcp_fulltest_rev";
+var COMPS = 30;
+var LAYERS = 12;
+var READ_ONLY = { undoGroup: "AE MCP Script (read-only check)", report: ["*"], checkOnly: true, timeoutMs: 3e5 };
+var user = (code) => evalBody(`(function(args, log){${code}
+})`);
+var findComp = `var c = null; for (var i = 1; i <= app.project.numItems; i++) if (app.project.item(i).name === "${P}") c = app.project.item(i);`;
+var U = `${P}_undo`;
+var UNDO = 16;
+var REDO = 2035;
+async function revisionSteps(features, say) {
+  const fast = !!features.revision;
+  const out = [];
+  const step2 = async (name, fn, bench2) => {
+    const t0 = Date.now();
+    let problem;
+    try {
+      problem = await fn();
+    } catch (e) {
+      problem = e.message;
+    }
+    const ms = Date.now() - t0;
+    out.push({ step: name, ok: !problem, ms, error: problem ?? void 0, bench: bench2 });
+    say(!problem, problem ? `${name}: ${problem}` : `${name} (${ms} ms)${bench2 ? ": " + Object.entries(bench2).map(([k2, v]) => `${k2} ${v} ms`).join(", ") : ""}`);
+  };
+  const check2 = (r) => r.ok ? null : `script failed: ${r.error?.message}`;
+  await step2(`build ${COMPS} comps x ${LAYERS} layers`, async () => {
+    const r = await runJsx(
+      `for (var k = 0; k < args.comps; k++) {
+  var c = app.project.items.addComp(k ? "${P}_" + k : "${P}", 1280, 720, 1, 4, 25);
+  for (var j = 0; j < args.layers; j++) {
+    var L = c.layers.addShape(); L.name = "S" + j;
+    L.property("ADBE Root Vectors Group").addProperty("ADBE Vector Shape - Ellipse");
+    L.property("ADBE Effect Parade").addProperty("ADBE Gaussian Blur 2");
+    L.property("ADBE Transform Group").property("ADBE Position").setValueAtTime(1, [j, j]);
+  }
+}
+return app.project.numItems;`,
+      { comps: COMPS, layers: LAYERS },
+      { undoGroup: "AE MCP self-test", timeoutMs: 3e5 }
+    );
+    return check2(r);
+  });
+  await step2("read-only check: a script that only reads", async () => {
+    const r = await runJsx(user("var n = 0; for (var i = 1; i <= app.project.numItems; i++) n += app.project.item(i).name.length; return n;"), {}, READ_ONLY);
+    if (!r.ok) return check2(r);
+    if (formatChanges(r.changes) !== "Changes: none") return `reported ${formatChanges(r.changes)}`;
+    return fast && !r.changes?.fast ? "app.project.revision is available but the fast path wasn't used" : null;
+  });
+  await step2("read-only check: catches a property edit", async () => {
+    const r = await runJsx(user(`${findComp} c.layer(1).property("ADBE Transform Group").property("ADBE Opacity").setValue(40); return 1;`), {}, READ_ONLY);
+    if (!r.ok) return check2(r);
+    const text = formatChanges(r.changes);
+    if (fast) return r.changes?.unlisted ? null : `expected "the project changed (not listed)", got ${text}`;
+    return /Opacity: 100 -> 40/.test(text ?? "") ? null : `the edit wasn't listed: ${text}`;
+  });
+  await step2("read-only check: catches a label and comment change", async () => {
+    const r = await runJsx(user(`${findComp} c.label = 5; c.comment = "x"; return 1;`), {}, READ_ONLY);
+    if (!r.ok) return check2(r);
+    const text = formatChanges(r.changes) ?? "";
+    return /label/.test(text) && /comment/.test(text) ? null : `not reported: ${text}`;
+  });
+  let k = 0;
+  const undoSafe = (name, script, opts = {}) => step2(`read-only undo keeps the user's last edit: ${name}`, async () => {
+    const comp = `${U}_${++k}`;
+    const findLayer = `var c = null; for (var i = 1; i <= app.project.numItems; i++) if (app.project.item(i).name === "${comp}") c = app.project.item(i); var L = c && c.layer(1);`;
+    const edit = async (code, label) => {
+      const r2 = await runJsx(code, {}, { undoGroup: `AE MCP self-test: ${label}` });
+      if (!r2.ok) throw new Error(`${label} failed: ${r2.error?.message}`);
+    };
+    const state = async () => {
+      const r2 = await runJsx(`${findLayer} return L ? [L.name, L.opacity.value, L.rotation.value].join(" | ") : "the test comp is gone";`, {}, { undoGroup: false });
+      if (!r2.ok) throw new Error(`couldn't read the test layer: ${r2.error?.message}`);
+      return String(r2.result);
+    };
+    await edit(`app.project.items.addComp("${comp}", 320, 180, 1, 4, 25).layers.addSolid([1, 0, 0], "solid", 320, 180, 1); return 1;`, "make comp");
+    await edit(`${findLayer} L.name = "user rename 1"; return 1;`, "user rename");
+    if (opts.userUndoes) {
+      await edit(`${findLayer} L.name = "user rename 2"; return 1;`, "user rename");
+      await evalRaw(`app.executeCommand(${UNDO}); 1`, 3e4);
+    }
+    const before = await state();
+    if (!before.startsWith("user rename 1 |")) return `setup didn't leave the user's rename: ${before}`;
+    const r = await runJsx(user(`${findLayer}
+${script}
+return L ? L.name : null;`), {}, READ_ONLY);
+    const refusal = await undoReadOnlyChanges(r);
+    const after = await state();
+    if (after !== before) return `before the script: ${before}; after the ${refusal ? "refusal and Undo" : "script (not refused)"}: ${after}`;
+    if (opts.took !== void 0 && r.result !== opts.took) return `the script's command didn't take effect (layer name ${r.result}, expected ${opts.took})`;
+    return null;
+  });
+  await undoSafe("script calls Edit > Undo", `app.executeCommand(${UNDO});`, { took: "solid" });
+  await undoSafe("script calls Edit > Redo", `app.executeCommand(${REDO});`, { userUndoes: true, took: "user rename 2" });
+  await undoSafe("script sets a property to its current value", "L.opacity.setValue(L.opacity.value);");
+  await undoSafe("script ends the undo group early, then edits", "app.endUndoGroup(); L.opacity.setValue(33);");
+  await undoSafe("script edits, ends the undo group, edits again", "L.opacity.setValue(33); app.endUndoGroup(); L.rotation.setValue(10);");
+  await undoSafe("script only ends the undo group early", "app.endUndoGroup();");
+  const bench = {};
+  await step2(
+    `read-only query on ${COMPS + 1}+ comps: fast path vs full snapshot`,
+    async () => {
+      const query = user("var n = 0; for (var i = 1; i <= app.project.numItems; i++) n += app.project.item(i).name.length; return n;");
+      const time3 = async (opts) => {
+        const xs = [];
+        for (let i = 0; i < 3; i++) {
+          const t0 = Date.now();
+          const r = await runJsx(query, {}, opts);
+          if (!r.ok) throw new Error(`query failed: ${r.error?.message}`);
+          xs.push(Date.now() - t0);
+        }
+        return xs.sort((a, b) => a - b)[1];
+      };
+      bench.fullSnapshot = await time3({ ...READ_ONLY, checkOnly: false });
+      bench.readOnly = await time3(READ_ONLY);
+      bench.noReport = await time3({ undoGroup: false });
+      return null;
+    },
+    bench
+  );
+  return out;
+}
+
 // src/cli/fulltest.ts
 var ALL = ALL_JSX_TOOLS;
 var C = "__aemcp_fulltest";
@@ -70510,6 +70663,7 @@ Full self-test: every major tool against this After Effects (temporary comps, re
     results.push({ step: s.name, ok: !problem, ms, error: problem ?? void 0 });
     problem ? fail(`${s.name}: ${problem}`) : ok(`${s.name} (${ms} ms)`);
   }
+  results.push(...await revisionSteps(features, (good, line) => (good ? ok : fail)(line)));
   await runJsx(
     `var p = app.project, rq = p.renderQueue;
 for (var r = rq.numItems; r > args.rq; r--) rq.item(r).remove();
