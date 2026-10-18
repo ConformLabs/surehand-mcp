@@ -223,6 +223,14 @@ export function readOnlyRefusal(r: RunResult): string | null {
   return `${READ_ONLY_REFUSAL}\nThis script changed the project, so its changes were undone${changes ? `:\n${changes}` : "."}`;
 }
 
+/** ae_run_script's read-only path, for the self-test: refused before anything runs, or run and rolled back. */
+export async function runReadOnly(code: string, timeoutMs = 120_000): Promise<{ refusal: string | null; r?: RunResult }> {
+  const refused = undoStackRefusal(code);
+  if (refused) return { refusal: refused };
+  const r = await runJsx(evalBody(transpileUserCode(code).source), {}, { ...readOnlyRunOptions(code), timeoutMs });
+  return { refusal: readOnlyRefusal(r), r };
+}
+
 export function registerCoreTools(server: McpServer) {
   server.registerTool(
     "ae_run_script",

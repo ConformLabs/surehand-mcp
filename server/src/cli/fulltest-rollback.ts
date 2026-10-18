@@ -2,10 +2,9 @@
 // After Effects. Each case first makes a "manual edit" in its own undo step (the user's last action)
 // and checks it survives. Everything it creates is named __aemcp_fulltest_rb and removed by the full
 // self-test's cleanup.
-import { evalBody, runJsx } from "../jsx.js";
-import { readOnlyRefusal, readOnlyRunOptions } from "../tools/core.js";
+import { runJsx } from "../jsx.js";
+import { runReadOnly } from "../tools/core.js";
 import { runBatch } from "../tools/workflow.js";
-import { transpileUserCode } from "../transpile.js";
 
 export interface RollbackStep { step: string; ok: boolean; ms: number; error?: string }
 
@@ -28,7 +27,7 @@ async function manualEdit(value: number) {
 
 const text = (r: { content: unknown[] }) => (r.content[0] as { text?: string })?.text ?? "";
 const script = (code: string) => ({ tool: "ae_run_script", args: { code } });
-const readOnly = async (code: string) => readOnlyRefusal(await runJsx(evalBody(transpileUserCode(code).source), {}, readOnlyRunOptions(code)));
+const readOnly = async (code: string) => (await runReadOnly(code)).refusal;
 
 export async function rollbackSteps(say: (ok: boolean, line: string) => void): Promise<RollbackStep[]> {
   const out: RollbackStep[] = [];
@@ -87,12 +86,22 @@ export async function rollbackSteps(say: (ok: boolean, line: string) => void): P
     return before.revision !== null && after.revision !== before.revision ? `revision moved ${before.revision} -> ${after.revision}` : null;
   });
 
-  await step("rollback: read-only script that closes its own undo group: reported, not undone again", async () => {
+  await step("rollback: read-only script that closes its own undo group: refused, nothing ran", async () => {
     await manualEdit(53);
     const refusal = await readOnly(`${OP} op.setValue(80); app.endUndoGroup(); op.setValue(90); return 1;`);
     const after = await state();
+    if (!refusal || !/^Nothing ran\./.test(refusal)) return `unexpected reply: ${refusal}`;
+    return after.opacity === 53 ? null : `Opacity is ${after.opacity}, expected 53 (nothing ran)`;
+  });
+
+  // the same script with the call assembled at runtime, which the text check can't see: the rollback
+  // is the backstop
+  await step("rollback: read-only script that closes its own undo group by an assembled name: reported, not undone again", async () => {
+    await manualEdit(59);
+    const refusal = await readOnly(`${OP} op.setValue(80); app["end" + "UndoGroup"](); op.setValue(90); return 1;`);
+    const after = await state();
     if (!refusal || !/not undone again/.test(refusal)) return `unexpected reply: ${refusal}`;
-    // one undo reverts only the last edit (90 -> 80); a second undo would have taken it to 53
+    // one undo reverts only the last edit (90 -> 80); a second undo would have taken it to 59
     return after.opacity === 80 ? null : `Opacity is ${after.opacity}, expected 80 (one undo)`;
   });
 
