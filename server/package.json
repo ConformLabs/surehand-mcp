@@ -18,6 +18,7 @@
     "sign": "node scripts/sign-extension.mjs",
     "test:mac": "node scripts/test-mac.mjs",
     "test:windows": "node scripts/test-windows.mjs",
+    "revision-matrix": "node scripts/revision-matrix.mjs",
     "release": "node scripts/release.mjs",
     "check": "tsc --noEmit && vitest run && node build.mjs"
   },
