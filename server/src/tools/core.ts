@@ -9,7 +9,7 @@ import { lastSetup } from "../cli/setup.js";
 import { checkForUpdate, updateMessage } from "../update.js";
 import { VERSION } from "../config.js";
 import { codeExcerpt, ensureHelpers, errorHint, evalBody, formatChanges, runJsx } from "../jsx.js";
-import { transpileUserCode } from "../transpile.js";
+import { reservedGlobalsHint, transpileUserCode } from "../transpile.js";
 import { approvalSummary, permissions, READ_ONLY_REFUSAL, SHELL_REFUSAL, usesShell } from "../permissions.js";
 import { compRef, errorResult, formatResult, layerRef, reportScope } from "./registry.js";
 
@@ -238,7 +238,7 @@ export function registerCoreTools(server: McpServer) {
             const ex = codeExcerpt(code, r.error.line);
             if (ex) extra.push(ex);
           }
-          const hint = errorHint(r.error.message);
+          const hint = reservedGlobalsHint(t.reservedGlobals) ?? errorHint(r.error.message);
           if (hint) extra.push(`Hint: ${hint}`);
           const out = formatResult(r, { quietNoChanges: true });
           if (extra.length) out.content.push({ type: "text", text: extra.join("\n\n") });
