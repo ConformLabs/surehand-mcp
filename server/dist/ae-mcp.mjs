@@ -129,22 +129,47 @@ var init_define_AEMCP_CEP_FILES = __esm({
     try { if (state.listening) fs.unlinkSync(instanceFile()); } catch (e) {}
   }
 
+  // CEP accepts scripts even while a dialog (Project Settings, a render...) blocks ExtendScript,
+  // and After Effects runs them whenever it is free again: possibly long after the AI gave up.
+  // So each job first sends this no-op, and the job itself is only sent once it has come back
+  // (AE is free right now) and only if the job is still wanted.
+  var READY_SCRIPT = "'aemcp-ready'";
+
+  // the client gave up on it (timeout or cancel), or its deadline has passed
+  function dead(job) { return job.cancelled || Date.now() >= job.deadline; }
+
+  function skip(job) {
+    addLog({ at: new Date().toISOString(), ms: 0, ok: false, skipped: true, size: job.script.length, label: job.label, preview: "not run: the AI gave up before After Effects was free" });
+  }
+
   // ExtendScript is single threaded: run one script at a time.
   function pump() {
     if (state.busy || !state.queue.length) return;
     var job = state.queue.shift();
-    if (job.cancelled) return pump();
+    if (dead(job)) { skip(job); return pump(); }
     state.busy = true;
-    var t0 = Date.now();
-    state.current = { startedAt: t0, label: job.label };
-    evalScript(job.script, function (result) {
-      state.busy = false;
-      state.current = null;
-      var ms = Date.now() - t0;
-      var ok = result !== "EvalScript error." && result.indexOf('{"ok":false') !== 0;
-      addLog({ at: new Date().toISOString(), ms: ms, ok: ok, size: job.script.length, label: job.label, preview: String(result).slice(0, 160) });
-      job.done(result);
-      pump();
+    state.current = { startedAt: Date.now(), label: job.label };
+    evalScript(READY_SCRIPT, function () {
+      if (dead(job)) {
+        state.busy = false;
+        state.current = null;
+        skip(job);
+        return pump();
+      }
+      job.started = true;
+      var t0 = Date.now();
+      evalScript(job.script, function (result) {
+        state.busy = false;
+        state.current = null;
+        var ms = Date.now() - t0;
+        var ok = result !== "EvalScript error." && result.indexOf('{"ok":false') !== 0;
+        // a script AE has started can't be interrupted: say so if the client had given up meanwhile
+        var late = !!job.cancelled;
+        var preview = (late ? "ran after the AI gave up: " : "") + String(result).slice(0, 160);
+        addLog({ at: new Date().toISOString(), ms: ms, ok: ok, late: late || undefined, size: job.script.length, label: job.label, preview: preview });
+        job.done(result);
+        pump();
+      });
     });
   }
 
@@ -198,11 +223,18 @@ var init_define_AEMCP_CEP_FILES = __esm({
     var timeoutMs = Math.max(1000, Math.min(Number(body.timeoutMs) || 120000, 24 * 3600 * 1000));
     var timer = null;
     var startTimer = function () {
+      job.deadline = Date.now() + timeoutMs; // never start it after this
       timer = setTimeout(function () {
         if (finished) return;
         finished = true;
         job.cancelled = true; // drop it if it has not started yet
-        send(res, 504, { ok: false, error: "Timed out after " + Math.round(timeoutMs / 1000) + "s waiting for After Effects (it may be busy, rendering, or showing a dialog)." });
+        send(res, 504, {
+          ok: false,
+          error: "Timed out after " + Math.round(timeoutMs / 1000) + "s waiting for After Effects (it may be busy, rendering, or showing a dialog). " +
+            (job.started
+              ? "The script had already started: it can't be interrupted and will finish on its own."
+              : "The script did not run and will not run later."),
+        });
       }, timeoutMs);
     };
     // client went away (or the AI app cancelled the request) before we answered: don't run it if still queued
@@ -73864,7 +73896,7 @@ function ensureExtension(force = false) {
   const dir = extensionDir();
   const current2 = installedExtensionHash();
   const present = existsSync2(join4(dir, "CSXS", "manifest.xml"));
-  if (!force && current2 === "e7fd3866173c" && present) return { installed: false, updated: false };
+  if (!force && current2 === "0307b36bdcfb" && present) return { installed: false, updated: false };
   const installedVersion = installedExtensionVersion();
   if (!force && present && installedVersion && compareVersions(installedVersion, VERSION) > 0) return { installed: false, updated: false };
   const updated = existsSync2(dir);
@@ -73875,7 +73907,7 @@ function ensureExtension(force = false) {
     writeFileSync3(p, content);
   }
   mkdirSync3(AEMCP_DIR, { recursive: true });
-  writeFileSync3(HASH_FILE, `${"e7fd3866173c"} ${VERSION}`);
+  writeFileSync3(HASH_FILE, `${"0307b36bdcfb"} ${VERSION}`);
   return { installed: true, updated };
 }
 function installedExtensionSignature() {
@@ -78584,7 +78616,7 @@ async function diagnostics() {
   if (cfg) L.push(`config: ${JSON.stringify({ ...cfg, token: cfg.token ? `<set, ${cfg.token.length} chars>` : "MISSING" })}`);
   else L.push(`config: MISSING (${CONFIG_FILE})`);
   L.push(`installed server: ${existsSync8(INSTALLED_SERVER) ? INSTALLED_SERVER : "not installed (fine when using the .mcpb)"}`);
-  L.push(`extension: ${extensionDir()} \xB7 ${existsSync8(join10(extensionDir(), "CSXS", "manifest.xml")) ? `hash ${installedExtensionHash()} (bundled ${"e7fd3866173c"})` : "MISSING"}`);
+  L.push(`extension: ${extensionDir()} \xB7 ${existsSync8(join10(extensionDir(), "CSXS", "manifest.xml")) ? `hash ${installedExtensionHash()} (bundled ${"0307b36bdcfb"})` : "MISSING"}`);
   const sig = installedExtensionSignature();
   L.push(`extension signature: ${sig.ok ? "valid" : sig.problems.join("; ")}`);
   L.push(`PlayerDebugMode: ${debugMode()}`);
@@ -79017,9 +79049,9 @@ After Effects MCP self-test v${VERSION}`));
   else bad(`No config at ${CONFIG_FILE}. Run the installer.`);
   const hash2 = installedExtensionHash();
   if (!existsSync11(join13(extensionDir(), "CSXS", "manifest.xml"))) bad(`After Effects extension missing at ${extensionDir()}. Run the installer.`);
-  else if (hash2 !== "e7fd3866173c" && compareVersions(installedExtensionVersion() ?? "0", VERSION) > 0)
+  else if (hash2 !== "0307b36bdcfb" && compareVersions(installedExtensionVersion() ?? "0", VERSION) > 0)
     warn(`A newer After Effects extension (v${installedExtensionVersion()}) is installed than this server (v${VERSION}): another copy of AE MCP is newer. Update this one (ae-mcp update, or the latest .mcpb).`);
-  else if (hash2 !== "e7fd3866173c") warn(`Extension at ${extensionDir()} is a different version (${hash2 ?? "unknown"} vs ${"e7fd3866173c"}). Re-run the installer.`);
+  else if (hash2 !== "0307b36bdcfb") warn(`Extension at ${extensionDir()} is a different version (${hash2 ?? "unknown"} vs ${"0307b36bdcfb"}). Re-run the installer.`);
   else ok("After Effects extension installed");
   if (bundledExtensionSigned) {
     const sig = installedExtensionSignature();
