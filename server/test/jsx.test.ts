@@ -187,6 +187,7 @@ return { doubled, a, rest, label, area: new Box(3).area(), sum, maybe, spread: [
     expect(codeExcerpt("a\nb\nc\nd\ne", 3)).toBe("  1 | a\n  2 | b\n> 3 | c\n  4 | d\n  5 | e");
     expect(errorHint("After Effects error: Object is invalid")).toMatch(/no longer exists/);
     expect(errorHint("index out of range")).toMatch(/1-based/);
+    expect(errorHint("Illegal use of reserved word")).toMatch(/o\["default"\]/);
   });
 });
 
@@ -262,5 +263,61 @@ describe("strict ES3 parse (what After Effects' engine accepts)", () => {
     const n = transpileUserCode("const v = args.a ? 1 : args.b ? 2 : 3;\nconst w = args.x?.y ?? args.z?.q ?? 0;\nreturn [v, w];");
     await parseES3(n.source);
     expect((0, eval)(n.source)({ b: true, z: { q: 7 } }, () => {})).toEqual([2, 7]);
+  });
+});
+
+/**
+ * ES3 reserves words that ES5+ allows as names (int, short, char...). ExtendScript rejects them
+ * (e.g. "Expected: (" on `function short(...)`), so the transpiler renames them.
+ */
+describe("ES3 reserved words in transpiled code", () => {
+  const es3 = async (code: string) => {
+    const { transpileUserCode } = await import("../src/transpile.js");
+    const t = transpileUserCode(code);
+    expect(t.transpiled).toBe(true);
+    const { parse } = await import("acorn");
+    expect(() => parse(t.source, { ecmaVersion: 3, sourceType: "script", allowReserved: false } as any), t.source).not.toThrow();
+    return t;
+  };
+  const run = (t: { source: string }, args: unknown = {}) => (0, eval)(t.source)(args, () => {});
+  const forms: [string, string, unknown][] = [
+    ["var", "var int = 1;\nreturn int + 1;", 2],
+    ["let", "let short = 2;\nreturn short * 2;", 4],
+    ["const", "const int = 1;\nreturn int;", 1],
+    ["function name", "function short(a) { return a + 1; }\nreturn short(1);", 2],
+    ["named function expression", "const f = function float(n) { return n ? n + float(n - 1) : 0; };\nreturn f(3);", 6],
+    ["function parameter", "function f(char) { return char + '!'; }\nreturn f('a');", "a!"],
+    ["arrow parameter", "const f = (byte) => byte * 3;\nreturn f(2);", 6],
+    ["destructured names", "const { double, list: [long] } = args;\nreturn double + long;", 7],
+    ["catch parameter", "try { throw 5; } catch (boolean) { return boolean; }", 5],
+    ["class method parameter", "class K { m(native) { return native; } }\nreturn new K().m(9);", 9],
+  ];
+  for (const [form, code, expected] of forms) {
+    it(`renames a reserved ${form}`, async () => {
+      const t = await es3(code);
+      expect(t.reservedGlobals).toBeUndefined();
+      expect(run(t, { double: 3, list: [4] })).toEqual(expected);
+    });
+  }
+
+  it("writes keyword property names as strings", async () => {
+    const t = await es3("const o = { default: 1, class: 2, int: 3, goto() { return 4; } };\no.default += o.class + o.int;\nconst { int } = o;\nreturn [o.default, o.goto(), int, o.float === undefined];");
+    expect(t.source).not.toMatch(/\.(default|class|int|goto)\b/);
+    expect(run(t)).toEqual([6, 4, 3, true]);
+  });
+
+  it("keeps line numbers and doesn't touch other names", async () => {
+    const t = await es3("const int = 1;\nconst short = 2;\nnull.boom(int, short);\nreturn integer + shortcut;");
+    const lines = t.source.split("\n");
+    expect(lines[2]).toContain("boom");
+    expect(lines[3]).toContain("integer + shortcut");
+  });
+
+  it("reports reserved-word globals it can't rename", async () => {
+    const { transpileUserCode, reservedGlobalsHint } = await import("../src/transpile.js");
+    const t = transpileUserCode("int = 5;\nreturn typeof boolean;");
+    expect(t.reservedGlobals?.sort()).toEqual(["boolean", "int"]);
+    expect(reservedGlobalsHint(t.reservedGlobals)).toMatch(/"boolean", "int"\. Declare/);
+    expect(reservedGlobalsHint(undefined)).toBeNull();
   });
 });

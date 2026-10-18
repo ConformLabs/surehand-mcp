@@ -20,9 +20,12 @@ export const EXTENDSCRIPT_DOC = `# After Effects ExtendScript cheat sheet (for a
 - AE collections are **1-based**: app.project.item(i), comp.layer(i), group.property(i). JS arrays are 0-based.
 - Times are in seconds. Colors are [r,g,b] floats 0-1 (aemcp.color("#ff8800") converts).
 - Use index loops or for...of over arrays, not for...in (polyfilled methods are enumerable in ES3).
+- ES3 reserves words such as int, short, char, float, double, long, byte, boolean, class, default. Variables, functions
+  and parameters with those names are renamed automatically, and o.default / { class: 1 } become string keys. Globals
+  you never declare can't be renamed: declare them or use another name.
 - Only with transpile:false or ae_run_script_file (raw ExtendScript): use var/function only, put parentheses around
-  nested ?: (ExtendScript evaluates a ? b : c ? d : e left-to-right), and don't use reserved words such as short, int,
-  char, float, class as names.
+  nested ?: (ExtendScript evaluates a ? b : c ? d : e left-to-right), don't use reserved words as names, and write
+  keyword properties as strings (o["default"]).
 - After Effects may run in another language: prefer match names ("ADBE Opacity", "ADBE Glo2") over display names in
   scripts. The tools accept common English names everywhere.
 - Don't use plain objects as dictionaries keyed by arbitrary names: ExtendScript objects already have members such as

@@ -73519,9 +73519,12 @@ var EXTENDSCRIPT_DOC = `# After Effects ExtendScript cheat sheet (for ae_run_scr
 - AE collections are **1-based**: app.project.item(i), comp.layer(i), group.property(i). JS arrays are 0-based.
 - Times are in seconds. Colors are [r,g,b] floats 0-1 (aemcp.color("#ff8800") converts).
 - Use index loops or for...of over arrays, not for...in (polyfilled methods are enumerable in ES3).
+- ES3 reserves words such as int, short, char, float, double, long, byte, boolean, class, default. Variables, functions
+  and parameters with those names are renamed automatically, and o.default / { class: 1 } become string keys. Globals
+  you never declare can't be renamed: declare them or use another name.
 - Only with transpile:false or ae_run_script_file (raw ExtendScript): use var/function only, put parentheses around
-  nested ?: (ExtendScript evaluates a ? b : c ? d : e left-to-right), and don't use reserved words such as short, int,
-  char, float, class as names.
+  nested ?: (ExtendScript evaluates a ? b : c ? d : e left-to-right), don't use reserved words as names, and write
+  keyword properties as strings (o["default"]).
 - After Effects may run in another language: prefer match names ("ADBE Opacity", "ADBE Glo2") over display names in
   scripts. The tools accept common English names everywhere.
 - Don't use plain objects as dictionaries keyed by arbitrary names: ExtendScript objects already have members such as
@@ -74970,6 +74973,7 @@ function errorHint(message) {
   if (/out of range|index.*range/i.test(m)) return "AE collections are 1-based: app.project.item(1..numItems), comp.layer(1..numLayers), prop.property(1..numProperties).";
   if (/Function .+ is undefined/i.test(m)) return "That method doesn't exist on this object in ExtendScript. Check the object type (ae_get_scripting_guide) or use aemcp helpers.";
   if (/undefined is not an object|null is not an object/i.test(m)) return "Something is undefined: a lookup returned nothing (names are case-sensitive; activeItem may not be a comp).";
+  if (/Illegal use of reserved word/i.test(m)) return `ExtendScript (ES3) reserves words such as int, short, char, float, double, long, byte, boolean, class, default. Don't use them as names or as .property names (write o["default"]); ae_run_script renames declared names automatically unless transpile is false.`;
   if (/does not have a value/i.test(m)) return "Syntax error (ExtendScript reports these as '... does not have a value').";
   if (/Can not .* to a (layer|property)|cannot set|not settable|read.?only/i.test(m)) return "That attribute is read-only or can't be set in this state (e.g. the layer is locked, or the property has expressions/keyframes).";
   return null;
@@ -75076,13 +75080,22 @@ function transpileUserCode(code, enabled = true) {
       babelrc: false,
       configFile: false
     }).code;
-    return { source: parenthesizeTernaries(out).replace(/;\s*$/, ""), transpiled: true };
+    const es3 = es3Pass(out);
+    const result = { source: es3.code.replace(/;\s*$/, ""), transpiled: true };
+    if (es3.reservedGlobals.length) result.reservedGlobals = es3.reservedGlobals;
+    return result;
   } catch (e) {
     return { source: plain, transpiled: false, syntaxError: cleanSyntaxError(String(e?.message || e)) };
   }
 }
-function parenthesizeTernaries(code) {
-  const plugin = ({ types: t }) => ({
+function reservedGlobalsHint(names) {
+  if (!names?.length) return null;
+  const list = names.map((n) => `"${n}"`).join(", ");
+  return `Reserved in After Effects' ExtendScript (ES3) and used without a declaration, so not renamed automatically: ${list}. Declare these names with let/const/var (declared names are renamed) or use other names.`;
+}
+function es3Pass(code) {
+  const globals = /* @__PURE__ */ new Set();
+  const parenthesize = ({ types: t }) => ({
     visitor: {
       ConditionalExpression(path) {
         for (const key of ["test", "consequent", "alternate"]) {
@@ -75092,8 +75105,16 @@ function parenthesizeTernaries(code) {
       }
     }
   });
-  return Babel.transform(code, {
-    plugins: [plugin],
+  const findReservedGlobals = ({ types: t }) => ({
+    visitor: {
+      "ReferencedIdentifier|BindingIdentifier"(path) {
+        const name = path.node.name;
+        if (!t.isValidES3Identifier(name) && !path.scope.hasBinding(name)) globals.add(name);
+      }
+    }
+  });
+  const out = Babel.transform(code, {
+    plugins: [parenthesize, "transform-reserved-words", "transform-member-expression-literals", "transform-property-literals", findReservedGlobals],
     sourceType: "script",
     retainLines: true,
     comments: false,
@@ -75102,6 +75123,7 @@ function parenthesizeTernaries(code) {
     configFile: false,
     parserOpts: { createParenthesizedExpressions: true }
   }).code;
+  return { code: out, reservedGlobals: [...globals] };
 }
 function cleanSyntaxError(msg) {
   const pre = PREFIX.length;
@@ -75415,7 +75437,7 @@ ${formatChanges(r.changes)}`
             const ex = codeExcerpt(code, r.error.line);
             if (ex) extra.push(ex);
           }
-          const hint = errorHint(r.error.message);
+          const hint = reservedGlobalsHint(t.reservedGlobals) ?? errorHint(r.error.message);
           if (hint) extra.push(`Hint: ${hint}`);
           const out = formatResult(r, { quietNoChanges: true });
           if (extra.length) out.content.push({ type: "text", text: extra.join("\n\n") });
@@ -78106,6 +78128,7 @@ function registerWorkflowTools(server) {
         const perm = permissions();
         const bodies = [];
         const stepArgs = [];
+        const hints = [];
         let edits = false;
         for (const [i, s] of steps.entries()) {
           if (s.tool === "ae_run_script") {
@@ -78113,6 +78136,7 @@ function registerWorkflowTools(server) {
             if (!perm.allowShell && usesShell(code)) return errorResult(`Step ${i + 1}: ${SHELL_REFUSAL}`);
             const t = transpileUserCode(code);
             if (t.syntaxError && !t.transpiled) return errorResult(`Step ${i + 1} (ae_run_script) has a syntax error: ${t.syntaxError}`);
+            hints[i] = reservedGlobalsHint(t.reservedGlobals);
             bodies.push(evalBody(t.source));
             stepArgs.push(s.args?.args ?? {});
             edits = true;
@@ -78149,7 +78173,8 @@ return { steps: __out, failed: __failed };`;
         if (!r.ok) return formatResult(r);
         const res = r.result;
         const lines = res.steps.map((s, i) => {
-          if (!s.ok) return `${i + 1}. ${steps[i].tool}: FAILED: ${s.error}${s.line ? ` (line ${s.line})` : ""}`;
+          if (!s.ok) return `${i + 1}. ${steps[i].tool}: FAILED: ${s.error}${s.line ? ` (line ${s.line})` : ""}${hints[i] ? `
+   Hint: ${hints[i]}` : ""}`;
           const txt = s.result === void 0 || s.result === null ? "ok" : JSON.stringify(s.result);
           return `${i + 1}. ${steps[i].tool}: ${verbose ? txt : txt.length > 160 ? txt.slice(0, 157) + "..." : txt}`;
         });
@@ -78909,6 +78934,18 @@ Full self-test: every major tool against this After Effects (temporary comps, re
       jsx: evalBody(transpileUserCode("const names = [];\nfor (let i = 1; i <= app.project.numItems; i++) names.push(app.project.item(i).name);\nreturn names.filter((n) => n.startsWith('__aemcp_fulltest')).length ?? 0;").source),
       args: {},
       check: (r) => Number(r.result) >= 1 ? null : `unexpected result ${JSON.stringify(r.result)}`
+    },
+    {
+      name: "ES3 reserved word as a name",
+      jsx: evalBody(transpileUserCode("const int = 1; return int;").source),
+      args: {},
+      check: (r) => r.result === 1 ? null : `unexpected result ${JSON.stringify(r.result)}`
+    },
+    {
+      name: "keyword property names",
+      jsx: evalBody(transpileUserCode("const o = { default: 1, class: 2 }; o.default += o.class; return o.default;").source),
+      args: {},
+      check: (r) => r.result === 3 ? null : `unexpected result ${JSON.stringify(r.result)}`
     }
   ];
   const results = await projectSafetyTests(tmpDir, before ?? await projectState());

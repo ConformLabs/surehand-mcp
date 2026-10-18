@@ -10,7 +10,7 @@ import { evalRaw } from "../bridge.js";
 import { loadConfig } from "../config.js";
 import { evalBody, formatChanges, runJsx } from "../jsx.js";
 import { approvalSummary, permissions, READ_ONLY_REFUSAL, SHELL_REFUSAL, usesShell } from "../permissions.js";
-import { transpileUserCode } from "../transpile.js";
+import { reservedGlobalsHint, transpileUserCode } from "../transpile.js";
 import { ALL_JSX_TOOLS } from "./all.js";
 import { errorResult, formatResult, reportScope } from "./registry.js";
 
@@ -172,6 +172,7 @@ export function registerWorkflowTools(server: McpServer) {
         const perm = permissions();
         const bodies: string[] = [];
         const stepArgs: unknown[] = [];
+        const hints: (string | null)[] = [];
         let edits = false;
         for (const [i, s] of steps.entries()) {
           if (s.tool === "ae_run_script") {
@@ -179,6 +180,7 @@ export function registerWorkflowTools(server: McpServer) {
             if (!perm.allowShell && usesShell(code)) return errorResult(`Step ${i + 1}: ${SHELL_REFUSAL}`);
             const t = transpileUserCode(code);
             if (t.syntaxError && !t.transpiled) return errorResult(`Step ${i + 1} (ae_run_script) has a syntax error: ${t.syntaxError}`);
+            hints[i] = reservedGlobalsHint(t.reservedGlobals);
             bodies.push(evalBody(t.source));
             stepArgs.push(s.args?.args ?? {});
             edits = true;
@@ -215,7 +217,7 @@ return { steps: __out, failed: __failed };`;
         if (!r.ok) return formatResult(r);
         const res = r.result as { steps: { ok: boolean; result?: unknown; error?: string; line?: number }[]; failed: number };
         const lines = res.steps.map((s, i) => {
-          if (!s.ok) return `${i + 1}. ${steps[i].tool}: FAILED: ${s.error}${s.line ? ` (line ${s.line})` : ""}`;
+          if (!s.ok) return `${i + 1}. ${steps[i].tool}: FAILED: ${s.error}${s.line ? ` (line ${s.line})` : ""}${hints[i] ? `\n   Hint: ${hints[i]}` : ""}`;
           const txt = s.result === undefined || s.result === null ? "ok" : JSON.stringify(s.result);
           return `${i + 1}. ${steps[i].tool}: ${verbose ? txt : txt.length > 160 ? txt.slice(0, 157) + "..." : txt}`;
         });
