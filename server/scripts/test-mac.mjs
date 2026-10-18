@@ -7,27 +7,61 @@
 //
 // After Effects only loads a new extension when it starts: an open AE keeps running the
 // previous one, which this reports (restart AE and run again to test the new extension too).
+//
+// The installed server, the extension and the open After Effects are shared by every checkout
+// on this Mac, so one run at a time: a run waits (up to --wait-minutes, default 30) while another
+// holds ~/.aemcp/test-mac.lock, and fails if the installed server stops being its own build.
 import { spawnSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { acquireLock, buildInfo, describeBuild, interruptedBy, sha256File } from "./test-guard.mjs";
 
 if (process.platform !== "darwin") {
   console.error("test-mac runs on macOS only.");
   process.exit(1);
 }
 const allowNoAe = process.argv.includes("--allow-no-ae");
+const waitArg = process.argv.indexOf("--wait-minutes");
+const waitMinutes = waitArg > 0 && Number.isFinite(Number(process.argv[waitArg + 1])) ? Number(process.argv[waitArg + 1]) : 30;
 const bundle = fileURLToPath(new URL("../dist/ae-mcp.mjs", import.meta.url));
 const buildVersion = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
 const installed = join(homedir(), ".aemcp", "server", "ae-mcp.mjs");
 const plain = (s) => s.replace(/\x1b\[[0-9;]*m/g, "");
+const build = describeBuild(buildInfo(dirname(bundle)));
+const bundleSha = sha256File(bundle);
+const tested = `${build}, dist/ae-mcp.mjs sha256 ${bundleSha}`;
 const node = (args, env = {}) => {
   const r = spawnSync(process.execPath, args, { encoding: "utf8", env: { ...process.env, ...env }, maxBuffer: 32 * 1024 * 1024 });
+  const sig = interruptedBy(r);
+  if (sig) {
+    // stop here: an interrupted step is not a test failure, and the rest of the run would not be a result
+    console.error(`\nInterrupted (${sig}): no result for ${tested}.`);
+    process.exit(130);
+  }
   return { status: r.status, out: plain((r.stdout || "") + (r.stderr || "")) };
 };
+console.log(`Mac test (v${buildVersion}): ${tested}`);
 
-console.log(`Mac test (v${buildVersion})`);
+for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"]) process.on(sig, () => process.exit(130)); // while waiting for the lock; the exit hook releases it
+try {
+  await acquireLock(join(homedir(), ".aemcp", "test-mac.lock"), { owner: { build, bundleSha, cwd: process.cwd() }, waitMs: waitMinutes * 60_000 });
+} catch (e) {
+  console.error(`\n${e.message}. Run again later (or pass --wait-minutes N).`);
+  process.exit(1);
+}
+/** Fails the run if something outside this run replaced the installed server. */
+const checkInstalled = (when) => {
+  let sha = "missing";
+  try {
+    sha = sha256File(installed);
+  } catch {}
+  if (sha === bundleSha) return;
+  console.error(`\nThe installed server (${installed}) is not this build ${when}: sha256 ${sha}, expected ${bundleSha}. Results are not valid for ${build}.`);
+  process.exit(1);
+};
+
 console.log("\n== install");
 const inst = node([bundle, "install", "--skip-clients"]);
 console.log(inst.out.split("\n").filter((l) => /✔|✖|!/.test(l)).join("\n"));
@@ -35,6 +69,7 @@ if (inst.status !== 0 || !/Extension:/.test(inst.out)) {
   console.error("install failed:\n" + inst.out);
   process.exit(1);
 }
+checkInstalled("after install");
 
 const alive = (pid) => {
   try {
@@ -56,6 +91,7 @@ let failed = 0;
 if (!instances.length) {
   console.log("\n== no After Effects open: running the checks that don't need it");
   console.log(node([installed, "selftest"]).out.split("\n").filter((l) => /✔|✖|!/.test(l)).join("\n"));
+  checkInstalled("after the self-test");
   if (!allowNoAe) {
     console.error("\nOpen After Effects and run again (or pass --allow-no-ae).");
     process.exit(1);
@@ -69,7 +105,9 @@ if (!instances.length) {
     if (bridge && bridge !== buildVersion)
       console.log(`  ! this After Effects still runs the v${bridge} extension: restart it to test v${buildVersion}'s extension too`);
     if (r.status !== 0) failed++;
+    checkInstalled(`after the self-test on After Effects ${i.host?.appVersion ?? "?"}`);
   }
 }
 console.log(failed ? `\n${failed} After Effects version(s) failed on this Mac.` : `\nMac: all passed on ${instances.length} After Effects version(s).`);
+console.log(`Tested: ${tested}`);
 process.exit(failed ? 1 : 0);
