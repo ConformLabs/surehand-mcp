@@ -1062,7 +1062,7 @@ var require_babel_min = __commonJS({
       function C2(e10, a10) {
         return E("ArrayExpression", e10, a10);
       }
-      function P2(e10, a10) {
+      function P3(e10, a10) {
         return E("AssignmentExpression", e10, a10);
       }
       function A(e10, a10) {
@@ -4050,7 +4050,7 @@ var require_babel_min = __commonJS({
         var n10, t10 = false;
         if (Wa(e10)) t10 = true, n10 = "ClassDeclaration";
         else if (Na(e10)) t10 = true, n10 = "FunctionDeclaration";
-        else if (P2(e10)) return Xr(e10);
+        else if (P3(e10)) return Xr(e10);
         if (t10 && !e10.id && (n10 = false), !n10) {
           if (a10) return false;
           throw new Error("cannot turn " + e10.type + " to a statement");
@@ -4142,7 +4142,7 @@ var require_babel_min = __commonJS({
         for (var r10 = [].concat(e10), i10 = /* @__PURE__ */ Object.create(null); r10.length; ) {
           var o10 = r10.shift();
           if (o10) {
-            if (!t10 || !(P2(o10) || ne(o10) || te(o10))) if (F(o10)) a10 ? (i10[o10.name] = i10[o10.name] || []).push(o10) : i10[o10.name] = o10;
+            if (!t10 || !(P3(o10) || ne(o10) || te(o10))) if (F(o10)) a10 ? (i10[o10.name] = i10[o10.name] || []).push(o10) : i10[o10.name] = o10;
             else if (!Ha(o10) || pe(o10)) {
               if (n10) {
                 if (j(o10)) {
@@ -4170,7 +4170,7 @@ var require_babel_min = __commonJS({
       function zh(e10, a10) {
         if ("id" in e10 && e10.id) return { name: e10.id.name, originalNode: e10.id };
         var n10, t10 = "";
-        if (Y(a10, { value: e10 }) ? n10 = Jh(a10) : X(e10) || Se(e10) ? (n10 = Jh(e10), "get" === e10.kind ? t10 = "get " : "set" === e10.kind && (t10 = "set ")) : ie(a10) && a10.init === e10 ? n10 = a10.id : P2(a10, { operator: "=", right: e10 }) && (n10 = a10.left), !n10) return null;
+        if (Y(a10, { value: e10 }) ? n10 = Jh(a10) : X(e10) || Se(e10) ? (n10 = Jh(e10), "get" === e10.kind ? t10 = "get " : "set" === e10.kind && (t10 = "set ")) : ie(a10) && a10.init === e10 ? n10 = a10.id : P3(a10, { operator: "=", right: e10 }) && (n10 = a10.left), !n10) return null;
         var r10 = Ma(n10) ? (function(e11) {
           return W(e11) ? "null" : H(e11) ? "/" + e11.pattern + "/" + e11.flags : Pe(e11) ? e11.quasis.map(function(e12) {
             return e12.value.raw;
@@ -4905,7 +4905,7 @@ var require_babel_min = __commonJS({
         return !!e10 && ("ClassAccessorProperty" === e10.type && (null == a10 || S(e10, a10)));
       }, isAnyTypeAnnotation: Le, isArgumentPlaceholder: function(e10, a10) {
         return E("ArgumentPlaceholder", e10, a10);
-      }, isArrayExpression: C2, isArrayPattern: se, isArrayTypeAnnotation: Ue, isArrowFunctionExpression: de, isAssignmentExpression: P2, isAssignmentPattern: oe, isAwaitExpression: _e, isBigIntLiteral: ke, isBigIntLiteralTypeAnnotation: function(e10, a10) {
+      }, isArrayExpression: C2, isArrayPattern: se, isArrayTypeAnnotation: Ue, isArrowFunctionExpression: de, isAssignmentExpression: P3, isAssignmentPattern: oe, isAwaitExpression: _e, isBigIntLiteral: ke, isBigIntLiteralTypeAnnotation: function(e10, a10) {
         return E("BigIntLiteralTypeAnnotation", e10, a10);
       }, isBinary: Aa, isBinaryExpression: function(e10, a10) {
         return E("BinaryExpression", e10, a10);
@@ -14571,7 +14571,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
         };
         return f10.version = "3.0.2", AP = f10;
       })(), BP = oe, NP = F, jP = "";
-      function OP(e10) {
+      function OP2(e10) {
         var a10 = e10.name, n10 = this.tokenMap.find(e10, function(e11) {
           return e11.value === a10;
         });
@@ -15302,7 +15302,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
         this.word("with"), this.space(), this.tokenChar(40), this.print(e10.object), this.tokenChar(41), this.printBlock(e10.body);
       }, YieldExpression: function(e10) {
         e10.delegate ? (this.word("yield", true), this.tokenChar(42), e10.argument && (this.space(), this.print(e10.argument))) : e10.argument ? (this.word("yield", true), this.space(), this.print(e10.argument)) : this.word("yield");
-      }, _classMethodHead: dA, _functionHead: tP, _getRawIdentifier: OP, _interfaceish: $P, _methodHead: aP, _param: eP, _parameters: ZC, _params: QC, _predicate: nP, _printAttributes: wP, _printTemplate: jC, _shouldPrintArrowParamsParens: iP, _shouldPrintDecoratorsBeforeExport: WC, _tsPrintClassMemberModifiers: mP, _variance: QP }), gA = /* @__PURE__ */ new Map(), fA = 0, hA = 0, mA = Object.keys(pA).sort(); hA < mA.length; hA++) {
+      }, _classMethodHead: dA, _functionHead: tP, _getRawIdentifier: OP2, _interfaceish: $P, _methodHead: aP, _param: eP, _parameters: ZC, _params: QC, _predicate: nP, _printAttributes: wP, _printTemplate: jC, _shouldPrintArrowParamsParens: iP, _shouldPrintDecoratorsBeforeExport: WC, _tsPrintClassMemberModifiers: mP, _variance: QP }), gA = /* @__PURE__ */ new Map(), fA = 0, hA = 0, mA = Object.keys(pA).sort(); hA < mA.length; hA++) {
         var RA = mA[hA];
         RA.startsWith("_") || gA.set(RA, [pA[RA], fA++, void 0]);
       }
@@ -15490,7 +15490,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
           var e11 = this._noLineTerminatorAfterNode;
           return null !== e11 && (this._noLineTerminatorAfterNode = null), e11;
         }, a10.generate = function(e11) {
-          return this.format.preserveFormat && (this.tokenMap = new AA(e11, this._tokens, this._originalCode), this._boundGetRawIdentifier = OP.bind(this)), this.print(e11), this._maybeAddAuxComment(), this._buf.get();
+          return this.format.preserveFormat && (this.tokenMap = new AA(e11, this._tokens, this._originalCode), this._boundGetRawIdentifier = OP2.bind(this)), this.print(e11), this._maybeAddAuxComment(), this._buf.get();
         }, a10.indent = function(e11) {
           void 0 === e11 && (e11 = this._flags), 7 & e11 || (this._indent += this._indentRepeat);
         }, a10.dedent = function(e11) {
@@ -16066,7 +16066,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
       function tD() {
         if (this.removed) throw this.buildCodeFrameError("NodePath has been removed so is read-only.");
       }
-      var rD = Bi, iD = rf, oD = jr, sD = Ur, dD = Wr, uD = vf, cD = Xr, lD = P2, pD = _, gD = fe, fD = Pa, hD = F, mD = Z, RD = we, yD = Si;
+      var rD = Bi, iD = rf, oD = jr, sD = Ur, dD = Wr, uD = vf, cD = Xr, lD = P3, pD = _, gD = fe, fD = Pa, hD = F, mD = Z, RD = we, yD = Si;
       function vD(e10, a10) {
         var n10;
         TD.call(this, e10, a10.length);
@@ -22189,7 +22189,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
       }
       function TH(e10, a10, n10) {
         if (!(F(e10) && a10.hasUid(e10.name))) {
-          if (P2(e10, { operator: "=" }) && F(e10.left) && a10.hasUid(e10.left.name)) return vf(e10);
+          if (P3(e10, { operator: "=" }) && F(e10.left) && a10.hasUid(e10.left.name)) return vf(e10);
           var t10 = ai(n10);
           return a10.push({ id: t10, kind: "let" }), jr("=", vf(t10), e10);
         }
@@ -22452,7 +22452,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
                       Xe2 = kH(Ze2);
                       var ta2 = rG(x10, "get_" + ke2), ra2 = rG(x10, "set_" + ke2);
                       VH(na2, He2, ta2, ra2, Ge2), ze2 = [ea2, ta2, ra2];
-                    } else _H(e10, r10), DH(e10.node.id, na2, vf(He2), P2(He2) ? vf(He2.left) : vf(He2), Ze2, De2, Ge2), ze2 = [ea2];
+                    } else _H(e10, r10), DH(e10.node.id, na2, vf(He2), P3(He2) ? vf(He2.left) : vf(He2), Ze2, De2, Ge2), ze2 = [ea2];
                   } else if (0 === Je2) {
                     var ia2 = rG(x10, "init_" + ke2), oa2 = Ee2.get("value"), sa2 = Ge2 ? [] : [Si()];
                     oa2.node && sa2.push(oa2.node), oa2.replaceWith(Wr(vf(ia2), sa2)), ze2 = [ia2], Ke2 && (Xe2 = kH(He2));
@@ -26023,10 +26023,10 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
         var e10 = VK()();
         return e10.addRange(2404, 2405).addRange(2534, 2543).addRange(43008, 43052), w3.characters = e10, w3;
       }
-      var P3, A3 = {};
+      var P32, A3 = {};
       function _3() {
-        if (P3) return A3;
-        P3 = 1;
+        if (P32) return A3;
+        P32 = 1;
         var e10 = VK()(778, 1548, 1567, 1600, 1648, 7672, 7674);
         return e10.addRange(771, 772).addRange(775, 776).addRange(803, 805).addRange(813, 814).addRange(816, 817).addRange(1563, 1564).addRange(1611, 1621).addRange(1792, 1805).addRange(1807, 1866).addRange(1869, 1871).addRange(2144, 2154), A3.characters = e10, A3;
       }
@@ -28733,7 +28733,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
           e11.skip();
         }, YieldExpression: function(e11) {
           var a11, n11;
-          a11 = e11.parent, n11 = this.sentId, P2(a11) && F(a11.left, { name: n11 }) || e11.replaceWith(jr("=", ai(this.sentId), e11.node));
+          a11 = e11.parent, n11 = this.sentId, P3(a11) && F(a11.left, { name: n11 }) || e11.replaceWith(jr("=", ai(this.sentId), e11.node));
         }, MetaProperty: function(e11) {
           a10(e11.node) && e11.replaceWith(ai(this.sentId));
         } };
@@ -28919,8 +28919,8 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
               else if (Pe(d12)) n12.push(vf(d12)), r12 = true;
               else if (Ma(d12)) n12.push(ri(String(d12.value)));
               else {
-                P2(d12) && F(d12.left) ? n12.push(vf(d12.left)) : n12.push(vf(d12));
-                var u12 = P2(d12) ? d12.right : d12;
+                P3(d12) && F(d12.left) ? n12.push(vf(d12.left)) : n12.push(vf(d12));
+                var u12 = P3(d12) ? d12.right : d12;
                 G(u12, { computed: false }) && F(u12.object, { name: "Symbol" }) || _(u12) && en(u12.callee, "Symbol.for") || (t12 = false);
               }
             }
@@ -29013,7 +29013,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
               var d12 = w10(s12, e12.scope);
               s12.forEach(function(e13) {
                 var a12 = e13.get("key"), n12 = a12.node;
-                P2(a12.node) && (n12 = a12.node.left), o10 = ci(o10, vf(n12), e13.node.computed || Ma(a12.node));
+                P3(a12.node) && (n12 = a12.node.left), o10 = ci(o10, vf(n12), e13.node.computed || Ma(a12.node));
               });
               var u12 = e12.parentPath, c11 = m(C10(u12, a11, o10), 3), l11 = c11[0], p10 = c11[1], g11 = c11[2];
               v10 && (function(e13) {
@@ -31805,7 +31805,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
           }
         }, ExpressionStatement: function(e11, a11) {
           var r10 = a11.file, i10 = e11.node.expression;
-          P2(i10, { operator: "=" }) && n10(i10.left) && e11.replaceWith(t10(i10, i10.left.object, r10));
+          P3(i10, { operator: "=" }) && n10(i10.left) && e11.replaceWith(t10(i10, i10.left.object, r10));
         }, ObjectExpression: function(e11, n11) {
           for (var t11, r10 = n11.file, i10 = e11.node, o10 = i10.properties, s10 = 0; s10 < o10.length; s10++) {
             var d10 = o10[s10];
@@ -39100,7 +39100,7 @@ var require_core = __commonJS({
       errorsText(errors = this.errors, { separator = ", ", dataVar = "data" } = {}) {
         if (!errors || errors.length === 0)
           return "No errors";
-        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text, msg) => text + separator + msg);
+        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text2, msg) => text2 + separator + msg);
       }
       $dataMetaSchema(metaSchema, keywordsJsonPointers) {
         const rules = this.RULES.all;
@@ -46957,11 +46957,11 @@ function settle(inst, answer) {
 function isRecursiveSchema(inst) {
   return isRecursive(inst, /* @__PURE__ */ new Set(), true) !== NONE;
 }
-function bucketFor(state, inst) {
-  let bucket = state.buckets.get(inst);
+function bucketFor(state2, inst) {
+  let bucket = state2.buckets.get(inst);
   if (!bucket) {
     bucket = /* @__PURE__ */ new WeakMap();
-    state.buckets.set(inst, bucket);
+    state2.buckets.set(inst, bucket);
   }
   return bucket;
 }
@@ -47019,16 +47019,16 @@ var memo = {
         const input2 = payload.value;
         if (!isRef(input2))
           return base(payload, ctx);
-        let state = ctx[STATE];
-        if (!state) {
-          state = { buckets: /* @__PURE__ */ new WeakMap(), backEdges: void 0 };
-          ctx[STATE] = state;
+        let state2 = ctx[STATE];
+        if (!state2) {
+          state2 = { buckets: /* @__PURE__ */ new WeakMap(), backEdges: void 0 };
+          ctx[STATE] = state2;
         }
         let bucket;
         if (lastCtx === ctx) {
           bucket = lastBucket;
         } else {
-          bucket = bucketFor(state, inst);
+          bucket = bucketFor(state2, inst);
           lastCtx = ctx;
           lastBucket = bucket;
         }
@@ -47040,8 +47040,8 @@ var memo = {
               payload.issues.push(...cloneIssues(hit.issues));
           } else {
             payload.memo = true;
-            state.backEdges ?? (state.backEdges = /* @__PURE__ */ new WeakSet());
-            state.backEdges.add(hit.value);
+            state2.backEdges ?? (state2.backEdges = /* @__PURE__ */ new WeakSet());
+            state2.backEdges.add(hit.value);
           }
           return payload;
         }
@@ -51137,8 +51137,8 @@ function ko_default() {
 
 // node_modules/zod/v4/locales/lt.js
 init_define_AEMCP_CEP_FILES();
-var capitalizeFirstCharacter = (text) => {
-  return text.charAt(0).toUpperCase() + text.slice(1);
+var capitalizeFirstCharacter = (text2) => {
+  return text2.charAt(0).toUpperCase() + text2.slice(1);
 };
 function getUnitTypeFromNumber(number4) {
   const abs = Math.abs(number4);
@@ -64453,7 +64453,7 @@ async function readRequestBody(request2, maxBytes = DEFAULT_MAX_REQUEST_BODY_SIZ
   const reader = request2.body.getReader();
   const decoder = new TextDecoder();
   let received = 0;
-  let text = "";
+  let text2 = "";
   try {
     for (; ; ) {
       const { done, value: value2 } = await reader.read();
@@ -64464,12 +64464,12 @@ async function readRequestBody(request2, maxBytes = DEFAULT_MAX_REQUEST_BODY_SIZ
       if (received > maxBytes) {
         return { tooLarge: true };
       }
-      text += decoder.decode(value2, { stream: true });
+      text2 += decoder.decode(value2, { stream: true });
     }
   } finally {
     reader.releaseLock();
   }
-  return { tooLarge: false, text: text + decoder.decode() };
+  return { tooLarge: false, text: text2 + decoder.decode() };
 }
 
 // node_modules/@modelcontextprotocol/sdk/dist/esm/server/sseKeepAlive.js
@@ -65376,9 +65376,9 @@ var SIGNATURE_FILE = "META-INF/signatures.xml";
 function checkSignature(files) {
   const xml = files[SIGNATURE_FILE];
   if (xml === void 0) return { signed: false, ok: false, problems: ["not signed (no META-INF/signatures.xml)"] };
-  const text = typeof xml === "string" ? xml : Buffer.from(xml).toString("utf8");
+  const text2 = typeof xml === "string" ? xml : Buffer.from(xml).toString("utf8");
   const digests = /* @__PURE__ */ new Map();
-  const manifest = /<Manifest Id="PackageContents">([\s\S]*?)<\/Manifest>/.exec(text)?.[1] ?? "";
+  const manifest = /<Manifest Id="PackageContents">([\s\S]*?)<\/Manifest>/.exec(text2)?.[1] ?? "";
   for (const m of manifest.matchAll(/<Reference URI="([^"]+)">[\s\S]*?<DigestValue>([^<]+)<\/DigestValue>/g)) digests.set(m[1], m[2]);
   const problems = [];
   if (!digests.size) problems.push("signatures.xml lists no files");
@@ -65545,8 +65545,8 @@ async function ask(question, def = true) {
 var sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 var CODEX_START = "# >>> ae-mcp >>>";
 var CODEX_END = "# <<< ae-mcp <<<";
-function removeCodexBlock(text) {
-  return text.replace(new RegExp(`\\n?${CODEX_START}[\\s\\S]*?${CODEX_END}\\n?`, "g"), "\n");
+function removeCodexBlock(text2) {
+  return text2.replace(new RegExp(`\\n?${CODEX_START}[\\s\\S]*?${CODEX_END}\\n?`, "g"), "\n");
 }
 function codexBlock(nodePath, serverFile) {
   const q = (s) => JSON.stringify(s);
@@ -65938,11 +65938,11 @@ async function explainTimeout(port, timeoutMs) {
 async function health(port) {
   return request("/health", { method: "GET", timeoutMs: 3e3, port });
 }
-async function evalRaw(script, timeoutMs = 12e4, opts = {}) {
+async function evalRaw(script2, timeoutMs = 12e4, opts = {}) {
   const extra = opts.approval ? 10 * 60 * 1e3 : 0;
   const body = await request("/eval", {
     method: "POST",
-    body: JSON.stringify({ script, timeoutMs, label: opts.label, approval: opts.approval }),
+    body: JSON.stringify({ script: script2, timeoutMs, label: opts.label, approval: opts.approval }),
     timeoutMs: timeoutMs + 5e3 + extra,
     cancel: opts.cancel
   });
@@ -66596,10 +66596,11 @@ aemcp = (function () {
     walk(L, "", 0);
   }
   // light: layer attributes and order only, no properties (the slow part)
-  function snapComp(c, budget, light) {
-    var o = { name: c.name, layers: {}, order: [] };
+  // time: compare at this time instead of the comp's current time (see snapshotAgain)
+  function snapComp(c, budget, light, time) {
+    var o = { name: c.name, layers: {}, order: [], time: time === undefined ? c.time : time };
     if (light) o.light = true;
-    budget.time = c.time;
+    budget.time = o.time;
     for (var i = 1; i <= c.numLayers; i++) {
       var L = c.layer(i), k = layerKey(L);
       var e = { sig: layerSig(L), props: {}, groups: {} };
@@ -66653,6 +66654,15 @@ aemcp = (function () {
     for (var id in ids) { if (!ids.hasOwnProperty(id)) continue; var c = p.itemByID(Number(id.substr(1))); if (c) snap.comps[id] = snapComp(c, budget, light); }
     return snap;
   };
+  // A new snapshot comparable with \`a\`: the same comps at the same times, as light as \`a\`
+  // (an undo doesn't move the time indicator, and the active comp may have changed meanwhile).
+  function snapshotAgain(a) {
+    var p = app.project, snap = { items: {}, comps: {}, project: projectSig(p) }, budget = { n: PROP_BUDGET, over: false };
+    if (a.light) snap.light = true;
+    for (var i = 1; i <= p.numItems; i++) { var it = p.item(i); snap.items["i" + it.id] = itemSig(it); }
+    for (var id in a.comps) { if (!a.comps.hasOwnProperty(id)) continue; var c = p.itemByID(Number(id.substr(1))); if (c) snap.comps[id] = snapComp(c, budget, a.light, a.comps[id].time); }
+    return snap;
+  }
   // app.project.revision goes up with every edit (also undo/redo, and writing an unchanged value) and
   // not on selection, viewer, time-indicator or preview changes or scripts that only read (AE 25/26).
   // It does NOT move for some attributes: item comment/label/folder, work area, expression engine, and
@@ -66762,6 +66772,28 @@ aemcp = (function () {
   };
 
   // ---------- runner ----------
+  function listed(ch) { return !!(ch && (ch.items.length || ch.layers.length || ch.props.length || ch.unlisted)); }
+  // Undo what this call changed (opts.rollback). It runs in the same script as the call, right after its
+  // undo group closed, so nothing else can land on the undo stack in between. Only when the call changed
+  // something: an empty undo group is not an undo step, and Edit > Undo would revert the user's previous
+  // action instead. Undo moves app.project.revision forward (it doesn't restore it), so the check
+  // afterwards compares a new snapshot with the one from before the call. Never undoes a second time.
+  function rollback(before, rev0, rev1, ch) {
+    var moved = rev0 !== null && rev1 !== null && rev1 !== rev0;
+    if (!moved) {
+      if (!before || !ch || ch.error) return { undone: false, verified: false, problem: "unknown" }; // can't tell: leave it
+      if (!listed(ch)) return { undone: false, verified: true }; // nothing changed: the undo stack is left alone
+    }
+    app.executeCommand(16); // Edit > Undo: this call's undo group
+    var out = { undone: true, verified: true };
+    if (moved && A.revision() === rev1) { out.verified = false; out.problem = "undo did nothing"; return out; }
+    if (!before) { out.verified = false; out.problem = "not checked"; return out; }
+    try {
+      var d = A.diff(before, snapshotAgain(before));
+      if (listed(d)) { out.verified = false; out.problem = "not back"; out.remaining = d; }
+    } catch (e) { out.verified = false; out.problem = "not checked: " + (e.message || e); }
+    return out;
+  }
   A.run = function (fn, args, opts) {
     opts = opts || {};
     var logs = [];
@@ -66771,22 +66803,36 @@ aemcp = (function () {
       logs.push(parts.join(" "));
     }
     var undo = opts.undoGroup !== false && opts.undoGroup !== "";
-    var res;
+    // rollback: "changes" = undo whatever the call changed (read-only mode);
+    // "requested" = only when the call returns { rollback: true } (atomic batch)
+    var res, before = null, rev0 = null, rev1 = null, back = false;
     try {
       if (opts.suppressDialogs !== false) { try { app.beginSuppressDialogs(); } catch (e) {} }
-      if (undo) app.beginUndoGroup(opts.undoGroup || "AE MCP");
-      var before = null, rev0 = opts.report ? A.revision() : null;
-      // checkOnly (read-only mode): with project.revision, no property snapshot at all
-      if (opts.report) { try { before = A.snapshot(opts.report, !!opts.checkOnly && rev0 !== null); } catch (e) { before = null; } }
-      var r = fn(args || {}, log);
-      res = { ok: true, result: opts.raw ? r : A.serialize(r, opts.depth || 4), logs: logs };
-      if (before) { try { res.changes = changesSince(before, rev0, opts.report); } catch (e) { res.changes = { error: e.message }; } }
-    } catch (e) {
-      res = { ok: false, error: { message: e.message || String(e), name: e.name, line: e.line, user: !!e.aemcpUser }, logs: logs };
-      // a failed script may have changed things before it stopped: report those too
-      if (before) { try { res.changes = changesSince(before, rev0, opts.report); } catch (e2) {} }
+      try {
+        if (undo) app.beginUndoGroup(opts.undoGroup || "AE MCP");
+        rev0 = opts.report || opts.rollback ? A.revision() : null;
+        // checkOnly (read-only mode): with project.revision, no property snapshot at all
+        if (opts.report) { try { before = A.snapshot(opts.report, !!opts.checkOnly && rev0 !== null); } catch (e) { before = null; } }
+        try {
+          var r = fn(args || {}, log);
+          back = opts.rollback === "changes" || (opts.rollback === "requested" && !!r && r.rollback === true);
+          res = { ok: true, result: opts.raw ? r : A.serialize(r, opts.depth || 4), logs: logs };
+          if (before) { try { res.changes = changesSince(before, rev0, opts.report); } catch (e) { res.changes = { error: e.message }; } }
+        } catch (e) {
+          back = opts.rollback === "changes";
+          res = { ok: false, error: { message: e.message || String(e), name: e.name, line: e.line, user: !!e.aemcpUser }, logs: logs };
+          // a failed script may have changed things before it stopped: report those too
+          if (before) { try { res.changes = changesSince(before, rev0, opts.report); } catch (e2) {} }
+        }
+        rev1 = rev0 === null ? null : A.revision();
+      } finally {
+        if (undo) { try { app.endUndoGroup(); } catch (e) {} }
+      }
+      if (back) {
+        if (!undo) res.rollback = { undone: false, verified: false, problem: "no undo group" };
+        else { try { res.rollback = rollback(before, rev0, rev1, res.changes); } catch (e) { res.rollback = { undone: false, verified: false, problem: "failed: " + (e.message || e) }; } }
+      }
     } finally {
-      if (undo) { try { app.endUndoGroup(); } catch (e) {} }
       if (opts.suppressDialogs !== false) { try { app.endSuppressDialogs(false); } catch (e) {} }
     }
     return A.stringify(res);
@@ -66822,7 +66868,7 @@ function toJsLiteral(v) {
   return (JSON.stringify(v ?? null) ?? "null").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
 }
 function wrapBody(body, args, opts = {}) {
-  const runOpts = { undoGroup: opts.undoGroup === void 0 ? "AE MCP" : opts.undoGroup, depth: opts.depth, report: opts.report, checkOnly: opts.checkOnly || void 0 };
+  const runOpts = { undoGroup: opts.undoGroup === void 0 ? "AE MCP" : opts.undoGroup, depth: opts.depth, report: opts.report, checkOnly: opts.checkOnly || void 0, rollback: opts.rollback };
   return `(function(){
 if (typeof aemcp === 'undefined' || aemcp.version !== ${toJsLiteral(HELPER_VERSION)}) return ${toJsLiteral(NEED_HELPERS)};
 return aemcp.run(function(args, log){
@@ -66871,17 +66917,17 @@ async function ensureHelpers() {
   if (!r.startsWith("aemcp loaded")) throw new Error("Failed to load the aemcp helper library into After Effects: " + r);
 }
 async function runJsx(body, args = {}, opts = {}) {
-  const script = wrapBody(body, args, opts);
+  const script2 = wrapBody(body, args, opts);
   const ctx = callContext.getStore();
   opts = { ...opts, bridge: { label: ctx?.tool, cancel: ctx?.signal, ...opts.bridge } };
   if (opts.bridge?.approval) {
     const probe2 = await evalRaw(`(typeof aemcp !== 'undefined' && aemcp.version === ${toJsLiteral(HELPER_VERSION)}) ? 'ok' : 'no'`, 1e4, { cancel: opts.bridge.cancel });
     if (probe2 !== "ok") await ensureHelpers();
   }
-  let raw = await evalRaw(script, opts.timeoutMs, opts.bridge);
+  let raw = await evalRaw(script2, opts.timeoutMs, opts.bridge);
   if (raw === NEED_HELPERS) {
     await ensureHelpers();
-    raw = await evalRaw(script, opts.timeoutMs, opts.bridge);
+    raw = await evalRaw(script2, opts.timeoutMs, opts.bridge);
   }
   return parseResult(raw);
 }
@@ -66916,6 +66962,16 @@ function formatChanges(ch) {
   if (ch.truncated) notes.push("more changes not listed");
   return `Changes${notes.length ? ` (${notes.join("; ")})` : ""}:
 ${lines.join("\n")}`;
+}
+function rollbackProblem(rb, what) {
+  if (rb.verified) return "";
+  const check2 = "Check the project before going on (Edit > Undo and Edit > Redo still work step by step).";
+  if (!rb.undone)
+    return `It couldn't be checked whether ${what} changed the project${rb.problem && rb.problem !== "unknown" ? ` (${rb.problem})` : ""}, so nothing was undone. ${check2}`;
+  const why = rb.problem === "not back" ? `the project still isn't how it was before ${what}:
+${(formatChanges(rb.remaining) ?? "").replace(/^Changes[^\n]*:\n/, "")}` : rb.problem === "undo did nothing" ? "After Effects didn't undo anything." : `the result couldn't be checked (${rb.problem}).`;
+  return `The undo step of ${what} was undone once, but ${why}
+It was not undone again, so nothing else in the undo history was reverted. ${check2}`;
 }
 
 // src/tools/profile.ts
@@ -66976,8 +67032,8 @@ function applyProfile(server, profile) {
         result = await callContext.run({ tool: name, signal: extra?.signal }, () => cb(args, extra));
         return result;
       } finally {
-        const text = result?.content?.find((c) => c.type === "text")?.text ?? "";
-        const changesAt = text.indexOf("\nChanges");
+        const text2 = result?.content?.find((c) => c.type === "text")?.text ?? "";
+        const changesAt = text2.indexOf("\nChanges");
         logActivity({
           at: new Date(t0).toISOString(),
           client: server.server.getClientVersion?.()?.name,
@@ -66985,8 +67041,8 @@ function applyProfile(server, profile) {
           args,
           ms: Date.now() - t0,
           ok: !!result && !result.isError,
-          summary: text.split("\n")[0].slice(0, 300) || (result ? void 0 : "no result (exception)"),
-          changes: changesAt >= 0 ? text.slice(changesAt).split("\n").filter((l) => /^[+~-] /.test(l)).length : void 0
+          summary: text2.split("\n")[0].slice(0, 300) || (result ? void 0 : "no result (exception)"),
+          changes: changesAt >= 0 ? text2.slice(changesAt).split("\n").filter((l) => /^[+~-] /.test(l)).length : void 0
         });
       }
     };
@@ -67194,9 +67250,9 @@ After Effects MCP installer v${VERSION}`));
     try {
       const file2 = codexConfig();
       mkdirSync5(dirname5(file2), { recursive: true });
-      const text = existsSync6(file2) ? readFileSync8(file2, "utf8") : "";
+      const text2 = existsSync6(file2) ? readFileSync8(file2, "utf8") : "";
       if (existsSync6(file2) && !existsSync6(file2 + ".aemcp.bak")) copyFileSync2(file2, file2 + ".aemcp.bak");
-      const rest = removeCodexBlock(text).trim();
+      const rest = removeCodexBlock(text2).trim();
       writeFileSync4(file2, (rest ? rest + "\n\n" : "") + codexBlock(nodePath, INSTALLED_SERVER));
       ok("ChatGPT desktop / Codex");
       registered.push("ChatGPT desktop");
@@ -67311,6 +67367,18 @@ function transpileUserCode(code, enabled = true) {
   } catch (e) {
     return { source: plain, transpiled: false, syntaxError: cleanSyntaxError(String(e?.message || e)) };
   }
+}
+function withoutComments(code) {
+  const plain = PREFIX + code + "\n})";
+  let comments;
+  try {
+    comments = Babel.transform(plain, { ast: true, code: false, sourceType: "script", babelrc: false, configFile: false }).ast.comments;
+  } catch {
+    return code;
+  }
+  let out = plain;
+  for (const c of comments) out = out.slice(0, c.start) + out.slice(c.start, c.end).replace(/[^\n]/g, " ") + out.slice(c.end);
+  return out.slice(PREFIX.length, out.length - 3);
 }
 function reservedGlobalsHint(names) {
   if (!names?.length) return null;
@@ -67476,11 +67544,11 @@ var propPath = external_exports.union([external_exports.string(), external_expor
 var colorSchema = external_exports.union([external_exports.string(), external_exports.array(external_exports.number()).min(3).max(4)]).describe('Color as "#rrggbb" or [r,g,b] (0-1 or 0-255).');
 var anyValue = external_exports.any().describe("Value: number, array ([x,y] / [x,y,z] / color), string for text, or object for text style / shape path.");
 var MAX_RESULT_CHARS = 6e4;
-function capText(text) {
-  if (text.length <= MAX_RESULT_CHARS) return text;
-  return text.slice(0, MAX_RESULT_CHARS) + `
+function capText(text2) {
+  if (text2.length <= MAX_RESULT_CHARS) return text2;
+  return text2.slice(0, MAX_RESULT_CHARS) + `
 
-[Result truncated: ${text.length.toLocaleString("en-US")} characters, showing the first ${MAX_RESULT_CHARS.toLocaleString("en-US")}. Ask for less: use offset/limit, a smaller depth, a filter, or return only the fields you need from ae_run_script.]`;
+[Result truncated: ${text2.length.toLocaleString("en-US")} characters, showing the first ${MAX_RESULT_CHARS.toLocaleString("en-US")}. Ask for less: use offset/limit, a smaller depth, a filter, or return only the fields you need from ae_run_script.]`;
 }
 function formatResult(r, opts = {}) {
   const logs = r.logs?.length ? `
@@ -67497,10 +67565,10 @@ The call failed, but these changes were already made (one undo step reverts them
 ${changes2}` : "";
     return { isError: true, content: [{ type: "text", text: `${e.name && !e.user ? e.name + ": " : ""}${e.message}${where}${logs}${changed}` }] };
   }
-  const text = r.result === void 0 || r.result === null ? "OK (no return value)" : typeof r.result === "string" ? r.result : JSON.stringify(r.result);
+  const text2 = r.result === void 0 || r.result === null ? "OK (no return value)" : typeof r.result === "string" ? r.result : JSON.stringify(r.result);
   let changes = formatChanges(r.changes);
   if (opts.quietNoChanges && changes === "Changes: none") changes = null;
-  return { content: [{ type: "text", text: capText(text) + logs + (changes ? `
+  return { content: [{ type: "text", text: capText(text2) + logs + (changes ? `
 
 ${capText(changes)}` : "") }] };
 }
@@ -69653,14 +69721,6 @@ import { existsSync as existsSync7, mkdirSync as mkdirSync6, readFileSync as rea
 import { homedir as homedir5 } from "node:os";
 import { join as join9 } from "node:path";
 var sleep2 = (ms) => new Promise((r) => setTimeout(r, ms));
-async function undoReadOnlyChanges(r) {
-  if (!r.changes || formatChanges(r.changes) === "Changes: none") return null;
-  await evalRaw("app.executeCommand(16); 'undone'", 3e4);
-  return r.changes.unlisted ? `${READ_ONLY_REFUSAL}
-This script changed the project, so its changes were undone.` : `${READ_ONLY_REFUSAL}
-This script changed the project, so its changes were undone:
-${formatChanges(r.changes)}`;
-}
 var OUTPUT_GUARD_JSX = `
 if (args.outputPath && !args.overwrite && new File(args.outputPath).exists)
   aemcp.fail("A file already exists at " + new File(args.outputPath).fsName + ". Nothing was rendered. To replace it, pass overwrite: true (or choose another outputPath).");`;
@@ -69814,6 +69874,34 @@ async function renderPng(body, args) {
   }
   return { info, data };
 }
+var UNDO_STACK_CALLS = /\b(?:begin|end)UndoGroup\b|\bexecuteCommand\b|\bpurge\b/g;
+function undoStackCalls(code) {
+  return [...new Set(withoutComments(code).match(UNDO_STACK_CALLS) ?? [])];
+}
+function undoStackRefusal(code) {
+  const calls = undoStackCalls(code);
+  if (!calls.length) return null;
+  return `Nothing ran. AE MCP is in read-only mode, and this script calls ${calls.join(", ")}. executeCommand, beginUndoGroup, endUndoGroup and purge change the undo history outside AE MCP's control, so read-only mode couldn't reliably put the project back afterwards; scripts that call them are refused. To run it on purpose, the user can switch to edit mode (Full access, or Ask before every change) in After Effects: Window > Extensions > AE MCP > Permissions.`;
+}
+function readOnlyRunOptions(code) {
+  return { undoGroup: "AE MCP Script (read-only check)", report: ["*"], checkOnly: !undoStackCalls(code).length, rollback: "changes" };
+}
+function readOnlyRefusal(r) {
+  const rb = r.rollback;
+  if (!rb || !rb.undone && rb.verified) return null;
+  if (!rb.verified) return `${READ_ONLY_REFUSAL}
+${rollbackProblem(rb, "the script")}`;
+  const changes = r.changes && !r.changes.unlisted ? formatChanges(r.changes) : null;
+  return `${READ_ONLY_REFUSAL}
+This script changed the project, so its changes were undone${changes ? `:
+${changes}` : "."}`;
+}
+async function runReadOnly(code, timeoutMs = 12e4) {
+  const refused = undoStackRefusal(code);
+  if (refused) return { refusal: refused };
+  const r = await runJsx(evalBody(transpileUserCode(code).source), {}, { ...readOnlyRunOptions(code), timeoutMs });
+  return { refusal: readOnlyRefusal(r), r };
+}
 function registerCoreTools(server) {
   server.registerTool(
     "ae_run_script",
@@ -69836,18 +69924,17 @@ function registerCoreTools(server) {
       try {
         const perm = permissions();
         if (!perm.allowShell && usesShell(code)) return errorResult(SHELL_REFUSAL);
-        const readOnly = perm.mode === "read-only";
+        const readOnly2 = perm.mode === "read-only";
+        const undoStack = readOnly2 ? undoStackRefusal(code) : null;
+        if (undoStack) return errorResult(undoStack);
         const t = transpileUserCode(code, transpile !== false);
         const r = await runJsx(evalBody(t.source), args ?? {}, {
-          // read-only mode needs a named undo group (to undo the script) and a report over every comp
-          undoGroup: readOnly ? "AE MCP Script (read-only check)" : undoGroup === "" ? false : undoGroup || "AE MCP Script",
+          ...readOnly2 ? readOnlyRunOptions(code) : { undoGroup: undoGroup === "" ? false : undoGroup || "AE MCP Script", report: report === false ? void 0 : reportScope(args) },
           depth,
           timeoutMs: (timeoutSeconds ?? 120) * 1e3,
-          report: readOnly ? ["*"] : report === false ? void 0 : reportScope(args),
-          checkOnly: readOnly,
           bridge: perm.mode === "ask" ? { approval: { tool: "Run script", summary: approvalSummary("ae_run_script", { code }) } } : void 0
         });
-        const refusal = readOnly ? await undoReadOnlyChanges(r) : null;
+        const refusal = readOnly2 ? readOnlyRefusal(r) : null;
         if (refusal) return errorResult(refusal);
         if (!r.ok && r.error) {
           if (t.syntaxError && /does not have a value|syntax|expected|illegal|unterminated/i.test(r.error.message)) {
@@ -70175,8 +70262,86 @@ function scanScripts(root, origin, depth = 2, out = []) {
   }
   return out;
 }
+var batchable = new Map(ALL_JSX_TOOLS.filter((t) => !t.noUndo).map((t) => [t.name, t]));
+async function runBatch({ steps, atomic, name, checkpoint, verbose }, perm) {
+  const bodies = [];
+  const stepArgs = [];
+  const hints = [];
+  let edits = false;
+  for (const [i, s] of steps.entries()) {
+    if (s.tool === "ae_run_script") {
+      const code = String(s.args?.code ?? "");
+      if (!perm.allowShell && usesShell(code)) return errorResult(`Step ${i + 1}: ${SHELL_REFUSAL}`);
+      const t = transpileUserCode(code);
+      if (t.syntaxError && !t.transpiled) return errorResult(`Step ${i + 1} (ae_run_script) has a syntax error: ${t.syntaxError}`);
+      hints[i] = reservedGlobalsHint(t.reservedGlobals);
+      bodies.push(evalBody(t.source));
+      stepArgs.push(s.args?.args ?? {});
+      edits = true;
+      continue;
+    }
+    const tool = batchable.get(s.tool);
+    if (!tool) return errorResult(`Step ${i + 1}: "${s.tool}" can't be used in a batch (unknown, or it can't be part of an undo step such as open/save project or undo).`);
+    if (!tool.readOnly && !tool.tempItems) edits = true;
+    bodies.push(tool.jsx);
+    stepArgs.push(s.args ?? {});
+  }
+  if (edits && perm.mode === "read-only") return errorResult(READ_ONLY_REFUSAL);
+  let cp = "";
+  if (checkpoint) cp = `Checkpoint saved first: ${(await saveCheckpoint("before-batch")).file}
+`;
+  const isAtomic = atomic !== false;
+  const body = "var __steps = [\n" + bodies.map((b) => `function (args, log) {
+${b}
+}`).join(",\n") + `
+], __out = [], __failed = -1;
+for (var __i = 0; __i < __steps.length; __i++) {
+  try { __out.push({ ok: true, result: aemcp.serialize(__steps[__i](args.stepArgs[__i], log), 2) }); }
+  catch (e) { __out.push({ ok: false, error: e.message || String(e), line: e.aemcpUser ? undefined : e.line }); if (__failed < 0) __failed = __i; if (args.atomic) break; }
+}
+return { steps: __out, failed: __failed, rollback: args.atomic && __failed >= 0 };`;
+  const scope = [...new Set(steps.map((s) => s.args?.comp).filter((c) => c !== void 0 && c !== null))];
+  const showReport = loadConfig().changeReport !== false;
+  const r = await runJsx(body, { stepArgs, atomic: isAtomic }, {
+    undoGroup: name || "AE MCP Batch",
+    timeoutMs: 6e5,
+    depth: 6,
+    // an atomic batch always compares before/after: that is what makes its rollback safe
+    report: showReport || isAtomic ? scope.length ? scope : reportScope({}) : void 0,
+    rollback: isAtomic ? "requested" : void 0,
+    bridge: edits && perm.mode === "ask" ? { approval: { tool: `Batch (${steps.length} steps)`, summary: steps.map((s, i) => `${i + 1}. ${s.tool} ${approvalSummary(s.tool, s.args).slice(0, 300)}`).join("\n") } } : void 0
+  });
+  if (!r.ok) return formatResult(r);
+  const res = r.result;
+  const lines = res.steps.map((s, i) => {
+    if (!s.ok) return `${i + 1}. ${steps[i].tool}: FAILED: ${s.error}${s.line ? ` (line ${s.line})` : ""}${hints[i] ? `
+   Hint: ${hints[i]}` : ""}`;
+    const txt = s.result === void 0 || s.result === null ? "ok" : JSON.stringify(s.result);
+    return `${i + 1}. ${steps[i].tool}: ${verbose ? txt : txt.length > 160 ? txt.slice(0, 157) + "..." : txt}`;
+  });
+  const changes = showReport ? formatChanges(r.changes) : null;
+  if (res.failed >= 0 && isAtomic) {
+    const at = `Batch stopped at step ${res.failed + 1} of ${steps.length}`;
+    const rb = r.rollback ?? { undone: false, verified: false, problem: "no result" };
+    const text2 = !rb.verified ? `${at}. ${rollbackProblem(rb, "the batch")}
+${lines.join("\n")}` + (changes && changes !== "Changes: none" ? `
+
+The batch made these changes:
+${changes}` : "") : rb.undone ? `${at} and was rolled back (nothing changed).
+${lines.join("\n")}` + (changes && changes !== "Changes: none" ? `
+
+Rolled back:
+${changes}` : "") : `${at}. It hadn't changed anything yet, so there was nothing to undo.
+${lines.join("\n")}`;
+    return { isError: true, content: [{ type: "text", text: cp + text2 }] };
+  }
+  const head = res.failed >= 0 ? `Batch finished with errors (atomic: false, successful steps were kept).` : `Batch done: ${steps.length} steps in one undo step.`;
+  return { content: [{ type: "text", text: `${cp}${head}
+${lines.join("\n")}${changes ? `
+
+${changes}` : ""}` }] };
+}
 function registerWorkflowTools(server) {
-  const batchable = new Map(ALL_JSX_TOOLS.filter((t) => !t.noUndo).map((t) => [t.name, t]));
   server.registerTool(
     "ae_batch",
     {
@@ -70192,83 +70357,9 @@ function registerWorkflowTools(server) {
       // steps can be ae_run_script
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true }
     },
-    async ({ steps, atomic, name, checkpoint, verbose }) => {
+    async (input2) => {
       try {
-        const perm = permissions();
-        const bodies = [];
-        const stepArgs = [];
-        const hints = [];
-        let edits = false;
-        for (const [i, s] of steps.entries()) {
-          if (s.tool === "ae_run_script") {
-            const code = String(s.args?.code ?? "");
-            if (!perm.allowShell && usesShell(code)) return errorResult(`Step ${i + 1}: ${SHELL_REFUSAL}`);
-            const t = transpileUserCode(code);
-            if (t.syntaxError && !t.transpiled) return errorResult(`Step ${i + 1} (ae_run_script) has a syntax error: ${t.syntaxError}`);
-            hints[i] = reservedGlobalsHint(t.reservedGlobals);
-            bodies.push(evalBody(t.source));
-            stepArgs.push(s.args?.args ?? {});
-            edits = true;
-            continue;
-          }
-          const tool = batchable.get(s.tool);
-          if (!tool) return errorResult(`Step ${i + 1}: "${s.tool}" can't be used in a batch (unknown, or it can't be part of an undo step such as open/save project or undo).`);
-          if (!tool.readOnly && !tool.tempItems) edits = true;
-          bodies.push(tool.jsx);
-          stepArgs.push(s.args ?? {});
-        }
-        if (edits && perm.mode === "read-only") return errorResult(READ_ONLY_REFUSAL);
-        let cp = "";
-        if (checkpoint) cp = `Checkpoint saved first: ${(await saveCheckpoint("before-batch")).file}
-`;
-        const isAtomic = atomic !== false;
-        const body = "var __steps = [\n" + bodies.map((b) => `function (args, log) {
-${b}
-}`).join(",\n") + `
-], __out = [], __failed = -1;
-for (var __i = 0; __i < __steps.length; __i++) {
-  try { __out.push({ ok: true, result: aemcp.serialize(__steps[__i](args.stepArgs[__i], log), 2) }); }
-  catch (e) { __out.push({ ok: false, error: e.message || String(e), line: e.aemcpUser ? undefined : e.line }); if (__failed < 0) __failed = __i; if (args.atomic) break; }
-}
-return { steps: __out, failed: __failed };`;
-        const scope = [...new Set(steps.map((s) => s.args?.comp).filter((c) => c !== void 0 && c !== null))];
-        const r = await runJsx(body, { stepArgs, atomic: isAtomic }, {
-          undoGroup: name || "AE MCP Batch",
-          timeoutMs: 6e5,
-          depth: 6,
-          report: loadConfig().changeReport === false ? void 0 : scope.length ? scope : reportScope({}),
-          bridge: edits && perm.mode === "ask" ? { approval: { tool: `Batch (${steps.length} steps)`, summary: steps.map((s, i) => `${i + 1}. ${s.tool} ${approvalSummary(s.tool, s.args).slice(0, 300)}`).join("\n") } } : void 0
-        });
-        if (!r.ok) return formatResult(r);
-        const res = r.result;
-        const lines = res.steps.map((s, i) => {
-          if (!s.ok) return `${i + 1}. ${steps[i].tool}: FAILED: ${s.error}${s.line ? ` (line ${s.line})` : ""}${hints[i] ? `
-   Hint: ${hints[i]}` : ""}`;
-          const txt = s.result === void 0 || s.result === null ? "ok" : JSON.stringify(s.result);
-          return `${i + 1}. ${steps[i].tool}: ${verbose ? txt : txt.length > 160 ? txt.slice(0, 157) + "..." : txt}`;
-        });
-        const changes = formatChanges(r.changes);
-        if (res.failed >= 0 && isAtomic) {
-          await evalRaw("app.executeCommand(16); 'undone'", 6e4);
-          return {
-            isError: true,
-            content: [
-              {
-                type: "text",
-                text: `${cp}Batch stopped at step ${res.failed + 1} of ${steps.length} and was rolled back (nothing changed).
-${lines.join("\n")}` + (changes && changes !== "Changes: none" ? `
-
-Rolled back:
-${changes}` : "")
-              }
-            ]
-          };
-        }
-        const head = res.failed >= 0 ? `Batch finished with errors (atomic: false, successful steps were kept).` : `Batch done: ${steps.length} steps in one undo step.`;
-        return { content: [{ type: "text", text: `${cp}${head}
-${lines.join("\n")}${changes ? `
-
-${changes}` : ""}` }] };
+        return await runBatch(input2, permissions());
       } catch (e) {
         return errorResult(e);
       }
@@ -70364,6 +70455,7 @@ var REDO = 2035;
 async function revisionSteps(features, say) {
   const fast = !!features.revision;
   const out = [];
+  let note;
   const step2 = async (name, fn, bench2) => {
     const t0 = Date.now();
     let problem;
@@ -70373,7 +70465,8 @@ async function revisionSteps(features, say) {
       problem = e.message;
     }
     const ms = Date.now() - t0;
-    out.push({ step: name, ok: !problem, ms, error: problem ?? void 0, bench: bench2 });
+    out.push({ step: name, ok: !problem, ms, error: problem ?? void 0, bench: bench2, note });
+    note = void 0;
     say(!problem, problem ? `${name}: ${problem}` : `${name} (${ms} ms)${bench2 ? ": " + Object.entries(bench2).map(([k2, v]) => `${k2} ${v} ms`).join(", ") : ""}`);
   };
   const check2 = (r) => r.ok ? null : `script failed: ${r.error?.message}`;
@@ -70403,25 +70496,25 @@ return app.project.numItems;`,
   await step2("read-only check: catches a property edit", async () => {
     const r = await runJsx(user(`${findComp} c.layer(1).property("ADBE Transform Group").property("ADBE Opacity").setValue(40); return 1;`), {}, READ_ONLY);
     if (!r.ok) return check2(r);
-    const text = formatChanges(r.changes);
-    if (fast) return r.changes?.unlisted ? null : `expected "the project changed (not listed)", got ${text}`;
-    return /Opacity: 100 -> 40/.test(text ?? "") ? null : `the edit wasn't listed: ${text}`;
+    const text2 = formatChanges(r.changes);
+    if (fast) return r.changes?.unlisted ? null : `expected "the project changed (not listed)", got ${text2}`;
+    return /Opacity: 100 -> 40/.test(text2 ?? "") ? null : `the edit wasn't listed: ${text2}`;
   });
   await step2("read-only check: catches a label and comment change", async () => {
     const r = await runJsx(user(`${findComp} c.label = 5; c.comment = "x"; return 1;`), {}, READ_ONLY);
     if (!r.ok) return check2(r);
-    const text = formatChanges(r.changes) ?? "";
-    return /label/.test(text) && /comment/.test(text) ? null : `not reported: ${text}`;
+    const text2 = formatChanges(r.changes) ?? "";
+    return /label/.test(text2) && /comment/.test(text2) ? null : `not reported: ${text2}`;
   });
   let k = 0;
-  const undoSafe = (name, script, opts = {}) => step2(`read-only undo keeps the user's last edit: ${name}`, async () => {
+  const undoSafe = (name, script2, opts = {}) => step2(`read-only undo keeps the user's last edit: ${name}`, async () => {
     const comp = `${U}_${++k}`;
     const findLayer = `var c = null; for (var i = 1; i <= app.project.numItems; i++) if (app.project.item(i).name === "${comp}") c = app.project.item(i); var L = c && c.layer(1);`;
     const edit = async (code, label) => {
       const r2 = await runJsx(code, {}, { undoGroup: `AE MCP self-test: ${label}` });
       if (!r2.ok) throw new Error(`${label} failed: ${r2.error?.message}`);
     };
-    const state = async () => {
+    const state2 = async () => {
       const r2 = await runJsx(`${findLayer} return L ? [L.name, L.opacity.value, L.rotation.value].join(" | ") : "the test comp is gone";`, {}, { undoGroup: false });
       if (!r2.ok) throw new Error(`couldn't read the test layer: ${r2.error?.message}`);
       return String(r2.result);
@@ -70432,23 +70525,35 @@ return app.project.numItems;`,
       await edit(`${findLayer} L.name = "user rename 2"; return 1;`, "user rename");
       await evalRaw(`app.executeCommand(${UNDO}); 1`, 3e4);
     }
-    const before = await state();
+    const before = await state2();
     if (!before.startsWith("user rename 1 |")) return `setup didn't leave the user's rename: ${before}`;
-    const r = await runJsx(user(`${findLayer}
-${script}
-return L ? L.name : null;`), {}, READ_ONLY);
-    const refusal = await undoReadOnlyChanges(r);
-    const after = await state();
+    const { refusal, r } = await runReadOnly(`${findLayer}
+${script2}
+return L ? L.name : null;`, 3e5);
+    const after = await state2();
+    if (opts.refused) {
+      if (r) return `not refused: the script ran (layer name ${r.result}); ${refusal ? `then: ${refusal}` : "no refusal"}; before: ${before}; after: ${after}`;
+      if (!/^Nothing ran\./.test(refusal ?? "")) return `unexpected reply: ${refusal}`;
+      return after === before ? null : `refused, but the layer changed: before ${before}; after ${after}`;
+    }
+    if (!r) return `refused, but the script doesn't call the undo stack: ${refusal}`;
+    if (opts.assembled) {
+      note = `the script saw layer name ${r.result}; before: ${before}; after: ${after}; rollback: ${JSON.stringify(r.rollback)}; reply: ${refusal ?? "(none)"}`;
+      say(true, `  ${name}: ${note}`);
+      if (after === before) return null;
+      if (after !== before.replace(/^user rename 1/, "solid")) return `the project isn't back and more than the script's own Undo changed it: before ${before}; after ${after}`;
+      return refusal && /not undone again|nothing was undone/.test(refusal) ? null : `the project isn't back and the reply doesn't say so: ${refusal}`;
+    }
     if (after !== before) return `before the script: ${before}; after the ${refusal ? "refusal and Undo" : "script (not refused)"}: ${after}`;
-    if (opts.took !== void 0 && r.result !== opts.took) return `the script's command didn't take effect (layer name ${r.result}, expected ${opts.took})`;
     return null;
   });
-  await undoSafe("script calls Edit > Undo", `app.executeCommand(${UNDO});`, { took: "solid" });
-  await undoSafe("script calls Edit > Redo", `app.executeCommand(${REDO});`, { userUndoes: true, took: "user rename 2" });
+  await undoSafe("script calls Edit > Undo", `app.executeCommand(${UNDO});`, { refused: true });
+  await undoSafe("script calls Edit > Redo", `app.executeCommand(${REDO});`, { userUndoes: true, refused: true });
   await undoSafe("script sets a property to its current value", "L.opacity.setValue(L.opacity.value);");
-  await undoSafe("script ends the undo group early, then edits", "app.endUndoGroup(); L.opacity.setValue(33);");
-  await undoSafe("script edits, ends the undo group, edits again", "L.opacity.setValue(33); app.endUndoGroup(); L.rotation.setValue(10);");
-  await undoSafe("script only ends the undo group early", "app.endUndoGroup();");
+  await undoSafe("script ends the undo group early, then edits", "app.endUndoGroup(); L.opacity.setValue(33);", { refused: true });
+  await undoSafe("script edits, ends the undo group, edits again", "L.opacity.setValue(33); app.endUndoGroup(); L.rotation.setValue(10);", { refused: true });
+  await undoSafe("script only ends the undo group early", "app.endUndoGroup();", { refused: true });
+  await undoSafe("script calls Edit > Undo by an assembled name", `app["execute" + "Command"](${UNDO});`, { assembled: true });
   const bench = {};
   await step2(
     `read-only query on ${COMPS + 1}+ comps: fast path vs full snapshot`,
@@ -70471,6 +70576,92 @@ return L ? L.name : null;`), {}, READ_ONLY);
     },
     bench
   );
+  return out;
+}
+
+// src/cli/fulltest-rollback.ts
+init_define_AEMCP_CEP_FILES();
+var P2 = "__aemcp_fulltest_rb";
+var OP = `var c = null; for (var i = 1; i <= app.project.numItems; i++) if (app.project.item(i).name === "${P2}") c = app.project.item(i);
+var op = c.layer(1).property("ADBE Transform Group").property("ADBE Opacity");`;
+var FULL = { mode: "full", allowShell: false };
+async function state() {
+  const r = await runJsx(`${OP} return { opacity: op.value, revision: aemcp.revision() };`, {}, { undoGroup: false });
+  if (!r.ok) throw new Error(`couldn't read the test comp: ${r.error?.message}`);
+  return r.result;
+}
+async function manualEdit(value2) {
+  const r = await runJsx(`${OP} op.setValue(args.value); return 1;`, { value: value2 }, { undoGroup: "AE MCP self-test: manual edit" });
+  if (!r.ok) throw new Error(`manual edit failed: ${r.error?.message}`);
+}
+var text = (r) => r.content[0]?.text ?? "";
+var script = (code) => ({ tool: "ae_run_script", args: { code } });
+var readOnly = async (code) => (await runReadOnly(code)).refusal;
+async function rollbackSteps(say) {
+  const out = [];
+  const step2 = async (name, fn) => {
+    const t0 = Date.now();
+    let problem;
+    try {
+      problem = await fn();
+    } catch (e) {
+      problem = e.message;
+    }
+    const ms = Date.now() - t0;
+    out.push({ step: name, ok: !problem, ms, error: problem ?? void 0 });
+    say(!problem, problem ? `${name}: ${problem}` : `${name} (${ms} ms)`);
+  };
+  await step2("rollback: set up", async () => {
+    const r = await runJsx(`var c = app.project.items.addComp("${P2}", 640, 360, 1, 4, 25); c.layers.addSolid([0.2, 0.4, 0.6], "${P2} solid", 64, 64, 1); return 1;`, {}, { undoGroup: "AE MCP self-test" });
+    return r.ok ? null : `couldn't create the test comp: ${r.error?.message}`;
+  });
+  await step2("rollback: manual edit, then an atomic batch that fails at step 1: the manual edit survives", async () => {
+    await manualEdit(37);
+    const before = await state();
+    const r = await runBatch({ steps: [script('throw new Error("fails before changing anything")'), script(`${OP} op.setValue(5);`)] }, FULL);
+    const after = await state();
+    if (!/nothing to undo/.test(text(r))) return `unexpected reply: ${text(r)}`;
+    if (after.opacity !== 37) return `the manual edit was reverted: Opacity is ${after.opacity}, expected 37`;
+    if (before.revision !== null && after.revision !== before.revision) return `the undo stack was touched (revision ${before.revision} -> ${after.revision})`;
+    return null;
+  });
+  await step2("rollback: atomic batch that edits, then fails at step 2: rolled back once, the manual edit survives", async () => {
+    await manualEdit(41);
+    const r = await runBatch({ steps: [script(`${OP} op.setValue(5);`), script('throw new Error("fails after an edit")')], name: "AE MCP self-test batch" }, FULL);
+    const after = await state();
+    if (!/was rolled back \(nothing changed\)/.test(text(r))) return `unexpected reply: ${text(r)}`;
+    return after.opacity === 41 ? null : `Opacity is ${after.opacity}, expected 41 (5 = not rolled back, 100/37 = undone twice)`;
+  });
+  await step2("rollback: read-only script that edits is reverted exactly once", async () => {
+    await manualEdit(43);
+    const refusal = await readOnly(`${OP} op.setValue(80); return 1;`);
+    const after = await state();
+    if (!refusal || !/its changes were undone/.test(refusal)) return `unexpected reply: ${refusal}`;
+    return after.opacity === 43 ? null : `Opacity is ${after.opacity}, expected 43 (80 = not reverted, 41 = undone twice)`;
+  });
+  await step2("rollback: read-only script that only reads leaves the undo stack alone", async () => {
+    await manualEdit(47);
+    const before = await state();
+    const refusal = await readOnly(`${OP} return op.value;`);
+    const after = await state();
+    if (refusal) return `refused a script that only reads: ${refusal}`;
+    if (after.opacity !== 47) return `Opacity is ${after.opacity}, expected 47`;
+    return before.revision !== null && after.revision !== before.revision ? `revision moved ${before.revision} -> ${after.revision}` : null;
+  });
+  await step2("rollback: read-only script that closes its own undo group: refused, nothing ran", async () => {
+    await manualEdit(53);
+    const refusal = await readOnly(`${OP} op.setValue(80); app.endUndoGroup(); op.setValue(90); return 1;`);
+    const after = await state();
+    if (!refusal || !/^Nothing ran\./.test(refusal)) return `unexpected reply: ${refusal}`;
+    return after.opacity === 53 ? null : `Opacity is ${after.opacity}, expected 53 (nothing ran)`;
+  });
+  await step2("rollback: read-only script that closes its own undo group by an assembled name: reported, not undone again", async () => {
+    await manualEdit(59);
+    const refusal = await readOnly(`${OP} op.setValue(80); app["end" + "UndoGroup"](); op.setValue(90); return 1;`);
+    const after = await state();
+    if (!refusal || !/not undone again/.test(refusal)) return `unexpected reply: ${refusal}`;
+    return after.opacity === 80 ? null : `Opacity is ${after.opacity}, expected 80 (one undo)`;
+  });
   return out;
 }
 
@@ -70664,6 +70855,7 @@ Full self-test: every major tool against this After Effects (temporary comps, re
     problem ? fail(`${s.name}: ${problem}`) : ok(`${s.name} (${ms} ms)`);
   }
   results.push(...await revisionSteps(features, (good, line) => (good ? ok : fail)(line)));
+  results.push(...await rollbackSteps((good, line) => (good ? ok : fail)(line)));
   await runJsx(
     `var p = app.project, rq = p.renderQueue;
 for (var r = rq.numItems; r > args.rq; r--) rq.item(r).remove();
@@ -79315,9 +79507,9 @@ return { project: p.file.fsName, comp: name, frames: frames, app: Folder.appPack
         const proc = spawn3(bin, cli, { stdio: ["ignore", "pipe", "pipe"] });
         job.proc = proc;
         const onData = (d) => {
-          const text = d.toString();
-          logStream.write(text);
-          for (const line of text.split(/\r?\n/)) {
+          const text2 = d.toString();
+          logStream.write(text2);
+          for (const line of text2.split(/\r?\n/)) {
             if (!line.trim()) continue;
             const m = line.match(/PROGRESS:.*\((\d+)\)/);
             if (m) job.frameRendered = Math.max(job.frameRendered, Number(m[1]));
@@ -79425,9 +79617,9 @@ function registerOnDemandTools(server, catalog) {
         if (only && cat.toLowerCase() !== only.toLowerCase()) continue;
         (groups[cat] ||= []).push(`${t.name}${t.direct ? "" : "*"}: ${firstSentence(t.config.description)}`);
       }
-      const text = Object.entries(groups).map(([cat, lines]) => `## ${cat}
+      const text2 = Object.entries(groups).map(([cat, lines]) => `## ${cat}
 ${lines.join("\n")}`).join("\n\n") + "\n\n* = not loaded in this chat: run it with ae_call (use ae_tools {describe: [...]} for its parameters).";
-      return { content: [{ type: "text", text }] };
+      return { content: [{ type: "text", text: text2 }] };
     }
   );
   server.registerTool(
