@@ -107,7 +107,8 @@
     var item = { at: e.at, tool: tool, kind: "read", title: toolName(e.tool, args), line: "", undoable: false, entry: e };
     if (tool === "ae_preflight") {
       var m = /^(FAIL|WARNINGS|INCOMPLETE|PASS)\b(?:\s*\((\d+))?/.exec(summary);
-      var spec = args.spec && (args.spec.name || (typeof args.spec === "string" ? args.spec : null));
+      // a spec file is named by its file name (the whole path is in Details)
+      var spec = args.spec && (args.spec.name || (typeof args.spec === "string" ? args.spec.split(/[\\/]/).pop() : null));
       item.line = [spec, typeof args.comp === "string" ? args.comp : null].filter(Boolean).join(" · ");
       if (!e.ok || !m) { item.kind = "problem"; item.title = "Preflight did not finish"; item.line = summary; }
       else if (m[1] === "PASS") { item.kind = "proof"; item.title = "Preflight passed"; }

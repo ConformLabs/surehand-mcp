@@ -225,3 +225,11 @@ describe("UX pass: refusals, readable errors, grouped reads, working row", () =>
     expect(UI.workingView(null, 90_000)).toMatchObject({ text: "After Effects isn’t answering", waiting: true });
   });
 });
+
+describe("Preflight rows", () => {
+  it("name a spec file by its file name, not its whole path", () => {
+    const it = UI.describeEntry({ at: "2026-10-20T01:00:00Z", ok: true, tool: "ae_preflight", args: { spec: "C:/Users/Ron/AppData/Local/Temp/sh-pf/pf-spec.json", comp: "Main" }, summary: "PASS" });
+    expect(it.line).toBe("pf-spec.json · Main");
+  });
+});
+
