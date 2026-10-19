@@ -279,6 +279,7 @@ Please share reports from other versions.
 | "Token mismatch" | Re-run the installer (it keeps the existing token) and restart AE. |
 | Scripts can't write files or use the network | Enable **Settings > Scripting & Expressions > Allow Scripts to Write Files and Access Network** in After Effects. Frame previews and the built-in tools work without it. |
 | A call times out | ExtendScript can't be interrupted: long scripts or renders keep AE busy, and modal dialogs block it. Check AE, then retry. Pass `timeoutSeconds` for long jobs. |
+| "After Effects is busy or showing a dialog" | A dialog or settings window (Project Settings, Preferences, an alert) is open in AE, or AE is still starting. Close it and retry: the call did not run and won't run later. Reported after 3s; change with `"blockedAfterSeconds"` in `~/.aemcp/config.json` (`0` waits for the full timeout). Scripts that have started are never cut short. |
 | Claude Desktop doesn't show the tools | Quit Claude Desktop completely (menu bar / tray) and reopen it. Check `claude_desktop_config.json` contains `after-effects`. |
 
 **Reporting a problem:** run **2. Test Installation**. If anything fails, it prints a diagnostics report at the end

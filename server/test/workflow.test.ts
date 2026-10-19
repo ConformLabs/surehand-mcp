@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { evalBody, formatChanges, runJsx, type RunResult } from "../src/jsx.js";
 import { READ_ONLY_RUN_OPTIONS, READ_ONLY_STILL_RUNNING, readOnlyBlockedCalls, readOnlyRefusal, readOnlyScriptRefusal, registerCoreTools } from "../src/tools/core.js";
-import { BridgeError } from "../src/bridge.js";
+import { BridgeError, explainBlocked } from "../src/bridge.js";
 import { _internal, runBatch } from "../src/tools/workflow.js";
 import { transpileUserCode } from "../src/transpile.js";
 import { fakeAE, loadHelpers, type Fake } from "./fake-ae.js";
@@ -496,6 +496,23 @@ describe("ae_run_script in read-only mode: undo-stack calls are refused before a
       } finally {
         bridgeError = null;
       }
+    }
+  });
+
+  it("BLOCKED in read-only mode: nothing ran, so no rollback is claimed and it is not treated as a timeout", async () => {
+    withManualEdit();
+    const msg = explainBlocked({ waitingForMs: 4000, waitingFor: "ae_run_script", queue: 0 });
+    bridgeError = new BridgeError(msg, "BLOCKED");
+    try {
+      const ro = await runScript("read-only", `${OP} return op.value;`);
+      expect(ro.isError).toBe(true);
+      expect(ro.all).toContain("This call did not run and will not run later.");
+      expect(ro.all).not.toContain(READ_ONLY_STILL_RUNNING);
+      expect(ro.all).not.toMatch(/rollback|rolled back|undone/i);
+      expect(opacity()).toBe(50);
+      expect(fake.undos.n).toBe(0);
+    } finally {
+      bridgeError = null;
     }
   });
 

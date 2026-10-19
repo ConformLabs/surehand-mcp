@@ -4,7 +4,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import { aeLabel, BridgeError, health, listInstances, matchInstance, resolvePort, selectInstance } from "../bridge.js";
+import { aeLabel, BridgeError, health, listInstances, matchInstance, selectInstance, startupWaitMs, waitForBridge, type Health } from "../bridge.js";
 import { lastSetup } from "../cli/setup.js";
 import { checkForUpdate, updateMessage } from "../update.js";
 import { VERSION } from "../config.js";
@@ -261,11 +261,15 @@ export function readOnlyRefusal(r: RunResult): string | null {
   return `${READ_ONLY_REFUSAL}\nThis script wrote to the project (perhaps only values that were already set), so its changes were undone.`;
 }
 
-/** Added to a timeout or cancel in read-only mode: the script, and then its rollback, still run to the end in AE. */
+/**
+ * Added to a timeout or cancel in read-only mode: if the script had started, it and then its rollback still run to the end in AE.
+ * (A script that had not started is dropped by the bridge and never runs. A BLOCKED error is not a timeout: nothing ran, so
+ * nothing needs rolling back, and this text is not added.)
+ */
 export const READ_ONLY_STILL_RUNNING =
-  "Read-only mode: a script can't be interrupted, and when it ends, the read-only rollback still runs inside After Effects in the same run " +
-  "(whatever the script changed is undone, once, as usual), but this reply can't show its result. Check the project (ae_status, " +
-  "ae_get_project_info) before going on.";
+  "Read-only mode: if After Effects had already started the script, it can't be interrupted, and when it ends, the read-only rollback " +
+  "still runs inside After Effects in the same run (whatever the script changed is undone, once, as usual), but this reply can't show " +
+  "its result. Check the project (ae_status, ae_get_project_info) before going on.";
 
 /** ae_run_script's read-only path, for the self-test: refused before anything runs, or run and rolled back. */
 export async function runReadOnly(code: string, timeoutMs = 120_000): Promise<{ refusal: string | null; r?: RunResult }> {
@@ -410,15 +414,37 @@ export function registerCoreTools(server: McpServer) {
           if (!m) return errorResult(`No running After Effects matches "${instance}". Running: ${list.map((i) => `${i.label} (port ${i.port})`).join(", ") || "none"}.`);
           selectInstance(m.port);
         }
-        const port = await resolvePort();
-        const h = await health(port);
-        const r = await runJsx(
+        // not running / still starting (waits up to ~15s) / bridge up: see which
+        const deadline = Date.now() + startupWaitMs();
+        const conn = await waitForBridge();
+        const port = conn.port;
+        let h: Health = conn.health;
+        const statusScript =
           "return { appVersion: app.version, buildName: app.buildName, language: String(app.isoLanguage), os: $.os, extendScriptVersion: $.version, " +
-            "memoryInUse: app.memoryInUse, isRenderEngine: app.isRenderEngine, project: aemcp.projectInfo(), " +
-            "canWriteFiles: (function(){ try { return app.preferences.getPrefAsLong('Main Pref Section', 'Pref_SCRIPTING_FILE_NETWORK_SECURITY') === 1; } catch (e) { return null; } })() };",
-          {},
-          { undoGroup: false, timeoutMs: 15_000 },
-        );
+          "memoryInUse: app.memoryInUse, isRenderEngine: app.isRenderEngine, project: aemcp.projectInfo(), " +
+          "canWriteFiles: (function(){ try { return app.preferences.getPrefAsLong('Main Pref Section', 'Pref_SCRIPTING_FILE_NETWORK_SECURITY') === 1; } catch (e) { return null; } })() };";
+        let r;
+        for (;;) {
+          try {
+            r = await runJsx(statusScript, {}, { undoGroup: false, timeoutMs: 15_000, bridge: { label: "ae_status" } });
+            break;
+          } catch (e) {
+            if (!(e instanceof BridgeError) || (e.code !== "BLOCKED" && e.code !== "TIMEOUT")) throw e;
+            // bridge up, but After Effects isn't taking scripts. While it may still be starting, wait for it.
+            const up = h.startedAt ? Date.now() - Date.parse(h.startedAt) : NaN;
+            if (e.code === "BLOCKED" && up >= 0 && up < 120_000 && Date.now() + 1000 < deadline) {
+              while (Date.now() + 1000 < deadline) {
+                await new Promise((res) => setTimeout(res, 1000));
+                h = await health(port).catch(() => h);
+                if (!h.waitingForAE) break;
+              }
+              if (!h.waitingForAE) continue;
+            }
+            return errorResult(
+              `The AE MCP bridge answers (${aeLabel(h.host?.appVersion)}, bridge v${h.version} on port ${port}), but After Effects is not taking scripts. ${e.message}`,
+            );
+          }
+        }
         const out = formatResult(r);
         const head: string[] = [`Connected to ${aeLabel(h.host?.appVersion)} (bridge v${h.version} on port ${port}, MCP server v${VERSION}).`];
         if (list.length > 1)

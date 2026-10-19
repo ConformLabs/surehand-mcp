@@ -99,7 +99,8 @@
     var job = state.queue.shift();
     if (dead(job)) { skip(job); return pump(); }
     state.busy = true;
-    state.current = { startedAt: Date.now(), label: job.label };
+    // waiting: the no-op has not come back yet, so After Effects isn't taking scripts right now
+    state.current = { startedAt: Date.now(), label: job.label, waiting: true };
     evalScript(READY_SCRIPT, function () {
       if (dead(job)) {
         state.busy = false;
@@ -107,6 +108,7 @@
         skip(job);
         return pump();
       }
+      state.current.waiting = false;
       job.started = true;
       var t0 = Date.now();
       evalScript(job.script, function (result) {
@@ -153,6 +155,8 @@
     return {
       ok: true, name: "aemcp-bridge", version: VERSION, host: hostInfo(), port: state.port, pid: process.pid,
       busy: state.busy, busyForMs: cur ? Date.now() - cur.startedAt : 0, busyWith: cur ? cur.label || null : null,
+      // AE has not accepted the no-op sent before the current job: a dialog is open, or AE is busy/starting
+      waitingForAE: !!(cur && cur.waiting), waitingForMs: cur && cur.waiting ? Date.now() - cur.startedAt : 0,
       queue: state.queue.length, pendingApprovals: state.pending.length, permissionMode: permissionMode(),
       startedAt: state.startedAt, lastActivated: state.lastActivated, authorized: authorized(req, token),
     };
@@ -161,25 +165,44 @@
   function handleEval(req, res, body) {
     if (!body || typeof body.script !== "string") return send(res, 400, { ok: false, error: "missing script" });
     var finished = false;
+    var timer = null;
+    var watch = null;
+    // answer the client once. From then on the job is unwanted: if it hasn't started it never will,
+    // and if it is running its log entry says it finished after the AI gave up.
+    function finish(status, obj) {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      clearInterval(watch);
+      job.cancelled = true;
+      send(res, status, obj);
+    }
     var job = {
       script: body.script,
       label: body.label || null,
-      done: function (result) {
-        if (finished) return;
-        finished = true;
-        clearTimeout(timer);
-        send(res, 200, { ok: true, result: result });
-      },
+      done: function (result) { finish(200, { ok: true, result: result }); },
     };
     var timeoutMs = Math.max(1000, Math.min(Number(body.timeoutMs) || 120000, 24 * 3600 * 1000));
-    var timer = null;
-    var startTimer = function () {
+    // optional (sent by newer servers): give up early if After Effects hasn't accepted any script for
+    // this long, i.e. it is blocked by a dialog. Never applies to a script that has started.
+    var startTimeoutMs = Number(body.startTimeoutMs) > 0 ? Math.max(500, Number(body.startTimeoutMs)) : 0;
+    function checkBlocked() {
+      if (finished || job.started) return clearInterval(watch);
+      var cur = state.current;
+      if (!cur || !cur.waiting) return; // idle, or queued behind a script that is running: keep waiting
+      var waited = Date.now() - cur.startedAt;
+      if (waited < startTimeoutMs) return;
+      finish(503, {
+        ok: false, blocked: true, waitingForMs: waited, waitingFor: cur.label || null,
+        queue: state.queue.filter(function (j) { return j !== job && !j.cancelled; }).length, startedAt: state.startedAt,
+        error: "After Effects is busy or showing a dialog: it has not accepted a script for " + Math.round(waited / 1000) + "s. " +
+          "Close any open dialog in After Effects and retry. The script did not run and will not run later.",
+      });
+    }
+    function enqueue() {
       job.deadline = Date.now() + timeoutMs; // never start it after this
       timer = setTimeout(function () {
-        if (finished) return;
-        finished = true;
-        job.cancelled = true; // drop it if it has not started yet
-        send(res, 504, {
+        finish(504, {
           ok: false,
           error: "Timed out after " + Math.round(timeoutMs / 1000) + "s waiting for After Effects (it may be busy, rendering, or showing a dialog). " +
             (job.started
@@ -187,9 +210,15 @@
               : "The script did not run and will not run later."),
         });
       }, timeoutMs);
-    };
+      state.queue.push(job);
+      pump();
+      if (startTimeoutMs && !finished) {
+        watch = setInterval(checkBlocked, Math.min(250, startTimeoutMs));
+        checkBlocked();
+      }
+    }
     // client went away (or the AI app cancelled the request) before we answered: don't run it if still queued
-    res.on("close", function () { if (!finished) { finished = true; job.cancelled = true; clearTimeout(timer); dropPending(job); } });
+    res.on("close", function () { if (!finished) { finished = true; job.cancelled = true; clearTimeout(timer); clearInterval(watch); dropPending(job); } });
 
     if (body.approval && permissionMode() === "ask") {
       // hold the edit until the user allows or denies it in the AE MCP panel
@@ -201,23 +230,18 @@
         state.pending = state.pending.filter(function (x) { return x !== p; });
         if (finished) return;
         if (!allow) {
-          finished = true;
           addLog({ at: new Date().toISOString(), ms: 0, ok: false, label: p.tool, preview: "denied in the AE MCP panel" });
-          return send(res, 200, { ok: false, denied: true, error: "The user denied this change in After Effects (AE MCP panel)." });
+          return finish(200, { ok: false, denied: true, error: "The user denied this change in After Effects (AE MCP panel)." });
         }
-        startTimer();
-        state.queue.push(job);
-        pump();
+        enqueue();
       };
       state.pending.push(p);
       openPanel();
       // waiting for a person: allow up to 10 minutes before giving up
-      setTimeout(function () { if (!finished && state.pending.indexOf(p) >= 0) { state.pending = state.pending.filter(function (x) { return x !== p; }); finished = true; send(res, 200, { ok: false, denied: true, error: "No one approved this change in the AE MCP panel within 10 minutes." }); } }, 10 * 60 * 1000);
+      setTimeout(function () { if (!finished && state.pending.indexOf(p) >= 0) { state.pending = state.pending.filter(function (x) { return x !== p; }); finish(200, { ok: false, denied: true, error: "No one approved this change in the AE MCP panel within 10 minutes." }); } }, 10 * 60 * 1000);
       return;
     }
-    startTimer();
-    state.queue.push(job);
-    pump();
+    enqueue();
   }
 
   function dropPending(job) {

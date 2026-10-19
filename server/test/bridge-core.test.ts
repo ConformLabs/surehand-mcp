@@ -249,3 +249,119 @@ describe("server-side instance discovery", () => {
     selectInstance(null);
   });
 });
+
+describe("blocked After Effects is reported fast", () => {
+  let ae: ReturnType<typeof blockableAE>;
+  let bridge: any;
+  beforeAll(async () => {
+    ae = blockableAE();
+    bridge = loadBridge("26.5", 20, ae.evalScript);
+    bridge.start();
+    await waitFor(() => bridge.state.listening);
+  });
+  afterAll(() => bridge?.state.server.close());
+  const log = async () => (await req(bridge.state.port, "/log")).body.log as any[];
+
+  it("answers 'blocked' after the start window instead of waiting for the timeout, and never runs the job", async () => {
+    ae.blocked = true;
+    const t0 = Date.now();
+    const r = await req(bridge.state.port, "/eval", { script: "edit b1", label: "ae_set_property", timeoutMs: 20_000, startTimeoutMs: 600 });
+    const took = Date.now() - t0;
+    expect(r.status).toBe(503);
+    expect(took).toBeGreaterThanOrEqual(550);
+    expect(took).toBeLessThan(3000);
+    expect(r.body).toMatchObject({ ok: false, blocked: true, waitingFor: "ae_set_property", queue: 0 });
+    expect(r.body.waitingForMs).toBeGreaterThanOrEqual(600);
+    expect(r.body.error).toMatch(/did not run and will not run later/);
+
+    const h = (await req(bridge.state.port, "/health")).body;
+    expect(h.waitingForAE).toBe(true);
+    expect(h.waitingForMs).toBeGreaterThanOrEqual(600);
+
+    // while AE is still blocked, the next call is turned away at once
+    const t1 = Date.now();
+    const again = await req(bridge.state.port, "/eval", { script: "edit b2", timeoutMs: 20_000, startTimeoutMs: 600 });
+    expect(again.status).toBe(503);
+    expect(Date.now() - t1).toBeLessThan(500);
+
+    ae.closeDialog();
+    await waitFor(() => !bridge.state.busy && !bridge.state.queue.length);
+    expect(ae.ran).not.toContain("edit b1");
+    expect(ae.ran).not.toContain("edit b2");
+    expect((await log()).find((e) => e.label === "ae_set_property")).toMatchObject({ ok: false, skipped: true });
+    expect((await req(bridge.state.port, "/health")).body.waitingForAE).toBe(false);
+    expect((await req(bridge.state.port, "/eval", { script: "after b", startTimeoutMs: 600 })).body).toEqual({ ok: true, result: "result:after b" });
+  });
+
+  it("never cuts short a script that has started, nor one queued behind it", async () => {
+    // "late" scripts take 1.5s in the simulated AE: well past the 500ms start window
+    const long = req(bridge.state.port, "/eval", { script: "late render", timeoutMs: 10_000, startTimeoutMs: 500 });
+    await waitFor(() => bridge.state.busy);
+    const next = req(bridge.state.port, "/eval", { script: "after render", timeoutMs: 10_000, startTimeoutMs: 500 });
+    expect((await long).body).toEqual({ ok: true, result: "result:late render" });
+    expect((await next).body).toEqual({ ok: true, result: "result:after render" });
+  });
+
+  it("without startTimeoutMs (older servers) it waits for the normal timeout", async () => {
+    ae.blocked = true;
+    const t0 = Date.now();
+    const r = await req(bridge.state.port, "/eval", { script: "edit old", timeoutMs: 1000 });
+    expect(r.status).toBe(504);
+    expect(Date.now() - t0).toBeGreaterThanOrEqual(950);
+    ae.closeDialog();
+    await waitFor(() => !bridge.state.busy);
+    expect(ae.ran).not.toContain("edit old");
+  });
+
+  describe("ae_status", () => {
+    let status: (args?: any) => Promise<{ isError: boolean; text: string }>;
+    beforeAll(async () => {
+      process.env.AEMCP_CONFIG = join(home, ".aemcp", "config.json");
+      process.env.AEMCP_NO_UPDATE_CHECK = "1";
+      process.env.AEMCP_BLOCKED_AFTER_SECONDS = "0.5";
+      process.env.AEMCP_STARTUP_WAIT_SECONDS = "2";
+      delete process.env.AEMCP_BRIDGE_PORT;
+      const { registerCoreTools } = await import("../src/tools/core.js");
+      const { selectInstance } = await import("../src/bridge.js");
+      let handler: any;
+      registerCoreTools({ registerTool: (name: string, _def: unknown, h: unknown) => void (name === "ae_status" && (handler = h)) } as any);
+      selectInstance(bridge.state.port);
+      status = async (args = {}) => {
+        const r = await handler(args);
+        return { isError: !!r.isError, text: r.content.map((c: any) => c.text).join("\n") };
+      };
+    });
+    afterAll(async () => {
+      for (const k of ["AEMCP_NO_UPDATE_CHECK", "AEMCP_BLOCKED_AFTER_SECONDS", "AEMCP_STARTUP_WAIT_SECONDS"]) delete process.env[k];
+      (await import("../src/bridge.js")).selectInstance(null);
+    });
+
+    it("says the bridge is up but After Effects is blocked, with what the bridge knows", async () => {
+      ae.blocked = true;
+      const t0 = Date.now();
+      const r = await status();
+      expect(Date.now() - t0).toBeLessThan(5000);
+      expect(r.isError).toBe(true);
+      expect(r.text).toMatch(/The AE MCP bridge answers \(After Effects 2026/);
+      expect(r.text).toMatch(/busy or showing a dialog \(it has not accepted a script for \d+s; waiting to run ae_status/);
+      // the bridge started moments ago: it may still be starting up
+      expect(r.text).toMatch(/may still be starting up/);
+      ae.closeDialog();
+      await waitFor(() => !bridge.state.busy);
+    });
+
+    it("waits while After Effects finishes starting (dialog closes during the wait)", async () => {
+      ae.blocked = true;
+      setTimeout(() => ae.closeDialog(), 900);
+      const r = await status();
+      expect(r.isError).toBe(false);
+      expect(r.text).toMatch(/^Connected to After Effects 2026/);
+    });
+
+    it("reports ready when After Effects takes scripts", async () => {
+      const r = await status();
+      expect(r.isError).toBe(false);
+      expect(r.text).toMatch(/^Connected to After Effects 2026 \(bridge v.* on port \d+/);
+    });
+  });
+});
