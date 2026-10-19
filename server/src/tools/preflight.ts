@@ -3,7 +3,7 @@
 // temporary items); the render checks run in Node on the file (src/preflight/media.ts).
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, unlinkSync } from "node:fs";
 import { extname } from "node:path";
 import { z } from "zod";
 import { callContext } from "../context.js";
@@ -104,7 +104,8 @@ async function runPreflight(args: Record<string, any>): Promise<CallToolResult> 
   let fc: FileCheck | undefined;
   if (target !== "project") {
     try {
-      fc = await checkFile(args.file, spec, { thumbnails: true, signal: callContext.getStore()?.signal });
+      // the one-time ffmpeg download only with the user's consent (the AI asks first, then passes allowFfmpegDownload)
+      fc = await checkFile(args.file, spec, { thumbnails: true, signal: callContext.getStore()?.signal, allowDownload: args.allowFfmpegDownload === true });
     } catch (e: any) {
       const why = e?.message ?? String(e);
       if (target === "file") return errorResult(`The file checks could not run: ${why}`);
@@ -113,6 +114,8 @@ async function runPreflight(args: Record<string, any>): Promise<CallToolResult> 
     if (fc) {
       findings.push(...fc.findings);
       skipped.push(...(fc.skipped ?? []));
+      if (!fc.tool && args.allowFfmpegDownload !== true)
+        notes.push("ffmpeg isn't installed, so the file checks didn't run. Ask the user whether to download it once (a pinned, checksum-verified build into ~/.aemcp/ffmpeg), then call again with allowFfmpegDownload: true; or they can install it themselves (brew install ffmpeg / winget install ffmpeg).");
       if (!timeBase) {
         const fps = Number(fc.probe.frameRate ?? fc.probe.fps ?? spec.video?.frameRate);
         if (fps > 0) timeBase = { fps };
@@ -125,7 +128,8 @@ async function runPreflight(args: Record<string, any>): Promise<CallToolResult> 
   const text = formatReport({ title, findings, timeBase, skipped, notes, probe: fc?.probe, maxFindings: args.maxFindings });
   const content: CallToolResult["content"] = [{ type: "text", text }];
   if (fc) {
-    for (const t of pickThumbnails(fc)) {
+    const picked = pickThumbnails(fc);
+    for (const t of picked) {
       try {
         const ext = extname(t.path).toLowerCase();
         const mimeType = ext === ".jpg" || ext === ".jpeg" ? "image/jpeg" : "image/png";
@@ -134,6 +138,11 @@ async function runPreflight(args: Record<string, any>): Promise<CallToolResult> 
         // a thumbnail that can't be read is left out
       }
     }
+    // the thumbnails are temporary files in ~/.aemcp/tmp: remove all of them, shown or not
+    for (const t of fc.thumbnails ?? [])
+      try {
+        unlinkSync(t.path);
+      } catch {}
   }
   return { content };
 }
@@ -158,9 +167,14 @@ export function registerPreflightTools(server: McpServer) {
         file: z.string().optional().describe('Path of the rendered file (target "file" or "both").'),
         comp: compRef.describe("The delivered comp (overrides spec.comp). Default: spec.comp, else the active comp."),
         maxFindings: z.number().int().min(1).max(500).optional().describe("Most findings listed (default 60); counts stay complete."),
+        allowFfmpegDownload: z
+          .boolean()
+          .optional()
+          .describe("Only after the user agreed: if ffmpeg isn't installed, download it once (a pinned, checksum-verified build, about 60-80 MB) into ~/.aemcp/ffmpeg for the file checks."),
         timeBudgetSeconds: z.number().min(5).max(1800).optional().describe("Stop the frame-by-frame project checks after this long and report what was checked (default 120)."),
       },
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      // never changes the project; can download ffmpeg (with the user's consent) and writes temporary thumbnails
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
     async (args: Record<string, any>) => {
       try {

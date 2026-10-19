@@ -291,6 +291,41 @@ active comp and any comp named in the call. If a script fails halfway, the repor
 `ae_undo` reports what was reverted. On very large comps (tens of thousands of properties) this adds up to about a
 second per edit; turn it off with `"changeReport": false` in `~/.aemcp/config.json`, or per script with `report: false`.
 
+### Preflight: rendered files
+
+Preflight also checks the rendered file itself against the same delivery spec, with ffprobe and one ffmpeg pass over
+the picture and sound. Each check runs only when its section is in the spec; checks that can't run are listed as
+skipped, with the reason (no ffmpeg, no audio stream, an RGB file for legal range...).
+
+| Spec section | What is measured in the file |
+|---|---|
+| `video` | container (file extension), codec, frame size, pixel aspect, frame rate (`30000/1001` is 29.97, not 30), duration (± `durationToleranceFrames`), bit depth, chroma subsampling, alpha, field order, and the signalled color primaries / transfer / matrix / range (a tag that isn't there is a warning) |
+| `audio` | sample rate, channels, `required`; loudness per ITU-R BS.1770 / EBU R128 (ffmpeg `ebur128`): integrated, loudness range, true peak, highest short-term (3 s) loudness |
+| `legalRange` | every pixel of every frame, in the file's own bit depth scaled to 8-bit (a 10-bit 941 is 235.25: out of 16-235); a frame fails when more than `maxOutOfRangePercent` of its pixels are outside the luma / chroma range. Reported as time ranges, with the worst frame and its code values. YUV files only |
+| `black`, `frozen` | ffmpeg `blackdetect` / `freezedetect`: runs longer than `maxSeconds` (black allowed at the start / end per `allowAtStart` / `allowAtEnd`; a black run isn't reported again as frozen) |
+| `flash` | a **pre-check, not a certified PSE / Harding test**: the picture as a 32x18 grid, relative luminance per cell; a transition is a change of at least `minLuminanceChange` where the darker state is below 0.8, a flash is a pair of opposing transitions over at least `minAreaFraction` of the screen; more than `maxFlashesPerSecond` in any second fails. Saturated red flashes (R/(R+G+B) >= 0.8, change of (R-G-B)x320 > 20) are checked too unless `redFlash` is false (definitions after ITU-R BT.1702 / WCAG 2.x) |
+
+Times in the findings are seconds in the file. With thumbnails on, up to four PNG frames from the most important
+failing times are written to `~/.aemcp/tmp`. A one-minute 1080p ProRes 422 HQ file with every check takes about 4 s on
+an Apple Silicon Mac (legal range marks the out-of-range pixels and measures that mask averaged down to a small grid,
+which is exact and much faster than full statistics on every frame).
+
+**ffmpeg.** Surehand MCP uses, in this order: `"ffmpegPath"` / `"ffprobePath"` in `~/.aemcp/config.json`, a private
+copy in `~/.aemcp/ffmpeg`, then the PATH (plus `/opt/homebrew/bin` and `/usr/local/bin` on a Mac). If there is none, it
+can download FFmpeg 9.0.2 once into `~/.aemcp/ffmpeg`, only after you allow it. The download is a pinned build checked
+against a SHA-256 written in the source, and must start and report the expected version before it is used; anything
+else is refused and nothing is installed:
+
+- macOS (Apple Silicon and Intel): Martin Riedl's static release builds ([ffmpeg.martin-riedl.de](https://ffmpeg.martin-riedl.de)),
+  `ffmpeg.zip` + `ffprobe.zip`, about 60 MB. These are GPL v3 builds (they include x264 / x265).
+- Windows x64 (and Windows on Arm, which runs x64 programs): [BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds)
+  `ffmpeg-n9.0.2-...-win64-lgpl-shared-9.0.zip` from a month-end release (those are kept), about 77 MB. LGPL v2.1+.
+
+Surehand MCP doesn't ship or redistribute FFmpeg: it downloads the publisher's own file on your machine and runs it as a
+separate program, so FFmpeg's licence (the GPL / LGPL terms above, with its source available from ffmpeg.org) applies to
+that copy and not to Surehand MCP. `~/.aemcp/ffmpeg/SOURCE.json` records what was installed and from where. To use your
+own FFmpeg instead, install it (`brew install ffmpeg`, `winget install ffmpeg`) or set `"ffmpegPath"`.
+
 ### Proven edits
 
 Some changes should not change the picture at all: un-precomposing, duplicating a comp deeply, baking or collapsing
@@ -476,38 +511,3 @@ MIT, see [LICENSE](LICENSE). Created and maintained by Ron Yitzhaki ([@ronyitzha
 
 Adobe and After Effects are either registered trademarks or trademarks of Adobe in the United States and/or other
 countries. Surehand MCP is not affiliated with or endorsed by Adobe.
-
-### Preflight: rendered files
-
-Preflight also checks the rendered file itself against the same delivery spec, with ffprobe and one ffmpeg pass over
-the picture and sound. Each check runs only when its section is in the spec; checks that can't run are listed as
-skipped, with the reason (no ffmpeg, no audio stream, an RGB file for legal range...).
-
-| Spec section | What is measured in the file |
-|---|---|
-| `video` | container (file extension), codec, frame size, pixel aspect, frame rate (`30000/1001` is 29.97, not 30), duration (± `durationToleranceFrames`), bit depth, chroma subsampling, alpha, field order, and the signalled color primaries / transfer / matrix / range (a tag that isn't there is a warning) |
-| `audio` | sample rate, channels, `required`; loudness per ITU-R BS.1770 / EBU R128 (ffmpeg `ebur128`): integrated, loudness range, true peak, highest short-term (3 s) loudness |
-| `legalRange` | every pixel of every frame, in the file's own bit depth scaled to 8-bit (a 10-bit 941 is 235.25: out of 16-235); a frame fails when more than `maxOutOfRangePercent` of its pixels are outside the luma / chroma range. Reported as time ranges, with the worst frame and its code values. YUV files only |
-| `black`, `frozen` | ffmpeg `blackdetect` / `freezedetect`: runs longer than `maxSeconds` (black allowed at the start / end per `allowAtStart` / `allowAtEnd`; a black run isn't reported again as frozen) |
-| `flash` | a **pre-check, not a certified PSE / Harding test**: the picture as a 32x18 grid, relative luminance per cell; a transition is a change of at least `minLuminanceChange` where the darker state is below 0.8, a flash is a pair of opposing transitions over at least `minAreaFraction` of the screen; more than `maxFlashesPerSecond` in any second fails. Saturated red flashes (R/(R+G+B) >= 0.8, change of (R-G-B)x320 > 20) are checked too unless `redFlash` is false (definitions after ITU-R BT.1702 / WCAG 2.x) |
-
-Times in the findings are seconds in the file. With thumbnails on, up to four PNG frames from the most important
-failing times are written to `~/.aemcp/tmp`. A one-minute 1080p ProRes 422 HQ file with every check takes about 4 s on
-an Apple Silicon Mac (legal range marks the out-of-range pixels and measures that mask averaged down to a small grid,
-which is exact and much faster than full statistics on every frame).
-
-**ffmpeg.** Surehand MCP uses, in this order: `"ffmpegPath"` / `"ffprobePath"` in `~/.aemcp/config.json`, a private
-copy in `~/.aemcp/ffmpeg`, then the PATH (plus `/opt/homebrew/bin` and `/usr/local/bin` on a Mac). If there is none, it
-can download FFmpeg 9.0.2 once into `~/.aemcp/ffmpeg`, only after you allow it. The download is a pinned build checked
-against a SHA-256 written in the source, and must start and report the expected version before it is used; anything
-else is refused and nothing is installed:
-
-- macOS (Apple Silicon and Intel): Martin Riedl's static release builds ([ffmpeg.martin-riedl.de](https://ffmpeg.martin-riedl.de)),
-  `ffmpeg.zip` + `ffprobe.zip`, about 60 MB. These are GPL v3 builds (they include x264 / x265).
-- Windows x64 (and Windows on Arm, which runs x64 programs): [BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds)
-  `ffmpeg-n9.0.2-...-win64-lgpl-shared-9.0.zip` from a month-end release (those are kept), about 77 MB. LGPL v2.1+.
-
-Surehand MCP doesn't ship or redistribute FFmpeg: it downloads the publisher's own file on your machine and runs it as a
-separate program, so FFmpeg's licence (the GPL / LGPL terms above, with its source available from ffmpeg.org) applies to
-that copy and not to Surehand MCP. `~/.aemcp/ffmpeg/SOURCE.json` records what was installed and from where. To use your
-own FFmpeg instead, install it (`brew install ffmpeg`, `winget install ffmpeg`) or set `"ffmpegPath"`.

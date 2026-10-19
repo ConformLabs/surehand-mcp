@@ -145,7 +145,7 @@ const EXPECTED: Record<string, Hints> = {
   ae_project_history: E, // never changes the project, but writes (and prunes) its snapshot files under ~/.aemcp/history
   ae_list_scripts: R,
   // checks
-  ae_preflight: R, // reads the project (no undo step, no temporary items) and the rendered file
+  ae_preflight: [false, false, true, true], // never changes the project; may download ffmpeg (with consent) and writes temporary thumbnails
   ae_tools: R,
   ae_call: SCRIPT, // runs any tool, including ae_run_script
 };
