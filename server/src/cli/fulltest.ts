@@ -169,6 +169,15 @@ export async function fullSelftest(before?: ProjectState): Promise<number> {
     { name: "render queue add", tool: "ae_add_to_render_queue", args: { comp: C, outputPath: join(tmpDir, "fulltest.mov") } },
     { name: "render settings", tool: "ae_set_render_settings", args: { renderSettings: { Quality: "Draft" } }, needs: "renderSettingsApi" },
     { name: "project health", tool: "ae_project_health", args: {} },
+    {
+      name: "project X-ray",
+      tool: "ae_project_xray",
+      args: { comps: [C], timeBudgetSeconds: 30 },
+      check: (r) => {
+        const text = ALL.find((t) => t.name === "ae_project_xray")!.format!(r.result, {});
+        return /^Project X-ray: /.test(text) && /"expressions":\{"total":[1-9]/.test(text) ? null : `unexpected X-ray result: ${text.slice(0, 200)}`;
+      },
+    },
     { name: "camera", tool: "ae_set_camera", args: { comp: C, focalLength: 50, type: "two-node", depthOfField: true } },
     { name: "light", tool: "ae_set_light", args: { comp: C, type: "SPOT", intensity: 120, castsShadows: true } },
     { name: "3D material", tool: "ae_set_material", args: { comp: C, layers: ["BG"], castsShadows: "on", specular: 30 } },

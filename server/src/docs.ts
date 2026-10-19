@@ -1,6 +1,8 @@
 export const INSTRUCTIONS = `This server controls a running Adobe After Effects instance through ExtendScript.
 - Start with ae_status to confirm the connection, then ae_get_project_info / ae_get_comp_info (and ae_get_comp_map for
-  nested precomps, parenting and expression links) to understand the project.
+  nested precomps, parenting and expression links) to understand the project. For an unfamiliar or inherited project,
+  ae_project_xray explains how it works: what the render queue pulls in, expression dependencies and fragile links,
+  missing items, footage specs and what makes it heavy (run it with ae_call if it isn't loaded).
 - Prefer the specific tools (ae_create_comp, ae_add_layer, ae_set_keyframes, ae_apply_effect...) for common edits; use ae_run_script for anything else - the full AE scripting API is available.
 - Use ae_get_properties to discover property paths/match names before setting values.
 - After visual changes, look at the result: ae_render_frame (one frame; can zoom a region, solo layers, show alpha, diff),

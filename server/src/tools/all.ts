@@ -12,8 +12,10 @@ import type { JsxTool } from "./registry.js";
 import { renderTools } from "./render.js";
 import { sceneTools } from "./scene.js";
 import { egpTools, healthTools, textTools } from "./text.js";
+import { xrayTools } from "./xray.js";
 
 export const ALL_JSX_TOOLS: JsxTool[] = [
   ...projectTools, ...compTools, ...layerTools, ...propertyTools, ...effectTools, ...renderTools, ...appTools,
   ...inspectTools, ...keyframeTools, ...footageTools, ...textTools, ...egpTools, ...healthTools, ...sceneTools,
+  ...xrayTools,
 ];

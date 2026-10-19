@@ -28,6 +28,8 @@ export interface JsxTool {
   /** Include a change report (default: for every tool that edits, i.e. not readOnly / noUndo). */
   report?: boolean;
   timeoutMs?: number;
+  /** Turns the JSX result into the tool's text (analysis done in TypeScript). */
+  format?: (result: unknown, args: Record<string, unknown>) => string;
 }
 
 // ---- shared argument schemas ----
@@ -114,14 +116,14 @@ export function registerJsxTools(server: McpServer, tools: JsxTool[]) {
           if (edits && perm.mode === "read-only") return { isError: true, content: [{ type: "text", text: READ_ONLY_REFUSAL }] };
           const timeoutMs = typeof args.timeoutSeconds === "number" ? args.timeoutSeconds * 1000 : t.timeoutMs;
           const wantsReport = t.report ?? (!t.readOnly && !t.noUndo);
-          return formatResult(
-            await runJsx(t.jsx, args, {
-              undoGroup: t.tempItems ? "Surehand MCP " + t.title : t.readOnly || t.noUndo ? false : t.title,
-              timeoutMs,
-              report: wantsReport ? reportScope(args) : undefined,
-              bridge: edits && perm.mode === "ask" ? { approval: { tool: t.title, summary: approvalSummary(t.name, args) } } : undefined,
-            }),
-          );
+          const r = await runJsx(t.jsx, args, {
+            undoGroup: t.tempItems ? "Surehand MCP " + t.title : t.readOnly || t.noUndo ? false : t.title,
+            timeoutMs,
+            report: wantsReport ? reportScope(args) : undefined,
+            bridge: edits && perm.mode === "ask" ? { approval: { tool: t.title, summary: approvalSummary(t.name, args) } } : undefined,
+          });
+          if (r.ok && t.format) r.result = t.format(r.result, args);
+          return formatResult(r);
         } catch (e) {
           return errorResult(e);
         }

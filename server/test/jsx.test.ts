@@ -12,8 +12,9 @@ import { keyframeTools } from "../src/tools/keyframes.js";
 import { footageTools } from "../src/tools/footage.js";
 import { egpTools, healthTools, textTools } from "../src/tools/text.js";
 import { sceneTools } from "../src/tools/scene.js";
+import { xrayTools } from "../src/tools/xray.js";
 
-const allTools = [...projectTools, ...compTools, ...layerTools, ...propertyTools, ...effectTools, ...renderTools, ...appTools, ...inspectTools, ...keyframeTools, ...footageTools, ...textTools, ...egpTools, ...healthTools, ...sceneTools];
+const allTools = [...projectTools, ...compTools, ...layerTools, ...propertyTools, ...effectTools, ...renderTools, ...appTools, ...inspectTools, ...keyframeTools, ...footageTools, ...textTools, ...egpTools, ...healthTools, ...sceneTools, ...xrayTools];
 
 /** Rough ES3 lint: things ExtendScript cannot parse. */
 function es3Problems(src: string): string[] {

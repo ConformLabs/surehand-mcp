@@ -183,3 +183,209 @@ export function loadHelpers(f: Fake): any {
   const $ = { global: { ...globals } };
   return new Function("$", "app", ...names, "var aemcp;\n" + helperSource + "\nreturn aemcp;")($, f.app, ...names.map((n) => (globals as any)[n]));
 }
+
+// ---------- a richer fake project, for read-only tools that walk the whole project (ae_project_xray) ----------
+// Every object is wrapped in a Proxy that records writes, so a test can prove a tool changed nothing.
+
+export interface FakeLayerSpec {
+  name: string;
+  type?: "text" | "shape" | "solid" | "null" | "adjustment" | "footage" | "precomp" | "camera";
+  /** item name (footage or comp) */
+  source?: string;
+  enabled?: boolean;
+  shy?: boolean;
+  guide?: boolean;
+  isTrackMatte?: boolean;
+  /** 1-based index */
+  parent?: number;
+  effects?: { matchName: string; name: string; enabled?: boolean }[];
+  /** property path ("Transform/Opacity", "Effects/Slider Control/Slider") -> expression */
+  expressions?: Record<string, { expr: string; error?: string; enabled?: boolean }>;
+  font?: string;
+  scale?: number[];
+  motionBlur?: boolean;
+  threeD?: boolean;
+  timeRemap?: boolean;
+  collapse?: boolean;
+  frameBlend?: "FRAME_MIX" | "PIXEL_MOTION";
+  inPoint?: number;
+  outPoint?: number;
+}
+export interface FakeCompSpec {
+  name: string;
+  width?: number;
+  height?: number;
+  fps?: number;
+  duration?: number;
+  layers: FakeLayerSpec[];
+  motionBlur?: boolean;
+  samples?: number;
+  renderer?: string;
+}
+export interface FakeFootageSpec {
+  name: string;
+  kind?: "file" | "solid" | "placeholder";
+  file?: string;
+  missing?: boolean;
+  width?: number;
+  height?: number;
+  fps?: number;
+  duration?: number;
+  still?: boolean;
+  alpha?: boolean;
+  proxy?: string;
+}
+export interface FakeProjectSpec {
+  comps: FakeCompSpec[];
+  footage?: FakeFootageSpec[];
+  rq?: { comp: string; render: boolean }[];
+  installedEffects?: { matchName: string; displayName: string }[];
+  /** null: an After Effects without the font API */
+  fonts?: { postScriptName: string; familyName: string; styleName: string; isSubstitute: boolean }[] | null;
+  activeComp?: string;
+}
+
+export function fakeProject(spec: FakeProjectSpec) {
+  class Item {}
+  class CompItem extends Item {}
+  class FootageItem extends Item {}
+  class FolderItem extends Item {}
+  class FootageSource {}
+  class FileSource extends FootageSource {}
+  class SolidSource extends FootageSource {}
+  class PlaceholderSource extends FootageSource {}
+  class Layer {}
+  class AVLayer extends Layer {}
+  class TextLayer extends AVLayer {}
+  class ShapeLayer extends AVLayer {}
+  class CameraLayer extends Layer {}
+  class LightLayer extends Layer {}
+  class PropertyBase {}
+  const globals: Record<string, unknown> = {
+    File: { decode: decodeURIComponent },
+    Item, CompItem, FootageItem, FolderItem, FootageSource, FileSource, SolidSource, PlaceholderSource, Layer, AVLayer, TextLayer, ShapeLayer, CameraLayer, LightLayer, PropertyBase,
+    PropertyType, PropertyValueType, BlendingMode, TrackMatteType,
+    AlphaMode: { IGNORE: 5412, STRAIGHT: 5413, PREMULTIPLIED: 5414 },
+    RQItemStatus: { QUEUED: 3015, UNQUEUED: 3013, DONE: 3019 },
+    FrameBlendingType: { NO_FRAME_BLEND: 4012, FRAME_MIX: 4013, PIXEL_MOTION: 4014 },
+  };
+  const writes: string[] = [];
+  const calls: string[] = [];
+  const watch = <T extends object>(o: T, label: string): T =>
+    new Proxy(o, {
+      set(t, k, v) {
+        writes.push(`${label}.${String(k)}`);
+        (t as any)[k] = v;
+        return true;
+      },
+    });
+  const prop = (name: string, matchName: string, extra: Record<string, unknown> = {}) =>
+    watch(Object.assign(new PropertyBase(), { name, matchName, propertyType: PropertyType.PROPERTY, canSetExpression: true, expression: "", expressionError: "", expressionEnabled: true, ...extra }), name);
+  const group = (name: string, matchName: string, children: any[], extra: Record<string, unknown> = {}): any => {
+    const g: any = Object.assign(new PropertyBase(), { name, matchName, propertyType: PropertyType.NAMED_GROUP, children, ...extra });
+    Object.defineProperty(g, "numProperties", { get: () => g.children.length });
+    g.property = (k: number | string) => (typeof k === "number" ? g.children[k - 1] : g.children.find((c: any) => c.name === k || c.matchName === k)) ?? null;
+    return watch(g, name);
+  };
+
+  const items: any[] = [];
+  let nextId = 1;
+  const byName = (n: string) => items.find((i) => i.name === n);
+  for (const f of spec.footage ?? []) {
+    const kind = f.kind ?? "file";
+    const src = kind === "solid" ? new SolidSource() : kind === "placeholder" ? new PlaceholderSource() : new FileSource();
+    Object.assign(src, { isStill: !!f.still, hasAlpha: !!f.alpha, alphaMode: globals.AlphaMode && (globals.AlphaMode as any).STRAIGHT, nativeFrameRate: f.fps ?? 25, missingFootagePath: f.missing ? f.file : "", conformFrameRate: 0 });
+    const it: any = Object.assign(new FootageItem(), {
+      id: nextId++, name: f.name, width: f.width ?? 1920, height: f.height ?? 1080, pixelAspect: 1, duration: f.duration ?? 10, frameRate: f.fps ?? 25,
+      hasVideo: true, hasAudio: false, footageMissing: !!f.missing, file: f.file && !f.missing ? { fsName: f.file, exists: true } : null, mainSource: watch(src, "source"),
+      useProxy: !!f.proxy, proxySource: f.proxy ? { file: { fsName: f.proxy, exists: false } } : null, usedIn: [],
+    });
+    items.push(watch(it, f.name));
+  }
+  const comps: any[] = [];
+  for (const c of spec.comps) {
+    const it: any = Object.assign(new CompItem(), {
+      id: nextId++, name: c.name, width: c.width ?? 1920, height: c.height ?? 1080, pixelAspect: 1, frameRate: c.fps ?? 25, duration: c.duration ?? 10,
+      motionBlur: !!c.motionBlur, shutterAngle: 180, shutterPhase: -90, motionBlurSamplesPerFrame: c.samples ?? 16, motionBlurAdaptiveSampleLimit: 128,
+      frameBlending: true, renderer: c.renderer ?? "ADBE Advanced 3d", usedIn: [], layers: [] as any[], time: 0,
+    });
+    Object.defineProperty(it, "numLayers", { get: () => it.layers.length });
+    it.layer = (k: number | string) => (typeof k === "number" ? it.layers[k - 1] : it.layers.find((l: any) => l.name === k)) ?? null;
+    comps.push(it);
+    items.push(watch(it, c.name));
+  }
+  const effectGroups = (l: FakeLayerSpec) =>
+    (l.effects ?? []).map((e) => group(e.name, e.matchName, [], { enabled: e.enabled !== false }));
+  spec.comps.forEach((c, ci) => {
+    const comp = comps[ci];
+    c.layers.forEach((ls, li) => {
+      const type = ls.type ?? "solid";
+      const Cls = type === "text" ? TextLayer : type === "shape" ? ShapeLayer : type === "camera" ? CameraLayer : AVLayer;
+      const source = ls.source ? byName(ls.source) : undefined;
+      if (source && !source.usedIn.includes(comp)) source.usedIn.push(comp);
+      const transform = group("Transform", "ADBE Transform Group", [prop("Opacity", "ADBE Opacity", { value: 100 }), prop("Scale", "ADBE Scale", { value: ls.scale ?? [100, 100, 100] }), prop("Position", "ADBE Position", { value: [960, 540] })]);
+      const children: any[] = [transform];
+      if (type !== "camera") children.push(group("Effects", "ADBE Effect Parade", effectGroups(ls)));
+      if (type === "text") children.push(group("Text", "ADBE Text Properties", [prop("Source Text", "ADBE Text Document", { value: { font: ls.font ?? "ArialMT", text: ls.name } })]));
+      for (const [path, e] of Object.entries(ls.expressions ?? {})) {
+        const segs = path.split("/");
+        let g: any = { children };
+        for (const [k, s] of segs.entries()) {
+          let next = g.children.find((x: any) => x.name === s);
+          if (!next) {
+            next = k === segs.length - 1 ? prop(s, s) : group(s, s, []);
+            g.children.push(next);
+          }
+          g = next;
+        }
+        Object.assign(g, { expression: e.expr, expressionError: e.error ?? "", expressionEnabled: e.enabled !== false });
+      }
+      const L: any = Object.assign(new Cls(), {
+        index: li + 1, id: 1000 + nextId++, name: ls.name, enabled: ls.enabled !== false, shy: !!ls.shy, guideLayer: !!ls.guide, isTrackMatte: !!ls.isTrackMatte,
+        nullLayer: type === "null", adjustmentLayer: type === "adjustment", source: source ?? null, collapseTransformation: !!ls.collapse, timeRemapEnabled: !!ls.timeRemap,
+        frameBlendingType: ls.frameBlend ? (globals.FrameBlendingType as any)[ls.frameBlend] : (globals.FrameBlendingType as any).NO_FRAME_BLEND,
+        motionBlur: !!ls.motionBlur, threeDLayer: !!ls.threeD, inPoint: ls.inPoint ?? 0, outPoint: ls.outPoint ?? comp.duration, parent: null, children,
+      });
+      Object.defineProperty(L, "numProperties", { get: () => L.children.length });
+      L.property = (k: number | string) => (typeof k === "number" ? L.children[k - 1] : L.children.find((x: any) => x.name === k || x.matchName === k)) ?? null;
+      comp.layers.push(watch(L, ls.name));
+    });
+    c.layers.forEach((ls, li) => {
+      if (ls.parent) comp.layers[li].parent = comp.layers[ls.parent - 1];
+    });
+  });
+  writes.length = 0; // setting up parents is not the tool's doing
+  const rqItems = (spec.rq ?? []).map((r) => ({
+    comp: byName(r.comp), render: r.render, status: r.render ? (globals.RQItemStatus as any).QUEUED : (globals.RQItemStatus as any).UNQUEUED,
+    outputModule: () => ({ file: { fsName: `/renders/${r.comp}.mov` } }),
+  }));
+  const project: any = watch(
+    {
+      file: { name: "Inherited.aep", fsName: "/jobs/Inherited.aep" }, bitsPerChannel: 16, expressionEngine: "javascript-1.0",
+      get numItems() { return items.length; },
+      item: (i: number) => items[i - 1],
+      itemByID: (id: number) => items.find((i) => i.id === id) ?? null,
+      activeItem: spec.activeComp ? byName(spec.activeComp) : null,
+      renderQueue: { get numItems() { return rqItems.length; }, item: (i: number) => rqItems[i - 1] },
+    },
+    "project",
+  );
+  const app: any = {
+    version: "25.0.0", project, effects: spec.installedEffects ?? [],
+    beginSuppressDialogs: () => calls.push("beginSuppressDialogs"),
+    endSuppressDialogs: () => calls.push("endSuppressDialogs"),
+    beginUndoGroup: () => calls.push("beginUndoGroup"),
+    endUndoGroup: () => calls.push("endUndoGroup"),
+    executeCommand: () => calls.push("executeCommand"),
+  };
+  if (spec.fonts !== null) app.fonts = { missingOrSubstitutedFonts: spec.fonts ?? [] };
+  const names = Object.keys(globals);
+  const values = names.map((n) => globals[n]);
+  const aemcp = new Function("$", "app", ...names, "var aemcp;\n" + helperSource + "\nreturn aemcp;")({ global: { ...globals } }, app, ...values);
+  /** run a tool's JSX body like the bridge does (no undo group: a read-only tool) */
+  const run = (jsx: string, args: Record<string, unknown>) => {
+    const fn = new Function("aemcp", "app", ...names, `return function (args, log) {\n${jsx}\n};`)(aemcp, app, ...values);
+    return JSON.parse(aemcp.run(fn, args, { undoGroup: false }));
+  };
+  return { app, comps, items, writes, calls, run };
+}

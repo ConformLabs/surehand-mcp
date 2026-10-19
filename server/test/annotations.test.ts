@@ -56,6 +56,7 @@ const EXPECTED: Record<string, Hints> = {
   ae_open_project: D, // closes the current project (discardChanges drops unsaved work)
   ae_new_project: D,
   ae_project_health: R,
+  ae_project_xray: R,
   ae_color_settings: EI,
   // comps
   ae_list_comps: R,

@@ -220,7 +220,8 @@ return { steps: __out, failed: __failed, rollback: args.atomic && __failed >= 0 
   const res = r.result as { steps: { ok: boolean; result?: unknown; error?: string; line?: number }[]; failed: number };
   const lines = res.steps.map((s, i) => {
     if (!s.ok) return `${i + 1}. ${steps[i].tool}: FAILED: ${s.error}${s.line ? ` (line ${s.line})` : ""}${hints[i] ? `\n   Hint: ${hints[i]}` : ""}`;
-    const txt = s.result === undefined || s.result === null ? "ok" : JSON.stringify(s.result);
+    const format = batchable.get(steps[i].tool)?.format;
+    const txt = s.result === undefined || s.result === null ? "ok" : format ? format(s.result, steps[i].args ?? {}) : JSON.stringify(s.result);
     return `${i + 1}. ${steps[i].tool}: ${verbose ? txt : txt.length > 160 ? txt.slice(0, 157) + "..." : txt}`;
   });
   const changes = showReport ? formatChanges(r.changes) : null;
