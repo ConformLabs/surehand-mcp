@@ -578,7 +578,7 @@ describe("Surehand panel: ☰ screens (live findings)", () => {
   });
 
   it("Checkpoints: Save one now goes through the server (with its history snapshot) as the panel; Compare shows the summary first", async () => {
-    const cps = [{ id: "2026-10-19-18-01-21", at: new Date().toISOString(), label: "v2", file: "/cp/a.aep", history: "h1" }, { id: "2026-10-19-17-00-00", at: new Date().toISOString(), label: "old", file: "/cp/b.aep" }];
+    const cps = [{ id: "2026-10-19-17-00-00", at: "2026-10-19T17:00:00.000Z", label: "old", file: "/cp/b.aep" }, { id: "2026-10-19-18-01-21", at: "2026-10-19T18:01:21.000Z", label: "v2", file: "/cp/a.aep", history: "h1" }];
     const DIFF = 'From: snapshot 2026-10-19-18-01-21 "v2" (checkpoint 2026-10-19-18-01-21), revision 5774\nTo:   the current project (revision 5910, not stored)\nSummary: 1 layer changed\n\n~ layer #1 "Title": Opacity 100 -> 50';
     cliAnswer = (cmd) => {
       if (cmd.startsWith("checkpoints --json")) return { checkpoints: cps };
@@ -588,6 +588,8 @@ describe("Surehand panel: ☰ screens (live findings)", () => {
     };
     panel().menu("checkpoints");
     await waitFor(() => doc().querySelectorAll("#screenBody .cp").length === 2);
+    // newest first (the server lists oldest first)
+    expect(doc().querySelectorAll("#screenBody .cp")[0].textContent).toMatch(/v2/);
     expect(doc().querySelectorAll("#screenBody .cp")[1].textContent).toMatch(/no history snapshot/);
     expect($("screenBody").textContent).not.toMatch(/saved before history existed/);
     const n = cli.length;

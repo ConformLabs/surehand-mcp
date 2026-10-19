@@ -822,6 +822,7 @@
   $("ver").onclick = function () { openScreen("update"); };
   function loading(body, text) { body.innerHTML = ""; body.appendChild(el("div", { cls: "loading", text: text || "Loading\u2026" })); }
   function message(body, text) { body.appendChild(el("div", { cls: "msg", text: text })); }
+  var TUNNEL_HELP_URL = "https://github.com/ConformLabs/surehand-mcp/wiki/ChatGPT-on-the-web";
   function openUrl(u) {
     try { window.cep.util.openURLInDefaultBrowser(u); } catch (e) { copyText(u); toast("Link copied: " + u); }
   }
@@ -950,7 +951,8 @@
       box.appendChild(el("div", { cls: "lead", text: "ChatGPT needs a free tunnel tool, cloudflared." }));
       box.appendChild(el("div", { cls: "line", text: "Install it in a terminal with:" }));
       box.appendChild(copyBox(cmd, function () { if (copyText(cmd)) toast("Command copied."); else toast("Could not copy to the clipboard.", true); }));
-      box.appendChild(el("div", { cls: "acts" }, [button("primary pill sm", "Try again", start)]));
+      box.appendChild(el("div", { cls: "acts" }, [button("primary pill sm", "Try again", start),
+        button("link", "Step-by-step guide", function () { openUrl(TUNNEL_HELP_URL); })]));
     } else if (st === "error") {
       box.appendChild(el("div", { cls: "lead bad", text: "The secure link didn\u2019t start." }));
       if (s.error) box.appendChild(el("div", { cls: "line", text: s.error }));
@@ -986,7 +988,9 @@
       body.appendChild(el("div", { cls: "sfoot", text: "50 kept per project \u00b7 oldest are removed first" }));
       runCli(["checkpoints", "--json", "--project", project], still(token, function (e2, json) {
         // without the command (older server), read the checkpoint index directly
-        var cps = !e2 && json ? (Array.isArray(json) ? json : json.checkpoints || []) : readIndex(project).slice().reverse();
+        var cps = !e2 && json ? (Array.isArray(json) ? json : json.checkpoints || []) : readIndex(project).slice();
+        // newest first (the server's list and the index file are oldest first)
+        cps.sort(function (a, b) { return String(b.at || "").localeCompare(String(a.at || "")) || String(b.id).localeCompare(String(a.id)); });
         list.innerHTML = "";
         if (!cps.length) return list.appendChild(el("div", { cls: "empty", text: "No checkpoints yet for this project." }));
         cps.forEach(function (cp) { list.appendChild(checkpointCard(project, cp, token, !e2)); });
