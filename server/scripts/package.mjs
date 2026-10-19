@@ -62,8 +62,8 @@ const manifest = {
       type: "boolean",
       title: "Enable all tools",
       description:
-        "Off (recommended): a fast core set of ~20 tools; everything else is still possible through scripts. " +
-        "On: all ~60 tools (uses more of Claude's context). Can also be switched in After Effects: Window > Extensions > Surehand MCP.",
+        "Off (recommended): a fast core set of 29 tools; every other tool stays available on demand (ae_tools / ae_call). " +
+        "On: all 98 tools (uses more of Claude's context). Can also be switched in the Surehand panel in After Effects: \u2630 menu \u203a Tools the AI sees.",
       default: false,
       required: false,
     },

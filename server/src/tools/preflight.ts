@@ -143,7 +143,7 @@ async function runPreflight(args: Record<string, any>): Promise<CallToolResult> 
       // without ffmpeg nothing in the file was measured: every requested file check is "not run" (INCOMPLETE)
       if (!fc.tool) {
         if (wantDownload && mode === "read-only")
-          notes.push("ffmpeg isn't installed, and Surehand MCP is in read-only mode, which doesn't download programs, so allowFfmpegDownload was not used. The user can install ffmpeg themselves (brew install ffmpeg / winget install ffmpeg) or change the permission mode in Window > Extensions > Surehand MCP.");
+          notes.push("ffmpeg isn't installed, and Surehand MCP is in read-only mode, which doesn't download programs, so allowFfmpegDownload was not used. The user can install ffmpeg themselves (brew install ffmpeg / winget install ffmpeg) or switch to Full or Ask with the mode selector at the top of the Surehand panel (Window > Extensions > Surehand MCP).");
         else if (!wantDownload)
           notes.push("ffmpeg isn't installed, so the file checks didn't run. Ask the user whether to download it once (a pinned, checksum-verified build into ~/.surehand/ffmpeg), then call again with allowFfmpegDownload: true; or they can install it themselves (brew install ffmpeg / winget install ffmpeg).");
       }

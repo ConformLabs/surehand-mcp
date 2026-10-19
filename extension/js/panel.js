@@ -764,7 +764,7 @@
     }
     var sep = '<MenuItem Label="---"/>';
     return "<Menu>" +
-      item("hdrShell", "AI may run shell commands", { disabled: true }) + item("shellYes", "Yes", { check: shell }) + item("shellNo", "No", { check: !shell }) + sep +
+      item("hdrShell", "Shell commands in scripts", { disabled: true }) + item("shellYes", "Allowed", { check: shell }) + item("shellNo", "Off", { check: !shell }) + sep +
       item("hdrTools", "Tools the AI sees", { disabled: true }) + item("toolsCore", "Core (faster)", { check: !all }) + item("toolsAll", "All tools", { check: all }) + sep +
       item("connect", "Connect an AI app\u2026") + item("checkpoints", "Checkpoints\u2026") + item("history", "Activity history\u2026") + sep +
       item("test", "Test the connection") + item("diag", "Copy diagnostics") + sep +

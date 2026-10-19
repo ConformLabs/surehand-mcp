@@ -442,7 +442,7 @@ describe("ae_run_script in read-only mode: undo-stack calls are refused before a
       expect(text).toMatch(/^Nothing ran\./);
       expect(text).toContain(`this script mentions ${call.replace(/^app\.|\(.*/g, "")}`);
       expect(text).toMatch(/undo history outside Surehand MCP's control/);
-      expect(text).toMatch(/edit mode/);
+      expect(text).toMatch(/switch to Full or Ask with the mode selector/);
       expect(opacity()).toBe(50);
       expect(fake.undos.n).toBe(0);
       expect(fake.undoStack()).toEqual(["user: opacity 50"]);
@@ -488,7 +488,7 @@ describe("ae_run_script in read-only mode: undo-stack calls are refused before a
       expect(text).toMatch(/^Nothing ran\. Surehand MCP is in read-only mode, and this script mentions /);
       expect(text).toContain("which read-only mode can't undo");
       expect(text).not.toContain("undo history outside Surehand MCP's control");
-      expect(text).toMatch(/edit mode/);
+      expect(text).toMatch(/switch to Full or Ask with the mode selector/);
       expect(opacity()).toBe(50);
       expect(fake.undos.n).toBe(0);
     });
