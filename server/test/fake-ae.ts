@@ -16,6 +16,9 @@ class AVLayer {}
 const PropertyType = { PROPERTY: 6212, INDEXED_GROUP: 6213, NAMED_GROUP: 6214 };
 const PropertyValueType = { NO_VALUE: 6412, OneD: 6417, TEXT_DOCUMENT: 6420 };
 export const BlendingMode = { NORMAL: 5212, ADD: 5220 };
+export const MaskMode = { NONE: 6812, ADD: 6813, SUBTRACT: 6814, INTERSECT: 6815 };
+export const MaskFeatherFalloff = { FFO_LINEAR: 7213, FFO_SMOOTH: 7212 };
+export const MaskMotionBlur = { SAME_AS_LAYER: 7012, ON: 7013, OFF: 7014 };
 const TrackMatteType = { NO_TRACK_MATTE: 5012 };
 
 interface State { opacity: number[]; blend: number; layerLabel: number; compLabel: number; comment: string; folders: { id: number; name: string }[] }
@@ -25,6 +28,8 @@ export interface Fake {
   comp: any;
   layer: any;
   opacity: any;
+  /** the layer's mask ("Masks/Mask 1": maskMode, inverted...; setting one is an edit), only with { mask: true } */
+  mask?: any;
   /** the second comp ("Other", not active), only with { otherComp: true } */
   other?: { comp: any; layer: any; opacity: any };
   /** property values read so far (what makes a snapshot slow) */
@@ -42,11 +47,11 @@ export interface Fake {
 /**
  * revision: false = an AE without app.project.revision; undoWorks: false = Edit > Undo does nothing;
  * otherComp: a second comp; bigComp: the layer has more properties than a snapshot reads (partial);
- * renameFails: renaming a folder silently keeps its name; throwAfterUndo: the first look at the project's
+ * mask: the layer has one mask; renameFails: renaming a folder silently keeps its name; throwAfterUndo: the first look at the project's
  * items after Edit > Undo throws (once).
  */
 export function fakeAE(
-  opts: { revision?: boolean; undoWorks?: boolean; otherComp?: boolean; bigComp?: boolean; renameFails?: boolean; throwAfterUndo?: boolean } = {},
+  opts: { revision?: boolean; undoWorks?: boolean; otherComp?: boolean; bigComp?: boolean; mask?: boolean; renameFails?: boolean; throwAfterUndo?: boolean } = {},
 ): Fake {
   const reads = { n: 0 };
   const undos = { n: 0 };
@@ -70,12 +75,22 @@ export function fakeAE(
       this.value = v;
     },
   });
-  const makeLayer = (id: number, name: string, opacity: any): any => {
+  const makeMask = (): any => {
+    const m: any = { name: "Mask 1", matchName: "ADBE Mask Atom", propertyType: PropertyType.NAMED_GROUP, numProperties: 0, property: () => null };
+    const attrs: Record<string, unknown> = { maskMode: MaskMode.ADD, inverted: false, maskFeatherFalloff: MaskFeatherFalloff.FFO_SMOOTH, maskMotionBlur: MaskMotionBlur.SAME_AS_LAYER, rotoBezier: false, locked: false, color: [0.5, 0.25, 1] };
+    for (const k of Object.keys(attrs))
+      Object.defineProperty(m, k, { get: () => attrs[k], set: (v) => edit(() => (attrs[k] = v)), enumerable: true });
+    return m;
+  };
+  const mask = opts.mask ? makeMask() : undefined;
+  const makeLayer = (id: number, name: string, opacity: any, withMask = false): any => {
     const transform: any = { name: "Transform", propertyType: PropertyType.NAMED_GROUP, numProperties: opts.bigComp ? 30_000 : 1, property: () => opacity };
+    const groups = [transform];
+    if (withMask) groups.push({ name: "Masks", matchName: "ADBE Mask Parade", propertyType: PropertyType.INDEXED_GROUP, numProperties: 1, property: () => mask });
     return Object.assign(new AVLayer(), {
       id, name, inPoint: 0, outPoint: 4, startTime: 0, stretch: 100, parent: null, enabled: true, solo: false, locked: false,
       shy: false, label: 1, threeDLayer: false, blendingMode: BlendingMode.NORMAL, trackMatteType: TrackMatteType.NO_TRACK_MATTE,
-      adjustmentLayer: false, motionBlur: false, guideLayer: false, audioEnabled: false, numProperties: 1, property: () => transform,
+      adjustmentLayer: false, motionBlur: false, guideLayer: false, audioEnabled: false, numProperties: groups.length, property: (i: number) => groups[i - 1],
     });
   };
   const makeComp = (id: number, name: string, layer: any): any =>
@@ -85,7 +100,7 @@ export function fakeAE(
       layer: () => layer,
     });
   const opacity = makeOpacity(0);
-  const layer = makeLayer(7, "BG", opacity);
+  const layer = makeLayer(7, "BG", opacity, !!opts.mask);
   const comp = makeComp(1, "Main", layer);
   let other: Fake["other"];
   if (opts.otherComp) {
@@ -173,12 +188,12 @@ export function fakeAE(
     revision++;
     if (!group) stack.push({ name: "(edit)", before, moved: true });
   }
-  return { app, comp, layer, opacity, other, reads, edit, undoStack: () => stack.map((s) => s.name), undos, folders: () => folders.map((f) => f.name) };
+  return { app, comp, layer, opacity, mask, other, reads, edit, undoStack: () => stack.map((s) => s.name), undos, folders: () => folders.map((f) => f.name) };
 }
 
 /** The real helper library (aemcp.jsxinc), loaded into the fake After Effects. */
 export function loadHelpers(f: Fake): any {
-  const globals = { CompItem, FolderItem, FootageItem, SolidSource, PlaceholderSource, AVLayer, PropertyType, PropertyValueType, BlendingMode, TrackMatteType };
+  const globals = { CompItem, FolderItem, FootageItem, SolidSource, PlaceholderSource, AVLayer, PropertyType, PropertyValueType, BlendingMode, TrackMatteType, MaskMode, MaskFeatherFalloff, MaskMotionBlur };
   const names = Object.keys(globals);
   const $ = { global: { ...globals } };
   return new Function("$", "app", ...names, "var aemcp;\n" + helperSource + "\nreturn aemcp;")($, f.app, ...names.map((n) => (globals as any)[n]));

@@ -612,6 +612,28 @@ aemcp = (function () {
     }
     return sig;
   };
+  // Mask settings are attributes of the mask group, not properties: the walk doesn't see them.
+  // Stored with the group (after its enabled state), readable: enums as AE shows them ("Subtract").
+  var MASK_FIELDS = [["maskMode", "mode", "MaskMode"], ["inverted", "inverted"], ["maskFeatherFalloff", "feather falloff", "MaskFeatherFalloff"], ["maskMotionBlur", "motion blur", "MaskMotionBlur"], ["rotoBezier", "RotoBezier"], ["locked", "locked"], ["color", "color"]];
+  function enumText(en, v) {
+    var k; try { k = A.enumName($.global[en], v); } catch (e) { k = v; }
+    if (typeof k !== "string" || !/^[A-Z][A-Z0-9_]*$/.test(k)) return String(k);
+    k = k.replace(/^FFO_/, "").replace(/_/g, " ").toLowerCase();
+    return k.charAt(0).toUpperCase() + k.substr(1);
+  }
+  function maskSig(m) {
+    var o = [];
+    for (var i = 0; i < MASK_FIELDS.length; i++) {
+      var f = MASK_FIELDS[i], v; try { v = m[f[0]]; } catch (e) { v = undefined; }
+      o.push(v === undefined ? "" : (f[2] ? "s" + enumText(f[2], v) : enc(v)));
+    }
+    return o.join(SEP);
+  }
+  function maskDiff(a, b) {
+    var fa = a.split(SEP), fb = b.split(SEP), d = [];
+    for (var i = 0; i < MASK_FIELDS.length; i++) if (fa[i] !== fb[i] && fa[i] && fb[i]) d.push(MASK_FIELDS[i][1] + " " + raw(fa[i]) + " -> " + raw(fb[i]));
+    return d;
+  }
   function snapProps(L, out, groups, budget) {
     function walk(g, path, depth) {
       for (var i = 1; i <= g.numProperties; i++) {
@@ -631,7 +653,7 @@ aemcp = (function () {
         } else {
           if (p.propertyType === PropertyType.INDEXED_GROUP || depth < 3) {
             var en = ""; try { if (p.canSetEnabled) en = p.enabled ? "on" : "off"; } catch (e) {}
-            if (path) groups[pp] = en;
+            if (path) groups[pp] = p.matchName === "ADBE Mask Atom" ? en + SEP + maskSig(p) : en;
           }
           walk(p, pp, depth + 1);
         }
@@ -776,7 +798,13 @@ aemcp = (function () {
         for (var gp in lb.groups) {
           if (!lb.groups.hasOwnProperty(gp)) continue;
           if (la.groups[gp] === undefined) addedG.push(gp);
-          else if (la.groups[gp] !== lb.groups[gp]) add(ch.props, ["~", lname, gp, "enabled " + la.groups[gp] + " -> " + lb.groups[gp]]);
+          else if (la.groups[gp] !== lb.groups[gp]) {
+            var gsa = la.groups[gp], gsb = lb.groups[gp], cut1 = gsa.indexOf(SEP), cut2 = gsb.indexOf(SEP), gd = [];
+            var ena = cut1 < 0 ? gsa : gsa.substr(0, cut1), enb = cut2 < 0 ? gsb : gsb.substr(0, cut2);
+            if (ena !== enb) gd.push("enabled " + ena + " -> " + enb);
+            if (cut1 >= 0 && cut2 >= 0) gd = gd.concat(maskDiff(gsa.substr(cut1 + 1), gsb.substr(cut2 + 1)));
+            if (gd.length) add(ch.props, ["~", lname, gp, gd.join("; ")]);
+          }
         }
         for (var gq in la.groups) if (la.groups.hasOwnProperty(gq) && lb.groups[gq] === undefined) removedG.push(gq);
         var outermost = function (list) {
