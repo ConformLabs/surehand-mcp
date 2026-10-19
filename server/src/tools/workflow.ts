@@ -36,8 +36,14 @@ function readIndex(dir: string): Checkpoint[] {
 
 const stamp = () => new Date().toISOString().replace(/[:T]/g, "-").replace(/\..+$/, "");
 
+/** Run after every saved checkpoint (project history links a snapshot to it); returns a note for the user. */
+const checkpointHooks: ((cp: Checkpoint) => Promise<string | undefined>)[] = [];
+export function onCheckpointSaved(hook: (cp: Checkpoint) => Promise<string | undefined>) {
+  checkpointHooks.push(hook);
+}
+
 /** Save the open project and copy it into the checkpoint folder. */
-export async function saveCheckpoint(label?: string): Promise<Checkpoint> {
+export async function saveCheckpoint(label?: string): Promise<Checkpoint & { note?: string }> {
   const r = await runJsx(
     `var p = app.project;
 if (!p.file) aemcp.fail("The project has never been saved, so there is nothing to checkpoint yet. Save it first (ae_save_project with a path).");
@@ -62,7 +68,16 @@ return p.file.fsName;`,
     } catch {}
   }
   writeFileSync(join(dir, "index.json"), JSON.stringify(index, null, 2));
-  return index[index.length - 1];
+  const cp: Checkpoint & { note?: string } = { ...index[index.length - 1] };
+  const notes: string[] = [];
+  for (const hook of checkpointHooks) {
+    try {
+      const n = await hook(cp);
+      if (n) notes.push(n);
+    } catch {} // a hook never fails the checkpoint
+  }
+  if (notes.length) cp.note = notes.join("\n");
+  return cp;
 }
 
 /** A restore target next to the project that does not exist yet (an earlier restore is never overwritten). */
@@ -281,7 +296,7 @@ export function registerWorkflowTools(server: McpServer) {
         if (action === "save") {
           if (permissions().mode === "read-only") return errorResult(READ_ONLY_REFUSAL);
           const c = await saveCheckpoint(label);
-          return { content: [{ type: "text", text: `Checkpoint ${c.id}${c.label ? ` (${c.label})` : ""} saved: ${c.file}` }] };
+          return { content: [{ type: "text", text: `Checkpoint ${c.id}${c.label ? ` (${c.label})` : ""} saved: ${c.file}${c.note ? `\n${c.note}` : ""}` }] };
         }
         const r = await runJsx("return app.project.file ? app.project.file.fsName : null;", {}, { undoGroup: false });
         const project = r.result as string | null;

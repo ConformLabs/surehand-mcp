@@ -15,7 +15,7 @@ read information back, and use up to 95 ready-made tools for projects, comps, la
 text styling and animators, footage, effects, shapes, masks, 3D cameras/lights/materials, audio, color management,
 Essential Graphics and rendering (including background renders with aerender). Batch edits run many steps as one
 undo step, checkpoints keep safety copies of the project, structural changes can be proven not to change the render,
-and your own scripts can be listed and run. It can *see* and *measure* its work (frames, contact sheets, zoomed regions, difference
+project history shows what changed between versions, and your own scripts can be listed and run. It can *see* and *measure* its work (frames, contact sheets, zoomed regions, difference
 images, exact layer bounds, pixel colors), and every edit returns an exact list of what changed in the project.
 
 ```
@@ -177,7 +177,9 @@ unknown effect name gets suggestions.
 
 - **Workflow:** `ae_batch` (many tool steps or scripts in one call and ONE undo step, with one change report; atomic by
   default: if a step fails everything is undone), `ae_checkpoint` (save a timestamped copy of the project, list, restore
-  as a new file next to the original; the original is never overwritten), `ae_prove_identical` (evidence that a
+  as a new file next to the original; the original is never overwritten; each checkpoint also gets a history snapshot),
+  `ae_project_history` (snapshot the project, list snapshots and checkpoints, diff any two of them or the current
+  project: see Project history below), `ae_prove_identical` (evidence that a
   structural change left the render unchanged, see "Proven edits" below), `ae_list_scripts` (your scripts: AE's Scripts
   folder, ScriptUI Panels, and folders listed as `"scriptFolders"` in `~/.aemcp/config.json`, with their descriptions)
   + `ae_run_script_file`
@@ -252,6 +254,34 @@ difference image of the worst frame (black = identical). If a comp was deleted o
 Reference frames are stored in `~/.aemcp/proofs/` for 7 days (30 proofs at most). Rendering works like
 `ae_render_frame`: a temporary comp that is removed again, so the project is left as it was. Capture and compare are
 allowed in read-only mode; `run` makes edits, so it follows the same permissions as `ae_batch`.
+
+### Project history
+
+"What changed between v11 and v12?" `ae_project_history` answers it. A **snapshot** is a record of the open project:
+every item (comps, footage with its file paths, solids, folders), comp settings, every layer with its switches,
+timing, parent and track matte, every property that isn't at its default or is animated (values, keyframes with
+interpolation and easing), expressions, effects, masks, text, markers and the render queue. Taking one doesn't change
+the project and adds no undo step; snapshots are kept in `~/.aemcp/history` (the last 100 per project), and every
+`ae_checkpoint save` stores one too, so checkpoints can be compared. A **diff** compares two snapshots, or a snapshot with
+the project as it is now, and lists what changed, grouped by comp, with a summary first:
+
+```
+Summary: 1 layer added, 1 layer renamed, 2 values changed, 1 keyframe change, 1 expression changed, 1 effect added
+Comp "Main" (id 12):
+  + layer #1 "Logo" (shape)
+  ~ layer #2 "Title": renamed from "Headline"
+  + Title > Effects/Glow (ADBE Glo2)
+  ~ Title > Transform/Opacity: keyframes: @1s 100 -> 80
+  ~ Title > Transform/Position: expression changed:
+        - wiggle(2, 10)
+        + wiggle(3, 10)
+```
+
+Refer to versions by label ("v11"), snapshot or checkpoint id, `latest`, `previous` or `current`. Long diffs are cut
+with a count of what's left; `detail` shows one comp in full. A big project takes a while to read (seconds for
+thousands of layers): `comps` limits a snapshot to some comps and `timeBudgetSeconds` caps the time (comps not reached
+are reported, never silently skipped). Checkpoints saved before this feature have no snapshot; comparing them would
+mean opening the old `.aep` in place of your project, so it isn't done automatically.
 
 ### Example prompts
 

@@ -6,6 +6,7 @@ import { registerCoreTools } from "./tools/core.js";
 import { registerRenderJobs } from "./tools/renderjobs.js";
 import { registerWorkflowTools } from "./tools/workflow.js";
 import { registerProveTools } from "./tools/prove.js";
+import { registerHistoryTools } from "./tools/history.js";
 import { registerOnDemandTools } from "./tools/ondemand.js";
 import { registerJsxTools } from "./tools/registry.js";
 import { ALL_JSX_TOOLS } from "./tools/all.js";
@@ -26,6 +27,7 @@ export function createMcpServer(profile: ToolProfile = resolveProfile()): McpSer
   registerRenderJobs(server);
   registerWorkflowTools(server);
   registerProveTools(server);
+  registerHistoryTools(server);
   server.registerResource(
     "extendscript-cheatsheet",
     "aemcp://docs/extendscript",
