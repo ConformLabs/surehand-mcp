@@ -180,3 +180,56 @@ describe("approval card", () => {
     expect(UI.parseCliJson("Surehand MCP selftest\nok")).toBeNull();
   });
 });
+
+describe("UX pass: refusals, readable errors, grouped reads, working row", () => {
+  const e = (o: Record<string, unknown>) => ({ at: "2026-10-20T01:00:00.000Z", ok: true, summary: "", ...o });
+  it("a call the user stopped (Pause, Deny, Read-only, shell off, no answer) is 'blocked', not a failure", () => {
+    expect(UI.describeEntry(e({ tool: "ae_create_comp", ok: false, summary: "Paused in the Surehand panel: nothing was run. Ask the user to resume." }))).toMatchObject({ kind: "blocked", title: "Create comp", line: "Not run: the AI was paused" });
+    expect(UI.describeEntry(e({ tool: "ae_run_script", ok: false, summary: "The user denied this change in After Effects (Surehand MCP panel)." }))).toMatchObject({ kind: "blocked", line: "You denied it" });
+    expect(UI.describeEntry(e({ tool: "ae_run_script", ok: false, summary: "No one approved this change in the Surehand MCP panel within 10 minutes." })).line).toBe("Not run: no answer within 10 minutes");
+    expect(UI.describeEntry(e({ tool: "ae_set_property", ok: false, summary: "Surehand MCP is in read-only mode, so tools that change the project are disabled." })).line).toBe("Not run: Read-only mode");
+    expect(UI.describeEntry(e({ tool: "ae_run_script", ok: false, summary: "Shell commands (system.callSystem) are disabled in the Surehand MCP permissions." })).line).toBe("Not run: shell commands are off");
+    // a script that read-only mode refused because it can't be undone is a real problem for the AI to fix
+    expect(UI.describeEntry(e({ tool: "ae_run_script", ok: false, summary: "This script writes the project to disk, which read-only mode can't undo" })).kind).toBe("problem");
+  });
+  it("failures read as plain words, never as instructions meant for the AI", () => {
+    expect(UI.readableError("Cannot reach After Effects. Make sure After Effects is running and the Surehand MCP bridge is loaded (it starts...)")).toBe("After Effects wasn’t reachable. Is it open?");
+    expect(UI.readableError("After Effects is busy or showing a dialog: it has not accepted a script for 30s. Ask...")).toBe("After Effects was busy or showing a dialog.");
+    expect(UI.readableError("Timed out after 120s waiting for After Effects (it may be busy).")).toBe("Took longer than 120 s: After Effects may have been busy.");
+    expect(UI.readableError("Error: Layer 'Title' not found in comp 'Main'. Available: A, B")).toBe("Layer 'Title' not found in comp 'Main'.");
+  });
+  it("consecutive reads are one feed row; the next change still gets its own", () => {
+    const log = [
+      e({ tool: "ae_get_comp_info", args: { comp: "Main" } }),
+      e({ tool: "ae_get_comp_info", args: { comp: "Main" } }),
+      e({ tool: "ae_get_layer_info", args: { layer: "Title" } }),
+      e({ tool: "ae_set_property", changes: 1 }),
+      e({ tool: "ae_get_comp_info", args: { comp: "Main" } }),
+      e({ tool: "ae_get_comp_info", args: { comp: "Main" } }),
+    ];
+    const items = UI.feedItems(log, { limit: 5 });
+    expect(items.map((i: any) => [i.kind, i.title, i.line, i.count ?? 1])).toEqual([
+      ["read", "Looked at the project", "Read comp Main · Read layer Title", 3],
+      ["change", "Set property", "1 change", 1],
+      ["read", "Read comp Main", "2 times", 2],
+    ]);
+    expect(UI.entryDetails(items[0].entry, items[0].group).split("\n")).toHaveLength(3);
+  });
+  it("says what the AI is doing right now, and when After Effects keeps it waiting", () => {
+    expect(UI.workingView(null)).toBeNull();
+    expect(UI.workingView({ busy: true, busyWith: "panel: project state" })).toBeNull();
+    expect(UI.workingView({ busy: true, busyWith: "ae_create_comp", busyForMs: 3200 })).toEqual({ text: "Working · Create comp", time: "3 s", line: "", waiting: false });
+    expect(UI.workingView({ busy: true, busyWith: "ae_run_script", waitingForMs: 9000 })).toMatchObject({ text: "Waiting for After Effects", waiting: true });
+    // the bridge stopped answering: the panel is frozen with After Effects while a script runs; after a minute it says so
+    expect(UI.workingView(null, 20_000)).toBeNull();
+    expect(UI.workingView(null, 90_000)).toMatchObject({ text: "After Effects isn’t answering", waiting: true });
+  });
+});
+
+describe("Preflight rows", () => {
+  it("name a spec file by its file name, not its whole path", () => {
+    const it = UI.describeEntry({ at: "2026-10-20T01:00:00Z", ok: true, tool: "ae_preflight", args: { spec: "C:/Users/Ron/AppData/Local/Temp/sh-pf/pf-spec.json", comp: "Main" }, summary: "PASS" });
+    expect(it.line).toBe("pf-spec.json · Main");
+  });
+});
+
