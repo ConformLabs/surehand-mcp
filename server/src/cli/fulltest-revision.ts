@@ -102,7 +102,10 @@ return app.project.numItems;`,
   // `unchanged`: the script only writes a value that is already set (AE may then leave no undo step, so a
   // blind Edit > Undo would revert the user's rename): it must be undone as the script's own step
   // (verified), and the user's rename must survive.
-  const undoSafe = (name: string, script: string, opts: { userUndoes?: boolean; refused?: boolean; assembled?: boolean; unchanged?: boolean } = {}) =>
+  // `unclosed`: the script opens an undo group (assembled name) and never closes it. The fake folds a nested
+  // group into the outer one; real AE may not. Whatever AE does, the user's rename must survive, and a
+  // project that isn't back must be reported.
+  const undoSafe = (name: string, script: string, opts: { userUndoes?: boolean; refused?: boolean; assembled?: boolean; unchanged?: boolean; unclosed?: boolean } = {}) =>
     step(`read-only undo keeps the user's last edit: ${name}`, async () => {
       const comp = `${U}_${++k}`;
       const findLayer = `var c = null; for (var i = 1; i <= app.project.numItems; i++) if (app.project.item(i).name === "${comp}") c = app.project.item(i); var L = c && c.layer(1);`;
@@ -134,12 +137,19 @@ return app.project.numItems;`,
         return after === before ? null : `refused, but the layer changed: before ${before}; after ${after}`;
       }
       if (!r) return `refused, but the script doesn't call the undo stack: ${refusal}`;
+      if (opts.unclosed) {
+        note = `the script saw layer name ${r.result}; before: ${before}; after: ${after}; rollback: ${JSON.stringify(r.rollback)}; reply: ${refusal ?? "(none)"}`;
+        say(true, `  ${name}: ${note}`);
+        if (!after.startsWith("user rename 1 |")) return `the user's rename was reverted: before ${before}; after ${after}`;
+        if (after === before) return null;
+        return refusal && /not undone again|not repeated|nothing was undone|still isn't/.test(refusal) ? null : `the project isn't back and the reply doesn't say so: ${refusal}`;
+      }
       if (opts.assembled) {
         note = `the script saw layer name ${r.result}; before: ${before}; after: ${after}; rollback: ${JSON.stringify(r.rollback)}; reply: ${refusal ?? "(none)"}`;
         say(true, `  ${name}: ${note}`);
         if (after === before) return null;
         if (after !== before.replace(/^user rename 1/, "solid")) return `the project isn't back and more than the script's own Undo changed it: before ${before}; after ${after}`;
-        return refusal && /not undone again|nothing was undone/.test(refusal) ? null : `the project isn't back and the reply doesn't say so: ${refusal}`;
+        return refusal && /not undone again|not repeated|nothing was undone/.test(refusal) ? null : `the project isn't back and the reply doesn't say so: ${refusal}`;
       }
       if (after !== before) return `before the script: ${before}; after the ${refusal ? "refusal and Undo" : "script (not refused)"}: ${after} (the user's rename must survive)`;
       if (opts.unchanged) {
@@ -157,6 +167,7 @@ return app.project.numItems;`,
   await undoSafe("script edits, ends the undo group, edits again", "L.opacity.setValue(33); app.endUndoGroup(); L.rotation.setValue(10);", { refused: true });
   await undoSafe("script only ends the undo group early", "app.endUndoGroup();", { refused: true });
   await undoSafe("script calls Edit > Undo by an assembled name", `app["execute" + "Command"](${UNDO});`, { assembled: true });
+  await undoSafe("script edits, then opens an undo group by an assembled name and never closes it", `L.opacity.setValue(33); app["begin" + "UndoGroup"]("x");`, { unclosed: true });
 
   // a read-only query on a project with many comps, the way ae_run_script runs it (median of 3)
   const bench: Record<string, number> = {};

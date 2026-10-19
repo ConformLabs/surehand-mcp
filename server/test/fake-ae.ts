@@ -41,9 +41,13 @@ export interface Fake {
 
 /**
  * revision: false = an AE without app.project.revision; undoWorks: false = Edit > Undo does nothing;
- * otherComp: a second comp; bigComp: the layer has more properties than a snapshot reads (partial).
+ * otherComp: a second comp; bigComp: the layer has more properties than a snapshot reads (partial);
+ * renameFails: renaming a folder silently keeps its name; throwAfterUndo: the first look at the project's
+ * items after Edit > Undo throws (once).
  */
-export function fakeAE(opts: { revision?: boolean; undoWorks?: boolean; otherComp?: boolean; bigComp?: boolean } = {}): Fake {
+export function fakeAE(
+  opts: { revision?: boolean; undoWorks?: boolean; otherComp?: boolean; bigComp?: boolean; renameFails?: boolean; throwAfterUndo?: boolean } = {},
+): Fake {
   const reads = { n: 0 };
   const undos = { n: 0 };
   let revision = 1;
@@ -96,14 +100,21 @@ export function fakeAE(opts: { revision?: boolean; undoWorks?: boolean; otherCom
     const it: any = Object.assign(new FolderItem(), { id: f.id, parentFolder: { name: "Root" }, label: 0, comment: "", numItems: 0 });
     Object.defineProperty(it, "name", {
       get: () => folders.find((x) => x.id === f.id)?.name ?? f.name,
-      set: (v: string) => edit(() => (folders = folders.map((x) => (x.id === f.id ? { ...x, name: v } : x)))),
+      set: (v: string) => {
+        if (!opts.renameFails) edit(() => (folders = folders.map((x) => (x.id === f.id ? { ...x, name: v } : x))));
+      },
     });
     it.remove = () => edit(() => (folders = folders.filter((x) => x.id !== f.id)));
     return it;
   };
   const items = () => [comp, ...(other ? [other.comp] : []), ...folders.map(folderItem)];
+  let throwNext = false;
   const project: any = {
     get numItems() {
+      if (throwNext) {
+        throwNext = false;
+        throw new Error("project busy");
+      }
       return items().length;
     },
     item: (i: number) => items()[i - 1],
@@ -146,6 +157,7 @@ export function fakeAE(opts: { revision?: boolean; undoWorks?: boolean; otherCom
       group = null;
     },
     executeCommand(id: number) {
+      if (id === 16 && opts.throwAfterUndo) throwNext = true;
       if (id !== 16 || opts.undoWorks === false) return;
       undos.n++;
       const step = stack.pop();

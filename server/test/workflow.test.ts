@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { evalBody, formatChanges, runJsx, type RunResult } from "../src/jsx.js";
+import { evalBody, formatChanges, rollbackProblem, runJsx, type RunResult } from "../src/jsx.js";
 import { READ_ONLY_RUN_OPTIONS, READ_ONLY_STILL_RUNNING, readOnlyBlockedCalls, readOnlyRefusal, readOnlyScriptRefusal, registerCoreTools } from "../src/tools/core.js";
 import { BridgeError, explainBlocked } from "../src/bridge.js";
 import { _internal, runBatch } from "../src/tools/workflow.js";
@@ -102,14 +102,15 @@ describe("guarded rollback in aemcp.run", () => {
     withManualEdit();
     const r = run(() => (fake.opacity.value = 20), { rollback: "changes", checkOnly: true });
     expect(r.changes?.unlisted).toBe(true);
-    expect(r.rollback).toEqual({ undone: true, verified: true });
+    // the marker shows the Undo reverted the call's step, but values weren't compared: never "true"
+    expect(r.rollback).toEqual({ undone: true, verified: "sentinel", note: "values were not compared" });
     expect(opacity()).toBe(50);
   });
 
   it("an edit that doesn't move the revision (label) is caught by the snapshot and undone", () => {
     withManualEdit();
     const r = run(() => (fake.comp.label = 5), { rollback: "changes", checkOnly: true });
-    expect(r.rollback).toEqual({ undone: true, verified: true });
+    expect(r.rollback).toEqual({ undone: true, verified: "sentinel", note: "values were not compared" });
     expect(fake.comp.label).toBe(1);
     expect(opacity()).toBe(50);
   });
@@ -176,7 +177,7 @@ describe("guarded rollback in aemcp.run", () => {
   it("a value written unchanged (revision moves, no undo step): only the call is undone, the user's edit survives", () => {
     withManualEdit();
     const r = run(() => (fake.opacity.value = fake.opacity.value), { rollback: "changes", checkOnly: true });
-    expect(r.rollback).toEqual({ undone: true, verified: true });
+    expect(r.rollback).toEqual({ undone: true, verified: "sentinel", note: "values were not compared" });
     expect(fake.undos.n).toBe(1);
     expect(opacity()).toBe(50);
     expect(fake.undoStack()).toEqual(["user: opacity 50"]);
@@ -268,9 +269,10 @@ describe("ae_batch: atomic rollback", () => {
   it("a rollback that can't be verified is reported and not undone again", async () => {
     withManualEdit();
     const r = await runBatch({ steps: [script(`${OP} op.setValue(10); app.endUndoGroup(); op.setValue(20);`), script('throw new Error("boom")')] }, full);
-    expect(text(r)).toContain("Edit > Undo was run once for the batch, but it didn't revert the undo step of the batch");
+    expect(text(r)).toContain("Edit > Undo was run once for the batch, but the Undo did not revert the batch's changes as a whole");
     expect(text(r)).toContain("the project still isn't how it was before the batch");
-    expect(text(r)).toContain("It was not undone again");
+    expect(text(r)).toContain("The Undo was not repeated.");
+    expect(text(r)).toContain("Hint: steps in a batch must not open or close undo groups themselves");
     expect(text(r)).not.toContain("__aemcp_rollback");
     expect(fake.undos.n).toBe(1);
     expect(opacity()).toBe(20); // the Undo only reverted the sentinel's rename
@@ -351,7 +353,7 @@ describe("ae_run_script in read-only mode", () => {
     withManualEdit();
     const { refusal } = await readOnly(`${OP} op.setValue(80); return 1;`);
     expect(refusal).toMatch(/read-only/i);
-    expect(refusal).toContain("so its changes were undone.");
+    expect(refusal).toContain("so its changes were undone (checked by AE MCP's undo marker; property values were not compared).");
     expect(fake.undos.n).toBe(1);
     expect(opacity()).toBe(50);
     expect(fake.undoStack()).toEqual(["user: opacity 50"]);
@@ -361,7 +363,7 @@ describe("ae_run_script in read-only mode", () => {
   it("a script that sets a value to what it already is: only its own step is undone, the user's edit survives", async () => {
     withManualEdit();
     const { r, refusal } = await readOnly(`${OP} op.value = op.value; return 1;`);
-    expect(r.rollback).toEqual({ undone: true, verified: true });
+    expect(r.rollback).toEqual({ undone: true, verified: "sentinel", note: "values were not compared" });
     expect(refusal).toContain("This script wrote to the project (perhaps only values that were already set)");
     expect(refusal).not.toContain("This script changed the project");
     expect(fake.undos.n).toBe(1);
@@ -373,7 +375,7 @@ describe("ae_run_script in read-only mode", () => {
   it("a script that edits an attribute (listed): its change is named in the reply", async () => {
     withManualEdit();
     const { refusal } = await readOnly(`app.project.item(1).label = 5; return 1;`);
-    expect(refusal).toContain("This script changed the project, so its changes were undone:");
+    expect(refusal).toContain("This script changed the project, so its changes were undone (checked by AE MCP's undo marker; property values were not compared):");
     expect(refusal).toContain('~ comp "Main": label 1 -> 5');
     expect(fake.comp.label).toBe(1);
   });
@@ -382,8 +384,9 @@ describe("ae_run_script in read-only mode", () => {
     expect(READ_ONLY_RUN_OPTIONS).toMatchObject({ checkOnly: true, rollback: "changes", report: ["*"] });
     withManualEdit();
     const { refusal } = await readOnly(`${OP} op.setValue(80); app["end" + "UndoGroup"](); op.setValue(90); return 1;`);
-    expect(refusal).toContain("it didn't revert the undo step of the script");
-    expect(refusal).toContain("It was not undone again");
+    expect(refusal).toContain("the Undo did not revert the script's changes as a whole");
+    expect(refusal).toContain("The Undo was not repeated.");
+    expect(refusal).not.toContain("undo marker");
     expect(refusal).not.toContain("__aemcp_rollback");
     expect(fake.undos.n).toBe(1);
     expect(opacity()).toBe(90); // only the sentinel's rename was undone
@@ -527,5 +530,206 @@ describe("ae_run_script in read-only mode: undo-stack calls are refused before a
 describe("no blind Edit > Undo", () => {
   it("read-only mode and ae_batch don't send Edit > Undo themselves (aemcp.run does, guarded)", () => {
     for (const f of ["core.ts", "workflow.ts"]) expect(readFileSync(new URL(`../src/tools/${f}`, import.meta.url), "utf8")).not.toMatch(/executeCommand\(16\)/);
+  });
+});
+
+describe("guarded rollback: what it can and can't prove", () => {
+  const run = (fn: () => unknown, opts: Record<string, unknown>): RunResult =>
+    JSON.parse(helpers.run(fn, {}, { undoGroup: "AE MCP test", report: ["*"], ...opts }));
+  const readOnly = async (code: string) => {
+    const r = await runJsx(evalBody(transpileUserCode(code).source), {}, READ_ONLY_RUN_OPTIONS);
+    return { r, refusal: readOnlyRefusal(r) };
+  };
+  // ends its undo group and opens a new one: its first edit stays in a closed step, the marker lands in the new group
+  const split = (v: number) => () => {
+    fake.opacity.value = v;
+    fake.app.endUndoGroup();
+    fake.app.beginUndoGroup("x");
+  };
+
+  it("split undo group, light snapshot: the Undo only reverts the new group; reported as checked by the marker, never as verified", () => {
+    withManualEdit();
+    const r = run(split(20), { rollback: "changes", checkOnly: true });
+    expect(r.rollback).toEqual({ undone: true, verified: "sentinel", note: "values were not compared" });
+    expect(r.rollback?.verified).not.toBe(true);
+    expect(fake.undos.n).toBe(1);
+    expect(opacity()).toBe(20); // the limit: values weren't compared, so the edit left behind isn't seen
+    expect(fake.folders()).toEqual([]);
+    expect(fake.undoStack()[0]).toBe("user: opacity 50");
+  });
+
+  it("split undo group, full snapshot: the edit left behind is found (not back)", () => {
+    withManualEdit();
+    const r = run(split(20), { rollback: "changes" });
+    expect(r.rollback).toMatchObject({ undone: true, verified: false, problem: "not back" });
+    expect(formatChanges(r.rollback?.remaining)).toContain("Opacity: 50 -> 20");
+    expect(fake.undos.n).toBe(1);
+  });
+
+  it("read-only reply for a split group (assembled names): says the values were not compared", async () => {
+    withManualEdit();
+    const { r, refusal } = await readOnly(`${OP} op.setValue(80); app["end" + "UndoGroup"](); app["begin" + "UndoGroup"]("x"); return 1;`);
+    expect(r.rollback?.verified).toBe("sentinel");
+    expect(refusal).toContain("so its changes were undone (checked by AE MCP's undo marker; property values were not compared)");
+    expect(refusal).not.toMatch(/values were compared|verified/);
+    expect(fake.undos.n).toBe(1);
+  });
+
+  it("app.project.revision can't show a split group: Undo moves it forward, it never restores it (fake = AE)", () => {
+    withManualEdit();
+    const rev0 = fake.app.project.revision;
+    run(() => (fake.opacity.value = 20), { rollback: "changes" });
+    expect(opacity()).toBe(50);
+    expect(fake.app.project.revision).toBeGreaterThan(rev0); // back to the same values, not to the same revision
+  });
+
+  it("nested unclosed begin (assembled): the fake folds it into the call's group; the user's edit survives", async () => {
+    withManualEdit();
+    const { r, refusal } = await readOnly(`${OP} op.setValue(80); app["begin" + "UndoGroup"]("x"); return 1;`);
+    expect(r.rollback?.undone).toBe(true);
+    expect(refusal).toContain("so its changes were undone");
+    expect(opacity()).toBe(50);
+    expect(fake.undoStack()).toEqual(["user: opacity 50"]);
+    expect(fake.folders()).toEqual([]);
+  });
+
+  it("the marker's rename fails: removed again, nothing undone, \"couldn't prepare the undo\"", () => {
+    withManualEdit({ renameFails: true });
+    const r = run(() => (fake.opacity.value = 20), { rollback: "changes" });
+    expect(r.rollback).toEqual({ undone: false, verified: false, problem: "failed: couldn't prepare the undo (the undo marker couldn't be renamed)" });
+    expect(fake.undos.n).toBe(0);
+    expect(fake.folders()).toEqual([]);
+    expect(readOnlyRefusal(r)).toContain("so nothing was undone");
+  });
+
+  it("an error after the Undo: undone is told by the marker (gone), never claimed blindly", () => {
+    withManualEdit({ throwAfterUndo: true });
+    const r = run(() => (fake.opacity.value = 20), { rollback: "changes" });
+    expect(r.rollback).toEqual({ undone: true, verified: false, problem: "failed: project busy" });
+    expect(opacity()).toBe(50);
+    expect(fake.folders()).toEqual([]);
+  });
+
+  it("an error after an Undo that didn't revert the marker: not this call, the marker is removed", () => {
+    withManualEdit({ throwAfterUndo: true, undoWorks: false });
+    const r = run(() => (fake.opacity.value = 20), { rollback: "changes" });
+    expect(r.rollback).toEqual({ undone: true, verified: false, problem: "not this call" });
+    expect(fake.folders()).toEqual([]);
+    expect(rollbackProblem(r.rollback!, "the script")).toContain("The Undo was not repeated.");
+  });
+
+  it("AE without revision, Undo did nothing: says it can't tell nothing from another step (never claims the marker was reverted)", () => {
+    withManualEdit({ revision: false, undoWorks: false });
+    const r = run(() => (fake.opacity.value = 20), { rollback: "changes" });
+    expect(r.rollback).toMatchObject({ undone: true, verified: false, problem: "undo did nothing / not this call" });
+    const msg = rollbackProblem(r.rollback!, "the script");
+    expect(msg).toContain("After Effects either undid nothing or undid a different step");
+    expect(msg).not.toContain("marker");
+    expect(fake.folders()).toEqual([]);
+  });
+
+  it("AE without revision, the call closed its group early: the marker's reverted rename shows it (not this call)", () => {
+    withManualEdit({ revision: false });
+    const r = run(() => {
+      fake.opacity.value = 20;
+      fake.app.endUndoGroup();
+    }, { rollback: "changes" });
+    expect(r.rollback).toMatchObject({ undone: true, verified: false, problem: "not this call" });
+    expect(fake.folders()).toEqual([]);
+  });
+
+  it("atomic batch whose step splits the undo group: not back, with the hint about undo groups", async () => {
+    withManualEdit();
+    const script = (code: string) => ({ tool: "ae_run_script", args: { code } });
+    const r = await runBatch({ steps: [script(`${OP} op.setValue(10); app.endUndoGroup(); app.beginUndoGroup("x");`), script('throw new Error("boom")')] }, { mode: "full", allowShell: false });
+    const t = (r.content[0] as { text: string }).text;
+    expect(t).toContain("the project still isn't how it was before the batch");
+    expect(t).toContain("Hint: steps in a batch must not open or close undo groups themselves");
+    expect(fake.undos.n).toBe(1);
+  });
+
+  it("a batch rolled back cleanly has no undo-group hint", async () => {
+    withManualEdit();
+    const script = (code: string) => ({ tool: "ae_run_script", args: { code } });
+    const r = await runBatch({ steps: [script(`${OP} op.setValue(10);`), script('throw new Error("boom")')] }, { mode: "full", allowShell: false });
+    expect((r.content[0] as { text: string }).text).not.toContain("Hint: steps in a batch");
+  });
+});
+
+describe("read-only refusal: bypass forms", () => {
+  const cases: [string, string[]][] = [
+    ['app["open"](f);', ["app.open"]],
+    ["app['open'](f);", ["app.open"]],
+    ["app[`open`](f);", ["app.open"]],
+    ["app?.open(f);", ["app.open"]],
+    ["app.open?.(f);", ["app.open"]],
+    ['app?.["open"](f);', ["app.open"]],
+    ["var o = app.open;", ["app.open"]],
+    ['app.project["close"](CloseOptions.DO_NOT_SAVE_CHANGES);', ["project.close"]],
+    ["app.project?.close(1);", ["project.close"]],
+    ["app.project['save']();", ["save"]],
+    ["app.project?.save();", ["save"]],
+    ["app.project.save?.();", ["save"]],
+    ['app["\\x6fpen"](f);', ["app.open"]],
+    ['app["\\157pen"](f);', ["app.open"]],
+    ['app["\\u006fpen"](f);', ["app.open"]],
+    ['app["\\x65xecuteCommand"](16);', ["executeCommand"]],
+    ['app["\\145ndUndoGroup"]();', ["endUndoGroup"]],
+    ['app["beginUndoGroup"]("x");', ["beginUndoGroup"]],
+    ["app[`endUndoGroup`]();", ["endUndoGroup"]],
+    ["app?.executeCommand(16);", ["executeCommand"]],
+    ["app.openFast(f);", ["openFast"]],
+    ['app["openFast"](f);', ["openFast"]],
+    ["app.quit();", ["quit"]],
+    ['app["quit"]();', ["quit"]],
+    ["app.project.renderQueue.render();", ["render"]],
+    ["var rq = app.project.renderQueue; rq['render']();", ["render"]],
+    ['app.preferences.savePrefAsLong("s", "k", 1, PREFType.PREF_Type_MACHINE_INDEPENDENT);', ["savePrefAs*"]],
+    ['app.preferences.savePrefAsString("s", "k", "v");', ["savePrefAs*"]],
+    ['app.settings.saveSetting("s", "k", "v");', ["saveSetting"]],
+    ["app.preferences.saveToDisk();", ["saveToDisk"]],
+  ];
+  for (const [code, names] of cases)
+    it(`refuses ${code}`, () => {
+      expect(readOnlyBlockedCalls(code)).toEqual(names);
+      const msg = readOnlyScriptRefusal(code, transpileUserCode(code).source)!;
+      expect(msg).toMatch(/^Nothing ran\. AE MCP is in read-only mode, and this script mentions /);
+    });
+
+  it("the transpiled code is checked too (optional chaining and template keys)", () => {
+    for (const code of ["app?.open(f);", "app[`open`](f);", "app.project?.save();"]) {
+      const t = transpileUserCode(code).source;
+      expect(readOnlyBlockedCalls(code, t).length).toBe(1);
+    }
+  });
+
+  it("each refused name comes with a short reason", () => {
+    const msg = readOnlyScriptRefusal("app.quit(); app.openFast(f); app.project.renderQueue.render(); app.settings.saveSetting('a','b','c');")!;
+    expect(msg).toContain("this script mentions openFast, quit, render, saveSetting.");
+    expect(msg).toContain("openFast: replaces the open project, which read-only mode can't undo.");
+    expect(msg).toContain("quit: quits After Effects");
+    expect(msg).toContain("render: renders files to disk (renderQueue.render)");
+    expect(msg).toContain("saveSetting: changes After Effects preferences");
+    expect(msg).toContain("the same method name on another object, such as obj.save()");
+  });
+
+  it("not refused: File.open/close, a variable or function named save/open/quit/render, a word in a comment", () => {
+    for (const code of [
+      'var f = new File("/tmp/x.txt"); f.open("r"); var s = f.read(); f.close(); return s;',
+      "var save = 1; return save + 1;",
+      "function save(x) { return x; } return save(2);",
+      "var open = true, quit = false, render = 3; return [open, quit, render];",
+      "var w = { close: function () {} }; w.close();",
+      "var opened = app.project.file; var saved = 1; return opened;",
+      "// app.quit(); app['open'](f)\nreturn 1;",
+      "return app.project.renderQueue.numItems;",
+      "var p = app.preferences; return p.getPrefAsLong('a', 'b');",
+    ])
+      expect(readOnlyBlockedCalls(code, transpileUserCode(code).source)).toEqual([]);
+  });
+
+  it("a rare false positive on another object's save() is refused, and the reply says the script mentions it", () => {
+    const msg = readOnlyScriptRefusal("var obj = { save: function () {} }; obj.save();")!;
+    expect(msg).toContain("this script mentions save.");
   });
 });

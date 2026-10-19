@@ -50,12 +50,21 @@ export interface Changes {
 export interface Rollback {
   /** Edit > Undo was run once */
   undone: boolean;
-  /** nothing changed (not undone), or undone and the project is back to how it was before the call */
-  verified: boolean;
+  /**
+   * true: nothing changed (not undone), or undone and the project is back to how it was before the call.
+   * "sentinel": undone, and AE MCP's undo marker shows the Undo reverted the undo step it was in, with items
+   * and layer attributes back as before, but property values were not compared (read-only check's light
+   * snapshot), so a call that split its own undo group could still have left edits behind. Truthy: not a problem.
+   */
+  verified: boolean | "sentinel";
+  /** with verified "sentinel": "values were not compared" */
+  note?: string;
   /**
    * "unknown": couldn't tell whether the call changed anything, so nothing was undone;
    * "undo did nothing"; "not this call": Edit > Undo reverted something else than this call's undo step
-   * (the call closed its undo group itself; its sentinel was left behind and removed by hand);
+   * (the call opened or closed undo groups itself; its sentinel was left behind and removed by hand);
+   * "undo did nothing / not this call": the sentinel was untouched and this AE has no project.revision to
+   * tell which;
    * "not back": still different after the undo (see `remaining`); "not checked...": undone but couldn't
    * compare; "no undo group"; "failed: ...".
    */
@@ -226,11 +235,14 @@ export function rollbackProblem(rb: Rollback, what: string): string {
     return `It couldn't be checked whether ${what} changed the project${rb.problem && rb.problem !== "unknown" ? ` (${rb.problem})` : ""}, so nothing was undone. ${check}${leftover}`;
   const remaining = rb.remaining ? (formatChanges(rb.remaining) ?? "").replace(/^Changes[^\n]*:\n/, "") : "";
   const notBack = `the project still isn't how it was before ${what}:\n${remaining}`;
-  if (rb.problem === "not this call")
+  if (rb.problem === "not this call" || rb.problem === "undo did nothing / not this call")
     return (
-      `Edit > Undo was run once for ${what}, but it didn't revert the undo step of ${what} (${what} may have ended its undo group itself), ` +
+      `Edit > Undo was run once for ${what}, but the Undo did not revert ${what}'s changes as a whole ` +
+      (rb.problem === "not this call"
+        ? `(${what} may have opened or closed undo groups itself), `
+        : `(After Effects either undid nothing or undid a different step; this version of After Effects can't tell which), `) +
       `${remaining ? `and ${notBack}` : "so some of its changes may still be in the project."}\n` +
-      `It was not undone again (that Undo only reverted AE MCP's temporary undo marker), so nothing else in the undo history was reverted. ${check}${leftover}`
+      `The Undo was not repeated. ${check}${leftover}`
     );
   const why =
     rb.problem === "not back"

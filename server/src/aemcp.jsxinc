@@ -845,8 +845,13 @@ aemcp = (function () {
   function isSentinel(name) { return String(name).indexOf(SENTINEL) === 0; }
   function addSentinel() {
     var id = SENTINEL + new Date().getTime() + "_" + Math.floor(Math.random() * 1000000000);
-    var f = app.project.items.addFolder(id + "_new");
-    try { f.name = id; } catch (e) {}
+    var f = app.project.items.addFolder(id + "_new"), named = false;
+    try { f.name = id; named = String(f.name) === id; } catch (e) {}
+    if (!named) {
+      // without the rename the marker can't tell which undo step the Undo reverted: don't undo at all
+      try { f.remove(); } catch (e) {}
+      throw new Error("the undo marker couldn't be renamed");
+    }
     return id;
   }
   function findSentinel(id) {
@@ -857,27 +862,45 @@ aemcp = (function () {
   // Edit > Undo once, then check: the sentinel must be gone (the undo reverted this call's group), and
   // the project must be as before the call. Undo moves app.project.revision forward (it doesn't restore
   // it), so the check compares a new snapshot with the one from before the call.
-  function rollback(before, revS, id) {
+  //
+  // With a light snapshot (read-only check: items and layer attributes only), a sentinel that is gone
+  // proves that the Undo reverted the undo step the sentinel was in, not that it was the call's only
+  // step: a script that ends its group and opens a new one leaves its first edits in a closed step of
+  // their own, and property values aren't compared to show it. That is reported as verified: "sentinel"
+  // (never as true). app.project.revision can't show it either: Undo moves it forward, it doesn't restore it.
+  function rollback(before, revS, id, st) {
     try { app.executeCommand(16); } // Edit > Undo: this call's undo group, sentinel included
-    catch (e) {
-      var still = findSentinel(id);
-      var fail = { undone: !still, verified: false, problem: "failed: " + (e.message || e) }; // the sentinel tells whether it undid
-      if (still) { try { still.remove(); } catch (e2) { fail.leftover = String(still.name); } }
-      return fail;
-    }
+    catch (e) { return failedRollback(id, e, false); }
+    st.ran = true;
     var out = { undone: true, verified: true }, left = findSentinel(id);
     if (left) {
       // the undo didn't revert this call's group: never undo again, remove the sentinel by hand
       out.verified = false;
-      out.problem = revS !== null && A.revision() === revS ? "undo did nothing" : "not this call";
-      try { left.remove(); } catch (e) { out.leftover = String(left.name); }
+      var leftName = String(left.name);
+      if (revS !== null && A.revision() === revS) out.problem = "undo did nothing";
+      // only the marker's rename was reverted: the call's group had closed before the marker went in
+      else if (leftName !== id) out.problem = "not this call";
+      // the marker is untouched: without revision, AE may have undone nothing, or another step
+      else out.problem = revS === null ? "undo did nothing / not this call" : "not this call";
+      try { left.remove(); } catch (e) { out.leftover = leftName; }
     }
     if (!before) { if (out.verified) { out.verified = false; out.problem = "not checked"; } return out; }
     try {
       var d = A.diff(before, snapshotAgain(before));
       if (listed(d)) { if (out.verified) { out.verified = false; out.problem = "not back"; } out.remaining = d; }
+      else if (out.verified && before.light) { out.verified = "sentinel"; out.note = "values were not compared"; }
     } catch (e) { if (out.verified) { out.verified = false; out.problem = "not checked: " + (e.message || e); } }
     return out;
+  }
+  // The rollback failed with `e`. `ran`: Edit > Undo had completed. Otherwise whether it undid anything is
+  // told by the sentinel (gone = the Undo reverted it). A sentinel still there is removed by hand.
+  function failedRollback(id, e, ran) {
+    var still = null;
+    try { still = id ? findSentinel(id) : null; } catch (e1) {}
+    var fail = { undone: ran || (!!id && !still), verified: false, problem: "failed: " + (e.message || e) };
+    if (ran && still) fail.problem = "not this call"; // the Undo ran but didn't revert this call's marker
+    if (still) { try { still.remove(); } catch (e2) { fail.leftover = String(still.name); } }
+    return fail;
   }
   A.run = function (fn, args, opts) {
     opts = opts || {};
@@ -924,7 +947,7 @@ aemcp = (function () {
       if (back) {
         if (!undo) res.rollback = { undone: false, verified: false, problem: "no undo group" };
         else if (plan) res.rollback = plan;
-        else { try { res.rollback = rollback(before, revS, sentinel); } catch (e) { res.rollback = { undone: true, verified: false, problem: "failed: " + (e.message || e) }; } }
+        else { var st = { ran: false }; try { res.rollback = rollback(before, revS, sentinel, st); } catch (e) { res.rollback = failedRollback(sentinel, e, st.ran); } }
       }
     } finally {
       if (opts.suppressDialogs !== false) { try { app.endSuppressDialogs(false); } catch (e) {} }

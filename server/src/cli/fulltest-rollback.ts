@@ -123,10 +123,57 @@ export async function rollbackSteps(say: (ok: boolean, line: string) => void): P
     await manualEdit(59);
     const refusal = await readOnly(`${OP} op.setValue(80); app["end" + "UndoGroup"](); op.setValue(90); return 1;`);
     const after = await state();
-    if (!refusal || !/didn't revert the undo step of the script/.test(refusal) || !/not undone again/.test(refusal)) return `unexpected reply: ${refusal}`;
+    if (!refusal || !/did not revert the script's changes as a whole/.test(refusal) || !/The Undo was not repeated/.test(refusal)) return `unexpected reply: ${refusal}`;
     // the sentinel lands outside the closed group: the one undo only reverts its rename, so Opacity stays 90
     // (80 = the script's last edit was undone, 59 = undone twice or the user's step)
     return clean(after.opacity === 90 ? null : `Opacity is ${after.opacity}, expected 90 (only the sentinel's rename undone)`);
+  });
+
+  // a script that ends its group and opens a new one (assembled names, past the text check): its first edit
+  // stays in a closed undo step, the marker lands in the new group, and the one Undo reverts only that.
+  // The light (read-only) snapshot can't compare values, so the reply must never claim they were compared.
+  await step("rollback: read-only script that splits its undo group (assembled end + begin): reported honestly, never claims values were compared", async () => {
+    await manualEdit(61);
+    const { refusal, r } = await runReadOnly(`${OP} op.setValue(80); app["end" + "UndoGroup"](); app["begin" + "UndoGroup"]("x"); return 1;`);
+    const after = await state();
+    if (!r) return `refused before it ran: ${refusal}`;
+    say(true, `  split undo group: Opacity ${after.opacity} (61 = back, 80 = the closed step stayed); rollback: ${JSON.stringify(r.rollback)}; reply: ${refusal ?? "(none)"}`);
+    const rb = r.rollback;
+    if (!rb || !refusal) return `no rollback reported: ${refusal}`;
+    if (rb.verified === true && after.opacity !== 61) return `claims verified, but Opacity is ${after.opacity} (expected 61): ${refusal}`;
+    if (rb.verified === "sentinel" && !/property values were not compared/.test(refusal)) return `reply doesn't say values were not compared: ${refusal}`;
+    if (!rb.verified && !/not repeated|not undone again|nothing was undone/.test(refusal)) return `unverified, and the reply doesn't say so: ${refusal}`;
+    if (after.opacity !== 80 && after.opacity !== 61) return `Opacity is ${after.opacity}, expected 80 (closed step left) or 61 (back); anything else = more than the script was undone`;
+    return clean(null);
+  });
+
+  // the marker (a folder added and renamed inside the call's undo group) must not change what the user
+  // has selected in the Project panel or the active item (viewer)
+  await step("rollback: the undo marker leaves the Project panel selection and the active item alone", async () => {
+    const ui = async () => {
+      const r = await runJsx(
+        `var s = app.project.selection, ids = []; for (var i = 0; i < s.length; i++) ids.push(s[i].id);
+return { selection: s.length, ids: ids.join(","), active: app.project.activeItem ? app.project.activeItem.id : null };`,
+        {},
+        { undoGroup: false },
+      );
+      if (!r.ok) throw new Error(`couldn't read the selection: ${r.error?.message}`);
+      return r.result as { selection: number; ids: string; active: number | null };
+    };
+    // make both meaningful: the test comp open in the viewer and selected in the Project panel
+    const set = await runJsx(`${OP} try { c.openInViewer(); } catch (e) {} try { c.selected = true; } catch (e) {} return 1;`, {}, { undoGroup: false });
+    if (!set.ok) return `couldn't select the test comp: ${set.error?.message}`;
+    await manualEdit(67);
+    const before = await ui();
+    const refusal = await readOnly(`${OP} op.setValue(80); return 1;`);
+    const after = await ui();
+    const st = await state();
+    say(true, `  selection ${before.selection} [${before.ids}] -> ${after.selection} [${after.ids}]; active item ${before.active} -> ${after.active}`);
+    if (!refusal || !/its changes were undone/.test(refusal)) return `unexpected reply: ${refusal}`;
+    if (st.opacity !== 67) return `Opacity is ${st.opacity}, expected 67`;
+    if (before.selection !== after.selection || before.ids !== after.ids) return `the rollback changed the Project panel selection: ${before.selection} [${before.ids}] -> ${after.selection} [${after.ids}]`;
+    if (before.active !== after.active) return `the rollback changed the active item: ${before.active} -> ${after.active}`;
+    return clean(null);
   });
 
   return out;

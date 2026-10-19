@@ -184,28 +184,52 @@ async function renderPng(body: string, args: Record<string, unknown>): Promise<{
 // What read-only mode refuses before a script runs (the one list): calls that change the undo history
 // outside AE MCP's control (its own undo groups, Edit > Undo/Redo via executeCommand, purging the undo
 // history), and calls whose effect can't be undone or happens after the rollback (opening, closing or
-// saving projects, code scheduled to run later). A text check on the code with its comments removed and
-// \u escapes decoded, and again on the transpiled code; a name inside a string counts too. A call built at
-// runtime (app["execute" + "Command"]) gets past it: the guarded rollback is the backstop.
-const READ_ONLY_BLOCKED: { name: string; re: RegExp; undoHistory?: true }[] = [
-  { name: "beginUndoGroup", re: /\bbeginUndoGroup\b/, undoHistory: true },
-  { name: "endUndoGroup", re: /\bendUndoGroup\b/, undoHistory: true },
-  { name: "executeCommand", re: /\bexecuteCommand\b/, undoHistory: true },
-  { name: "purge", re: /\bpurge\b/, undoHistory: true },
-  { name: "scheduleTask", re: /\bscheduleTask\b/ },
-  { name: "newProject", re: /\bnewProject\b/ },
-  { name: "app.open", re: /\bapp\s*\.\s*open\s*\(/ },
-  { name: "project.close", re: /\bproject\s*\.\s*close\s*\(/ },
-  { name: "save", re: /\.\s*save\s*\(/ },
-  { name: "saveWithDialog", re: /\bsaveWithDialog\b/ },
+// saving projects, quitting, rendering, saving preferences, code scheduled to run later). A text check on
+// the code with its comments removed and \u, \x and octal escapes decoded, and again on the transpiled
+// code; a name inside a string counts too. Member calls are matched as .name(, ?.name(, ["name"], ['name']
+// and [`name`]; the generic ones (save, quit, render) on any object, so obj.save() is refused too (the
+// reply says the script "mentions" it). A call built at runtime (app["execute" + "Command"]) gets past it:
+// the guarded rollback is the backstop.
+const UNDO_HISTORY = "changes the undo history outside AE MCP's control, so read-only mode couldn't reliably put the project back afterwards";
+const word = (name: string) => new RegExp(`\\b${name}\\b`);
+/** obj.name, obj?.name, obj["name"], obj?.['name'], obj[`name`] (`call`: the dot forms only when called) */
+function member(obj: string | null, name: string, call: boolean): RegExp {
+  const o = obj ? `\\b${obj}\\s*` : "";
+  const dot = `${o}(?:\\?\\.|\\.)\\s*${name}${call ? "\\s*(?:\\?\\.\\s*)?\\(" : "\\b"}`;
+  const bracket = `${o}${obj ? "(?:\\?\\.\\s*)?" : ""}\\[\\s*["'\`]${name}["'\`]\\s*\\]`;
+  return new RegExp(`${dot}|${bracket}`);
+}
+const READ_ONLY_BLOCKED: { name: string; re: RegExp; why: string }[] = [
+  { name: "beginUndoGroup", re: word("beginUndoGroup"), why: UNDO_HISTORY },
+  { name: "endUndoGroup", re: word("endUndoGroup"), why: UNDO_HISTORY },
+  { name: "executeCommand", re: word("executeCommand"), why: UNDO_HISTORY },
+  { name: "purge", re: word("purge"), why: UNDO_HISTORY },
+  { name: "scheduleTask", re: word("scheduleTask"), why: "runs code later, after the rollback, which read-only mode can't undo" },
+  { name: "newProject", re: word("newProject"), why: "replaces the open project, which read-only mode can't undo" },
+  { name: "app.open", re: member("app", "open", false), why: "replaces the open project, which read-only mode can't undo" },
+  { name: "openFast", re: word("openFast"), why: "replaces the open project, which read-only mode can't undo" },
+  { name: "project.close", re: member("project", "close", false), why: "closes the project, which read-only mode can't undo" },
+  { name: "quit", re: member(null, "quit", true), why: "quits After Effects, which read-only mode can't undo" },
+  { name: "save", re: member(null, "save", true), why: "writes the project to disk, which read-only mode can't undo" },
+  { name: "saveWithDialog", re: word("saveWithDialog"), why: "writes the project to disk, which read-only mode can't undo" },
+  { name: "render", re: member(null, "render", true), why: "renders files to disk (renderQueue.render), which read-only mode can't undo" },
+  { name: "savePrefAs*", re: /\bsavePrefAs\w*/, why: "changes After Effects preferences, which read-only mode can't undo (Edit > Undo doesn't revert them)" },
+  { name: "saveSetting", re: word("saveSetting"), why: "changes After Effects preferences, which read-only mode can't undo (Edit > Undo doesn't revert them)" },
+  { name: "saveToDisk", re: word("saveToDisk"), why: "changes After Effects preferences, which read-only mode can't undo (Edit > Undo doesn't revert them)" },
 ];
 
-/** \uXXXX and \u{X} escapes decoded (an escaped identifier is the same name to the JavaScript engine). */
+/**
+ * \uXXXX, \u{X}, \xXX and octal (\101) escapes decoded: an escaped identifier is the same name to the
+ * JavaScript engine, and an escaped string is the same member key (app["\x6fpen"]).
+ */
 function decodeEscapes(code: string): string {
-  return code.replace(/\\u\{([0-9a-fA-F]{1,6})\}|\\u([0-9a-fA-F]{4})/g, (m, a, b) => {
-    const cp = parseInt(a ?? b, 16);
-    return cp <= 0x10ffff ? String.fromCodePoint(cp) : m;
-  });
+  return code
+    .replace(/\\u\{([0-9a-fA-F]{1,6})\}|\\u([0-9a-fA-F]{4})/g, (m, a, b) => {
+      const cp = parseInt(a ?? b, 16);
+      return cp <= 0x10ffff ? String.fromCodePoint(cp) : m;
+    })
+    .replace(/\\x([0-9a-fA-F]{2})/g, (_m, h) => String.fromCharCode(parseInt(h, 16)))
+    .replace(/\\([0-3][0-7]{0,2}|[4-7][0-7]?)/g, (_m, o) => String.fromCharCode(parseInt(o, 8)));
 }
 
 /**
@@ -222,21 +246,14 @@ export function readOnlyBlockedCalls(code: string, transpiled?: string): string[
 export function readOnlyScriptRefusal(code: string, transpiled?: string): string | null {
   const names = readOnlyBlockedCalls(code, transpiled);
   if (!names.length) return null;
-  const blocked = READ_ONLY_BLOCKED.filter((b) => names.includes(b.name));
-  const why: string[] = [];
-  if (blocked.some((b) => b.undoHistory))
-    why.push(
-      "executeCommand, beginUndoGroup, endUndoGroup and purge change the undo history outside AE MCP's control, " +
-        "so read-only mode couldn't reliably put the project back afterwards.",
-    );
-  if (blocked.some((b) => !b.undoHistory))
-    why.push(
-      "app.open, newProject, project.close, save, saveWithDialog and scheduleTask open, close or save projects or run code later, " +
-        "which read-only mode can't undo.",
-    );
+  // each reason once, with the refused names it is about
+  const why = new Map<string, string[]>();
+  for (const b of READ_ONLY_BLOCKED) if (names.includes(b.name)) why.set(b.why, [...(why.get(b.why) ?? []), b.name]);
+  const reasons = [...why].map(([w, ns]) => `${ns.join(", ")}: ${w}.`);
   return (
-    `Nothing ran. AE MCP is in read-only mode, and this script mentions ${names.join(", ")}. ${why.join(" ")} ` +
-    "Scripts that mention these names are refused (the check reads the code, so a name in a string counts too). " +
+    `Nothing ran. AE MCP is in read-only mode, and this script mentions ${names.join(", ")}.\n${reasons.join("\n")}\n` +
+    "Scripts that mention these names are refused (the check reads the code, so a name in a string counts too, and so does " +
+    "the same method name on another object, such as obj.save()). " +
     "To run it on purpose, the user can switch to edit mode (Full access, or Ask before every change) in " +
     "After Effects: Window > Extensions > AE MCP > Permissions."
   );
@@ -254,11 +271,13 @@ export function readOnlyRefusal(r: RunResult): string | null {
   const rb = r.rollback;
   if (!rb || (!rb.undone && rb.verified)) return null;
   if (!rb.verified) return `${READ_ONLY_REFUSAL}\n${rollbackProblem(rb, "the script")}`;
+  // light snapshot: the undo marker shows the Undo reverted the script's undo step; values weren't compared
+  const how = rb.verified === "sentinel" ? " (checked by AE MCP's undo marker; property values were not compared)" : "";
   const ch = r.changes;
   if (ch && !ch.unlisted && (ch.items.length || ch.layers.length || ch.props.length))
-    return `${READ_ONLY_REFUSAL}\nThis script changed the project, so its changes were undone:\n${formatChanges(ch)}`;
+    return `${READ_ONLY_REFUSAL}\nThis script changed the project, so its changes were undone${how}:\n${formatChanges(ch)}`;
   // app.project.revision moved, but nothing was listed: an edit not compared, or only a value written unchanged
-  return `${READ_ONLY_REFUSAL}\nThis script wrote to the project (perhaps only values that were already set), so its changes were undone.`;
+  return `${READ_ONLY_REFUSAL}\nThis script wrote to the project (perhaps only values that were already set), so its changes were undone${how}.`;
 }
 
 /**

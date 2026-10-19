@@ -212,8 +212,15 @@ return { steps: __out, failed: __failed, rollback: args.atomic && __failed >= 0 
   if (res.failed >= 0 && isAtomic) {
     const at = `Batch stopped at step ${res.failed + 1} of ${steps.length}`;
     const rb = r.rollback ?? { undone: false, verified: false, problem: "no result" };
+    // a step that opened or closed undo groups itself split the batch into several undo steps
+    const ownGroups =
+      !rb.verified &&
+      (/not this call/.test(rb.problem ?? "") || steps.some((s) => s.tool === "ae_run_script" && /\b(?:begin|end)UndoGroup\b/.test(String(s.args?.code ?? ""))));
+    const groupHint = ownGroups
+      ? "\nHint: steps in a batch must not open or close undo groups themselves (beginUndoGroup / endUndoGroup): that splits the batch into several undo steps, and it can't be rolled back as one."
+      : "";
     const text = !rb.verified
-      ? `${at}. ${rollbackProblem(rb, "the batch")}\n${lines.join("\n")}` + (changes && changes !== "Changes: none" ? `\n\nThe batch made these changes:\n${changes}` : "")
+      ? `${at}. ${rollbackProblem(rb, "the batch")}${groupHint}\n${lines.join("\n")}` + (changes && changes !== "Changes: none" ? `\n\nThe batch made these changes:\n${changes}` : "")
       : rb.undone
         ? `${at} and was rolled back (nothing changed).\n${lines.join("\n")}` + (changes && changes !== "Changes: none" ? `\n\nRolled back:\n${changes}` : "")
         : `${at}. It hadn't changed anything yet, so there was nothing to undo.\n${lines.join("\n")}`;
