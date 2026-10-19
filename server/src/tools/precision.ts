@@ -11,6 +11,9 @@ import { auditEasing, withCurves, type PropRows } from "./easing.js";
 
 /** Frames <-> seconds. Frame n is at n * frameDuration from the comp's time 0. */
 export const FRAMES_JSX = `
+// After Effects reports influence 0 for a side no segment uses (the in-side of the first key, the out-side of
+// the last) but only accepts 0.1-100: such a value (as read back from AE) is written as 0.1, the minimum
+function inf01(v) { return v >= 0 && v < 0.1 ? 0.1 : v; }
 function specTime(c, o, what) {
   if (o.frame !== undefined && o.frame !== null) return o.frame * c.frameDuration;
   if (o.time !== undefined && o.time !== null) return o.time;
@@ -117,7 +120,7 @@ function collect(c, layers, paths, t0, t1, budget, out) {
 
 // ---------- schemas ----------
 
-const easeObj = z.object({ speed: z.number().describe("Property units per second (px/s for Position, %/s for Opacity, degrees/s for Rotation)."), influence: z.number().min(0.1).max(100).describe("0.1-100 (%).") });
+const easeObj = z.object({ speed: z.number().describe("Property units per second (px/s for Position, %/s for Opacity, degrees/s for Rotation)."), influence: z.number().min(0).max(100).describe("0.1-100 (%). 0, as After Effects reports it for a side no segment uses, is written as 0.1.") });
 const exactEase = z
   .union([easeObj, z.array(easeObj).min(1).max(3)])
   .describe(
@@ -213,7 +216,7 @@ return r;`,
     destructive: true,
     idempotent: true,
     jsx: `${FRAMES_JSX}${KEY_ROW_JSX}
-function checkInf(p, v) { if (!(v >= 0.1 && v <= 100)) aemcp.fail("Influence must be 0.1-100 (%) on '" + p.name + "', got " + v); return v; }
+function checkInf(p, v) { if (!(v >= 0 && v <= 100)) aemcp.fail("Influence must be 0.1-100 (%) on '" + p.name + "', got " + v); return inf01(v); }
 function easeFor(p, idx, e, side) {
   var cur = side === "in" ? p.keyInTemporalEase(idx) : p.keyOutTemporalEase(idx), n = cur.length, a = [], i;
   if (e instanceof Array) {
@@ -333,7 +336,7 @@ function mapEase(list, cur, where) {
     aemcp.fail("The reference key has " + n + " ease values per side, " + where + " has " + m + ": pass sourceDimension (0-" + (n - 1) + ") to copy one reference dimension to every target dimension");
   for (var i = 0; i < m; i++) {
     var s = n === m && sd === undefined ? list[i] : list[n === 1 ? 0 : sd];
-    a.push(new KeyframeEase(spd === "copy" ? s.speed : (spd === "keep" ? cur[i].speed : 0), s.influence));
+    a.push(new KeyframeEase(spd === "copy" ? s.speed : (spd === "keep" ? cur[i].speed : 0), inf01(s.influence)));
   }
   return a;
 }
@@ -498,7 +501,7 @@ for (var w = 0; w < jobs.length; w++) {
   if (!changed) continue;
   if (keep) {
     // a key's out-speed belongs to the segment after it, its in-speed to the one before: scale each by its own stretch
-    var scaleEase = function (list, ratio) { var r = []; for (var x = 0; x < list.length; x++) r.push(new KeyframeEase(list[x].speed * ratio, list[x].influence)); return r; };
+    var scaleEase = function (list, ratio) { var r = []; for (var x = 0; x < list.length; x++) r.push(new KeyframeEase(list[x].speed * ratio, inf01(list[x].influence))); return r; };
     for (var g = 0; g < n; g++) {
       var d = caps[g];
       if (!d.inEase) continue;

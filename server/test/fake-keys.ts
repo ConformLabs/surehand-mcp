@@ -13,9 +13,15 @@ export const PVT = { NO_VALUE: 6412, ThreeD_SPATIAL: 6413, ThreeD: 6414, TwoD_SP
 export const KIT = { LINEAR: 6612, BEZIER: 6613, HOLD: 6614 };
 const PT = { PROPERTY: 6212, INDEXED_GROUP: 6213, NAMED_GROUP: 6214 };
 
+// like After Effects, the constructor itself refuses an influence outside 0.1..100 (seen live: copying an ease that
+// AE had reported with influence 0 failed in the constructor)
 export class KeyframeEase {
-  constructor(public speed: number, public influence: number) {}
+  constructor(public speed: number, public influence: number) {
+    if (!(influence >= 0.1 && influence <= 100)) throw new Error(`After Effects error: Unable to call "Constructor" because of parameter 2. Value ${influence} out of range 0.1 to 100.`);
+  }
 }
+/** An ease as After Effects reports it (built without the constructor's check). */
+const reported = (e: KeyframeEase, influence = e.influence) => Object.assign(Object.create(KeyframeEase.prototype), { speed: e.speed, influence }) as KeyframeEase;
 class Item {}
 class CompItem extends Item {}
 class FootageItem extends Item {}
@@ -46,7 +52,7 @@ interface Key {
 }
 
 const easeDims = (vt: number) => (vt === PVT.TwoD ? 2 : vt === PVT.ThreeD ? 3 : 1);
-const copyE = (a: KeyframeEase[]) => a.map((e) => new KeyframeEase(e.speed, e.influence));
+const copyE = (a: KeyframeEase[]) => a.map((e) => reported(e));
 
 export function makeProp(name: string, matchName: string, vt: number, value: any, log: string[] = []): any {
   const keys: Key[] = [];
@@ -118,15 +124,24 @@ export function makeProp(name: string, matchName: string, vt: number, value: any
     keyInInterpolationType: (i: number) => chk(i).inI,
     keyOutInterpolationType: (i: number) => chk(i).outI,
     setInterpolationTypeAtKey(i: number, a: number, b?: number) {
-      chk(i).inI = a;
-      chk(i).outI = b ?? a;
+      const k = chk(i), out = b ?? a;
+      // seen live (AE 26.5): a key switched to Bezier without setting its ease reads back speed 0, influence 0 on
+      // both sides (values the KeyframeEase constructor itself refuses) until an ease is set
+      if ((a === KIT.BEZIER && k.inI !== KIT.BEZIER) || (out === KIT.BEZIER && k.outI !== KIT.BEZIER)) {
+        const zero = () => Array.from({ length: dims }, () => reported(new KeyframeEase(0, 1), 0));
+        k.inE = zero();
+        k.outE = zero();
+      }
+      k.inI = a;
+      k.outI = out;
     },
-    keyInTemporalEase: (i: number) => copyE(chk(i).inE),
-    keyOutTemporalEase: (i: number) => copyE(chk(i).outE),
+    keyInTemporalEase: (i: number) => chk(i).inE.map((e) => reported(e)),
+    keyOutTemporalEase: (i: number) => chk(i).outE.map((e) => reported(e)),
     setTemporalEaseAtKey(i: number, a: KeyframeEase[], b?: KeyframeEase[]) {
       for (const list of [a, b ?? a]) {
         if (!Array.isArray(list) || list.length !== dims) throw new Error(`After Effects error: ease must be an array of ${dims} KeyframeEase`);
-        for (const e of list) if (!(e.influence >= 0.1 && e.influence <= 100)) throw new Error("After Effects error: influence out of range");
+        // its own objects come back with influence 0 and are accepted; new ones are checked by the constructor
+        for (const e of list) if (!(e.influence >= 0 && e.influence <= 100)) throw new Error("After Effects error: influence out of range");
       }
       chk(i).inE = copyE(a);
       chk(i).outE = copyE(b ?? a);

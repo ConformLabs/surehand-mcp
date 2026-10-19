@@ -333,3 +333,47 @@ describe("existing tools: shared bounds, frames", () => {
     expect(rm.result).toEqual({ removed: 1, remaining: 1 });
   });
 });
+
+describe("eases After Effects reports with influence 0 (seen live in AE 26.5)", () => {
+  // a key switched to Bezier without an explicit ease reads back speed 0, influence 0, which `new KeyframeEase`
+  // refuses ("Value 0 out of range 0.1 to 100"): copying, retiming and conforming such keys must still work
+  function unsetBezier() {
+    const ae = fakeKeysAE({ fps: 25, layers: [{ name: "A" }, { name: "B" }] });
+    const op = ae.prop("A", "ADBE Opacity");
+    op.setValueAtTime(0, 0);
+    op.setValueAtTime(1, 100);
+    op.setInterpolationTypeAtKey(1, KIT.BEZIER, KIT.BEZIER);
+    op.setInterpolationTypeAtKey(2, KIT.BEZIER, KIT.BEZIER);
+    const sc = ae.prop("B", "ADBE Scale");
+    sc.setValueAtTime(0, [100, 100, 100]);
+    sc.setValueAtTime(1, [200, 200, 100]);
+    return { ae, op, sc };
+  }
+  it("the fake reports them like After Effects", () => {
+    const { op } = unsetBezier();
+    expect(op.keyInTemporalEase(1)[0]).toMatchObject({ speed: 0, influence: 0 });
+    expect(() => new KeyframeEase(0, 0)).toThrow(/out of range 0.1 to 100/);
+  });
+  it("ae_copy_ease from such a key writes influence 0.1", () => {
+    const { ae, sc } = unsetBezier();
+    const r = ae.run(jsx("ae_copy_ease"), { from: { layer: "A", path: "Transform/Opacity", frame: 0 }, to: [{ layer: "B", path: "Transform/Scale" }], speed: "zero" });
+    expect(r.ok, JSON.stringify(r.error)).toBe(true);
+    expect(sc.keyInTemporalEase(1).map((e: any) => e.influence)).toEqual([0.1, 0.1, 0.1]);
+  });
+  it("ae_retime_keyframes scale and conform work on them", () => {
+    const { ae, op } = unsetBezier();
+    const s = ae.run(jsx("ae_retime_keyframes"), { mode: "scale", factor: 2, layers: ["A"] });
+    expect(s.ok, JSON.stringify(s.error)).toBe(true);
+    expect(Math.round(op.keyTime(2) * 25)).toBe(50);
+    const c = ae.run(jsx("ae_retime_keyframes"), { mode: "conform", frameRate: 30 });
+    expect(c.ok, JSON.stringify(c.error)).toBe(true);
+  });
+  it("a table read back from After Effects (influence 0) can be written again", () => {
+    const { ae } = unsetBezier();
+    const read = ae.run(jsx("ae_get_keyframes"), { layers: ["A"] });
+    expect(read.ok, JSON.stringify(read.error)).toBe(true);
+    const keys = read.result.properties[0].keys.map((k: any) => ({ frame: k.frame, value: k.value, easeIn: k.easeIn, easeOut: k.easeOut }));
+    const w = ae.run(jsx("ae_set_keyframe_table"), { properties: [{ layer: "A", path: read.result.properties[0].path, keys }] });
+    expect(w.ok, JSON.stringify(w.error)).toBe(true);
+  });
+});
