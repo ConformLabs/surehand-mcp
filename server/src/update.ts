@@ -21,9 +21,23 @@ export interface UpdateInfo {
 
 /** -1 / 0 / 1 comparison of "1.2.3"-style versions (a leading "v" is ignored). */
 export function compareVersions(a: string, b: string): number {
-  const pa = a.replace(/^v/, "").split(/[.-]/).map((x) => parseInt(x, 10) || 0);
-  const pb = b.replace(/^v/, "").split(/[.-]/).map((x) => parseInt(x, 10) || 0);
-  for (let i = 0; i < 3; i++) if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) > (pb[i] ?? 0) ? 1 : -1;
+  // x.y.z, optionally with a pre-release (1.4.0-beta.1), which comes before x.y.z itself
+  const parse = (v: string) => {
+    const [core, pre] = v.replace(/^v/, "").split(/-(.*)/s);
+    return { n: core.split(".").map((x) => parseInt(x, 10) || 0), pre: pre ? pre.split(".") : null };
+  };
+  const pa = parse(a), pb = parse(b);
+  for (let i = 0; i < 3; i++) if ((pa.n[i] ?? 0) !== (pb.n[i] ?? 0)) return (pa.n[i] ?? 0) > (pb.n[i] ?? 0) ? 1 : -1;
+  if (!pa.pre || !pb.pre) return pa.pre ? -1 : pb.pre ? 1 : 0;
+  for (let i = 0; i < Math.max(pa.pre.length, pb.pre.length); i++) {
+    const x = pa.pre[i], y = pb.pre[i];
+    if (x === undefined || y === undefined) return x === undefined ? -1 : 1;
+    if (x === y) continue;
+    const nx = /^\d+$/.test(x), ny = /^\d+$/.test(y);
+    if (nx && ny) return Number(x) > Number(y) ? 1 : -1;
+    if (nx !== ny) return nx ? -1 : 1;
+    return x > y ? 1 : -1;
+  }
   return 0;
 }
 
