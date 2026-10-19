@@ -1,4 +1,4 @@
-// Tests the current build on a Windows PC over SSH: copies dist/ae-mcp.mjs, installs it
+// Tests the current build on a Windows PC over SSH: copies dist/surehand-ae.mjs, installs it
 // (without touching the AI apps' settings) and runs the full self-test against every
 // After Effects that is open there.
 //
@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 
 const host = process.env.AEMCP_WIN_HOST || "ron-pc";
 const allowNoAe = process.argv.includes("--allow-no-ae");
-const bundle = fileURLToPath(new URL("../dist/ae-mcp.mjs", import.meta.url));
+const bundle = fileURLToPath(new URL("../dist/surehand-ae.mjs", import.meta.url));
 const buildVersion = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
 const SSH = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10"];
 
@@ -34,19 +34,19 @@ if (remote("echo ok", { quiet: true }).out.trim() !== "ok") {
   process.exit(1);
 }
 
-const scp = spawnSync("scp", [...SSH, "-q", bundle, `${host}:ae-mcp-test.mjs`], { stdio: "inherit" });
+const scp = spawnSync("scp", [...SSH, "-q", bundle, `${host}:surehand-ae-test.mjs`], { stdio: "inherit" });
 if (scp.status !== 0) process.exit(1);
 
 // Surehand MCP's own Node if the installer downloaded one, else the one on PATH
 const nodeExe =
   remote(
-    `powershell -NoProfile -Command "$p = Join-Path $env:USERPROFILE '.aemcp\\node\\node.exe'; if (Test-Path $p) { $p } else { (Get-Command node -ErrorAction SilentlyContinue).Source }"`,
+    `powershell -NoProfile -Command "$p = Join-Path $env:USERPROFILE '.surehand\\node\\node.exe'; $q = Join-Path $env:USERPROFILE '.aemcp\\node\\node.exe'; if (Test-Path $p) { $p } elseif (Test-Path $q) { $q } else { (Get-Command node -ErrorAction SilentlyContinue).Source }"`,
     { quiet: true },
   ).out.trim() || "node";
 const run = (args) => `cd /d "%USERPROFILE%" && "${nodeExe}" ${args}`;
 
 console.log(`\n== install (${nodeExe})`);
-const inst = remote(run("ae-mcp-test.mjs install --skip-clients & del ae-mcp-test.mjs"), { quiet: true });
+const inst = remote(run("surehand-ae-test.mjs install --skip-clients & del surehand-ae-test.mjs"), { quiet: true });
 const instOut = plain(inst.out);
 console.log(instOut.split(/\r?\n/).filter((l) => /✔|✖|!|installer v/.test(l)).join("\n"));
 if (!/Extension:/.test(instOut)) {
@@ -55,15 +55,18 @@ if (!/Extension:/.test(instOut)) {
 }
 
 const list = remote(
-  `powershell -NoProfile -Command "Get-ChildItem $env:USERPROFILE\\.aemcp\\instances\\*.json -ErrorAction SilentlyContinue | ForEach-Object { $j = Get-Content $_ -Raw | ConvertFrom-Json; '{0} {1}' -f $j.port, $j.host.appVersion }"`,
+  `powershell -NoProfile -Command "Get-ChildItem $env:USERPROFILE\\.surehand\\ae\\instances\\*.json, $env:USERPROFILE\\.aemcp\\instances\\*.json -ErrorAction SilentlyContinue | ForEach-Object { $j = Get-Content $_ -Raw | ConvertFrom-Json; '{0} {1}' -f $j.port, $j.host.appVersion }"`,
   { quiet: true },
 );
-const instances = list.out.split(/\r?\n/).map((l) => l.trim().split(" ")).filter((p) => /^\d+$/.test(p[0]));
+const instances = list.out.split(/\r?\n/).map((l) => l.trim().split(" ")).filter((p, i, all) => /^\d+$/.test(p[0]) && all.findIndex((q) => q[0] === p[0]) === i);
+// the installed server: ~/.aemcp's only while a 1.3 installation could not be moved (see .surehand\migration.log)
+const moved = remote(`if exist "%USERPROFILE%\\.surehand\\ae\\server\\surehand-ae.mjs" (echo new) else (echo old)`, { quiet: true }).out.trim();
+const server = moved === "old" ? ".aemcp\\server\\ae-mcp.mjs" : ".surehand\\ae\\server\\surehand-ae.mjs";
 
 let failed = 0;
 if (!instances.length) {
   console.log("\n== no After Effects open on the PC: running the checks that don't need it");
-  const r = remote(run(".aemcp\\server\\ae-mcp.mjs selftest"), { quiet: true });
+  const r = remote(run(`${server} selftest`), { quiet: true });
   console.log(plain(r.out).split(/\r?\n/).filter((l) => /✔|✖|!/.test(l)).join("\n"));
   if (!allowNoAe) {
     console.error("\nOpen After Effects on the PC and run again (or pass --allow-no-ae).");
@@ -72,7 +75,7 @@ if (!instances.length) {
 } else {
   for (const [port, aeVersion] of instances) {
     console.log(`\n== After Effects ${aeVersion} (bridge port ${port})`);
-    const r = remote(run(`.aemcp\\server\\ae-mcp.mjs selftest --full`).replace("&& ", `&& set AEMCP_BRIDGE_PORT=${port}&& `), { quiet: true });
+    const r = remote(run(`${server} selftest --full`).replace("&& ", `&& set SUREHAND_AE_BRIDGE_PORT=${port}&& `), { quiet: true });
     const out = plain(r.out);
     console.log(out.split(/\r?\n/).filter((l) => /✖|signature|Bridge running|steps passed|step\(s\) failed|All checks|problem/i.test(l)).join("\n"));
     const bridge = /bridge v(\S+?)\)/.exec(out)?.[1];

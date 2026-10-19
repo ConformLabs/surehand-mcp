@@ -1,6 +1,5 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { existsSync, mkdirSync, readFileSync, statSync, unlinkSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
@@ -12,6 +11,7 @@ import { codeExcerpt, ensureHelpers, errorHint, evalBody, formatChanges, rollbac
 import { reservedGlobalsHint, transpileUserCode, withoutComments } from "../transpile.js";
 import { approvalSummary, permissions, READ_ONLY_REFUSAL, SHELL_REFUSAL, usesShell } from "../permissions.js";
 import { compRef, errorResult, formatResult, layerRef, reportScope } from "./registry.js";
+import { appFile } from "../paths.js";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -155,7 +155,7 @@ return r;`;
  */
 async function renderPng(body: string, args: Record<string, unknown>): Promise<{ error: CallToolResult } | { info: any; data: string; note: string }> {
   // A folder both AE and this process can access (system temp dirs can be sandboxed per app on macOS)
-  const tmpDir = join(homedir(), ".aemcp", "tmp");
+  const tmpDir = appFile("tmp");
   mkdirSync(tmpDir, { recursive: true });
   // The temporary comp is created and removed in one undo group, which the guarded rollback then undoes
   // again: Edit > Undo in AE keeps undoing the user's own last step, not an invisible preview step.

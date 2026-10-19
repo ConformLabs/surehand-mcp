@@ -1,4 +1,4 @@
-// `ae-mcp selftest --full`: 1.3.4 regression cases not covered by the revision and rollback steps:
+// `surehand-ae selftest --full`: 1.3.4 regression cases not covered by the revision and rollback steps:
 // ES3 reserved words as names (T1), a full-mode edit still reports its changes with the fast path on
 // (T2), and a frame preview never overwrites an existing file (T4b; Save As and checkpoint restore are
 // checked by projectSafetyTests in fulltest.ts).

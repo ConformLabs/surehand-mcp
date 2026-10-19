@@ -1,5 +1,5 @@
 // Keeps parallel test runs on one machine from testing each other's build.
-// The installed server (~/.aemcp/server), the After Effects extension and the open After Effects
+// The installed server (~/.surehand/ae/server), the After Effects extension and the open After Effects
 // are shared by every checkout on the machine, so a run holds a machine-wide lock from install to
 // the last self-test, and checks that the installed server is still its own build.
 import { spawnSync } from "node:child_process";

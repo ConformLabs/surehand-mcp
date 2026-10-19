@@ -108,7 +108,7 @@ beforeEach(() => {
   tmpLeft = false;
 });
 
-const proofsDir = () => join(home, ".aemcp", "proofs");
+const proofsDir = () => join(home, ".surehand", "ae", "proofs");
 const idOf = (r: any) => /proof (\S+?):/.exec(text(r))![1];
 
 describe("ae_prove_identical", () => {
@@ -134,7 +134,7 @@ describe("ae_prove_identical", () => {
     expect(text(cmp)).toMatch(/Verdict: IDENTICAL: all 5 frames are bit-identical/);
     expect(image(cmp)).toBeUndefined();
     // the frames rendered for the comparison are removed again
-    expect(readdirSync(join(home, ".aemcp", "tmp"))).toEqual([]);
+    expect(readdirSync(join(home, ".surehand", "ae", "tmp"))).toEqual([]);
   });
 
   it("compare defaults to the latest proof", async () => {
@@ -243,11 +243,11 @@ describe("ae_prove_identical", () => {
     expect(text(r)).toMatch(/Verdict: NOT PROVEN: the reference was captured in an unsaved project and comp id 12 \("Main"\) now has another name/);
   });
 
-  it("a render that fails half way leaves no frames in ~/.aemcp/tmp", async () => {
+  it("a render that fails half way leaves no frames in ~/.surehand/ae/tmp", async () => {
     const id = idOf(await prove({ action: "capture", frames: 3 }, FULL));
     failAfterFrames = 2;
     await expect(prove({ action: "compare", id }, FULL)).rejects.toThrow(/saveFrameToPng failed/);
-    expect(readdirSync(join(home, ".aemcp", "tmp"))).toEqual([]);
+    expect(readdirSync(join(home, ".surehand", "ae", "tmp"))).toEqual([]);
   });
 
   it("run: if the comparison fails after the batch, it says the batch WAS applied and gives the proof id", async () => {

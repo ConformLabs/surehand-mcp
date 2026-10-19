@@ -1,4 +1,4 @@
-// `ae-mcp selftest --full`: the read-only check and change report with app.project.revision (fast path),
+// `surehand-ae selftest --full`: the read-only check and change report with app.project.revision (fast path),
 // whether read-only mode's rollback only ever reverts the script (never the user's last edit),
 // plus a timing of a read-only query on a project with many comps, fast path vs the full snapshot.
 // Everything it creates is named __aemcp_fulltest_rev* and removed by the full self-test's cleanup.
@@ -6,6 +6,7 @@ import { evalRaw } from "../bridge.js";
 import { warn } from "./util.js";
 import { evalBody, formatChanges, runJsx, type RunOptions, type RunResult } from "../jsx.js";
 import { READ_ONLY_RUN_OPTIONS, runReadOnly } from "../tools/core.js";
+import { env } from "../paths.js";
 
 export interface RevisionStep { step: string; ok: boolean; ms: number; error?: string; skipped?: boolean; bench?: Record<string, number>; note?: string }
 
@@ -163,9 +164,9 @@ return app.project.numItems;`,
 
   // Cases that really run Edit > Undo/Redo or unbalance undo groups inside After Effects can make AE show
   // "Undo group mismatch" and crash it (seen in AE 26.5 on the 1.3.4 test day). Read-only mode refuses such
-  // scripts anyway, so these stress cases only run when asked for: AEMCP_SELFTEST_UNDO_STRESS=1.
-  const stress = process.env.AEMCP_SELFTEST_UNDO_STRESS === "1";
-  const stressSkip = (name: string) => warn(`read-only undo keeps the user's last edit: ${name}: skipped (undo-stress case; can crash After Effects; run with AEMCP_SELFTEST_UNDO_STRESS=1)`);
+  // scripts anyway, so these stress cases only run when asked for: SUREHAND_AE_SELFTEST_UNDO_STRESS=1 (or AEMCP_SELFTEST_UNDO_STRESS=1).
+  const stress = env("SELFTEST_UNDO_STRESS") === "1";
+  const stressSkip = (name: string) => warn(`read-only undo keeps the user's last edit: ${name}: skipped (undo-stress case; can crash After Effects; run with SUREHAND_AE_SELFTEST_UNDO_STRESS=1)`);
 
   await undoSafe("script calls Edit > Undo", `app.executeCommand(${UNDO});`, { refused: true });
   if (stress) await undoSafe("script calls Edit > Redo", `app.executeCommand(${REDO});`, { userUndoes: true, refused: true });

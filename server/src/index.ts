@@ -7,15 +7,18 @@ import { ensureAeSetup } from "./cli/setup.js";
 import { checkForUpdate } from "./update.js";
 // CLI commands are imported statically: lazily imported modules made esbuild initialize shared
 // dependencies (zod) too late for the MCP SDK, crashing the bundle at startup.
-import { ACTIVITY_FILE, readActivity } from "./activity.js";
+import { activityFile, readActivity } from "./activity.js";
 import { chatgpt } from "./cli/chatgpt.js";
+import { checkpointDiffCommand, checkpointsCommand } from "./cli/checkpoints.js";
+import { connectClient, disconnectClient, listClients, moveFromLegacy } from "./cli/clients.js";
 import { diagnostics } from "./cli/diagnostics.js";
 import { install } from "./cli/install.js";
-import { selftest } from "./cli/selftest.js";
+import { selftest, selftestJson } from "./cli/selftest.js";
 import { updateCommand } from "./cli/update-cmd.js";
 import { recordRuntime } from "./cli/setup.js";
 import { uninstall } from "./cli/uninstall.js";
 import { createMcpServer } from "./server.js";
+import { env, SERVER_NAME } from "./paths.js";
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(name);
@@ -38,10 +41,10 @@ function startHttp() {
   const cfg = loadConfig();
   const port = Number(arg("--port") || cfg.httpPort);
   const host = arg("--host") || "127.0.0.1";
-  const token = process.env.AEMCP_HTTP_TOKEN || cfg.token;
+  const token = env("HTTP_TOKEN") || cfg.token;
   const noAuth = process.argv.includes("--no-auth");
   if (!token && !noAuth) {
-    console.error("No token configured (~/.aemcp/config.json). Run the installer, set AEMCP_HTTP_TOKEN, or pass --no-auth (NOT recommended with a tunnel).");
+    console.error("No token configured (~/.surehand/ae/config.json). Run the installer, set SUREHAND_AE_HTTP_TOKEN, or pass --no-auth (NOT recommended with a tunnel).");
     process.exit(1);
   }
 
@@ -82,40 +85,63 @@ function startHttp() {
   });
   http.listen(port, host, () => {
     console.error(`Surehand MCP (HTTP) v${VERSION} listening on http://${host}:${port}/mcp`);
-    if (!noAuth) console.error(`Auth: header "Authorization: Bearer <token>" or URL http://${host}:${port}/mcp/<token> (token in ~/.aemcp/config.json)`);
+    if (!noAuth) console.error(`Auth: header "Authorization: Bearer <token>" or URL http://${host}:${port}/mcp/<token> (token in ~/.surehand/ae/config.json)`);
   });
 }
 
-const HELP = `Surehand MCP v${VERSION} for Adobe After Effects (command: ae-mcp)
+const HELP = `Surehand MCP v${VERSION} for Adobe After Effects (command: surehand-ae; ae-mcp still works)
 
 Usage:
-  ae-mcp                 run the MCP server over stdio (Claude Desktop, Claude Code, Cursor...)
-  ae-mcp [--tools core|full]   core (default, ~20 tools) or every tool
-  ae-mcp --http [--port 8766] [--host 127.0.0.1] [--no-auth]
+  surehand-ae                 run the MCP server over stdio (Claude Desktop, Claude Code, Cursor...)
+  surehand-ae [--tools core|full]   core (default, ~20 tools) or every tool
+  surehand-ae --http [--port 8766] [--host 127.0.0.1] [--no-auth]
                          run over Streamable HTTP at /mcp (ChatGPT via a tunnel)
-  ae-mcp install [--skip-clients] [--no-claude-desktop|--no-claude-code|--no-cursor|--no-codex]
+  surehand-ae install [--skip-clients] [--no-claude-desktop|--no-claude-code|--no-cursor|--no-codex]
                          install the server + After Effects extension and connect AI apps
-  ae-mcp uninstall [--keep-config] [--all]   (keeps checkpoints and files that are not ours unless --all)
-  ae-mcp selftest [--full]  check the installation and the connection to After Effects;
+  surehand-ae uninstall [--keep-config] [--all]   (keeps checkpoints and files that are not ours unless --all)
+  surehand-ae selftest [--full]  check the installation and the connection to After Effects;
                          --full also runs every major tool and saves a compatibility report
-  ae-mcp diagnostics     print a report to paste into a bug report (no secrets)
-  ae-mcp activity [n]    the last n tool calls (default 30); full log in ~/.aemcp/activity.jsonl
-  ae-mcp chatgpt [--local]
+  surehand-ae test --json     the quick self-test as data: [{name, ok, detail, fix?}]
+  surehand-ae diagnostics     print a report to paste into a bug report (no secrets)
+  surehand-ae activity [n]    the last n tool calls (default 30); full log in ~/.surehand/ae/activity.jsonl
+  surehand-ae chatgpt [--local]
                          HTTP server + public tunnel for ChatGPT
-  ae-mcp update [--json]  install the latest release over this installation (and the AE extension)
-  ae-mcp setup           only install/update the After Effects extension and config
+  surehand-ae update [--json]  install the latest release over this installation (and the AE extension)
+  surehand-ae update --check [--json]   only report: {current, latest, updateAvailable, notes, url}
+  surehand-ae clients [--json]          the AI apps on this computer and whether they are connected
+  surehand-ae connect <app> [--json]    connect one: claude-desktop, claude-code, codex, cursor
+  surehand-ae disconnect <app> [--json]
+  surehand-ae checkpoints [--json] [--project <path.aep>]      a project's checkpoints (default: the open one)
+  surehand-ae checkpoint-diff <id> [--json] [--project <path>]  what changed since a checkpoint (needs After Effects)
+  surehand-ae setup           only install/update the After Effects extension and config
 
-Config: ~/.aemcp/config.json  (env: AEMCP_CONFIG, AEMCP_BRIDGE_PORT, AEMCP_TOKEN, AEMCP_HTTP_PORT, AEMCP_HTTP_TOKEN)`;
+Files: ~/.surehand/ae (config.json, checkpoints, history...); shared: ~/.surehand/node, ~/.surehand/ffmpeg.
+Version 1.3's ~/.aemcp moves there automatically.
+Environment (SUREHAND_AE_* or the older AEMCP_* names): SUREHAND_AE_CONFIG, SUREHAND_AE_BRIDGE_PORT, SUREHAND_AE_TOKEN,
+  SUREHAND_AE_HTTP_PORT, SUREHAND_AE_HTTP_TOKEN, SUREHAND_AE_TOOLS, SUREHAND_AE_INSTANCE, SUREHAND_AE_NO_UPDATE_CHECK,
+  SUREHAND_AE_NO_AUTOSETUP, SUREHAND_AE_NO_ACTIVITY_LOG, SUREHAND_AE_BLOCKED_AFTER_SECONDS, SUREHAND_AE_STARTUP_WAIT_SECONDS`;
 
 /** Make sure the After Effects side is installed/up to date (cheap no-op when it already is). */
 function autoSetup() {
-  if (process.env.AEMCP_NO_AUTOSETUP) return;
+  if (env("NO_AUTOSETUP")) return;
   try {
     const r = ensureAeSetup();
-    if (r.extensionInstalled) console.error(`[ae-mcp] After Effects extension ${r.extensionUpdated ? "updated" : "installed"}; restart After Effects to load it.`);
-    if (r.errors.length) console.error(`[ae-mcp] setup problems: ${r.errors.join("; ")}`);
+    if (r.extensionInstalled) console.error(`[${SERVER_NAME}] After Effects extension ${r.extensionUpdated ? "updated" : "installed"}; restart After Effects to load it.`);
+    if (r.errors.length) console.error(`[${SERVER_NAME}] setup problems: ${r.errors.join("; ")}`);
   } catch (e) {
-    console.error("[ae-mcp] setup failed:", e);
+    console.error(`[${SERVER_NAME}] setup failed:`, e);
+  }
+}
+
+/** A 1.3 installation (~/.aemcp) moves to ~/.surehand/ae: a cheap check once done. Never fails a start. */
+function moveOnStart(quiet: boolean) {
+  try {
+    const r = moveFromLegacy();
+    if (quiet) return;
+    if (r.status === "migrated") console.error(`[${SERVER_NAME}] moved ~/.aemcp to ~/.surehand/ae${r.repointed.length ? ` and updated ${r.repointed.join(", ")}` : ""} (log: ${r.log})`);
+    else if (r.status === "failed") console.error(`[${SERVER_NAME}] could not move ~/.aemcp to ~/.surehand/ae (${r.error}); working from ~/.aemcp. Log: ${r.log}`);
+  } catch (e) {
+    if (!quiet) console.error(`[${SERVER_NAME}] moving ~/.aemcp failed:`, e);
   }
 }
 
@@ -124,22 +150,44 @@ async function main() {
   const rest = process.argv.slice(3);
   if (process.argv.includes("--version")) return void console.log(VERSION);
   if (process.argv.includes("--help") || cmd === "help") return void console.log(HELP);
+  const json = rest.includes("--json");
+  // install and update move (and report) it themselves; --json output stays clean
+  if (cmd !== "install" && cmd !== "update" && cmd !== "uninstall") moveOnStart(json);
+  const print = (o: unknown, text: string) => console.log(json ? JSON.stringify(o) : text);
   switch (cmd) {
+    case "clients": {
+      const list = listClients();
+      return print(list, list.map((c) => `${c.name.padEnd(24)} ${c.id === "chatgpt-web" ? "see `surehand-ae chatgpt`" : !c.installed ? "not installed" : c.configured ? "connected" : "not connected"}${c.note ? ` (${c.note})` : ""}`).join("\n"));
+    }
+    case "connect":
+    case "disconnect": {
+      const id = rest.find((a) => !a.startsWith("--"));
+      const r = id ? (cmd === "connect" ? connectClient(id) : disconnectClient(id)) : { ok: false, message: `usage: surehand-ae ${cmd} <claude-desktop|claude-code|codex|cursor> [--json]`, restartHint: null };
+      print(r, `${r.message}${r.restartHint ? `\n${r.restartHint}` : ""}`);
+      process.exitCode = r.ok ? 0 : 1;
+      return;
+    }
+    case "checkpoints":
+      process.exitCode = await checkpointsCommand(rest);
+      return;
+    case "checkpoint-diff":
+      process.exitCode = await checkpointDiffCommand(rest);
+      return;
     case "install":
       return install(rest);
     case "uninstall":
       return uninstall(rest);
     case "selftest":
     case "test":
-      process.exitCode = await selftest(rest.includes("--full"));
+      process.exitCode = json ? await selftestJson() : await selftest(rest.includes("--full"));
       return;
     case "activity": {
             const n = Number(rest[0]) || 30;
       const list = readActivity(n).reverse();
-      if (!list.length) return void console.log(`No activity yet (${ACTIVITY_FILE}).`);
+      if (!list.length) return void console.log(`No activity yet (${activityFile()}).`);
       for (const e of list)
         console.log(`${e.at}  ${e.ok ? "ok " : "ERR"}  ${String(e.ms).padStart(6)}ms  ${e.tool}${e.client ? `  [${e.client}]` : ""}  ${e.summary ?? ""}`);
-      return void console.log(`\nFull log with arguments and code: ${ACTIVITY_FILE}`);
+      return void console.log(`\nFull log with arguments and code: ${activityFile()}`);
     }
     case "diagnostics":
       return void console.log(await diagnostics());

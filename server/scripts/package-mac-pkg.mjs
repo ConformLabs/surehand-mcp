@@ -9,14 +9,16 @@
 //   npm run package:mac-pkg -- --notary-timeout 2h   wait longer for Apple (default 30m)
 //
 // What it installs (no admin password; only the installing user's home folder):
-//   ~/.aemcp/node/bin/node      Node.js 24 LTS (pinned below), universal arm64 + x86_64, re-signed with our Developer ID
-//   ~/.aemcp/node/LICENSE       Node.js license
-//   ~/.aemcp/server/ae-mcp.mjs  the single-file server (server/dist)
-// then installer/mac/pkg/scripts/postinstall runs `node ae-mcp.mjs install` (extension, config, AI apps).
+//   ~/.surehand/node/bin/node                Node.js 24 LTS (pinned below), universal arm64 + x86_64, re-signed with our
+//                                            Developer ID (shared by the Surehand apps)
+//   ~/.surehand/node/LICENSE                 Node.js license
+//   ~/.surehand/ae/server/surehand-ae.mjs    the single-file server (server/dist)
+// then installer/mac/pkg/scripts/postinstall runs `node surehand-ae.mjs install` (moves a 1.3 ~/.aemcp, extension,
+// config, AI apps).
 //
 // Pipeline: build.mjs -> download both Node tarballs (cached in installer/mac/pkg/.cache, checked against the pinned
 // hashes and nodejs.org SHASUMS256.txt) -> lipo -create -> codesign (hardened runtime + node.entitlements) -> smoke
-// test both slices (node -e, server --version, MCP tools/list) -> pkgbuild (component, install location /.aemcp in
+// test both slices (node -e, server --version, MCP tools/list) -> pkgbuild (component, install location /.surehand in
 // the home domain) -> productbuild (distribution.xml, welcome/conclusion pages, Developer ID Installer signature)
 // -> notarytool submit --wait -> stapler staple/validate -> spctl + pkgutil --check-signature.
 //
@@ -147,7 +149,7 @@ if (flag("--notarize-only")) {
 // ---------- 1. server bundle ----------
 log("Building the server");
 run(process.execPath, ["build.mjs"], { cwd: SERVER });
-const bundle = join(SERVER, "dist", "ae-mcp.mjs");
+const bundle = join(SERVER, "dist", "surehand-ae.mjs");
 
 // ---------- 2. Node.js download + verification ----------
 log(`Node.js v${NODE_VERSION} (darwin-arm64 + darwin-x64)`);
@@ -180,10 +182,11 @@ for (const arch of ["arm64", "x64"]) {
 // ---------- 3. payload ----------
 log("Assembling the payload");
 rmSync(BUILD, { recursive: true, force: true });
-const payload = join(BUILD, "root"); // installed at ~/.aemcp
+const payload = join(BUILD, "root"); // installed at ~/.surehand
+const serverRel = ["ae", "server", "surehand-ae.mjs"];
 const nodeBin = join(payload, "node", "bin", "node");
 mkdirSync(dirname(nodeBin), { recursive: true });
-mkdirSync(join(payload, "server"), { recursive: true });
+mkdirSync(join(payload, "ae", "server"), { recursive: true });
 run("lipo", ["-create", join(extracted.arm64, "bin", "node"), join(extracted.x64, "bin", "node"), "-output", nodeBin]);
 const archs = capture("lipo", ["-archs", nodeBin]).trim().split(/\s+/).sort();
 if (archs.join(",") !== "arm64,x86_64") die(`universal node has architectures ${archs.join(",")}`);
@@ -191,8 +194,8 @@ console.log(`universal node: ${archs.join(" + ")}, ${mb(nodeBin)}`);
 chmodSync(nodeBin, 0o755);
 copyFileSync(join(extracted.arm64, "LICENSE"), join(payload, "node", "LICENSE"));
 chmodSync(join(payload, "node", "LICENSE"), 0o644);
-copyFileSync(bundle, join(payload, "server", "ae-mcp.mjs"));
-chmodSync(join(payload, "server", "ae-mcp.mjs"), 0o755);
+copyFileSync(bundle, join(payload, ...serverRel));
+chmodSync(join(payload, ...serverRel), 0o755);
 run("xattr", ["-cr", payload]); // (com.apple.provenance stays; see the Payload rebuild below)
 
 // ---------- 4. code signing ----------
@@ -204,7 +207,7 @@ if (!sigInfo.includes(`Authority=${APP_IDENTITY}`) || !/flags=.*runtime/.test(si
 
 // ---------- 5. smoke test: both slices run the server under the hardened runtime ----------
 log("Smoke-testing the signed node");
-const sandboxHome = mkdtempSync(join(tmpdir(), "surehand-pkg-test-")); // the server writes under ~/.aemcp: keep it out of the real home
+const sandboxHome = mkdtempSync(join(tmpdir(), "surehand-pkg-test-")); // the server writes under ~/.surehand: keep it out of the real home
 const testEnv = { ...process.env, HOME: sandboxHome, AEMCP_NO_AUTOSETUP: "1", AEMCP_NO_ACTIVITY_LOG: "1", AEMCP_NO_UPDATE_CHECK: "1" };
 const toolsList =
   'import { spawn } from "node:child_process";' +
@@ -223,8 +226,8 @@ for (const arch of ["arm64", "x86_64"]) {
   }
   const exec = (args) => capture("arch", [`-${arch}`, nodeBin, ...args], { env: testEnv, cwd: sandboxHome }).trim();
   const one = exec(["-e", "console.log(1 + 0, process.arch)"]);
-  const ver = exec([join(payload, "server", "ae-mcp.mjs"), "--version"]);
-  const tools = exec(["--input-type=module", "-e", toolsList, join(payload, "server", "ae-mcp.mjs")]);
+  const ver = exec([join(payload, ...serverRel), "--version"]);
+  const tools = exec(["--input-type=module", "-e", toolsList, join(payload, ...serverRel)]);
   console.log(`${arch}: node -e -> "${one}", server --version -> ${ver}, MCP tools/list -> ${tools} tools`);
   if (!one.startsWith("1 ") || ver !== version || !(Number(tools) > 0)) die(`${arch}: smoke test failed`);
 }
@@ -236,7 +239,7 @@ const componentName = `surehand-mcp-${version}-component.pkg`;
 const component = join(BUILD, componentName);
 run("pkgbuild", [
   "--root", payload,
-  "--install-location", "/.aemcp", // in the home domain this is ~/.aemcp
+  "--install-location", "/.surehand", // in the home domain this is ~/.surehand
   "--scripts", join(PKG_SRC, "scripts"),
   "--identifier", PKG_ID,
   "--version", version,
@@ -244,7 +247,7 @@ run("pkgbuild", [
 ]);
 // pkgbuild stores extended attributes as "._name" AppleDouble files in the payload, and macOS tags every file this
 // process writes with com.apple.provenance (which cannot be removed). Installer would then drop ._node etc. into
-// ~/.aemcp. So rebuild the Payload (gzipped odc cpio, root:wheel like pkgbuild's default ownership) and the Bom
+// ~/.surehand. So rebuild the Payload (gzipped odc cpio, root:wheel like pkgbuild's default ownership) and the Bom
 // without them and re-flatten the component.
 const expandedComponent = join(BUILD, "component-expanded");
 run("pkgutil", ["--expand", component, expandedComponent]);
@@ -280,14 +283,14 @@ run("productbuild", ["--distribution", dist, "--resources", res, "--package-path
 
 // payload sanity: exactly the expected files, with the node binary signed as above
 const files = capture("pkgutil", ["--payload-files", pkg]).trim().split("\n").sort();
-const expected = [".", "./node", "./node/LICENSE", "./node/bin", "./node/bin/node", "./server", "./server/ae-mcp.mjs"];
+const expected = [".", "./ae", "./ae/server", "./ae/server/surehand-ae.mjs", "./node", "./node/LICENSE", "./node/bin", "./node/bin/node"];
 if (files.join("\n") !== expected.join("\n")) die(`unexpected payload files:\n${files.join("\n")}`);
-console.log(`payload (relative to ~/.aemcp): ${files.filter((f) => f !== ".").join("  ")}`);
+console.log(`payload (relative to ~/.surehand): ${files.filter((f) => f !== ".").join("  ")}`);
 // unpack the finished product and check the files came through byte-for-byte with the node signature intact
 const unpacked = join(BUILD, "unpacked");
 run("pkgutil", ["--expand-full", pkg, unpacked]);
 const unpackedRoot = join(unpacked, componentName, "Payload");
-for (const rel of ["node/bin/node", "node/LICENSE", "server/ae-mcp.mjs"])
+for (const rel of ["node/bin/node", "node/LICENSE", "ae/server/surehand-ae.mjs"])
   if (sha256(join(unpackedRoot, rel)) !== sha256(join(payload, rel))) die(`${rel} differs after unpacking the pkg`);
 run("codesign", ["--verify", "--strict", join(unpackedRoot, "node", "bin", "node")]);
 if (!existsSync(join(unpacked, componentName, "Scripts", "postinstall"))) die("postinstall script missing from the pkg");

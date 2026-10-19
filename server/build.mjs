@@ -1,6 +1,6 @@
 import { build } from "esbuild";
 import { createHash } from "node:crypto";
-import { chmodSync, readFileSync } from "node:fs";
+import { chmodSync, readFileSync, rmSync } from "node:fs";
 import { readCepFiles } from "./scripts/cep-files.mjs";
 
 const pkg = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8"));
@@ -17,7 +17,7 @@ await build({
   platform: "node",
   format: "esm",
   target: "node18",
-  outfile: "dist/ae-mcp.mjs",
+  outfile: "dist/surehand-ae.mjs",
   loader: { ".jsxinc": "text" },
   // Babel (modern JS -> ExtendScript) is the biggest dependency: use its minified build
   alias: { "@babel/standalone": "@babel/standalone/babel.min.js" },
@@ -37,5 +37,7 @@ await build({
   // stack traces still name the function; ExtendScript bodies are string literals and stay as written)
   minifyWhitespace: true,
 });
-chmodSync("dist/ae-mcp.mjs", 0o755);
-console.log(`built dist/ae-mcp.mjs v${pkg.version} (extension ${Object.keys(cepFiles).length} files, ${cepHash})`);
+chmodSync("dist/surehand-ae.mjs", 0o755);
+// up to 1.3 the bundle was dist/ae-mcp.mjs (releases still carry that name too: scripts/release.mjs)
+rmSync("dist/ae-mcp.mjs", { force: true });
+console.log(`built dist/surehand-ae.mjs v${pkg.version} (extension ${Object.keys(cepFiles).length} files, ${cepHash})`);

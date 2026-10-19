@@ -72,25 +72,25 @@ jobs:
       - name: 1. Install (macOS launcher, forced Node download)
         if: runner.os == 'macOS'
         env:
-          AEMCP_FORCE_NODE_DOWNLOAD: "1"
+          SUREHAND_AE_FORCE_NODE_DOWNLOAD: "1"
         run: bash "dist-zip/Surehand-MCP/2. Mac/1. Install.command" --skip-clients < /dev/null
       - name: 1. Install (Windows launcher, forced Node download)
         if: runner.os == 'Windows'
         shell: cmd
         env:
-          AEMCP_FORCE_NODE_DOWNLOAD: "1"
+          SUREHAND_AE_FORCE_NODE_DOWNLOAD: "1"
         run: call "dist-zip\Surehand-MCP\3. Windows\1. Install.bat" --skip-clients < NUL
 
       - name: 2. Test Installation (macOS launcher)
         if: runner.os == 'macOS'
         env:
-          AEMCP_FORCE_NODE_DOWNLOAD: "1"
+          SUREHAND_AE_FORCE_NODE_DOWNLOAD: "1"
         run: bash "dist-zip/Surehand-MCP/2. Mac/2. Test Installation.command" > "$RUNNER_TEMP/selftest.txt" 2>&1 < /dev/null || true
       - name: 2. Test Installation (Windows launcher)
         if: runner.os == 'Windows'
         shell: cmd
         env:
-          AEMCP_FORCE_NODE_DOWNLOAD: "1"
+          SUREHAND_AE_FORCE_NODE_DOWNLOAD: "1"
         run: call "dist-zip\Surehand-MCP\3. Windows\2. Test Installation.bat" > "%RUNNER_TEMP%\selftest.txt" 2>&1 < NUL & exit /b 0
 
       - name: Check installation
@@ -102,13 +102,13 @@ jobs:
       - name: 4. Uninstall (macOS launcher)
         if: runner.os == 'macOS'
         env:
-          AEMCP_FORCE_NODE_DOWNLOAD: "1"
+          SUREHAND_AE_FORCE_NODE_DOWNLOAD: "1"
         run: bash "dist-zip/Surehand-MCP/2. Mac/4. Uninstall.command" < /dev/null
       - name: 4. Uninstall (Windows launcher)
         if: runner.os == 'Windows'
         shell: cmd
         env:
-          AEMCP_FORCE_NODE_DOWNLOAD: "1"
+          SUREHAND_AE_FORCE_NODE_DOWNLOAD: "1"
         run: call "dist-zip\Surehand-MCP\3. Windows\4. Uninstall.bat" < NUL
 
       - name: Check uninstall

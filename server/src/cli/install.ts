@@ -1,30 +1,14 @@
 import { spawn, spawnSync } from "node:child_process";
-import { chmodSync, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { chmodSync, copyFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { VERSION } from "../config.js";
-import { bundledExtensionSigned, ensureConfig, ensureDebugMode, ensureExtension, RUNTIME_FILE } from "./setup.js";
+import { claudeDesktopRunning, connectClient, isOurEntry, mcpbInstalled, moveFromLegacy } from "./clients.js";
+import { bundledExtensionSigned, ensureConfig, ensureDebugMode, ensureExtension, runtimeFile } from "./setup.js";
 import {
-  CONFIG_FILE, INSTALLED_SERVER, SERVER_NAME, ask, bold, claudeCodeConfig, claudeDesktopConfig, claudeDesktopDir, claudeDesktopExe,
-  chatgptDesktopInstalled, codexBlock, codexConfig, cursorConfig, dim, extensionDir, fail, findClaudeCli, isMac, isWin, ok, readJson, removeCodexBlock, run,
-  sleep, stableNodePath, step, warn, writeJsonWithBackup, CSXS_VERSIONS,
+  LEGACY_SERVER_NAME, SERVER_NAME, ask, bold, claudeCodeConfig, claudeDesktopConfig, claudeDesktopDir, claudeDesktopExe, chatgptDesktopInstalled, codexConfig, configPath,
+  cursorConfig, dim, extensionDir, fail, findClaudeCli, installedServer, isMac, isWin, ok, readJson, sleep, stableNodePath, step, warn, CSXS_VERSIONS,
 } from "./util.js";
-
-/** True if the Claude Desktop extension (.mcpb) version of Surehand MCP is installed. */
-function mcpbInstalled(): boolean {
-  try {
-    return readdirSync(join(claudeDesktopDir(), "Claude Extensions")).some((n) => /after-effects/i.test(n) && !n.endsWith(".json"));
-  } catch {
-    return false;
-  }
-}
-
-function claudeDesktopRunning(): boolean {
-  if (isMac)
-    return (spawnSync("ps", ["-axo", "comm="], { encoding: "utf8" }).stdout || "").split("\n").some((l) => l.trim().endsWith(".app/Contents/MacOS/Claude"));
-  if (isWin) return (spawnSync("tasklist", ["/FI", "IMAGENAME eq claude.exe", "/NH"], { encoding: "utf8" }).stdout || "").toLowerCase().includes("claude.exe");
-  return false;
-}
 
 async function quitClaudeDesktop(): Promise<boolean> {
   if (isMac) spawnSync("osascript", ["-e", 'tell application "Claude" to quit']);
@@ -54,16 +38,24 @@ export async function install(argv: string[]) {
   if (!isMac && !isWin) warn("After Effects only runs on macOS and Windows; continuing anyway.");
 
   step("1/4  Installing the MCP server");
+  // a 1.3 installation (~/.aemcp) moves to ~/.surehand/ae first
+  const moved = moveFromLegacy({ force: true });
+  if (moved.status === "migrated") {
+    ok(`Moved your settings and files from the previous version to ${dirname(dirname(installedServer()))}${moved.kept.length ? ` (left in place: ${moved.kept.join("; ")})` : ""}`);
+    if (moved.repointed.length) ok(`Updated the connection settings of ${moved.repointed.join(", ")}`);
+  } else if (moved.status === "failed")
+    warn(`Your files from the previous version could not be moved (${moved.error}); everything keeps working from there. Details: ${moved.log}`);
   const self = fileURLToPath(import.meta.url);
+  const INSTALLED_SERVER = installedServer();
   // the Mac .pkg and the Windows installer run the already installed copy; there is no release folder with launchers
   const fromInstaller = self === INSTALLED_SERVER;
   mkdirSync(dirname(INSTALLED_SERVER), { recursive: true });
   if (self !== INSTALLED_SERVER) copyFileSync(self, INSTALLED_SERVER);
   if (!isWin) chmodSync(INSTALLED_SERVER, 0o755);
   ok(`Server: ${INSTALLED_SERVER}`);
-  writeFileSync(RUNTIME_FILE, JSON.stringify({ node: stableNodePath(), server: INSTALLED_SERVER, version: VERSION }, null, 2));
+  writeFileSync(runtimeFile(), JSON.stringify({ node: stableNodePath(), server: INSTALLED_SERVER, version: VERSION }, null, 2));
   ensureConfig();
-  ok(`Config: ${CONFIG_FILE}`);
+  ok(`Config: ${configPath()}`);
 
   step("2/4  Installing the After Effects extension");
   try {
@@ -87,18 +79,12 @@ export async function install(argv: string[]) {
   const nodePath = stableNodePath();
   const entry = { command: nodePath, args: [INSTALLED_SERVER] };
   const registered: string[] = [];
-
-  const addJson = (label: string, file: string, value: object = entry) => {
-    try {
-      const data = readJson<any>(file, {});
-      data.mcpServers ||= {};
-      data.mcpServers[SERVER_NAME] = value;
-      writeJsonWithBackup(file, data);
-      ok(`${label}`);
+  const connect = (id: string, label: string) => {
+    const r = connectClient(id, entry);
+    if (r.ok) {
+      ok(label);
       registered.push(label);
-    } catch (e: any) {
-      warn(`${label}: could not update ${file}: ${e.message}`);
-    }
+    } else warn(`${label}: ${r.message}`);
   };
 
   let restartClaude = false;
@@ -108,9 +94,10 @@ export async function install(argv: string[]) {
       registered.push("Claude Desktop");
     } else if (existsSync(claudeDesktopDir())) {
       const cfg = readJson<any>(claudeDesktopConfig(), {});
-      // An existing entry that runs our installed server with a Node that still exists is fine as is.
+      // An existing entry that runs our installed server with a Node that still exists is fine as is
+      // (a 1.3 "after-effects" entry of ours is renamed).
       const cur = cfg.mcpServers?.[SERVER_NAME];
-      const already = !!cur && cur.args?.[0] === INSTALLED_SERVER && typeof cur.command === "string" && existsSync(cur.command);
+      const already = !!cur && cur.args?.[0] === INSTALLED_SERVER && typeof cur.command === "string" && existsSync(cur.command) && !isOurEntry(cfg.mcpServers?.[LEGACY_SERVER_NAME]);
       if (!already && claudeDesktopRunning()) {
         // A running Claude Desktop rewrites its config from memory and would drop the new entry.
         console.log("  Claude Desktop is open. It must be closed while it is connected, then it reopens.");
@@ -122,42 +109,19 @@ export async function install(argv: string[]) {
       if (already) {
         ok("Claude Desktop (already connected)");
         registered.push("Claude Desktop");
-      } else addJson("Claude Desktop", claudeDesktopConfig());
+      } else connect("claude-desktop", "Claude Desktop");
     } else console.log(dim("  - Claude Desktop not installed (skipped)"));
   }
 
   if (want("claude-code")) {
-    const claude = findClaudeCli();
-    if (claude) {
-      try {
-        try { run(claude, ["mcp", "remove", SERVER_NAME, "--scope", "user"]); } catch {}
-        run(claude, ["mcp", "add", "--scope", "user", SERVER_NAME, "--", nodePath, INSTALLED_SERVER]);
-        ok("Claude Code");
-        registered.push("Claude Code");
-      } catch (e: any) {
-        warn(`Claude Code: ${String(e.stderr || e.message).split("\n")[0]}`);
-      }
-    } else if (existsSync(claudeCodeConfig())) addJson("Claude Code", claudeCodeConfig(), { type: "stdio", ...entry, env: {} });
+    if (findClaudeCli() || existsSync(claudeCodeConfig())) connect("claude-code", "Claude Code");
     else console.log(dim("  - Claude Code not installed (skipped)"));
   }
 
-  if (want("cursor") && existsSync(dirname(cursorConfig()))) addJson("Cursor", cursorConfig());
+  if (want("cursor") && existsSync(dirname(cursorConfig()))) connect("cursor", "Cursor");
 
   // ChatGPT desktop and Codex read ~/.codex/config.toml; create it if the app is installed but has never written it
-  if (want("codex") && (existsSync(dirname(codexConfig())) || chatgptDesktopInstalled())) {
-    try {
-      const file = codexConfig();
-      mkdirSync(dirname(file), { recursive: true });
-      const text = existsSync(file) ? readFileSync(file, "utf8") : "";
-      if (existsSync(file) && !existsSync(file + ".aemcp.bak")) copyFileSync(file, file + ".aemcp.bak");
-      const rest = removeCodexBlock(text).trim();
-      writeFileSync(file, (rest ? rest + "\n\n" : "") + codexBlock(nodePath, INSTALLED_SERVER));
-      ok("ChatGPT desktop / Codex");
-      registered.push("ChatGPT desktop");
-    } catch (e: any) {
-      warn(`Codex: ${e.message}`);
-    }
-  }
+  if (want("codex") && (existsSync(dirname(codexConfig())) || chatgptDesktopInstalled())) connect("codex", "ChatGPT desktop");
   if (restartClaude) {
     startClaudeDesktop();
     ok("Claude Desktop restarted");
@@ -170,7 +134,7 @@ export async function install(argv: string[]) {
 
   Try asking Claude: ${bold('"Check After Effects is connected, then make a 1080p comp with an animated title."')}
   Check the installation any time with ${fromInstaller ? bold(`"${nodePath}" "${INSTALLED_SERVER}" selftest`) : `${bold("2. Test Installation")} (in the ${isWin ? "Windows" : "Mac"} folder)`}.
-${registered.includes("ChatGPT desktop") ? "  ChatGPT desktop app: restart it; after-effects appears under Settings > Plugins > Servers.\n" : ""}  ChatGPT on the web: run ${fromInstaller ? bold(`"${nodePath}" "${INSTALLED_SERVER}" chatgpt`) : `${bold("3. Connect ChatGPT")} from the same folder`}.
+${registered.includes("ChatGPT desktop") ? "  ChatGPT desktop app: restart it; ${SERVER_NAME} appears under Settings > Plugins > Servers.\n" : ""}  ChatGPT on the web: run ${fromInstaller ? bold(`"${nodePath}" "${INSTALLED_SERVER}" chatgpt`) : `${bold("3. Connect ChatGPT")} from the same folder`}.
 
   Other MCP apps can use:  command ${nodePath}
                            args    ["${INSTALLED_SERVER}"]

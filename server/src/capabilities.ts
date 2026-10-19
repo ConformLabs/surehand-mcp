@@ -1,5 +1,5 @@
 // Which scripting features the connected After Effects version has. Used by ae_system_info,
-// diagnostics and `ae-mcp selftest --full`, so behaviour differences between AE versions are visible.
+// diagnostics and `surehand-ae selftest --full`, so behaviour differences between AE versions are visible.
 export const CAPABILITIES_JSX = `
 var c = app.project.items.addComp("__aemcp_caps", 64, 64, 1, 1, 30), f = {};
 try {

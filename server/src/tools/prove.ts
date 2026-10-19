@@ -4,7 +4,6 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import { z } from "zod";
 import { runJsx } from "../jsx.js";
@@ -13,10 +12,11 @@ import { decodePng, encodePng, type Image } from "../png.js";
 import { errorResult } from "./registry.js";
 import { RENDER_RUN_OPTIONS, renderCleanupNote } from "./core.js";
 import { runBatch } from "./workflow.js";
+import { appFile } from "../paths.js";
 
 export const MAX_PROOFS = 30;
 export const MAX_AGE_MS = 7 * 24 * 3600 * 1000;
-const proofsRoot = () => join(homedir(), ".aemcp", "proofs");
+const proofsRoot = () => appFile("proofs");
 
 /**
  * Renders frames of comps the way ae_render_frame does (a temporary comp, removed in `finally`, all in
@@ -160,7 +160,7 @@ function loadManifest(id?: string): Manifest | string {
 // to the millisecond, so "the latest proof" (ids sorted) is right even for proofs made in the same second
 const stamp = () => new Date().toISOString().replace(/[-:]/g, "").replace("T", "-").replace(/\.(\d{3})Z$/, "$1");
 
-/** Render reference frames and store them with a manifest under ~/.aemcp/proofs/<id>/. */
+/** Render reference frames and store them with a manifest under ~/.surehand/ae/proofs/<id>/. */
 export async function captureProof(input: { comps?: (number | string)[]; times?: number[]; frames?: number; maxSize?: number }): Promise<Manifest & { note?: string }> {
   pruneProofs(MAX_PROOFS - 1);
   const id = `${stamp()}-${randomBytes(2).toString("hex")}`;
@@ -303,7 +303,7 @@ export async function compareProof(input: { id?: string; tolerance?: number }): 
   // default: under half an 8-bit step, so 16/32 bpc rounding (e.g. 0.02/255 after a precompose) doesn't count,
   // while any change that shows in 8-bit output does; tolerance 0 asks for bit-identical
   const tol = input.tolerance ?? DEFAULT_TOLERANCE;
-  const tmp = join(homedir(), ".aemcp", "tmp");
+  const tmp = appFile("tmp");
   mkdirSync(tmp, { recursive: true });
   const specs = m.comps.map((c) => ({ id: c.id, times: c.frames.map((f) => f.time), width: c.width, height: c.height, pixelAspect: c.pixelAspect }));
   const prefix = `aemcp_proof_${Date.now()}_${randomBytes(2).toString("hex")}_`;

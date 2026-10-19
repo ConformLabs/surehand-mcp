@@ -3,46 +3,46 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFi
 import { homedir, platform } from "node:os";
 import { dirname, join } from "node:path";
 import { createInterface } from "node:readline";
+import { mapLegacyPath } from "../migrate.js";
+import { privateNodeDir, SERVER_NAME, surehandRoot } from "../paths.js";
 
 export const isMac = platform() === "darwin";
 export const isWin = platform() === "win32";
-export const HOME = homedir();
-export const AEMCP_DIR = join(HOME, ".aemcp");
-export const CONFIG_FILE = join(AEMCP_DIR, "config.json");
-export const INSTALLED_SERVER = join(AEMCP_DIR, "server", "ae-mcp.mjs");
-export const SERVER_NAME = "after-effects";
+/** Read when used (tests and the uninstaller run with other home folders). */
+const HOME_ = () => homedir();
+export { SERVER_NAME, LEGACY_SERVER_NAME, appDir, configPath, installedServer } from "../paths.js";
 export const EXTENSION_ID = "com.aemcp";
 export const CSXS_VERSIONS = [9, 10, 11, 12, 13, 14];
 
-const APPDATA = process.env.APPDATA || join(HOME, "AppData", "Roaming");
-const LOCALAPPDATA = process.env.LOCALAPPDATA || join(HOME, "AppData", "Local");
+const APPDATA_ = () => process.env.APPDATA || join(HOME_(), "AppData", "Roaming");
+const LOCALAPPDATA_ = () => process.env.LOCALAPPDATA || join(HOME_(), "AppData", "Local");
 
 export const cepExtensionsDir = () =>
-  isWin ? join(APPDATA, "Adobe", "CEP", "extensions") : join(HOME, "Library", "Application Support", "Adobe", "CEP", "extensions");
+  isWin ? join(APPDATA_(), "Adobe", "CEP", "extensions") : join(HOME_(), "Library", "Application Support", "Adobe", "CEP", "extensions");
 export const extensionDir = () => join(cepExtensionsDir(), EXTENSION_ID);
-export const claudeDesktopDir = () => (isWin ? join(APPDATA, "Claude") : join(HOME, "Library", "Application Support", "Claude"));
+export const claudeDesktopDir = () => (isWin ? join(APPDATA_(), "Claude") : join(HOME_(), "Library", "Application Support", "Claude"));
 export const claudeDesktopConfig = () => join(claudeDesktopDir(), "claude_desktop_config.json");
-export const claudeCodeConfig = () => join(HOME, ".claude.json");
-export const cursorConfig = () => join(HOME, ".cursor", "mcp.json");
+export const claudeCodeConfig = () => join(HOME_(), ".claude.json");
+export const cursorConfig = () => join(HOME_(), ".cursor", "mcp.json");
 /** ChatGPT desktop and Codex share this file (CODEX_HOME overrides ~/.codex). */
-export const codexConfig = () => join(process.env.CODEX_HOME || join(HOME, ".codex"), "config.toml");
+export const codexConfig = () => join(process.env.CODEX_HOME || join(HOME_(), ".codex"), "config.toml");
 
 /** True if the ChatGPT desktop app or Codex is installed, even if it hasn't created ~/.codex yet. */
 export function chatgptDesktopInstalled(): boolean {
   if (which("codex")) return true;
   if (isMac)
-    return ["/Applications/ChatGPT.app", "/Applications/Codex.app", join(HOME, "Applications", "ChatGPT.app")].some((p) => existsSync(p));
+    return ["/Applications/ChatGPT.app", "/Applications/Codex.app", join(HOME_(), "Applications", "ChatGPT.app")].some((p) => existsSync(p));
   if (isWin) {
-    if ([join(LOCALAPPDATA, "Programs", "ChatGPT"), join(LOCALAPPDATA, "Microsoft", "WindowsApps", "ChatGPT.exe")].some((p) => existsSync(p))) return true;
+    if ([join(LOCALAPPDATA_(), "Programs", "ChatGPT"), join(LOCALAPPDATA_(), "Microsoft", "WindowsApps", "ChatGPT.exe")].some((p) => existsSync(p))) return true;
     try {
-      return readdirSync(join(LOCALAPPDATA, "Packages")).some((n) => /^OpenAI\.(ChatGPT|Codex)/i.test(n));
+      return readdirSync(join(LOCALAPPDATA_(), "Packages")).some((n) => /^OpenAI\.(ChatGPT|Codex)/i.test(n));
     } catch {
       return false;
     }
   }
   return false;
 }
-export const claudeDesktopExe = () => join(LOCALAPPDATA, "AnthropicClaude", "claude.exe");
+export const claudeDesktopExe = () => join(LOCALAPPDATA_(), "AnthropicClaude", "claude.exe");
 
 const useColor = process.stdout.isTTY || isWin;
 const color = (c: number) => (s: string) => (useColor ? `\x1b[${c}m${s}\x1b[0m` : s);
@@ -60,10 +60,16 @@ export function readJson<T = any>(file: string, fallback: T): T {
   }
 }
 
-/** Write JSON, keeping a one-time .aemcp.bak of the original file. */
+/** Keep a one-time backup of a settings file before the first change (<file>.surehand.bak). 1.3 wrote
+ *  <file>.aemcp.bak: an existing one already holds the original, so no second copy is made. */
+export function backupOnce(file: string) {
+  if (existsSync(file) && !existsSync(file + ".aemcp.bak") && !existsSync(file + ".surehand.bak")) copyFileSync(file, file + ".surehand.bak");
+}
+
+/** Write JSON, keeping a one-time backup of the original file. */
 export function writeJsonWithBackup(file: string, data: unknown) {
   mkdirSync(dirname(file), { recursive: true });
-  if (existsSync(file) && !existsSync(file + ".aemcp.bak")) copyFileSync(file, file + ".aemcp.bak");
+  backupOnce(file);
   writeFileSync(file, JSON.stringify(data, null, 2) + "\n");
 }
 
@@ -77,20 +83,29 @@ export function run(cmd: string, args: string[]) {
   return execFileSync(cmd, args, { stdio: "pipe", encoding: "utf8", shell: isWin && /\.(cmd|bat)$/i.test(cmd) });
 }
 
+/** The private Node.js the installers put in ~/.surehand/node, if it is there. */
+export function privateNode(): string | null {
+  const p = join(privateNodeDir(), ...(isWin ? ["node.exe"] : ["bin", "node"]));
+  return existsSync(p) ? p : null;
+}
+
 /** Prefer the node on PATH (often a stable symlink that survives upgrades) over the resolved binary. */
-export function stableNodePath(): string {
-  // a Node the wrapper downloaded into ~/.aemcp/node is already stable
-  if (process.execPath.startsWith(join(AEMCP_DIR, "node"))) return process.execPath;
+export function stableNodePath(execPath = process.execPath): string {
+  // a private Node (installers, or the launcher's download) is already stable; one still in the
+  // 1.3 folder (~/.aemcp/node) is used from where it moved to
+  const mapped = mapLegacyPath(execPath);
+  if (mapped !== execPath && existsSync(mapped)) return mapped;
+  if (execPath.startsWith(privateNodeDir()) || execPath.startsWith(join(surehandRoot(), "node"))) return execPath;
   const onPath = which("node");
-  return onPath && existsSync(onPath) ? onPath : process.execPath;
+  return onPath && existsSync(onPath) ? onPath : execPath;
 }
 
 export function findClaudeCli(): string | null {
   const found = which("claude");
   if (found) return found;
   const candidates = isWin
-    ? [join(APPDATA, "npm", "claude.cmd"), join(HOME, ".local", "bin", "claude.exe")]
-    : [join(HOME, ".local", "bin", "claude"), join(HOME, ".claude", "local", "claude"), "/opt/homebrew/bin/claude", "/usr/local/bin/claude"];
+    ? [join(APPDATA_(), "npm", "claude.cmd"), join(HOME_(), ".local", "bin", "claude.exe")]
+    : [join(HOME_(), ".local", "bin", "claude"), join(HOME_(), ".claude", "local", "claude"), "/opt/homebrew/bin/claude", "/usr/local/bin/claude"];
   return candidates.find((c) => existsSync(c)) || null;
 }
 
@@ -105,12 +120,14 @@ export async function ask(question: string, def = true): Promise<boolean> {
 
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-// --- Codex (TOML): only add/remove our own marked block ---
-const CODEX_START = "# >>> ae-mcp >>>";
-const CODEX_END = "# <<< ae-mcp <<<";
+// --- Codex (TOML): only add/remove our own marked block (1.3 marked it "ae-mcp") ---
+const CODEX_START = `# >>> ${SERVER_NAME} >>>`;
+const CODEX_END = `# <<< ${SERVER_NAME} <<<`;
 export function removeCodexBlock(text: string) {
-  return text.replace(new RegExp(`\\n?${CODEX_START}[\\s\\S]*?${CODEX_END}\\n?`, "g"), "\n");
+  return text.replace(/\n?# >>> (?:ae-mcp|surehand-ae) >>>[\s\S]*?# <<< (?:ae-mcp|surehand-ae) <<<\n?/g, "\n");
 }
+/** True if the text has our block (either name). */
+export const hasCodexBlock = (text: string) => /# >>> (?:ae-mcp|surehand-ae) >>>/.test(text);
 export function codexBlock(nodePath: string, serverFile: string) {
   const q = (s: string) => JSON.stringify(s);
   return `${CODEX_START}\n[mcp_servers.${SERVER_NAME}]\ncommand = ${q(nodePath)}\nargs = [${q(serverFile)}]\nstartup_timeout_sec = 20\ntool_timeout_sec = 600\n${CODEX_END}\n`;

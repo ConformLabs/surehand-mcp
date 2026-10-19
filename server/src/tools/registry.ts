@@ -80,7 +80,7 @@ export function formatResult(r: RunResult, opts: { quietNoChanges?: boolean } = 
   return { content: [{ type: "text", text: capText(text) + logs + (changes ? `\n\n${capText(changes)}` : "") }] };
 }
 
-/** Change reports are on unless "changeReport": false in ~/.aemcp/config.json. */
+/** Change reports are on unless "changeReport": false in ~/.surehand/ae/config.json. */
 export function reportScope(args: Record<string, unknown> | undefined): unknown[] | undefined {
   if (loadConfig().changeReport === false) return undefined;
   const refs: unknown[] = [];

@@ -1,75 +1,98 @@
-// `ae-mcp selftest`: checks every link of the chain and runs a small non-destructive job in After Effects.
+// `surehand-ae selftest`: checks every link of the chain and runs a small non-destructive job in After Effects.
+// `surehand-ae test --json` gives the same quick checks as data for the panel: [{name, ok, detail, fix?}].
 import { existsSync, mkdirSync, readFileSync, statSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { health } from "../bridge.js";
 import { loadConfig, VERSION } from "../config.js";
 import { runJsx } from "../jsx.js";
+import { appFile, configPath, legacyDir, migrationPending } from "../paths.js";
+import { migrationLog } from "../migrate.js";
 import { diagnostics } from "./diagnostics.js";
 import { fullSelftest, projectState } from "./fulltest.js";
 import { checkForUpdate, compareVersions, updateCheckEnabled, updateMessage } from "../update.js";
 import { bundledExtensionSigned, debugModeEnabled, installedExtensionHash, installedExtensionSignature, installedExtensionVersion } from "./setup.js";
-import {
-  AEMCP_DIR, CONFIG_FILE, CSXS_VERSIONS, SERVER_NAME, bold, claudeDesktopConfig, extensionDir, fail, green, isMac, isWin, ok, readJson, red, sleep, warn,
-} from "./util.js";
-import { spawnSync } from "node:child_process";
+import { clientInfo } from "./clients.js";
+import { CSXS_VERSIONS, bold, extensionDir, fail, green, ok, readJson, red, sleep, warn } from "./util.js";
 
-export async function selftest(full = false): Promise<number> {
-  let failures = 0;
-  const bad = (m: string) => { failures++; fail(m); };
-  console.log(bold(`\nSurehand MCP self-test v${VERSION}`));
-  console.log(`  ${process.platform} · node ${process.version}\n`);
+export interface Check {
+  name: string;
+  ok: boolean;
+  detail: string;
+  /** what to do about it */
+  fix?: string;
+  /** passed, with something worth knowing */
+  warning?: boolean;
+}
+
+/** The bridge's last status: this version's, else the one the 1.3 extension (before an AE restart) writes. */
+function bridgeStatus(): any {
+  return readJson<any>(appFile("bridge-status.json"), null) ?? readJson<any>(join(legacyDir(), "bridge-status.json"), null);
+}
+
+/** The quick checks (installation, AI app, connection, a small job in a temporary comp). `print` writes them as they run. */
+export async function quickChecks(print: boolean, beforeJob?: () => Promise<void>): Promise<Check[]> {
+  const checks: Check[] = [];
+  const add = (c: Check, plain = false) => {
+    checks.push(c);
+    if (!print) return;
+    const text = c.detail + (c.fix && (!c.ok || c.warning) ? ` ${c.fix}` : "");
+    if (!c.ok) fail(text);
+    else if (c.warning) warn(text);
+    else if (plain) console.log(`  - ${text}`);
+    else ok(text);
+  };
+  const pass = (name: string, detail: string) => add({ name, ok: true, detail });
+  const note = (name: string, detail: string, fix?: string) => add({ name, ok: true, warning: true, detail, ...(fix ? { fix } : {}) });
+  const bad = (name: string, detail: string, fix?: string) => add({ name, ok: false, detail, ...(fix ? { fix } : {}) });
+  const REINSTALL = "Run the installer (1. Install) again.";
 
   if (updateCheckEnabled()) {
     const u = await checkForUpdate(true);
     const msg = updateMessage(u);
-    if (msg) warn(msg);
-    else if (u?.latest) ok(`Up to date (latest release v${u.latest})`);
+    if (msg) note("update", msg, "Install it with: surehand-ae update (or the panel's Update button).");
+    else if (u?.latest) pass("update", `Up to date (latest release v${u.latest})`);
   }
 
   // --- installation ---
-  if (existsSync(CONFIG_FILE) && loadConfig().token) ok(`Config ${CONFIG_FILE}`);
-  else bad(`No config at ${CONFIG_FILE}. Run the installer.`);
+  if (migrationPending()) note("folder", `Your files are still in ${legacyDir()}: moving them to ~/.surehand/ae didn't work yet (see ${migrationLog()}).`, "Quit your AI apps and After Effects, then run the installer again.");
+  if (existsSync(configPath()) && loadConfig().token) pass("config", `Config ${configPath()}`);
+  else bad("config", `No config at ${configPath()}.`, REINSTALL);
 
   const hash = installedExtensionHash();
-  if (!existsSync(join(extensionDir(), "CSXS", "manifest.xml"))) bad(`After Effects extension missing at ${extensionDir()}. Run the installer.`);
+  if (!existsSync(join(extensionDir(), "CSXS", "manifest.xml"))) bad("extension", `After Effects extension missing at ${extensionDir()}.`, REINSTALL);
   else if (hash !== __AEMCP_CEP_HASH__ && compareVersions(installedExtensionVersion() ?? "0", VERSION) > 0)
-    warn(`A newer After Effects extension (v${installedExtensionVersion()}) is installed than this server (v${VERSION}): another copy of Surehand MCP is newer. Update this one (ae-mcp update, or the latest .mcpb).`);
-  else if (hash !== __AEMCP_CEP_HASH__) warn(`Extension at ${extensionDir()} is a different version (${hash ?? "unknown"} vs ${__AEMCP_CEP_HASH__}). Re-run the installer.`);
-  else ok("After Effects extension installed");
+    note("extension", `A newer After Effects extension (v${installedExtensionVersion()}) is installed than this server (v${VERSION}): another copy of Surehand MCP is newer.`, "Update this one (surehand-ae update, or the latest .mcpb).");
+  else if (hash !== __AEMCP_CEP_HASH__) note("extension", `Extension at ${extensionDir()} is a different version (${hash ?? "unknown"} vs ${__AEMCP_CEP_HASH__}).`, REINSTALL);
+  else pass("extension", "After Effects extension installed");
 
   if (bundledExtensionSigned) {
     const sig = installedExtensionSignature();
-    if (sig.ok) ok("Extension signature valid (loads without PlayerDebugMode)");
-    else if (debugModeEnabled()) warn(`Extension signature: ${sig.problems.join("; ")}. It still loads because PlayerDebugMode is on; re-run the installer to fix.`);
-    else bad(`Extension signature: ${sig.problems.join("; ")}. After Effects will not load it. Re-run the installer.`);
-  } else if (debugModeEnabled()) ok("Unsigned extensions allowed (PlayerDebugMode)");
-  else bad(`This is an unsigned development build and PlayerDebugMode is off for some CSXS versions (${CSXS_VERSIONS.join(", ")}). Run the installer.`);
+    if (sig.ok) pass("signature", "Extension signature valid (loads without PlayerDebugMode)");
+    else if (debugModeEnabled()) note("signature", `Extension signature: ${sig.problems.join("; ")}. It still loads because PlayerDebugMode is on.`, REINSTALL);
+    else bad("signature", `Extension signature: ${sig.problems.join("; ")}. After Effects will not load it.`, REINSTALL);
+  } else if (debugModeEnabled()) pass("signature", "Unsigned extensions allowed (PlayerDebugMode)");
+  else bad("signature", `This is an unsigned development build and PlayerDebugMode is off for some CSXS versions (${CSXS_VERSIONS.join(", ")}).`, REINSTALL);
 
-  const desktop = readJson<any>(claudeDesktopConfig(), null);
-  if (desktop?.mcpServers?.[SERVER_NAME]) {
-    const cmd = desktop.mcpServers[SERVER_NAME].command;
-    if (cmd && !existsSync(cmd)) bad(`Claude Desktop points to a Node that no longer exists: ${cmd}. Re-run the installer.`);
-    else ok("Claude Desktop configured");
-  } else console.log("  - Claude Desktop config has no after-effects entry (fine if you use the .mcpb extension or another app)");
+  const desktop = clientInfo("claude-desktop");
+  if (desktop.configured && desktop.note && /no longer exists/.test(desktop.note)) bad("claude-desktop", `Claude Desktop: ${desktop.note}.`, REINSTALL);
+  else if (desktop.configured) pass("claude-desktop", `Claude Desktop configured${desktop.note ? ` (${desktop.note})` : ""}`);
+  else add({ name: "claude-desktop", ok: true, detail: "Claude Desktop has no surehand-ae entry (fine if you use the .mcpb extension or another app)" }, true);
 
   // --- After Effects connection ---
-  console.log("");
+  if (print) console.log("");
   let h;
   try {
     h = await health();
   } catch (e: any) {
-    bad(`Bridge not reachable on 127.0.0.1:${loadConfig().bridgePort}. Is After Effects running? (restart it after installing)`);
-    const statusFile = join(AEMCP_DIR, "bridge-status.json");
-    if (existsSync(statusFile)) {
-      const st = readJson<any>(statusFile, {});
-      console.log(`    last bridge status: ${st.listening ? "listening" : "not listening"}${st.error ? " - " + st.error : ""} (${st.at})`);
-    }
-    return summary(failures);
+    const st = bridgeStatus();
+    const last = st ? ` Last bridge status: ${st.listening ? "listening" : "not listening"}${st.error ? " - " + st.error : ""} (${st.at}).` : "";
+    bad("bridge", `Bridge not reachable on 127.0.0.1:${loadConfig().bridgePort}.${last}`, "Is After Effects running? Restart it after installing.");
+    return checks;
   }
-  ok(`Bridge running inside ${h.host?.appName ?? "AE"} ${h.host?.appVersion ?? ""} (bridge v${h.version})`);
+  pass("bridge", `Bridge running inside ${h.host?.appName ?? "AE"} ${h.host?.appVersion ?? ""} (bridge v${h.version})`);
   if ((h as any).authorized === false) {
-    bad("Bridge rejected our token: config mismatch. Re-run the installer and restart After Effects.");
-    return summary(failures);
+    bad("token", "Bridge rejected our token: config mismatch.", "Re-run the installer and restart After Effects.");
+    return checks;
   }
 
   const info = await runJsx(
@@ -77,17 +100,23 @@ export async function selftest(full = false): Promise<number> {
     {},
     { undoGroup: false, timeoutMs: 15000 },
   ).catch((e) => ({ ok: false, error: { message: e.message } }) as any);
-  if (!info.ok) return bad(`ExtendScript failed: ${info.error?.message}`), summary(failures);
-  ok(`ExtendScript works: After Effects ${info.result.version} on ${info.result.os}`);
+  if (!info.ok) {
+    bad("extendscript", `ExtendScript failed: ${info.error?.message}`);
+    return checks;
+  }
+  pass("extendscript", `ExtendScript works: After Effects ${info.result.version} on ${info.result.os}`);
   if (info.result.canWrite === false)
-    warn("'Allow Scripts to Write Files and Access Network' is OFF. Previews still work; scripts that write files themselves (File.write, exports) or use the network need it: AE Settings > Scripting & Expressions.");
+    note(
+      "scripting-prefs",
+      "'Allow Scripts to Write Files and Access Network' is OFF. Previews still work; scripts that write files themselves (File.write, exports) or use the network need it.",
+      "AE Settings > Scripting & Expressions.",
+    );
 
   // --- functional test in a temporary comp ---
-  const tmpDir = join(AEMCP_DIR, "tmp");
+  await beforeJob?.();
+  const tmpDir = appFile("tmp");
   mkdirSync(tmpDir, { recursive: true });
   const png = join(tmpDir, `selftest_${Date.now()}.png`);
-  // before the test job below marks the project as changed
-  const before = full ? await projectState() : undefined;
   const job = await runJsx(
     `var c = app.project.items.addComp("__aemcp_selftest", 640, 360, 1, 2, 30);
 var t = c.layers.addText("Surehand MCP OK");
@@ -105,26 +134,41 @@ return r;`,
     { png },
     { undoGroup: "Surehand MCP self-test", timeoutMs: 60000 },
   );
-  if (!job.ok) bad(`Test job failed: ${job.error?.message}`);
+  if (!job.ok) bad("test-job", `Test job failed: ${job.error?.message}`);
   else {
     const r = job.result as any;
-    if (r.keys === 2 && r.effect === "ADBE Drop Shadow" && !r.exprError) ok("Created a comp, text layer, keyframes, effect and expression (then removed it)");
-    else bad(`Unexpected test result: ${JSON.stringify(r)}`);
-    {
-      for (let i = 0; i < 50 && !(existsSync(png) && statSync(png).size > 0); i++) await sleep(100);
-      if (existsSync(png) && statSync(png).size > 0) {
-        const sig = readFileSync(png).subarray(1, 4).toString();
-        sig === "PNG" ? ok("Rendered a frame preview") : bad("Frame preview is not a valid PNG");
-        try { unlinkSync(png); } catch {}
-      } else bad(`Frame preview was not written to ${png}`);
-    }
+    if (r.keys === 2 && r.effect === "ADBE Drop Shadow" && !r.exprError) pass("test-job", "Created a comp, text layer, keyframes, effect and expression (then removed it)");
+    else bad("test-job", `Unexpected test result: ${JSON.stringify(r)}`);
+    for (let i = 0; i < 50 && !(existsSync(png) && statSync(png).size > 0); i++) await sleep(100);
+    if (existsSync(png) && statSync(png).size > 0) {
+      const sig = readFileSync(png).subarray(1, 4).toString();
+      if (sig === "PNG") pass("preview", "Rendered a frame preview");
+      else bad("preview", "Frame preview is not a valid PNG");
+      try {
+        unlinkSync(png);
+      } catch {}
+    } else bad("preview", `Frame preview was not written to ${png}`);
   }
-  if (full && !failures) {
-    failures += await fullSelftest(before);
-  }
+  return checks;
+}
+
+export async function selftest(full = false): Promise<number> {
+  console.log(bold(`\nSurehand MCP self-test v${VERSION}`));
+  console.log(`  ${process.platform} · node ${process.version}\n`);
+  let before: Awaited<ReturnType<typeof projectState>>;
+  // before the test job marks the project as changed
+  const checks = await quickChecks(true, full ? async () => void (before = await projectState()) : undefined);
+  let failures = checks.filter((c) => !c.ok).length;
+  if (full && !failures && checks.some((c) => c.name === "test-job")) failures += await fullSelftest(before);
   return summary(failures);
 }
 
+/** `test --json`: the quick checks as JSON on stdout. */
+export async function selftestJson(): Promise<number> {
+  const checks = await quickChecks(false);
+  console.log(JSON.stringify(checks));
+  return checks.every((c) => c.ok) ? 0 : 1;
+}
 async function summary(failures: number): Promise<number> {
   if (!failures) {
     console.log(`\n${green(bold("All checks passed. Surehand MCP is ready."))}\n`);

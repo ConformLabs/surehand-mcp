@@ -1,11 +1,10 @@
 // Activity log: every tool call with its arguments (including script code), duration and result,
-// one JSON object per line in ~/.aemcp/activity.jsonl (rotated at 5 MB, keeps one older file).
-// Shown in the Surehand MCP panel; `ae-mcp activity` prints it.
+// one JSON object per line in ~/.surehand/ae/activity.jsonl (rotated at 5 MB, keeps one older file).
+// Shown in the Surehand MCP panel; `surehand-ae activity` prints it.
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, statSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
+import { appDir, appFile, env } from "./paths.js";
 
-export const ACTIVITY_FILE = join(homedir(), ".aemcp", "activity.jsonl");
+export const activityFile = () => appFile("activity.jsonl");
 const MAX_BYTES = 5 * 1024 * 1024;
 
 export interface ActivityEntry {
@@ -28,11 +27,12 @@ function trimArgs(args: unknown): unknown {
 }
 
 export function logActivity(e: ActivityEntry) {
-  if (process.env.AEMCP_NO_ACTIVITY_LOG) return;
+  if (env("NO_ACTIVITY_LOG")) return;
   try {
-    mkdirSync(join(homedir(), ".aemcp"), { recursive: true });
-    if (existsSync(ACTIVITY_FILE) && statSync(ACTIVITY_FILE).size > MAX_BYTES) renameSync(ACTIVITY_FILE, ACTIVITY_FILE + ".1");
-    appendFileSync(ACTIVITY_FILE, JSON.stringify({ ...e, args: trimArgs(e.args) }) + "\n");
+    mkdirSync(appDir(), { recursive: true });
+    const file = activityFile();
+    if (existsSync(file) && statSync(file).size > MAX_BYTES) renameSync(file, file + ".1");
+    appendFileSync(file, JSON.stringify({ ...e, args: trimArgs(e.args) }) + "\n");
   } catch {
     // logging must never break a tool call
   }
@@ -40,7 +40,7 @@ export function logActivity(e: ActivityEntry) {
 
 export function readActivity(limit = 50): ActivityEntry[] {
   try {
-    const lines = readFileSync(ACTIVITY_FILE, "utf8").trim().split("\n");
+    const lines = readFileSync(activityFile(), "utf8").trim().split("\n");
     return lines.slice(-limit).map((l) => JSON.parse(l)).reverse();
   } catch {
     return [];

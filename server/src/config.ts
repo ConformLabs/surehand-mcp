@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
+import { configPath, defaultConfigPath, env, legacyDir } from "./paths.js";
+
+export { configPath };
 
 export const VERSION = __AEMCP_VERSION__;
 
@@ -29,22 +31,25 @@ export interface AemcpConfig {
   ffprobePath?: string;
 }
 
-export function configPath(): string {
-  return process.env.AEMCP_CONFIG || join(homedir(), ".aemcp", "config.json");
+function readFile(file: string): Partial<AemcpConfig> {
+  try {
+    return JSON.parse(readFileSync(file, "utf8"));
+  } catch {
+    return {};
+  }
 }
 
 /** Read on every call so a re-install / token change is picked up without restarting clients. */
 export function loadConfig(): AemcpConfig {
-  let file: Partial<AemcpConfig> = {};
-  try {
-    file = JSON.parse(readFileSync(configPath(), "utf8"));
-  } catch {
-    // no config yet: defaults (the AE bridge writes one on first start)
-  }
+  // no config yet: defaults (the AE bridge writes one on first start)
+  const file = readFile(configPath());
+  // Moving from 1.3: an After Effects that hasn't restarted still runs the 1.3 extension, which uses
+  // ~/.aemcp/config.json. Its token is accepted while the new config has none.
+  const legacyToken = !file.token && defaultConfigPath() ? readFile(join(legacyDir(), "config.json")).token : undefined;
   return {
-    bridgePort: Number(process.env.AEMCP_BRIDGE_PORT || file.bridgePort || 8765),
-    token: process.env.AEMCP_TOKEN || file.token || "",
-    httpPort: Number(process.env.AEMCP_HTTP_PORT || file.httpPort || 8766),
+    bridgePort: Number(env("BRIDGE_PORT") || file.bridgePort || 8765),
+    token: env("TOKEN") || file.token || legacyToken || "",
+    httpPort: Number(env("HTTP_PORT") || file.httpPort || 8766),
     toolProfile: file.toolProfile,
     updateCheck: file.updateCheck,
     changeReport: file.changeReport,

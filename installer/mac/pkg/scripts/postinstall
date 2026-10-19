@@ -1,29 +1,31 @@
 #!/bin/bash
-# Surehand MCP installer package: runs after the payload (~/.aemcp/node/bin/node, ~/.aemcp/server/ae-mcp.mjs) is in place.
-# Hands over to the server's own installer ("ae-mcp install"), which installs the After Effects extension, writes
-# ~/.aemcp/config.json and connects the AI apps it finds. Never fails the package: problems go to ~/.aemcp/install.log
-# and the user can re-run the install from the docs.
-# Arguments from Installer: $1 package path, $2 install location (the payload root, ~/.aemcp), $3 target volume.
+# Surehand MCP installer package: runs after the payload (~/.surehand/node/bin/node, ~/.surehand/ae/server/surehand-ae.mjs)
+# is in place. Hands over to the server's own installer ("surehand-ae install"), which moves a 1.3 installation
+# (~/.aemcp) to ~/.surehand/ae, installs the After Effects extension, writes ~/.surehand/ae/config.json and connects
+# the AI apps it finds. Never fails the package: problems go to ~/.surehand/ae/install.log and the user can re-run
+# the install from the docs.
+# Arguments from Installer: $1 package path, $2 install location (the payload root, ~/.surehand), $3 target volume.
 
 # The home folder this package was installed into: the parent of the payload root, else $HOME.
 DEST="${2:-}"
 case "$DEST" in
-  */.aemcp) TARGET_HOME="${DEST%/.aemcp}" ;;
+  */.surehand) TARGET_HOME="${DEST%/.surehand}" ;;
   *) TARGET_HOME="${HOME:-}" ;;
 esac
-[ -n "$TARGET_HOME" ] && [ -d "$TARGET_HOME/.aemcp" ] || TARGET_HOME="$HOME"
+[ -n "$TARGET_HOME" ] && [ -d "$TARGET_HOME/.surehand" ] || TARGET_HOME="$HOME"
 
-AEMCP="$TARGET_HOME/.aemcp"
-LOG="$AEMCP/install.log"
-NODE="$AEMCP/node/bin/node"
-SERVER="$AEMCP/server/ae-mcp.mjs"
-mkdir -p "$AEMCP" 2>/dev/null
+SUREHAND="$TARGET_HOME/.surehand"
+APPDIR="$SUREHAND/ae"
+LOG="$APPDIR/install.log"
+NODE="$SUREHAND/node/bin/node"
+SERVER="$APPDIR/server/surehand-ae.mjs"
+mkdir -p "$APPDIR" 2>/dev/null
 
 {
   echo "=== Surehand MCP package install: $(date '+%Y-%m-%d %H:%M:%S %z') ==="
   echo "user: $(id -un) ($(id -u))  home: $TARGET_HOME  install location: ${DEST:-?}"
   echo "macOS $(sw_vers -productVersion 2>/dev/null) $(uname -m)"
-  ls -ln "$AEMCP/node/bin/node" "$AEMCP/server/ae-mcp.mjs"
+  ls -ln "$NODE" "$SERVER"
 } >>"$LOG" 2>&1
 
 if [ ! -x "$NODE" ] || [ ! -f "$SERVER" ]; then
@@ -40,7 +42,8 @@ if [ "$(id -u)" = "0" ]; then
     echo "ERROR: running as root for $TARGET_HOME; not connecting apps as root. Re-run the install from the docs." >>"$LOG"
     exit 0
   fi
-  chown -R "$OWNER" "$AEMCP" 2>>"$LOG"
+  chown -R "$OWNER" "$SUREHAND" 2>>"$LOG"
+  [ -d "$TARGET_HOME/.aemcp" ] && chown -R "$OWNER" "$TARGET_HOME/.aemcp" 2>>"$LOG"
   AS_USER=(sudo -u "$OWNER" -H)
 fi
 
@@ -48,12 +51,12 @@ fi
 export PATH="/opt/homebrew/bin:/usr/local/bin:$TARGET_HOME/.local/bin:$TARGET_HOME/.volta/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 export HOME="$TARGET_HOME"
 
-# stdin is /dev/null: "ae-mcp install" asks nothing without a terminal (it never quits a running Claude Desktop
+# stdin is /dev/null: "surehand-ae install" asks nothing without a terminal (it never quits a running Claude Desktop
 # unasked; it writes the setting and says to restart Claude Desktop). perl's alarm caps the run at 3 minutes.
 "${AS_USER[@]+"${AS_USER[@]}"}" /usr/bin/env PATH="$PATH" HOME="$TARGET_HOME" AEMCP_NO_UPDATE_CHECK=1 \
   /usr/bin/perl -e 'alarm shift; exec @ARGV or die "exec: $!"' 180 "$NODE" "$SERVER" install </dev/null >>"$LOG" 2>&1
 STATUS=$?
-echo "ae-mcp install exited with status $STATUS" >>"$LOG"
+echo "surehand-ae install exited with status $STATUS" >>"$LOG"
 [ "$STATUS" = "0" ] || echo "Something did not finish; see above. Re-running the install later is safe." >>"$LOG"
 echo >>"$LOG"
 exit 0

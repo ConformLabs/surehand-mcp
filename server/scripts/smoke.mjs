@@ -1,4 +1,4 @@
-// End-to-end smoke test against a running After Effects: node scripts/smoke.mjs [path/to/ae-mcp.mjs]
+// End-to-end smoke test against a running After Effects: node scripts/smoke.mjs [path/to/surehand-ae.mjs]
 // Safe to run with a real project open: it only touches items it creates (named "__aemcp_smoke...")
 // and removes them at the end. Pass --with-undo to also test ae_undo/ae_redo (affects AE's undo history).
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -6,7 +6,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-const serverPath = process.argv.slice(2).find((a) => !a.startsWith("--")) || fileURLToPath(new URL("../dist/ae-mcp.mjs", import.meta.url));
+const serverPath = process.argv.slice(2).find((a) => !a.startsWith("--")) || fileURLToPath(new URL("../dist/surehand-ae.mjs", import.meta.url));
 const client = new Client({ name: "aemcp-smoke", version: "1.0.0" });
 await client.connect(new StdioClientTransport({ command: process.execPath, args: [serverPath, "--tools", "full"] }));
 

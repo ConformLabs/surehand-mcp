@@ -11,7 +11,8 @@ const appdata = process.env.APPDATA || join(home, "AppData", "Roaming");
 const ext = isWin
   ? join(appdata, "Adobe", "CEP", "extensions", "com.aemcp")
   : join(home, "Library", "Application Support", "Adobe", "CEP", "extensions", "com.aemcp");
-const aemcp = join(home, ".aemcp");
+const surehand = join(home, ".surehand");
+const app = join(surehand, "ae");
 
 const failures = [];
 const expect = (cond, msg) => {
@@ -20,16 +21,18 @@ const expect = (cond, msg) => {
 };
 
 if (phase === "installed") {
-  expect(existsSync(join(aemcp, "server", "ae-mcp.mjs")), "server copied to ~/.aemcp/server");
-  expect(existsSync(join(aemcp, "config.json")), "config created");
-  const cfg = JSON.parse(readFileSync(join(aemcp, "config.json"), "utf8"));
+  expect(existsSync(join(app, "server", "surehand-ae.mjs")), "server copied to ~/.surehand/ae/server");
+  expect(existsSync(join(app, "config.json")), "config created");
+  expect(!existsSync(join(home, ".aemcp")), "nothing written to the 1.3 folder ~/.aemcp");
+  const cfg = JSON.parse(readFileSync(join(app, "config.json"), "utf8"));
   expect(typeof cfg.token === "string" && cfg.token.length >= 32, "config has a random token");
   expect(existsSync(join(ext, "CSXS", "manifest.xml")), "After Effects extension installed");
-  expect(existsSync(join(aemcp, "extension-hash")), "extension version marker written (outside the extension)");
+  expect(existsSync(join(app, "extension-hash")), "extension version marker written (outside the extension)");
   expect(!existsSync(join(ext, ".aemcp-hash")), "no extra files inside the signed extension");
   expect(existsSync(join(ext, "META-INF", "signatures.xml")) && existsSync(join(ext, "mimetype")), "extension signature installed");
   expect(!readFileSync(join(ext, "js", "bridge-core.js"), "utf8").includes("__AEMCP_VERSION__"), "extension version stamped");
-  if (process.env.AEMCP_FORCE_NODE_DOWNLOAD) expect(existsSync(join(aemcp, "node", isWin ? "node.exe" : "bin/node")), "private Node.js downloaded");
+  if (process.env.SUREHAND_AE_FORCE_NODE_DOWNLOAD || process.env.AEMCP_FORCE_NODE_DOWNLOAD)
+    expect(existsSync(join(surehand, "node", isWin ? "node.exe" : "bin/node")), "private Node.js downloaded to ~/.surehand/node");
   if (selftestOutput) {
     const out = readFileSync(selftestOutput, "utf8");
     expect(/After Effects extension installed/.test(out), "selftest: extension check passes");
@@ -40,9 +43,10 @@ if (phase === "installed") {
   }
 } else if (phase === "uninstalled") {
   expect(!existsSync(ext), "extension removed");
-  expect(!existsSync(join(aemcp, "server")), "server removed");
-  expect(!existsSync(join(aemcp, "config.json")), "config removed");
-  expect(!existsSync(join(aemcp, "node")), "private Node.js removed");
+  expect(!existsSync(join(app, "server")), "server removed");
+  expect(!existsSync(join(app, "config.json")), "config removed");
+  expect(!existsSync(join(surehand, "node")), "private Node.js removed");
+  expect(!existsSync(surehand), "~/.surehand removed (nothing of the user's was in it)");
 } else {
   console.error("usage: ci-check.mjs installed [selftest-output] | uninstalled");
   process.exit(2);

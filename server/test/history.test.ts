@@ -466,7 +466,7 @@ describe("history storage", () => {
     const { _internal } = await import("../src/tools/workflow.js");
     fakeApp = fakeProject([fakeLayer(7, 1, "A")]);
     const dir = historyDir("/work/Spot.aep");
-    expect(dir.startsWith(join(home, ".aemcp", "history"))).toBe(true);
+    expect(dir.startsWith(join(home, ".surehand", "ae", "history"))).toBe(true);
     expect(dir.split(/[\\/]/).pop()).toBe(_internal.projectDir("/work/Spot.aep").split(/[\\/]/).pop());
     const first = await saveSnapshot({ label: "v11" });
     expect(loadSnapshot("/work/Spot.aep", first.id).items["1"].name).toBe("Main");
@@ -544,5 +544,70 @@ describe("ae_project_history tool", () => {
     const bad = await handler({ action: "diff", from: "v99" });
     expect(bad.isError).toBe(true);
     expect(bad.content[0].text).toMatch(/^from: No snapshot or checkpoint "v99"/);
+  });
+});
+
+describe("checkpoints / checkpoint-diff commands (the panel's Checkpoints screen)", () => {
+  const capture = () => {
+    const lines: string[] = [];
+    const log = vi.spyOn(console, "log").mockImplementation((s: string) => void lines.push(s));
+    const err = vi.spyOn(console, "error").mockImplementation((s: string) => void lines.push(s));
+    return { lines, done: () => (log.mockRestore(), err.mockRestore()) };
+  };
+
+  it("lists a project's checkpoints with hasSnapshot, and diffs one against the open project", async () => {
+    const root = mkdtempSync(join(tmpdir(), "surehand-proj-"));
+    const file = join(root, "Cli.aep");
+    writeFileSync(file, "aep");
+    fakeApp = fakeProject([fakeLayer(7, 1, "Title")]);
+    fakeApp.__projectFile = file;
+    fakeApp.project.file = { fsName: file };
+    const { saveCheckpoint } = await import("../src/tools/workflow.js");
+    const { checkpointsCommand, checkpointDiffCommand } = await import("../src/cli/checkpoints.js");
+    const cp = await saveCheckpoint("v1");
+
+    let c = capture();
+    expect(await checkpointsCommand(["--json"])).toBe(0); // the open project
+    expect(await checkpointsCommand(["--json", "--project", file])).toBe(0);
+    c.done();
+    const rows = JSON.parse(c.lines[0]);
+    expect(rows).toEqual([{ id: cp.id, at: expect.any(String), label: "v1", file: cp.file, hasSnapshot: true }]);
+    expect(JSON.parse(c.lines[1])).toEqual(rows);
+
+    // a change in the open project shows up in the diff
+    fakeApp = fakeProject([fakeLayer(7, 1, "Headline")]);
+    fakeApp.project.file = { fsName: file };
+    c = capture();
+    expect(await checkpointDiffCommand([cp.id, "--json"])).toBe(0);
+    expect(await checkpointDiffCommand([cp.id])).toBe(0);
+    c.done();
+    const d = JSON.parse(c.lines[0]);
+    expect(d).toMatchObject({ ok: true, project: file, checkpoint: cp.id });
+    expect(d.text).toContain('~ layer #1 "Headline": renamed from "Title"');
+    expect(c.lines[1]).toBe(d.text);
+
+    // an unknown id, and a project that isn't the open one
+    c = capture();
+    expect(await checkpointDiffCommand(["nope", "--json"])).toBe(1);
+    expect(await checkpointDiffCommand([cp.id, "--json", "--project", join(root, "Other.aep")])).toBe(1);
+    c.done();
+    expect(JSON.parse(c.lines[0])).toEqual({ ok: false, error: expect.stringMatching(/^No snapshot or checkpoint "nope"/) });
+    expect(JSON.parse(c.lines[1]).error).toMatch(/compares with the project open in After Effects \(.*Cli\.aep\), not .*Other\.aep/);
+  });
+
+  it("says so when After Effects can't be reached (the diff needs it; the list works with --project)", async () => {
+    fakeApp = { project: { file: null } }; // the stand-in fails like an unreachable bridge
+    const { checkpointsCommand, checkpointDiffCommand } = await import("../src/cli/checkpoints.js");
+    const jsx = await import("../src/jsx.js");
+    const spy = vi.spyOn(jsx, "runJsx").mockRejectedValue(new Error("Cannot reach After Effects. Make sure it runs."));
+    const c = capture();
+    expect(await checkpointsCommand(["--json"])).toBe(1);
+    expect(await checkpointDiffCommand(["x", "--json"])).toBe(1);
+    expect(await checkpointsCommand(["--json", "--project", "/nowhere/None.aep"])).toBe(0);
+    c.done();
+    spy.mockRestore();
+    expect(JSON.parse(c.lines[0]).error).toMatch(/After Effects isn't reachable .*pass --project/);
+    expect(JSON.parse(c.lines[1]).error).toMatch(/After Effects isn't reachable.*has to be running/);
+    expect(JSON.parse(c.lines[2])).toEqual([]);
   });
 });

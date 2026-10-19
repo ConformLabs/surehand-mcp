@@ -8,7 +8,7 @@
 //            --skip-windows   don't run the Windows test (scripts/test-windows.mjs)
 //            --draft          create the GitHub release as a draft
 //            --skip-installers  don't build the installers (no SimplySign / Apple notarization needed)
-//   A pre-release version (1.4.0-beta.1) becomes a GitHub pre-release: `ae-mcp update` ignores those.
+//   A pre-release version (1.4.0-beta.1) becomes a GitHub pre-release: `surehand-ae update` ignores those.
 //   The installers need SimplySign Desktop logged in (Windows signing) and the "aemcp-notary" keychain
 //   profile (Apple notarization, which can take a while); both are checked before anything changes.
 //
@@ -114,15 +114,21 @@ const dist = join(ROOT, "dist-zip");
 const zip = join(dist, `Surehand-MCP-${version}.zip`);
 const mcpb = join(dist, "Surehand-MCP.mcpb");
 copyFileSync(join(dist, "Surehand-MCP", "1. Claude Desktop (easiest)", "Surehand-MCP.mcpb"), mcpb);
-// the single-file server, for `ae-mcp update` and the panel's Update button
-const serverFile = join(dist, "ae-mcp.mjs");
-copyFileSync(join(SERVER, "dist", "ae-mcp.mjs"), serverFile);
-const digest = await new Promise((ok, bad) => {
-  const h = createHash("sha256");
-  createReadStream(serverFile).on("data", (d) => h.update(d)).on("end", () => ok(h.digest("hex"))).on("error", bad);
-});
-writeFileSync(`${serverFile}.sha256`, `${digest}  ae-mcp.mjs\n`);
-const assets = [zip, mcpb, serverFile, `${serverFile}.sha256`];
+// the single-file server, for `surehand-ae update` and the panel's Update button: as surehand-ae.mjs (1.4+) and,
+// the same file, as ae-mcp.mjs, the name 1.3's updater downloads (so 1.3 installations still update; the new
+// server then moves them to ~/.surehand/ae). Each with a .sha256 file.
+const serverFiles = [];
+for (const name of ["surehand-ae.mjs", "ae-mcp.mjs"]) {
+  const serverFile = join(dist, name);
+  copyFileSync(join(SERVER, "dist", "surehand-ae.mjs"), serverFile);
+  const digest = await new Promise((ok, bad) => {
+    const h = createHash("sha256");
+    createReadStream(serverFile).on("data", (d) => h.update(d)).on("end", () => ok(h.digest("hex"))).on("error", bad);
+  });
+  writeFileSync(`${serverFile}.sha256`, `${digest}  ${name}\n`);
+  serverFiles.push(serverFile, `${serverFile}.sha256`);
+}
+const assets = [zip, mcpb, ...serverFiles];
 if (installers) {
   step("Windows installer (signed)");
   run("npm", ["run", "package:win-installer", "--", "--sign"]);

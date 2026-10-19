@@ -1,13 +1,16 @@
 #!/bin/bash
-# macOS launcher: finds Node.js 18+ (or downloads a private copy into ~/.aemcp/node, verified
+# macOS launcher: finds Node.js 18+ (or downloads a private copy into ~/.surehand/node, verified
 # against the nodejs.org checksums) and runs the Surehand MCP command given as arguments.
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
 # release layout: the server sits next to this script; source checkout: server/dist
-SERVER="$HERE/ae-mcp.mjs"
-[ -f "$SERVER" ] || SERVER="$ROOT/server/dist/ae-mcp.mjs"
-PRIVATE_NODE="$HOME/.aemcp/node"
+SERVER="$HERE/surehand-ae.mjs"
+[ -f "$SERVER" ] || SERVER="$ROOT/server/dist/surehand-ae.mjs"
+SUREHAND="$HOME/.surehand"
+PRIVATE_NODE="$SUREHAND/node"
+# version 1.3 kept it in ~/.aemcp/node (the server moves it on its first run)
+LEGACY_NODE="$HOME/.aemcp/node"
 export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$HOME/.volta/bin:$PATH"
 [ -s "$HOME/.nvm/nvm.sh" ] && . "$HOME/.nvm/nvm.sh" >/dev/null 2>&1
 
@@ -17,17 +20,18 @@ xattr -dr com.apple.quarantine "$ROOT" 2>/dev/null
 node_ok() { [ -x "$1" ] && [ "$("$1" -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)" -ge 18 ]; }
 
 NODE=""
-CANDIDATES=("$(command -v node 2>/dev/null)" "$PRIVATE_NODE/bin/node")
-# CI/testing: AEMCP_FORCE_NODE_DOWNLOAD=1 ignores the system Node, so the private download is used
-[ -n "${AEMCP_FORCE_NODE_DOWNLOAD:-}" ] && CANDIDATES=("$PRIVATE_NODE/bin/node")
+CANDIDATES=("$(command -v node 2>/dev/null)" "$PRIVATE_NODE/bin/node" "$LEGACY_NODE/bin/node")
+# CI/testing: SUREHAND_AE_FORCE_NODE_DOWNLOAD=1 (or AEMCP_FORCE_NODE_DOWNLOAD=1) ignores the system Node, so the private download is used
+[ -n "${SUREHAND_AE_FORCE_NODE_DOWNLOAD:-}${AEMCP_FORCE_NODE_DOWNLOAD:-}" ] && CANDIDATES=("$PRIVATE_NODE/bin/node")
 for c in "${CANDIDATES[@]+"${CANDIDATES[@]}"}"; do
   if [ -n "$c" ] && node_ok "$c"; then NODE="$c"; break; fi
 done
 
 if [ -z "$NODE" ]; then
   if [ "${1:-}" = "uninstall" ]; then
-    rm -rf "$HOME/Library/Application Support/Adobe/CEP/extensions/com.aemcp" "$HOME/.aemcp"
-    echo "Removed the After Effects extension and ~/.aemcp (Node.js not found, so AI app settings were left unchanged)."
+    rm -rf "$HOME/Library/Application Support/Adobe/CEP/extensions/com.aemcp" "$SUREHAND/ae" "$PRIVATE_NODE" "$HOME/.aemcp"
+    rmdir "$SUREHAND" 2>/dev/null
+    echo "Removed the After Effects extension, ~/.surehand/ae and ~/.aemcp (Node.js not found, so AI app settings were left unchanged)."
     exit 0
   fi
   echo "Node.js was not found. Downloading a private copy for Surehand MCP (one time, about 45 MB)..."
@@ -57,8 +61,10 @@ fi
 "$NODE" "$SERVER" "$@"
 STATUS=$?
 # The private Node can only be deleted after it has finished running the uninstaller.
-if [ "${1:-}" = "uninstall" ] && [ "$NODE" = "$PRIVATE_NODE/bin/node" ]; then
-  rm -rf "$PRIVATE_NODE"
-  rmdir "$HOME/.aemcp" 2>/dev/null
+if [ "${1:-}" = "uninstall" ]; then
+  case "$NODE" in
+    "$PRIVATE_NODE/bin/node" | "$LEGACY_NODE/bin/node") rm -rf "$PRIVATE_NODE" "$LEGACY_NODE" ;;
+  esac
+  rmdir "$SUREHAND" "$HOME/.aemcp" 2>/dev/null
 fi
 exit $STATUS

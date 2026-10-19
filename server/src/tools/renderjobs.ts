@@ -3,12 +3,12 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { spawn, type ChildProcess } from "node:child_process";
 import { createWriteStream, existsSync, mkdirSync } from "node:fs";
-import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { z } from "zod";
 import { runJsx } from "../jsx.js";
 import { permissions, READ_ONLY_REFUSAL } from "../permissions.js";
 import { errorResult, formatResult } from "./registry.js";
+import { appFile } from "../paths.js";
 
 interface Job {
   id: string;
@@ -27,7 +27,7 @@ interface Job {
 }
 
 const jobs = new Map<string, Job>();
-const LOG_DIR = join(homedir(), ".aemcp", "renders");
+const LOG_DIR = () => appFile("renders");
 
 /** aerender lives next to the After Effects app (macOS) or AfterFX.exe (Windows). */
 function aerenderPath(appPackage: string): string | null {
@@ -120,9 +120,9 @@ return { project: p.file.fsName, comp: name, frames: frames, app: Folder.appPack
         if (args.endFrame !== undefined) cli.push("-e", String(args.endFrame));
         if (args.output) mkdirSync(dirname(args.output), { recursive: true });
 
-        mkdirSync(LOG_DIR, { recursive: true });
+        mkdirSync(LOG_DIR(), { recursive: true });
         const id = `r${Date.now().toString(36)}`;
-        const logPath = join(LOG_DIR, `${id}.log`);
+        const logPath = join(LOG_DIR(), `${id}.log`);
         const logStream = createWriteStream(logPath);
         const job: Job = {
           id, comp: info.comp, output: args.output || "(render queue item output)", project: info.project, status: "running",

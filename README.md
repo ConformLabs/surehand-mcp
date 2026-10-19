@@ -19,7 +19,7 @@ project history shows what changed between versions, and your own scripts can be
 images, exact layer bounds, pixel colors), and every edit returns an exact list of what changed in the project.
 
 ```
-Claude / ChatGPT ──MCP──> ae-mcp server (Node) ──localhost──> Surehand MCP bridge (extension inside After Effects) ──> ExtendScript
+Claude / ChatGPT ──MCP──> surehand-ae server (Node) ──localhost──> Surehand MCP bridge (extension inside After Effects) ──> ExtendScript
 ```
 
 ## Download
@@ -43,7 +43,7 @@ Surehand-MCP/
   1. Claude Desktop (easiest)/   Surehand-MCP.mcpb
   2. Mac/                        1. Install, 2. Test Installation, 3. Connect ChatGPT, 4. Uninstall (.command)
   3. Windows/                    1. Install, 2. Test Installation, 3. Connect ChatGPT, 4. Uninstall (.bat)
-  Support files/                 run.sh, run.ps1, ae-mcp.mjs, this README
+  Support files/                 run.sh, run.ps1, surehand-ae.mjs, this README
 ```
 
 Then:
@@ -61,14 +61,14 @@ Use either the `.mcpb` or the installer for Claude Desktop, not both.
 macOS Gatekeeper or Windows SmartScreen blocks the files.
 
 The installer:
-- uses the Node.js on your PATH, or downloads a private Node.js 22 LTS into `~/.aemcp/node` (checksum-verified)
-- copies the MCP server to `~/.aemcp/server/ae-mcp.mjs` (one self-contained file)
+- uses the Node.js on your PATH, or downloads a private Node.js 22 LTS into `~/.surehand/node` (checksum-verified)
+- copies the MCP server to `~/.surehand/ae/server/surehand-ae.mjs` (one self-contained file)
 - installs the After Effects extension (`com.aemcp`) into your user CEP extensions folder. The extension
   is signed, so it loads without enabling unsigned extensions (`PlayerDebugMode`)
-- creates `~/.aemcp/config.json` with a random access token
+- creates `~/.surehand/ae/config.json` with a random access token
 - registers the server with **Claude Desktop**, **Claude Code**, **ChatGPT desktop / Codex** (`~/.codex/config.toml`,
   created if the ChatGPT or Codex app is installed) and **Cursor** if they are installed
-  (original config files are backed up once as `*.aemcp.bak`); if Claude Desktop is open it offers to restart it,
+  under the name `surehand-ae` (original config files are backed up once as `*.surehand.bak`); if Claude Desktop is open it offers to restart it,
   because a running Claude Desktop overwrites its config file
 
 The server also checks the After Effects extension every time it starts and installs or updates it if needed, so
@@ -107,7 +107,7 @@ x64 emulation on Apple Silicon may be slow, so a real PC is better.
 
 Things worth checking specifically on Windows: paths with spaces or non-English characters in the user name,
 a machine without Node.js (tests the automatic download), and Windows on ARM.
-If something fails, send the full output of **2. Test Installation** and `%USERPROFILE%\.aemcp\bridge-status.json`.
+If something fails, send the full output of **2. Test Installation** and `%USERPROFILE%\.surehand\ae\bridge-status.json`.
 
 ### Other MCP clients
 
@@ -116,7 +116,7 @@ Point them at the installed server (stdio):
 ```json
 {
   "mcpServers": {
-    "after-effects": { "command": "/path/to/node", "args": ["/Users/<you>/.aemcp/server/ae-mcp.mjs"] }
+    "surehand-ae": { "command": "/path/to/node", "args": ["/Users/<you>/.surehand/ae/server/surehand-ae.mjs"] }
   }
 }
 ```
@@ -124,9 +124,9 @@ Point them at the installed server (stdio):
 ## ChatGPT
 
 **ChatGPT desktop app (Mac/Windows): no tunnel needed.** It runs local MCP servers itself and reads the same
-`~/.codex/config.toml` as Codex, which **1. Install** fills in. Restart ChatGPT after installing; **after-effects**
+`~/.codex/config.toml` as Codex, which **1. Install** fills in. Restart ChatGPT after installing; **surehand-ae**
 appears under **Settings > Plugins > Servers** (switch on). To add it by hand: **Add > MCP server > STDIO**, command =
-the Node path printed by the installer, argument = `~/.aemcp/server/ae-mcp.mjs`. Tested working on Windows.
+the Node path printed by the installer, argument = `~/.surehand/ae/server/surehand-ae.mjs`. Tested working on Windows.
 
 **ChatGPT on the web (chatgpt.com):** it can only reach MCP servers over public HTTPS, so the server runs in HTTP mode
 behind a temporary tunnel:
@@ -141,7 +141,7 @@ behind a temporary tunnel:
 
 The URL contains your secret token: anyone with it can run scripts on your machine while the tunnel is up.
 Quick-tunnel URLs change on every start, so update the connector URL each time (or set up a named Cloudflare tunnel).
-To rotate the token, delete `token` from `~/.aemcp/config.json` and re-run the installer, then restart After Effects.
+To rotate the token, delete `token` from `~/.surehand/ae/config.json` and re-run the installer, then restart After Effects.
 
 ## What the AI can do
 
@@ -158,7 +158,7 @@ To rotate the token, delete `token` from `~/.aemcp/config.json` and re-run the i
 `ae_tools` lists all tools by category (or gives full parameter details of chosen ones), and `ae_call` runs any tool by
 name with the same validation, permissions, change report and activity log. Loading everything up front is optional:
 switch to **Full** in After Effects (**Window > Extensions > Surehand MCP > AI tools**), in Claude Desktop's
-extension settings ("Enable all tools") for the `.mcpb`, or with `"toolProfile": "full"` in `~/.aemcp/config.json`, then
+extension settings ("Enable all tools") for the `.mcpb`, or with `"toolProfile": "full"` in `~/.surehand/ae/config.json`, then
 restart the AI app. Advanced: `"toolProfile": "core,ae_import_files,ae_render_queue_start"` adds single tools.
 
 Core set: `ae_status`, `ae_run_script`, `ae_get_scripting_guide`, `ae_render_frame`, `ae_render_contact_sheet`,
@@ -181,7 +181,7 @@ unknown effect name gets suggestions.
   `ae_project_history` (snapshot the project, list snapshots and checkpoints, diff any two of them or the current
   project: see Project history below), `ae_prove_identical` (evidence that a
   structural change left the render unchanged, see "Proven edits" below), `ae_list_scripts` (your scripts: AE's Scripts
-  folder, ScriptUI Panels, and folders listed as `"scriptFolders"` in `~/.aemcp/config.json`, with their descriptions)
+  folder, ScriptUI Panels, and folders listed as `"scriptFolders"` in `~/.surehand/ae/config.json`, with their descriptions)
   + `ae_run_script_file`
 - **3D:** `ae_set_camera` (one/two-node, focal length in mm, depth of field; reports angle of view), `ae_set_light`
   (type, color, intensity, cone, falloff, shadows), `ae_set_material` (material options, lists the 3D renderers)
@@ -294,7 +294,7 @@ Changes (layers/properties compared in: Main):
 Project items are always compared; layers, properties, keyframes, expressions, effects and masks are compared in the
 active comp and any comp named in the call. If a script fails halfway, the report lists what it had already changed.
 `ae_undo` reports what was reverted. On very large comps (tens of thousands of properties) this adds up to about a
-second per edit; turn it off with `"changeReport": false` in `~/.aemcp/config.json`, or per script with `report: false`.
+second per edit; turn it off with `"changeReport": false` in `~/.surehand/ae/config.json`, or per script with `report: false`.
 
 ### Preflight: rendered files
 
@@ -316,14 +316,14 @@ than the picture by more than a frame is a warning.
 | `flash` | a **pre-check, not a certified PSE / Harding test**: the picture as a 32x18 grid, relative luminance per cell; a transition is a change of at least `minLuminanceChange` where the darker state is below 0.8, a flash is a pair of opposing transitions over at least `minAreaFraction` of the screen; more than `maxFlashesPerSecond` in any second fails. Saturated red flashes (R/(R+G+B) >= 0.8, change of (R-G-B)x320 > 20) are checked too unless `redFlash` is false (definitions after ITU-R BT.1702 / WCAG 2.x) |
 
 Times in the findings are seconds in the file. Up to four JPEG frames (960 px wide at most) from the most important
-failing times are written to `~/.aemcp/tmp`, shown in the report and deleted right after (also when the check is
+failing times are written to `~/.surehand/ae/tmp`, shown in the report and deleted right after (also when the check is
 cancelled; leftovers older than a day are swept). A one-minute 1080p ProRes 422 HQ file with every check takes about 4 s on
 an Apple Silicon Mac (legal range marks the out-of-range pixels and measures that mask averaged down to a small grid,
 which is exact and much faster than full statistics on every frame).
 
-**ffmpeg.** Surehand MCP uses, in this order: `"ffmpegPath"` / `"ffprobePath"` in `~/.aemcp/config.json`, a private
-copy in `~/.aemcp/ffmpeg`, then the PATH (plus `/opt/homebrew/bin` and `/usr/local/bin` on a Mac). If there is none, it
-can download FFmpeg 9.0.2 once into `~/.aemcp/ffmpeg`, only after you allow it (in "ask" permission mode you also
+**ffmpeg.** Surehand MCP uses, in this order: `"ffmpegPath"` / `"ffprobePath"` in `~/.surehand/ae/config.json`, a private
+copy in `~/.surehand/ffmpeg`, then the PATH (plus `/opt/homebrew/bin` and `/usr/local/bin` on a Mac). If there is none, it
+can download FFmpeg 9.0.2 once into `~/.surehand/ffmpeg`, only after you allow it (in "ask" permission mode you also
 approve it in the Surehand MCP panel; in read-only mode it never downloads). The download is a pinned build checked
 against a SHA-256 written in the source, and must start and report the expected version before it is used; anything
 else is refused and nothing is installed:
@@ -335,7 +335,7 @@ else is refused and nothing is installed:
 
 Surehand MCP doesn't ship or redistribute FFmpeg: it downloads the publisher's own file on your machine and runs it as a
 separate program, so FFmpeg's licence (the GPL / LGPL terms above, with its source available from ffmpeg.org) applies to
-that copy and not to Surehand MCP. `~/.aemcp/ffmpeg/SOURCE.json` records what was installed and from where. To use your
+that copy and not to Surehand MCP. `~/.surehand/ffmpeg/SOURCE.json` records what was installed and from where. To use your
 own FFmpeg instead, install it (`brew install ffmpeg`, `winget install ffmpeg`) or set `"ffmpegPath"`.
 
 ### Proven edits
@@ -353,7 +353,7 @@ over-bright areas can be missed. Comp ids belong to one project: a proof capture
 that same file (otherwise the verdict is not proven); one captured in an unsaved project is compared if every comp still
 has its name, with a note that the project itself couldn't be confirmed.
 `action: "run"` does it in one call: capture, the edits as `ae_batch` steps (one undo step, all or nothing), compare.
-Reference frames are stored in `~/.aemcp/proofs/` for 7 days (30 proofs at most). Rendering works like
+Reference frames are stored in `~/.surehand/ae/proofs/` for 7 days (30 proofs at most). Rendering works like
 `ae_render_frame`: through a temporary comp that is removed again and leaves no undo step behind (After Effects still
 marks the project as changed); if the temporary comp can't be removed, the result says so. Capture and compare are
 allowed in read-only mode; `run` makes edits, so it follows the same permissions as `ae_batch`.
@@ -364,7 +364,7 @@ allowed in read-only mode; `run` makes edits, so it follows the same permissions
 every item (comps, footage with its file paths, solids, folders), comp settings, every layer with its switches,
 timing, parent and track matte, every property that isn't at its default or is animated (values, keyframes with
 interpolation and easing), expressions, effects, masks, text, markers and the render queue. Taking one doesn't change
-the project and adds no undo step; snapshots are kept in `~/.aemcp/history` (the last 100 per project), and every
+the project and adds no undo step; snapshots are kept in `~/.surehand/ae/history` (the last 100 per project), and every
 `ae_checkpoint save` stores one too, so checkpoints can be compared (with a 15 s time budget, so saving stays quick; if
 that isn't enough, the checkpoint says the snapshot is partial and a full one can be taken with `snapshot`). A **diff** compares two snapshots, or a snapshot with
 the project as it is now, and lists what changed, grouped by comp, with a summary first:
@@ -397,7 +397,7 @@ mean opening the old `.aep` in place of your project, so it isn't done automatic
 
 ## Control and trust
 
-**Permissions** (After Effects: Window > Extensions > Surehand MCP, or `"permissions"` in `~/.aemcp/config.json`; applies to
+**Permissions** (After Effects: Window > Extensions > Surehand MCP, or `"permissions"` in `~/.surehand/ae/config.json`; applies to
 the next request, no restart):
 
 | Mode | What happens |
@@ -409,9 +409,9 @@ the next request, no restart):
 **Shell commands** (`system.callSystem`) can be blocked separately. These are safeguards against mistakes, not a
 sandbox: a script can still read and write files.
 
-**Activity log.** Every tool call is recorded in `~/.aemcp/activity.jsonl` with time, AI app, tool, arguments
+**Activity log.** Every tool call is recorded in `~/.surehand/ae/activity.jsonl` with time, AI app, tool, arguments
 (including the full script code), duration and result. The Surehand MCP panel shows the latest calls (click one for its code),
-**Open log** reveals the file, and `ae-mcp activity` prints it.
+**Open log** reveals the file, and `surehand-ae activity` prints it.
 
 **Several After Effects versions at once.** Each running After Effects registers its own bridge (ports 8765+). The AI
 controls the one you used most recently; `ae_status` lists all of them and switches with `instance: "2025"` (or a
@@ -421,9 +421,9 @@ version or port). Set a permanent preference with `"instance": "2026"` in the co
 If After Effects doesn't answer, the error says what it is busy with and for how long, and suggests checking for an open
 dialog. `ae_status` shows the same.
 
-**Compatibility check.** `ae-mcp selftest --full` runs every major tool (over 60 steps) against temporary comps (removed
+**Compatibility check.** `surehand-ae selftest --full` runs every major tool (over 60 steps) against temporary comps (removed
 afterwards; if the open project has no unsaved changes, the Save As and checkpoint-restore checks briefly switch to a
-scratch project and then reopen it), lists which scripting features your After Effects version has, and saves a report to `~/.aemcp/compat/`.
+scratch project and then reopen it), lists which scripting features your After Effects version has, and saves a report to `~/.surehand/ae/compat/`.
 All steps pass on After Effects 2025 (25.6) and 2026 (26.5) on macOS and on 2026 on Windows 11, also with 2025 and 2026
 running side by side; the panel, permissions, approvals and background rendering are verified on macOS and Windows.
 Please share reports from other versions.
@@ -434,27 +434,49 @@ Please share reports from other versions.
 |---|---|
 | "Cannot reach After Effects" | Make sure AE is running. Open **Window > Extensions > Surehand MCP** to see the bridge status. If **Surehand MCP** is missing from the menu, re-run the installer and fully restart AE. |
 | Extension missing from the menu | Run `selftest`: it checks the extension's files against its signature (After Effects silently skips a signed extension whose files changed). Re-running the installer rewrites them. As a last resort, allowing unsigned extensions also works: set `PlayerDebugMode` to `1` with `defaults write com.adobe.CSXS.12 PlayerDebugMode 1` (macOS) or in the registry under `HKCU\Software\Adobe\CSXS.12` (Windows). |
-| "Port 8765 is already in use" | Only one After Effects instance can host the bridge. Close the other instance, or change `bridgePort` in `~/.aemcp/config.json` and restart AE + your AI app. |
+| "Port 8765 is already in use" | Only one After Effects instance can host the bridge. Close the other instance, or change `bridgePort` in `~/.surehand/ae/config.json` and restart AE + your AI app. |
 | "Token mismatch" | Re-run the installer (it keeps the existing token) and restart AE. |
 | Scripts can't write files or use the network | Enable **Settings > Scripting & Expressions > Allow Scripts to Write Files and Access Network** in After Effects. Frame previews and the built-in tools work without it. |
 | A call times out | ExtendScript can't be interrupted: long scripts or renders keep AE busy, and modal dialogs block it. Check AE, then retry. Pass `timeoutSeconds` for long jobs. |
-| "After Effects is busy or showing a dialog" | A dialog or settings window (Project Settings, Preferences, an alert) is open in AE, or AE is still starting. Close it and retry: the call did not run and won't run later. Reported after 3s; change with `"blockedAfterSeconds"` in `~/.aemcp/config.json` (`0` waits for the full timeout). Scripts that have started are never cut short. |
-| Claude Desktop doesn't show the tools | Quit Claude Desktop completely (menu bar / tray) and reopen it. Check `claude_desktop_config.json` contains `after-effects`. |
+| "After Effects is busy or showing a dialog" | A dialog or settings window (Project Settings, Preferences, an alert) is open in AE, or AE is still starting. Close it and retry: the call did not run and won't run later. Reported after 3s; change with `"blockedAfterSeconds"` in `~/.surehand/ae/config.json` (`0` waits for the full timeout). Scripts that have started are never cut short. |
+| Claude Desktop doesn't show the tools | Quit Claude Desktop completely (menu bar / tray) and reopen it. Check `claude_desktop_config.json` contains `surehand-ae`. |
 
 **Reporting a problem:** run **2. Test Installation**. If anything fails, it prints a diagnostics report at the end
-(no secrets in it). You can also click **Copy diagnostics** in the Surehand MCP panel, or run `ae-mcp diagnostics`.
+(no secrets in it). You can also click **Copy diagnostics** in the Surehand MCP panel, or run `surehand-ae diagnostics`.
 The panel also shows recent calls, and a banner when a new version is out (checked against GitHub at most once a day;
-turn off with `"updateCheck": false` in `~/.aemcp/config.json`).
+turn off with `"updateCheck": false` in `~/.surehand/ae/config.json`).
 
-**Updating:** click **Update** in that banner, or run `ae-mcp update` (`node ~/.aemcp/server/ae-mcp.mjs update`). It
-downloads the server from the latest GitHub release, checks its SHA-256 checksum and that it starts, replaces the installed
-one (the old one is kept as `ae-mcp.mjs.previous`) and updates the After Effects extension. Restart After Effects and your
+**Updating:** click **Update** in that banner, or run `surehand-ae update` (`node ~/.surehand/ae/server/surehand-ae.mjs update`;
+`update --check` only reports). It downloads the server from the latest GitHub release, checks its SHA-256 checksum and that it
+starts, replaces the installed one (the old one is kept as `surehand-ae.mjs.previous`) and updates the After Effects extension. Restart After Effects and your
 AI apps afterwards. If you use the Claude Desktop extension (.mcpb), install the new `Surehand-MCP.mcpb` from the release page
 instead.
 
+**Upgrading from 1.3: automatic.** Version 1.3 kept everything in `~/.aemcp`. The first time 1.4 runs (installer, update,
+or just starting), it moves it: settings, checkpoints, project history and your other files to `~/.surehand/ae`, the private
+Node.js and ffmpeg to `~/.surehand`, and points the AI apps that ran the old server at the new one (`after-effects` becomes
+`surehand-ae`; an `after-effects` entry that isn't ours is left alone). Nothing is deleted: if something can't be moved
+(a file in use), everything stays where it was, keeps working from there, and the move is tried again later; the reason
+is in `~/.surehand/migration.log`. Until After Effects is restarted once, the old extension still runs in it and uses
+`~/.aemcp`, so a copy of `config.json`, an `instances` folder, a small `server/ae-mcp.mjs` that starts the new server and
+`MOVED.txt` stay there; uninstalling removes them too.
+With the Claude Desktop extension: the 1.4 `.mcpb` is a new extension to Claude Desktop (named `surehand-ae`), so after
+installing it remove the old Surehand MCP entry in **Settings > Extensions**.
+
+**Environment variables** (each also works with the older `AEMCP_` prefix): `SUREHAND_AE_CONFIG` (config file; instances are
+looked up next to it), `SUREHAND_AE_BRIDGE_PORT`, `SUREHAND_AE_TOKEN`, `SUREHAND_AE_HTTP_PORT`, `SUREHAND_AE_HTTP_TOKEN`,
+`SUREHAND_AE_TOOLS` (`core` / `full`), `SUREHAND_AE_INSTANCE`, `SUREHAND_AE_BLOCKED_AFTER_SECONDS`,
+`SUREHAND_AE_STARTUP_WAIT_SECONDS`, `SUREHAND_AE_NO_UPDATE_CHECK`, `SUREHAND_AE_NO_AUTOSETUP`, `SUREHAND_AE_NO_ACTIVITY_LOG`.
+
+**Commands for the panel** (all print JSON with `--json` and never ask anything): `clients` (the AI apps and whether they
+are connected), `connect <app>` / `disconnect <app>` (`claude-desktop`, `claude-code`, `codex`, `cursor`), `checkpoints
+[--project <path>]`, `checkpoint-diff <id> [--project <path>]` (needs After Effects: it compares with the open project),
+`test --json` (the quick self-test as `[{name, ok, detail, fix}]`) and `update --check`. The panel runs them with the Node
+and server named in `~/.surehand/ae/runtime.json`.
+
 ## Security
 
-- The bridge listens on `127.0.0.1` only and requires the token from `~/.aemcp/config.json` (file mode 600);
+- The bridge listens on `127.0.0.1` only and requires the token from `~/.surehand/ae/config.json` (file mode 600);
   requests from web pages (with an `Origin` header) are rejected.
 - `ae_run_script` can do anything an After Effects script can, including reading/writing files and running shell
   commands via `system.callSystem`. Only connect AI apps you trust, and keep the ChatGPT tunnel running only while you use it.
@@ -462,10 +484,10 @@ instead.
 ## Development
 
 ```
-server/              MCP server (TypeScript) -> bundled into server/dist/ae-mcp.mjs
+server/              MCP server (TypeScript) -> bundled into server/dist/surehand-ae.mjs
   src/aemcp.jsxinc     ExtendScript helper library, loaded into AE on demand (reloaded when it changes)
   src/tools/           tool definitions (each tool is a small ExtendScript function body)
-  src/cli/             install / uninstall / selftest / chatgpt / setup commands (ae-mcp <command>)
+  src/cli/             install / uninstall / selftest / chatgpt / setup commands (surehand-ae <command>)
   scripts/smoke.mjs    end-to-end test against a running After Effects
   scripts/package.mjs  builds the shareable release folder, zip and .mcpb
   scripts/release.mjs  cuts a release: version, sign, check, Mac + Windows tests, package, installers, release PR, CI, merge, GitHub release
@@ -478,7 +500,7 @@ server/              MCP server (TypeScript) -> bundled into server/dist/ae-mcp.
   scripts/sign-win.mjs               signs Windows files with the Certum certificate (SimplySign)
   scripts/ci-check.mjs assertions for the CI install / uninstall dry runs
 extension/           After Effects extension (signed): invisible bridge (auto-starts) + status panel
-installer/           run.sh / run.ps1: find or download Node.js, then run an ae-mcp command
+installer/           run.sh / run.ps1: find or download Node.js, then run a surehand-ae command
   START HERE.txt       plain-language install guide (copied into the release)
   mac/, windows/       double-click launchers for a source checkout (the release generates its own)
 brand/               the logo: master SVGs, PNG sizes, Surehand.icns / Surehand.ico (see brand/README.md)
@@ -490,13 +512,13 @@ cd server
 npm install
 npm run check            # what CI runs: type-check, all tests, build (run before pushing)
 npm test                 # unit tests only
-npm run build            # -> dist/ae-mcp.mjs
+npm run build            # -> dist/surehand-ae.mjs
 node scripts/smoke.mjs   # live test: needs After Effects running with the bridge
 npm run package          # -> ../dist-zip/Surehand-MCP/ (launchers, server, Surehand-MCP.mcpb) + zip
 npm run sign             # re-sign the After Effects extension after changing extension/ or the version
                          # (needs the certificate in ~/.aemcp-signing; see scripts/sign-extension.mjs)
 npm run test:mac         # install this build here and run the full self-test on each open After Effects
-                         # (one run per Mac at a time: waits for ~/.aemcp/test-mac.lock; reports the commit tested)
+                         # (one run per Mac at a time: waits for ~/.surehand/test-mac.lock; reports the commit tested)
 npm run test:windows     # the same on the Windows PC over SSH
 npm run package:mac-pkg       # -> ../dist-zip/Surehand-MCP-<version>.pkg, signed and notarized (--no-notarize: faster)
 npm run package:win-installer # -> ../dist-zip/Surehand-MCP-Setup-<version>.exe (--sign: needs SimplySign logged in)
@@ -510,12 +532,14 @@ or updates it when it starts. After changing the server or the panel: rebuild, r
 To add a tool, add an entry to one of the arrays in `server/src/tools/*.ts`: a zod input schema plus an ExtendScript
 function body that receives `args` and can use the `aemcp` helpers.
 
-**Names kept from AE MCP, on purpose.** The product is now called Surehand MCP, but these identifiers are unchanged so
-existing installs, AI-app configs and scripts keep working: the tool names (`ae_*`), the MCP server name `after-effects`
-(`SERVER_NAME`, the key in each AI app's config), the CLI command and server file `ae-mcp` / `ae-mcp.mjs` (also the
-release asset the updater downloads), the `~/.aemcp` folder and its files, the `AEMCP_*` environment variables, the
-After Effects extension id `com.aemcp` (and its bundle ids), the `aemcp` helper object and `aemcp://` resource URIs, and
-the `.mcpb` manifest `name` (its `display_name` is "Surehand MCP"). The npm package name is `surehand-mcp`.
+**Names.** The family is Surehand (Photoshop and Premiere may follow), so this app's names are `surehand-ae`: the command
+(`ae-mcp` stays as an alias), the server file `surehand-ae.mjs`, the MCP server name and the key in each AI app's settings
+(`SERVER_NAME`; 1.3 used `after-effects`), the `.mcpb` `name` (its `display_name` is "Surehand MCP"), and the folders
+`~/.surehand/ae` (this app) and `~/.surehand` (shared: `node/`, `ffmpeg/`); all in `server/src/paths.ts`. Unchanged so
+scripts and the extension keep working: the tool names (`ae_*`), the After Effects extension id `com.aemcp` (and its
+bundle ids), the `aemcp` helper object and `aemcp://` resource URIs. Environment variables are `SUREHAND_AE_*`; the
+`AEMCP_*` names still work. Releases carry the server as `surehand-ae.mjs` and also as `ae-mcp.mjs` (what 1.3's updater
+downloads). The npm package name is `surehand-mcp`.
 
 ## License
 

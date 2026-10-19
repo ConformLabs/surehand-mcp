@@ -1,12 +1,12 @@
 // Preflight: finding (and, only when the user agreed, downloading) ffmpeg / ffprobe.
 //
-// Search order: the config override (~/.aemcp/config.json "ffmpegPath" / "ffprobePath"), the private copy in
-// ~/.aemcp/ffmpeg, then PATH (plus /opt/homebrew/bin and /usr/local/bin on a Mac, which apps started from the
+// Search order: the config override (~/.surehand/ae/config.json "ffmpegPath" / "ffprobePath"), the private copy in
+// ~/.surehand/ffmpeg, then PATH (plus /opt/homebrew/bin and /usr/local/bin on a Mac, which apps started from the
 // Dock don't have on their PATH).
 //
 // The one-time download (ensureFfmpeg({allowDownload: true})) fetches a PINNED build over HTTPS and refuses it
 // unless its SHA-256 matches the hash written below, then checks that it starts and reports the expected
-// version before it is moved into ~/.aemcp/ffmpeg. The same standard as the Node.js download in the installer
+// version before it is moved into ~/.surehand/ffmpeg. The same standard as the Node.js download in the installer
 // and the server's own update.
 //
 // Builds (all FFmpeg 9.0.2; we only download them from their publishers, we don't redistribute them):
@@ -18,9 +18,9 @@
 import { spawn } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { chmodSync, copyFileSync, createWriteStream, existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { basename, delimiter, dirname, join } from "node:path";
 import { loadConfig, VERSION } from "../config.js";
+import { privateFfmpegDir } from "../paths.js";
 
 export interface FfmpegPaths {
   ffmpeg: string;
@@ -87,7 +87,7 @@ export const FFMPEG_BUILDS: Record<string, FfmpegBuild> = {
 };
 
 export function ffmpegDir(): string {
-  return join(homedir(), ".aemcp", "ffmpeg");
+  return privateFfmpegDir();
 }
 
 const exe = (name: string, platform = process.platform) => (platform === "win32" ? `${name}.exe` : name);
@@ -102,9 +102,9 @@ function isFile(p: string | undefined): p is string {
 }
 
 export interface FindOptions {
-  /** the config override (default: ~/.aemcp/config.json) */
+  /** the config override (default: ~/.surehand/ae/config.json) */
   config?: { ffmpegPath?: string; ffprobePath?: string };
-  /** the private download folder (default ~/.aemcp/ffmpeg) */
+  /** the private download folder (default ~/.surehand/ffmpeg) */
   dir?: string;
   /** PATH to search (default process.env.PATH) */
   pathEnv?: string;
@@ -123,7 +123,7 @@ export function locateFfmpeg(o: FindOptions = {}): { found: FfmpegPaths | null; 
     const fp = cfg.ffprobePath ?? (ff ? join(dirname(ff), exe("ffprobe", platform)) : undefined);
     if (isFile(ff) && isFile(fp)) return { found: { ffmpeg: ff, ffprobe: fp, source: "config" }, notes };
     notes.push(
-      `~/.aemcp/config.json sets ${[cfg.ffmpegPath && `ffmpegPath "${cfg.ffmpegPath}"`, cfg.ffprobePath && `ffprobePath "${cfg.ffprobePath}"`].filter(Boolean).join(" and ")}, ` +
+      `~/.surehand/ae/config.json sets ${[cfg.ffmpegPath && `ffmpegPath "${cfg.ffmpegPath}"`, cfg.ffprobePath && `ffprobePath "${cfg.ffprobePath}"`].filter(Boolean).join(" and ")}, ` +
         `but ${!isFile(ff) ? "ffmpeg" : "ffprobe"} is not there${!ff ? " (set ffmpegPath too)" : ""}.`,
     );
   }
@@ -151,9 +151,9 @@ export function ffmpegNotFoundMessage(notes: string[] = locateFfmpeg().notes, ke
     "ffmpeg / ffprobe were not found, so the rendered file can't be checked.",
     ...notes,
     build
-      ? `Surehand MCP can download FFmpeg ${build.version} once into ~/.aemcp/ffmpeg (${build.publisher}, ${build.licence}; checked against a pinned SHA-256) if you allow it, `
+      ? `Surehand MCP can download FFmpeg ${build.version} once into ~/.surehand/ffmpeg (${build.publisher}, ${build.licence}; checked against a pinned SHA-256) if you allow it, `
       : "",
-    `or install FFmpeg yourself (Mac: \`brew install ffmpeg\`; Windows: \`winget install ffmpeg\`) or set "ffmpegPath" (and "ffprobePath") in ~/.aemcp/config.json.`,
+    `or install FFmpeg yourself (Mac: \`brew install ffmpeg\`; Windows: \`winget install ffmpeg\`) or set "ffmpegPath" (and "ffprobePath") in ~/.surehand/ae/config.json.`,
   ]
     .filter(Boolean)
     .join(" ");
@@ -242,7 +242,7 @@ export async function ensureFfmpeg(o: EnsureOptions = {}): Promise<FfmpegPaths> 
     else {
       const again = locateFfmpeg({ ...o.find, skipPrivate: true });
       found = again.found;
-      notes = [...again.notes, "The copy in ~/.aemcp/ffmpeg doesn't start (damaged, or files missing next to it), so it was ignored; downloading it again replaces it."];
+      notes = [...again.notes, "The copy in ~/.surehand/ffmpeg doesn't start (damaged, or files missing next to it), so it was ignored; downloading it again replaces it."];
     }
   }
   if (found) return found;
@@ -273,7 +273,7 @@ async function fetchHttps(url: string, signal: AbortSignal): Promise<Response> {
   let u = url;
   for (let hop = 0; hop < 8; hop++) {
     if (!allowedUrl(u, local)) throw new Error(`refusing a non-HTTPS download: ${u}`);
-    const res = await fetch(u, { headers: { "user-agent": `ae-mcp/${VERSION}` }, redirect: "manual", signal });
+    const res = await fetch(u, { headers: { "user-agent": `surehand-ae/${VERSION}` }, redirect: "manual", signal });
     const loc = res.headers.get("location");
     if (res.status >= 300 && res.status < 400 && loc) {
       await res.body?.cancel().catch(() => {});

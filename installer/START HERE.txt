@@ -32,7 +32,7 @@ Pick ONE way to install:
 
 Node.js is downloaded automatically if your computer doesn't have it.
 If Claude Desktop is open during the install, the installer offers to restart it.
-ChatGPT desktop app: restart it after installing. "after-effects" then appears in
+ChatGPT desktop app: restart it after installing. "surehand-ae" then appears in
 ChatGPT under Settings > Plugins > Servers. Make sure its switch is on.
 
 

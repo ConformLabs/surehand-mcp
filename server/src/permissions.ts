@@ -1,4 +1,4 @@
-// Permission modes, set in the Surehand MCP panel or ~/.aemcp/config.json:
+// Permission modes, set in the Surehand MCP panel or ~/.surehand/ae/config.json:
 //   "permissions": { "mode": "full" | "ask" | "read-only", "allowShell": true }
 // - full: everything runs (your AI app may still ask you per tool call)
 // - ask: every edit and script waits for Allow/Deny in After Effects (Window > Extensions > Surehand MCP)
@@ -27,7 +27,7 @@ export const READ_ONLY_REFUSAL =
 
 export const SHELL_REFUSAL =
   "Shell commands (system.callSystem) are disabled in the Surehand MCP permissions. The user can allow them in " +
-  "Window > Extensions > Surehand MCP > Permissions (or \"allowShell\": true in ~/.aemcp/config.json).";
+  "Window > Extensions > Surehand MCP > Permissions (or \"allowShell\": true in ~/.surehand/ae/config.json).";
 
 /** Short description of a tool call for the approval prompt in After Effects. */
 export function approvalSummary(tool: string, args: Record<string, unknown> | undefined): string {
