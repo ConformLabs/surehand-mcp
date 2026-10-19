@@ -47,7 +47,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 var define_AEMCP_CEP_FILES_default;
 var init_define_AEMCP_CEP_FILES = __esm({
   "<define:__AEMCP_CEP_FILES__>"() {
-    define_AEMCP_CEP_FILES_default = { "CSXS/manifest.xml": '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n<ExtensionManifest xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n    ExtensionBundleId="com.aemcp"\n    ExtensionBundleVersion="1.3.4"\n    ExtensionBundleName="AE MCP"\n    Version="9.0">\n  <ExtensionList>\n    <Extension Id="com.aemcp.bridge" Version="1.3.4" />\n    <Extension Id="com.aemcp.panel" Version="1.3.4" />\n  </ExtensionList>\n  <ExecutionEnvironment>\n    <HostList>\n      <Host Name="AEFT" Version="[16.0,99.9]" />\n    </HostList>\n    <LocaleList>\n      <Locale Code="All" />\n    </LocaleList>\n    <RequiredRuntimeList>\n      <RequiredRuntime Name="CSXS" Version="9.0" />\n    </RequiredRuntimeList>\n  </ExecutionEnvironment>\n  <DispatchInfoList>\n    <!-- Invisible background extension: starts with After Effects and runs the local bridge server. -->\n    <Extension Id="com.aemcp.bridge">\n      <DispatchInfo>\n        <Resources>\n          <MainPath>./bridge.html</MainPath>\n          <CEFCommandLine>\n            <Parameter>--enable-nodejs</Parameter>\n            <Parameter>--mixed-context</Parameter>\n          </CEFCommandLine>\n        </Resources>\n        <Lifecycle>\n          <AutoVisible>false</AutoVisible>\n          <StartOn>\n            <Event>com.adobe.csxs.events.ApplicationInitialized</Event>\n            <Event>applicationActivate</Event>\n          </StartOn>\n        </Lifecycle>\n        <UI>\n          <Type>Custom</Type>\n          <Geometry>\n            <Size><Height>1</Height><Width>1</Width></Size>\n          </Geometry>\n        </UI>\n      </DispatchInfo>\n    </Extension>\n    <!-- Status panel: Window > Extensions > AE MCP -->\n    <Extension Id="com.aemcp.panel">\n      <DispatchInfo>\n        <Resources>\n          <MainPath>./index.html</MainPath>\n          <CEFCommandLine>\n            <Parameter>--enable-nodejs</Parameter>\n            <Parameter>--mixed-context</Parameter>\n          </CEFCommandLine>\n        </Resources>\n        <Lifecycle>\n          <AutoVisible>true</AutoVisible>\n        </Lifecycle>\n        <UI>\n          <Type>Panel</Type>\n          <Menu>AE MCP</Menu>\n          <Geometry>\n            <Size><Height>420</Height><Width>320</Width></Size>\n            <MinSize><Height>200</Height><Width>240</Width></MinSize>\n          </Geometry>\n        </UI>\n      </DispatchInfo>\n    </Extension>\n  </DispatchInfoList>\n</ExtensionManifest>\n', "META-INF/signatures.xml": '<signatures>\n<Signature xmlns="http://www.w3.org/2000/09/xmldsig#" Id="PackageSignature">\n<SignedInfo>\n<CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>\n<SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/>\n<Reference Type="http://www.w3.org/2000/09/xmldsig#Manifest" URI="#PackageContents">\n<Transforms>\n<Transform Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>\n</Transforms>\n<DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>\n<DigestValue>hC1zg/PO96vss2CfIVHNr/dpgwtkRsG3nY/Xz7ZoKik=</DigestValue>\n</Reference>\n</SignedInfo>\n<SignatureValue Id="PackageSignatureValue">iJ15zvneHl/Gpr6RElj6fByouJtSMknw8B2lMRkaCdyI06o7CeEIN57pc+fnWsFy\n0hKW9e60x7ERaheWXIN8g5omJ3LoiMii2/1JXUgjNpBwI0inra/hXambjiAOipwJ\nPP/ZSPv62ZpzMVuMFdU36kmWyD7DfkZssS6gOw4vtuU=</SignatureValue>\n\n<KeyInfo>\n<X509Data>\n<X509Certificate>MIIB/TCCAWYCCQDt8b8ZOqaroDANBgkqhkiG9w0BAQsFADBCMQswCQYDVQQGEwJJ\nTDELMAkGA1UECAwCTkExFTATBgNVBAoMDFJvbnkgSXR6aGFraTEPMA0GA1UEAwwG\nQUUgTUNQMCAXDTI2MTAxNzIwNDc0MFoYDzIwNTExMDExMjA0NzQwWjBCMQswCQYD\nVQQGEwJJTDELMAkGA1UECAwCTkExFTATBgNVBAoMDFJvbnkgSXR6aGFraTEPMA0G\nA1UEAwwGQUUgTUNQMIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCpv3D0LnoK\nVfHJj9cZffhfUTRVl/xYETq83Z2ftcLTjYUiHQqYAcAl43NQC869moAPfOgB0A/+\nF7aCAOQVPSKeVh4czeyAy4nCfdiNbRxHu9/ZUFW8tk71EjhfEHWc6jHcmlc143i3\nrkyG1DsgzyWnajm1JmvQ/QCNb/OTxv+RnwIDAQABMA0GCSqGSIb3DQEBCwUAA4GB\nAHVqZQs1/Q5O0B+WhgDBSJBXThC391CMyfoVAZnvQVodHAz73ubv/aN00wwPjFzL\ntT8pmLbStTaHMHVX7vQcvOcKJMiP/ki8T0zx5y1/qcU9C62O8RvpXaxruZmX+B1T\nyxFmRt6UHmiLiOgWpZtEyN94gOPAUp5guQ6i8yMnyjZW\n</X509Certificate>\n</X509Data>\n</KeyInfo>\n<Object>\n<Manifest Id="PackageContents">\n<Reference URI="mimetype"><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>b07Onu9cTlGK1WpvgtFOlfk+Tl0HscuNIt6GZtesPX8=</DigestValue></Reference><Reference URI="index.html"><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>pf38+vwTJ8WJsr4epGr+W/0S2d7aG14RYPL2qZYox54=</DigestValue></Reference><Reference URI="css/panel.css"><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>eUGSUu7v7xyduFiO38UWttti+BeJ7POEVpfkiXIfaZo=</DigestValue></Reference><Reference URI="js/bridge-core.js"><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>arLmcB7lArx06l0tKgJEBJEzulPqq+UCVIVN9JYEjeQ=</DigestValue></Reference><Reference URI="js/panel.js"><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>K8ugFkAm4neGRj1H9luikeNwBDZ7845FfLaqvbZ/Pgs=</DigestValue></Reference><Reference URI="CSXS/manifest.xml"><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>HCVwBDwu6e5NVEDGcOTw0xgSys3zOahfNNboY67KH6c=</DigestValue></Reference><Reference URI="bridge.html"><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>z3EV4R9yzRLZ2sOysVkF2kYhXAeuVXx3JvZOtB2nJuI=</DigestValue></Reference></Manifest>\n</Object>\n<Object xmlns:xades="http://uri.etsi.org/01903/v1.1.1#" >\n<xades:QualifyingProperties>\n<xades:UnsignedProperties>\n<xades:UnsignedSignatureProperties>\n<xades:SignatureTimeStamp>\n<xades:HashDataInfo uri="SignatureValue">\n<Transforms>\n<Transform Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>\n</Transforms>\n</xades:HashDataInfo>\n<xades:EncapsulatedTimeStamp>\nMIIXczADAgEAMIIXagYJKoZIhvcNAQcCoIIXWzCCF1cCAQMxDzANBglghkgBZQME\nAgEFADCBggYLKoZIhvcNAQkQAQSgcwRxMG8CAQEGCWCGSAGG/WwHATAxMA0GCWCG\nSAFlAwQCAQUABCBOLBizFQXg/6cx6kh3lJaeyxhX+rq0kArPUlItJ1T6twIQS5T4\n6eEqTWYpcDuPIl/b2xgPMjAyNjEwMTkxMTI3MDBaAgkAmvAj8CsIGtmgghM6MIIG\n7TCCBNWgAwIBAgIQCE/cM09+RU7bww+P+ZIYNTANBgkqhkiG9w0BAQsFADBpMQsw\nCQYDVQQGEwJVUzEXMBUGA1UEChMORGlnaUNlcnQsIEluYy4xQTA/BgNVBAMTOERp\nZ2lDZXJ0IFRydXN0ZWQgRzQgVGltZVN0YW1waW5nIFJTQTQwOTYgU0hBMjU2IDIw\nMjUgQ0ExMB4XDTI2MDgwNTAwMDAwMFoXDTM3MTEwNDIzNTk1OVowYzELMAkGA1UE\nBhMCVVMxFzAVBgNVBAoTDkRpZ2lDZXJ0LCBJbmMuMTswOQYDVQQDEzJEaWdpQ2Vy\ndCBTSEEyNTYgUlNBNDA5NiBUaW1lc3RhbXAgUmVzcG9uZGVyIDIwMjYgMTCCAiIw\nDQYJKoZIhvcNAQEBBQADggIPADCCAgoCggIBALZ7pvLJ/s1K+NSbTGWz/TjGMPh8\nCQ6RucZCLv5anHzWJjF/NWJrFIhy24fcpKXlgRiky4WAawDfU3YP0BMxt9l3Dm5o\nCG5Z69AqEN1kgHg2epx+l+lZBcmJCcN0ASURML5uFIS80sZsDwO3BSkUxDjLJhBI\n+qiZP3aixAC/qEGLjsBNlLol9VZ7pfGEXiMlneJIC5/YKuizVzNFKZZEeoy/0B8Z\nm+nzKBgSWG52lCO1w+nCg6XpCtklTJXeIg283hw7TmmsZXR+SMbjbrEOvZ3fP2Vx\nIgeR28Y90ZStd3F9VuA5RVynb/whITPAo9b75Zr4Ta6Mj3URm26QZYMn/FnbuTeg\ncoRcFEZ9FOqM5T6MTdtr/n74lIT/ug0eeOzmZ6QTFg33otX+bFRsIolvykE1jive\n4PuESaT8zzVeFWDAMDtozNgLctkGD1ZjkEyZtJrLl5ya0m5doH/ScpaZCZVl6pNU\nOCybMc/kxC6EAmSJY24L0yYKD1Nkddsnb/ItVKi/2nXpQNMu1PT5prW83vV8d67W\nowuUs0HdY4H8AMLGvdL/WHEj3ZnqMqAQQP9u3Ai9t+5eQ02GDwy0ODjdzi0xlp70\nW+ow63/0++YDEX1M0iwgUHwbrJvfpklkZQvw3+kv3vUPItdwroczk9icflf55W1z\nOEKAcJVAIXpcMCU9AgMBAAGjggGVMIIBkTAMBgNVHRMBAf8EAjAAMB0GA1UdDgQW\nBBQUyWOKMC7USvtulPPm40B+9ezN4jAfBgNVHSMEGDAWgBTvb1NK6eQGfHrK4pBW\n9i/USezLTjAOBgNVHQ8BAf8EBAMCB4AwFgYDVR0lAQH/BAwwCgYIKwYBBQUHAwgw\ngZUGCCsGAQUFBwEBBIGIMIGFMCQGCCsGAQUFBzABhhhodHRwOi8vb2NzcC5kaWdp\nY2VydC5jb20wXQYIKwYBBQUHMAKGUWh0dHA6Ly9jYWNlcnRzLmRpZ2ljZXJ0LmNv\nbS9EaWdpQ2VydFRydXN0ZWRHNFRpbWVTdGFtcGluZ1JTQTQwOTZTSEEyNTYyMDI1\nQ0ExLmNydDBfBgNVHR8EWDBWMFSgUqBQhk5odHRwOi8vY3JsMy5kaWdpY2VydC5j\nb20vRGlnaUNlcnRUcnVzdGVkRzRUaW1lU3RhbXBpbmdSU0E0MDk2U0hBMjU2MjAy\nNUNBMS5jcmwwIAYDVR0gBBkwFzAIBgZngQwBBAIwCwYJYIZIAYb9bAcBMA0GCSqG\nSIb3DQEBCwUAA4ICAQCNxTphHp1SCt+ZrAmAfn0oQLFr0mLywSLaDXQIENoyKqxr\nFbJblzCVP/pkXmwXOdrOpWygLzlT12os5ipDCy35RBCg2UMeApEtrfGhz45F4Wt4\nWGdNdIbRWt3YTYJmpR+b7lr4d7Uwn+H600u4D7RnOGf8Wj4UNgAdZkfHhHv1mx9E\nVh71SJelcEN/oORSjXzdjfw1iZH9d8Nh/thn6hH23d+VsPAr6GAYyzSA02nXD1nY\nLI7Ijmiv+xLCiYC41DSFYL3GhTiy0PxpawPtGRyaBVGzq+UiTfM8pD7KVyF5aQyW\nP4KhVGUUTnmm/RlYJoW3TiXA/+t0YcT2oRVBm3JETjajHug2AL+v5jhtKVnd3D0r\nbHXEu27o+Q8p4sEWPMqKDB+qbceb6T/6WcwTwXmQ9lOCLLYcsQeSWmvKqzpAec9e\ntE14jOQAzLKWdE3w/TCaKtLRaRT7LCkRYVnhA2D73FLje1O5b3HR5eHs0NzU/+xX\n7NbEdcofy0W3Wdwd1XOqtlpg/JgwtKfZM5dqO94lbUveOiJBI+xZEbGRsMNbXmMR\nEUTgu+Oca7Y73MPWcslIx2VhkSKSXjDbD6rgg39H5Mh7QfieAIjWagkJNt68Yfim\n6cjEzVSiLSeZfdkr5dtFPTW6jATlWJdYeeDRGCyatf8R1hSjzSvdN8yWQPT9gzCC\nBrQwggScoAMCAQICEA3HrFcF/yGZLkBDIgw6SYYwDQYJKoZIhvcNAQELBQAwYjEL\nMAkGA1UEBhMCVVMxFTATBgNVBAoTDERpZ2lDZXJ0IEluYzEZMBcGA1UECxMQd3d3\nLmRpZ2ljZXJ0LmNvbTEhMB8GA1UEAxMYRGlnaUNlcnQgVHJ1c3RlZCBSb290IEc0\nMB4XDTI1MDUwNzAwMDAwMFoXDTM4MDExNDIzNTk1OVowaTELMAkGA1UEBhMCVVMx\nFzAVBgNVBAoTDkRpZ2lDZXJ0LCBJbmMuMUEwPwYDVQQDEzhEaWdpQ2VydCBUcnVz\ndGVkIEc0IFRpbWVTdGFtcGluZyBSU0E0MDk2IFNIQTI1NiAyMDI1IENBMTCCAiIw\nDQYJKoZIhvcNAQEBBQADggIPADCCAgoCggIBALR4MdMKmEFyvjxGwBysddujRmh0\ntFEXnU2tjQ2UtZmWgyxU7UNqEY81FzJsQqr5G7A6c+Gh/qm8Xi4aPCOo2N8S9SLr\nC6Kbltqn7SWCWgzbNfiR+2fkHUiljNOqnIVD/gG3SYDEAd4dg2dDGpeZGKe+42DF\nUF0mR/vtLa4+gKPsYfwEu7EEbkC9+0F2w4QJLVSTEG8yAR2CQWIM1iI5PHg62IVw\nxKSpO0XaF9DPfNBKS7Zazch8NF5vp7eaZ2CVNxpqumzTCNSOxm+SAWSuIr21Qomb\n+zzQWKhxKTVVgtmUPAW35xUUFREmDrMxSNlr/NsJyUXzdtFUUt4aS4CEeIY8y9Ia\naGBpPNXKFifinT7zL2gdFpBP9qh8SdLnEut/GcalNeJQ55IuwnKCgs+nrpuQNfVm\nUB5KlCX3ZA4x5HHKS+rqBvKWxdCyQEEGcbLe1b8Aw4wJkhU1JrPsFfxW1gaou30y\nZ46t4Y9F20HHfIY4/6vHespYMQmUiote8ladjS/nJ0+k6MvqzfpzPDOy5y6gqzti\nT96Fv/9bH7mQyogxG9QEPHrPV6/7umw052AkyiLA6tQbZl1KhBtTasySkuJDpsZG\nKdlsjg4u70EwgWbVRSX1Wd4+zoFpp4Ra+MlKM2baoD6x0VR4RjSpWM8o5a6D8bpf\nm4CLKczsG7ZrIGNTAgMBAAGjggFdMIIBWTASBgNVHRMBAf8ECDAGAQH/AgEAMB0G\nA1UdDgQWBBTvb1NK6eQGfHrK4pBW9i/USezLTjAfBgNVHSMEGDAWgBTs1+OC0nFd\nZEzfLmc/57qYrhwPTzAOBgNVHQ8BAf8EBAMCAYYwEwYDVR0lBAwwCgYIKwYBBQUH\nAwgwdwYIKwYBBQUHAQEEazBpMCQGCCsGAQUFBzABhhhodHRwOi8vb2NzcC5kaWdp\nY2VydC5jb20wQQYIKwYBBQUHMAKGNWh0dHA6Ly9jYWNlcnRzLmRpZ2ljZXJ0LmNv\nbS9EaWdpQ2VydFRydXN0ZWRSb290RzQuY3J0MEMGA1UdHwQ8MDowOKA2oDSGMmh0\ndHA6Ly9jcmwzLmRpZ2ljZXJ0LmNvbS9EaWdpQ2VydFRydXN0ZWRSb290RzQuY3Js\nMCAGA1UdIAQZMBcwCAYGZ4EMAQQCMAsGCWCGSAGG/WwHATANBgkqhkiG9w0BAQsF\nAAOCAgEAF877FoAc/gc9EXZxML2+C8i1NKZ/zdCHxYgaMH9Pw5tcBnPw6O6FTGNp\noV2V4wzSUGvI9NAzaoQk97frPBtIj+ZLzdp+yXdhOP4hCFATuNT+ReOPK0mCefSG\n+tXqGpYZ3essBS3q8nL2UwM+NMvEuBd/2vmdYxDCvwzJv2sRUoKEfJ+nN57mQfQX\nwcAEGCvRR2qKtntujB71WPYAgwPyWLKu6RnaID/B0ba2H3LUiwDRAXx1Neq9ydOa\nl95CHfmTnM4I+ZI2rVQfjXQA1WSjjf4J2a7jLzWGNqNX+DF0SQzHU0pTi4dBwp9n\nEC8EAqoxW6q17r0z0noDjs6+BFo+z7bKSBwZXTRNivYuve3L2oiKNqetRHdqfMTC\nW/NmKLJ9M+MtucVGyOxiDf06VXxyKkOirv6o02OoXN4bFzK0vlNMsvhlqgF2puE6\nFndlENSmE+9JGYxOGLS/D284NHNboDGcmWXfwXRy4kbu4QFhOm0xJuF2EZAOk5eC\nkhSxZON3rGlHqhpB/8MluDezooIs8CVnrpHMiD2wL40mm53+/j7tFaxYKIqL0Q4s\nsd8xHZnIn/7GELH3IdvG2XlM9q7WP/UwgOkw/HQtyRN62JK4S1C8uw3PdBunvAZa\npsiI5YKdvlarEvf8EA+8hcpSM9LHJmyrxaFtoza2zNaQ9k+5t1wwggWNMIIEdaAD\nAgECAhAOmxiO+dAt5+/bUOIIQBhaMA0GCSqGSIb3DQEBDAUAMGUxCzAJBgNVBAYT\nAlVTMRUwEwYDVQQKEwxEaWdpQ2VydCBJbmMxGTAXBgNVBAsTEHd3dy5kaWdpY2Vy\ndC5jb20xJDAiBgNVBAMTG0RpZ2lDZXJ0IEFzc3VyZWQgSUQgUm9vdCBDQTAeFw0y\nMjA4MDEwMDAwMDBaFw0zMTExMDkyMzU5NTlaMGIxCzAJBgNVBAYTAlVTMRUwEwYD\nVQQKEwxEaWdpQ2VydCBJbmMxGTAXBgNVBAsTEHd3dy5kaWdpY2VydC5jb20xITAf\nBgNVBAMTGERpZ2lDZXJ0IFRydXN0ZWQgUm9vdCBHNDCCAiIwDQYJKoZIhvcNAQEB\nBQADggIPADCCAgoCggIBAL/mkHNo3rvkXUo8MCIwaTPswqclLskhPfKK2FnC4Smn\nPVirdprNrnsbhA3EMB/zG6Q4FutWxpdtHauyefLKEdLkX9YFPFIPUh/GnhWlfr6f\nqVcWWVVyr2iTcMKyunWZanMylNEQRBAu34LzB4TmdDttceItDBvuINXJIB1jKS3O\n7F5OyJP4IWGbNOsFxl7sWxq868nPzaw0QF+xembud8hIqGZXV59UWI4MK7dPpzDZ\nVu7Ke13jrclPXuU15zHL2pNe3I6PgNq2kZhAkHnDeMe2scS1ahg4AxCN2NQ3pC4F\nfYj1gj4QkXCrVYJBMtfbBHMqbpEBfCFM1LyuGwN1XXhm2ToxRJozQL8I11pJpMLm\nqaBn3aQnvKFPObURWBf3JFxGj2T3wWmIdph2PVldQnaHiZdpekjw4KISG2aadMre\nSx7nDmOu5tTvkpI6nj3cAORFJYm2mkQZK37AlLTSYW3rM9nF30sEAMx9HJXDj/ch\nsrIRt7t/8tWMcCxBYKqxYxhElRp2Yn72gLD76GSmM9GJB+G9t+ZDpBi4pncB4Q+U\nDCEdslQpJYls5Q5SUUd0viastkF13nqsX40/ybzTQRESW+UQUOsxxcpyFiIJ33xM\ndT9j7CFfxCBRa2+xq4aLT8LWRV+dIPyhHsXAj6KxfgommfXkaS+YHS312amyHeUb\nAgMBAAGjggE6MIIBNjAPBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQWBBTs1+OC0nFd\nZEzfLmc/57qYrhwPTzAfBgNVHSMEGDAWgBRF66Kv9JLLgjEtUYunpyGd823IDzAO\nBgNVHQ8BAf8EBAMCAYYweQYIKwYBBQUHAQEEbTBrMCQGCCsGAQUFBzABhhhodHRw\nOi8vb2NzcC5kaWdpY2VydC5jb20wQwYIKwYBBQUHMAKGN2h0dHA6Ly9jYWNlcnRz\nLmRpZ2ljZXJ0LmNvbS9EaWdpQ2VydEFzc3VyZWRJRFJvb3RDQS5jcnQwRQYDVR0f\nBD4wPDA6oDigNoY0aHR0cDovL2NybDMuZGlnaWNlcnQuY29tL0RpZ2lDZXJ0QXNz\ndXJlZElEUm9vdENBLmNybDARBgNVHSAECjAIMAYGBFUdIAAwDQYJKoZIhvcNAQEM\nBQADggEBAHCgv0NcVec4X6CjdBs9thbX979XB72arKGHLOyFXqkauyL4hxppVCLt\npIh3bb0aFPQTSnovLbc47/T/gLn4offyct4kvFIDyE7QKt76LVbP+fT3rDB6mouy\nXtTP0UNEm0Mh65ZyoUi0mcudT6cGAxN3J0TU53/oWajwvy8LpunyNDzs9wPHh6jS\nTEAZNUZqaVSwuKFWjuyk1T3osdz9HNj0d1pcVIxv76FQPfx2CWiEn2/K2yCNNWAc\nAgPLILCsWKAOQGPFmCLBsln1VWvPJ6tsds5vIy30fnFqI2si/xK4VC0nftg62fC2\nh5b9W9FcrBjDTZ9ztwGpn1eqXijiuZQxggN8MIIDeAIBATB9MGkxCzAJBgNVBAYT\nAlVTMRcwFQYDVQQKEw5EaWdpQ2VydCwgSW5jLjFBMD8GA1UEAxM4RGlnaUNlcnQg\nVHJ1c3RlZCBHNCBUaW1lU3RhbXBpbmcgUlNBNDA5NiBTSEEyNTYgMjAyNSBDQTEC\nEAhP3DNPfkVO28MPj/mSGDUwDQYJYIZIAWUDBAIBBQCggdEwGgYJKoZIhvcNAQkD\nMQ0GCyqGSIb3DQEJEAEEMBwGCSqGSIb3DQEJBTEPFw0yNjEwMTkxMTI3MDBaMCsG\nCyqGSIb3DQEJEAIMMRwwGjAYMBYEFFHZq9oDSXPYT0JmrKSCSOazacQ5MC8GCSqG\nSIb3DQEJBDEiBCB8zytCTd0F4K6Wt37wXaLtc0dwIqm+AmEdRxuxNAvf0TA3Bgsq\nhkiG9w0BCRACLzEoMCYwJDAiBCAtoJ2n9BMfn+cttsXm6cllZ1WvBD8ep0LMDSEg\n4UHr/DANBgkqhkiG9w0BAQEFAASCAgBJG3cmPraYQACV4TPWo3UDiMa4SvJlpa4+\nx5u0uFlZotDULjgDOrHYl1GOCsJ+CCzZzdmh7ZcR6zMGKveDnmfuEgqE3auRI1fy\n9ZPV/G3bHAWAAvzMCOC1O7NUn4igmH3t1v6S5OZdFZ4rf95tP71URmW7L1L1IOQA\nf3W6+SmFI2HG92WuuC/WwlnwSLk0sZrAEkl2UgwqbBAQuzyGTP5PiwsY6SS0yBF7\nwY0GtHX5kmlJ/f6UikDCd2XhgwCtAhT6cfrqEnvsGkm5x0jQB6YIvP3Jk/6EW82E\nFBI50SL8pWH91DpbKoF9XR8bm6hi0V7mWk0XLmJC1SHqa9nJw7PvVee7vasz1Q9Z\n9gZ+32zU9O9aqRRkncABJH8gmjs8jShQahmRteF326qzJi1PlMnPo4eLDtzZhVNt\n3r2RspBhthRdMo6EbPg8U5xaDkTTSgt/0IfzLxXKYJip1zej+51TL+LwUWLCPhJW\nNHQNCEwDWUtYrrBMZoOPyJTOfz9YDnMqAmDc8HV5+eJoqjLThhchA3RDQaXGl+TF\nYLrSWpEbALs2rQKbhoo+UriWY9d7RMN0nuszs5j7uHR3U+AK9HPCRiL/IuV9x8VU\nqkAIrmh5lczhvn6GrISl1cDU/JV6ecg7Lnewt+vXQYt70Zk7nQurhhlR+poLNVbO\nYLA0Ps2z9A==\n</xades:EncapsulatedTimeStamp>\n</xades:SignatureTimeStamp>\n</xades:UnsignedSignatureProperties>\n</xades:UnsignedProperties>\n</xades:QualifyingProperties>\n</Object>\n</Signature>\n</signatures>', "bridge.html": '<!DOCTYPE html>\n<html>\n<head><meta charset="utf-8"><title>AE MCP Bridge</title></head>\n<body>\n<script src="js/bridge-core.js"></script>\n<script>AEMCPBridge.start();</script>\n</body>\n</html>\n', "css/panel.css": ':root { --bg: #232323; --fg: #d6d6d6; --muted: #8a8a8a; --ok: #3fb950; --bad: #f85149; --warn: #d29922; --line: #3a3a3a; }\n* { box-sizing: border-box; }\nbody { margin: 0; padding: 10px; background: var(--bg); color: var(--fg); font: 12px -apple-system, "Segoe UI", sans-serif; }\nheader { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }\n#title { font-weight: 600; font-size: 13px; }\n.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--warn); flex: none; }\n.dot.ok { background: var(--ok); } .dot.bad { background: var(--bad); }\n.muted { color: var(--muted); }\n.row { display: flex; gap: 6px; margin-bottom: 10px; }\nbutton { background: #3a3a3a; color: var(--fg); border: 1px solid #4a4a4a; border-radius: 4px; padding: 4px 10px; cursor: pointer; font: inherit; }\nbutton:hover { background: #454545; }\n.label { text-transform: uppercase; font-size: 10px; letter-spacing: .05em; color: var(--muted); margin-bottom: 4px; }\nul { list-style: none; padding: 0; margin: 0; }\nli { border-top: 1px solid var(--line); padding: 4px 0; word-break: break-all; }\nli .t { color: var(--muted); margin-right: 6px; }\nli.err .s { color: var(--bad); } li.ok .s { color: var(--ok); }\nfooter { margin-top: 10px; font-size: 10px; }\n.banner { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #2d2a12; border: 1px solid #5c531c; border-radius: 4px; padding: 6px 8px; margin-bottom: 10px; }\n.banner[hidden], [hidden] { display: none; }\n.setting { align-items: center; }\n.setting label { color: var(--muted); }\nselect { background: #3a3a3a; color: var(--fg); border: 1px solid #4a4a4a; border-radius: 4px; padding: 3px 6px; font: inherit; flex: 1; }\n.small { font-size: 10px; margin: -6px 0 10px; }\n.grid { display: grid; grid-template-columns: auto 1fr; gap: 6px 8px; align-items: center; margin-bottom: 8px; }\n.grid label { color: var(--muted); }\n#approvals { border: 1px solid #5c531c; background: #2d2a12; border-radius: 4px; padding: 6px 8px; margin-bottom: 10px; }\n.approval { border-top: 1px solid #4a4520; padding: 6px 0; }\n.approval:first-child { border-top: 0; }\n.approval .what { font-weight: 600; margin-bottom: 4px; }\n.approval pre, li pre { max-height: 160px; overflow: auto; background: #181818; padding: 6px; border-radius: 3px; margin: 4px 0; white-space: pre-wrap; word-break: break-word; font: 11px Menlo, Consolas, monospace; }\n.approval .row { margin: 4px 0 0; }\nbutton.allow { background: #1f4d2b; border-color: #2e6b3d; }\nbutton.deny { background: #5a1f1f; border-color: #7a2c2c; }\nli { cursor: pointer; }\nli .c { color: var(--muted); }\n', "index.html": '<!DOCTYPE html>\n<html>\n<head>\n  <meta charset="utf-8">\n  <title>AE MCP</title>\n  <link rel="stylesheet" href="css/panel.css">\n</head>\n<body>\n  <header>\n    <span id="dot" class="dot"></span>\n    <div>\n      <div id="title">AE MCP</div>\n      <div id="sub" class="muted">checking\u2026</div>\n    </div>\n  </header>\n  <div id="update" class="banner" hidden>\n    <span id="updateText"></span>\n    <button id="updateBtn">Update</button>\n  </div>\n\n  <section id="approvals" hidden>\n    <div class="label">Waiting for your approval</div>\n    <div id="approvalList"></div>\n  </section>\n\n  <section class="row">\n    <button id="test">Test</button>\n    <button id="diag" title="Copies a report to paste into a bug report or a chat">Copy diagnostics</button>\n    <button id="openLog" title="Show the full activity log file">Open log</button>\n  </section>\n\n  <section class="grid">\n    <label for="perm">Permissions</label>\n    <select id="perm">\n      <option value="full">Full access</option>\n      <option value="ask">Ask before every change</option>\n      <option value="read-only">Read-only</option>\n    </select>\n    <label for="shell">Shell commands</label>\n    <select id="shell">\n      <option value="on">Allowed</option>\n      <option value="off">Blocked</option>\n    </select>\n    <label for="profile">AI tools</label>\n    <select id="profile">\n      <option value="core">Core (faster, recommended)</option>\n      <option value="full">Full (all tools)</option>\n    </select>\n  </section>\n  <div id="note" class="muted small" hidden></div>\n\n  <section>\n    <div class="label">Activity <span class="muted" id="activityHint">(click an entry for details)</span></div>\n    <ul id="log"><li class="muted">No calls yet</li></ul>\n  </section>\n  <footer class="muted" id="foot"></footer>\n  <script src="js/bridge-core.js"></script>\n  <script src="js/panel.js"></script>\n</body>\n</html>\n', "js/bridge-core.js": `/* AE MCP bridge: a tiny HTTP server inside After Effects (CEP + Node) that evaluates
+    define_AEMCP_CEP_FILES_default = { "CSXS/manifest.xml": '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n<ExtensionManifest xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n    ExtensionBundleId="com.aemcp"\n    ExtensionBundleVersion="1.3.4"\n    ExtensionBundleName="Surehand MCP"\n    Version="9.0">\n  <ExtensionList>\n    <Extension Id="com.aemcp.bridge" Version="1.3.4" />\n    <Extension Id="com.aemcp.panel" Version="1.3.4" />\n  </ExtensionList>\n  <ExecutionEnvironment>\n    <HostList>\n      <Host Name="AEFT" Version="[16.0,99.9]" />\n    </HostList>\n    <LocaleList>\n      <Locale Code="All" />\n    </LocaleList>\n    <RequiredRuntimeList>\n      <RequiredRuntime Name="CSXS" Version="9.0" />\n    </RequiredRuntimeList>\n  </ExecutionEnvironment>\n  <DispatchInfoList>\n    <!-- Invisible background extension: starts with After Effects and runs the local bridge server. -->\n    <Extension Id="com.aemcp.bridge">\n      <DispatchInfo>\n        <Resources>\n          <MainPath>./bridge.html</MainPath>\n          <CEFCommandLine>\n            <Parameter>--enable-nodejs</Parameter>\n            <Parameter>--mixed-context</Parameter>\n          </CEFCommandLine>\n        </Resources>\n        <Lifecycle>\n          <AutoVisible>false</AutoVisible>\n          <StartOn>\n            <Event>com.adobe.csxs.events.ApplicationInitialized</Event>\n            <Event>applicationActivate</Event>\n          </StartOn>\n        </Lifecycle>\n        <UI>\n          <Type>Custom</Type>\n          <Geometry>\n            <Size><Height>1</Height><Width>1</Width></Size>\n          </Geometry>\n        </UI>\n      </DispatchInfo>\n    </Extension>\n    <!-- Status panel: Window > Extensions > Surehand MCP -->\n    <Extension Id="com.aemcp.panel">\n      <DispatchInfo>\n        <Resources>\n          <MainPath>./index.html</MainPath>\n          <CEFCommandLine>\n            <Parameter>--enable-nodejs</Parameter>\n            <Parameter>--mixed-context</Parameter>\n          </CEFCommandLine>\n        </Resources>\n        <Lifecycle>\n          <AutoVisible>true</AutoVisible>\n        </Lifecycle>\n        <UI>\n          <Type>Panel</Type>\n          <Menu>Surehand MCP</Menu>\n          <Geometry>\n            <Size><Height>420</Height><Width>320</Width></Size>\n            <MinSize><Height>200</Height><Width>240</Width></MinSize>\n          </Geometry>\n        </UI>\n      </DispatchInfo>\n    </Extension>\n  </DispatchInfoList>\n</ExtensionManifest>\n', "META-INF/signatures.xml": '<signatures>\n<Signature xmlns="http://www.w3.org/2000/09/xmldsig#" Id="PackageSignature">\n<SignedInfo>\n<CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>\n<SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/>\n<Reference Type="http://www.w3.org/2000/09/xmldsig#Manifest" URI="#PackageContents">\n<Transforms>\n<Transform Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>\n</Transforms>\n<DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>\n<DigestValue>c4XHzD2hbXvcDzwKs5R8q442aTVeFYnihoToEXZXpVg=</DigestValue>\n</Reference>\n</SignedInfo>\n<SignatureValue Id="PackageSignatureValue">cUOyH05EaKUozJEPcmc/eYG7uG4vG0U15d+UVDd9oMCrv4GbZ3o6hweanjQTdtAi\neALHPdwSV1Fadpen/9EIpDeLspGTXfz4fT9UaPZ177T1plXmyeL0NEG+wblyOneL\n7lrZxpCiRMWIg0/1RB4g4aAk+Yq8kfwrmxIoA1NXc10=</SignatureValue>\n\n<KeyInfo>\n<X509Data>\n<X509Certificate>MIIB/TCCAWYCCQDt8b8ZOqaroDANBgkqhkiG9w0BAQsFADBCMQswCQYDVQQGEwJJ\nTDELMAkGA1UECAwCTkExFTATBgNVBAoMDFJvbnkgSXR6aGFraTEPMA0GA1UEAwwG\nQUUgTUNQMCAXDTI2MTAxNzIwNDc0MFoYDzIwNTExMDExMjA0NzQwWjBCMQswCQYD\nVQQGEwJJTDELMAkGA1UECAwCTkExFTATBgNVBAoMDFJvbnkgSXR6aGFraTEPMA0G\nA1UEAwwGQUUgTUNQMIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCpv3D0LnoK\nVfHJj9cZffhfUTRVl/xYETq83Z2ftcLTjYUiHQqYAcAl43NQC869moAPfOgB0A/+\nF7aCAOQVPSKeVh4czeyAy4nCfdiNbRxHu9/ZUFW8tk71EjhfEHWc6jHcmlc143i3\nrkyG1DsgzyWnajm1JmvQ/QCNb/OTxv+RnwIDAQABMA0GCSqGSIb3DQEBCwUAA4GB\nAHVqZQs1/Q5O0B+WhgDBSJBXThC391CMyfoVAZnvQVodHAz73ubv/aN00wwPjFzL\ntT8pmLbStTaHMHVX7vQcvOcKJMiP/ki8T0zx5y1/qcU9C62O8RvpXaxruZmX+B1T\nyxFmRt6UHmiLiOgWpZtEyN94gOPAUp5guQ6i8yMnyjZW\n</X509Certificate>\n</X509Data>\n</KeyInfo>\n<Object>\n<Manifest Id="PackageContents">\n<Reference URI="mimetype"><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>b07Onu9cTlGK1WpvgtFOlfk+Tl0HscuNIt6GZtesPX8=</DigestValue></Reference><Reference URI="index.html"><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>+4+8e5p8PIO4JyKvvyQUIifmUwQFsst6QHAAR/ZAspg=</DigestValue></Reference><Reference URI="css/panel.css"><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>eUGSUu7v7xyduFiO38UWttti+BeJ7POEVpfkiXIfaZo=</DigestValue></Reference><Reference URI="js/bridge-core.js"><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>UAAKppoebo/LTQVadg535zzMlwRKY1TgxlH/d1bUOeA=</DigestValue></Reference><Reference URI="js/panel.js"><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>yXHrB7P/hysmp07yPgVxsKUVcRA9hX271swgQgkNhi0=</DigestValue></Reference><Reference URI="CSXS/manifest.xml"><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>glGdVBmT0/tsgwR/S25zWnu/ys4eoDgvZZ47EEO7ayM=</DigestValue></Reference><Reference URI="bridge.html"><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>21uh0N5jjC6HkNlmnfWBzJMvOR+rVRdzAopqqaGNv7s=</DigestValue></Reference></Manifest>\n</Object>\n<Object xmlns:xades="http://uri.etsi.org/01903/v1.1.1#" >\n<xades:QualifyingProperties>\n<xades:UnsignedProperties>\n<xades:UnsignedSignatureProperties>\n<xades:SignatureTimeStamp>\n<xades:HashDataInfo uri="SignatureValue">\n<Transforms>\n<Transform Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>\n</Transforms>\n</xades:HashDataInfo>\n<xades:EncapsulatedTimeStamp>\nMIIXcjADAgEAMIIXaQYJKoZIhvcNAQcCoIIXWjCCF1YCAQMxDzANBglghkgBZQME\nAgEFADCBgQYLKoZIhvcNAQkQAQSgcgRwMG4CAQEGCWCGSAGG/WwHATAxMA0GCWCG\nSAFlAwQCAQUABCAgc/9C9OEigLwHnhpqe8XhAKzkdXoI3epMfraWRpXeKAIQUweU\nDSMjLIUgpnjHgLK3oBgPMjAyNjEwMTkxNjM1MzZaAggCM1YstNFz3aCCEzowggbt\nMIIE1aADAgECAhAIT9wzT35FTtvDD4/5khg1MA0GCSqGSIb3DQEBCwUAMGkxCzAJ\nBgNVBAYTAlVTMRcwFQYDVQQKEw5EaWdpQ2VydCwgSW5jLjFBMD8GA1UEAxM4RGln\naUNlcnQgVHJ1c3RlZCBHNCBUaW1lU3RhbXBpbmcgUlNBNDA5NiBTSEEyNTYgMjAy\nNSBDQTEwHhcNMjYwODA1MDAwMDAwWhcNMzcxMTA0MjM1OTU5WjBjMQswCQYDVQQG\nEwJVUzEXMBUGA1UEChMORGlnaUNlcnQsIEluYy4xOzA5BgNVBAMTMkRpZ2lDZXJ0\nIFNIQTI1NiBSU0E0MDk2IFRpbWVzdGFtcCBSZXNwb25kZXIgMjAyNiAxMIICIjAN\nBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAtnum8sn+zUr41JtMZbP9OMYw+HwJ\nDpG5xkIu/lqcfNYmMX81YmsUiHLbh9ykpeWBGKTLhYBrAN9Tdg/QEzG32XcObmgI\nblnr0CoQ3WSAeDZ6nH6X6VkFyYkJw3QBJREwvm4UhLzSxmwPA7cFKRTEOMsmEEj6\nqJk/dqLEAL+oQYuOwE2UuiX1Vnul8YReIyWd4kgLn9gq6LNXM0UplkR6jL/QHxmb\n6fMoGBJYbnaUI7XD6cKDpekK2SVMld4iDbzeHDtOaaxldH5IxuNusQ69nd8/ZXEi\nB5Hbxj3RlK13cX1W4DlFXKdv/CEhM8Cj1vvlmvhNroyPdRGbbpBlgyf8Wdu5N6By\nhFwURn0U6ozlPoxN22v+fviUhP+6DR547OZnpBMWDfei1f5sVGwiiW/KQTWOK97g\n+4RJpPzPNV4VYMAwO2jM2Aty2QYPVmOQTJm0msuXnJrSbl2gf9JylpkJlWXqk1Q4\nLJsxz+TELoQCZIljbgvTJgoPU2R12ydv8i1UqL/adelA0y7U9Pmmtbze9Xx3rtaj\nC5SzQd1jgfwAwsa90v9YcSPdmeoyoBBA/27cCL237l5DTYYPDLQ4ON3OLTGWnvRb\n6jDrf/T75gMRfUzSLCBQfBusm9+mSWRlC/Df6S/e9Q8i13CuhzOT2Jx+V/nlbXM4\nQoBwlUAhelwwJT0CAwEAAaOCAZUwggGRMAwGA1UdEwEB/wQCMAAwHQYDVR0OBBYE\nFBTJY4owLtRK+26U8+bjQH717M3iMB8GA1UdIwQYMBaAFO9vU0rp5AZ8esrikFb2\nL9RJ7MtOMA4GA1UdDwEB/wQEAwIHgDAWBgNVHSUBAf8EDDAKBggrBgEFBQcDCDCB\nlQYIKwYBBQUHAQEEgYgwgYUwJAYIKwYBBQUHMAGGGGh0dHA6Ly9vY3NwLmRpZ2lj\nZXJ0LmNvbTBdBggrBgEFBQcwAoZRaHR0cDovL2NhY2VydHMuZGlnaWNlcnQuY29t\nL0RpZ2lDZXJ0VHJ1c3RlZEc0VGltZVN0YW1waW5nUlNBNDA5NlNIQTI1NjIwMjVD\nQTEuY3J0MF8GA1UdHwRYMFYwVKBSoFCGTmh0dHA6Ly9jcmwzLmRpZ2ljZXJ0LmNv\nbS9EaWdpQ2VydFRydXN0ZWRHNFRpbWVTdGFtcGluZ1JTQTQwOTZTSEEyNTYyMDI1\nQ0ExLmNybDAgBgNVHSAEGTAXMAgGBmeBDAEEAjALBglghkgBhv1sBwEwDQYJKoZI\nhvcNAQELBQADggIBAI3FOmEenVIK35msCYB+fShAsWvSYvLBItoNdAgQ2jIqrGsV\nsluXMJU/+mRebBc52s6lbKAvOVPXaizmKkMLLflEEKDZQx4CkS2t8aHPjkXha3hY\nZ010htFa3dhNgmalH5vuWvh3tTCf4frTS7gPtGc4Z/xaPhQ2AB1mR8eEe/WbH0RW\nHvVIl6VwQ3+g5FKNfN2N/DWJkf13w2H+2GfqEfbd35Ww8CvoYBjLNIDTadcPWdgs\njsiOaK/7EsKJgLjUNIVgvcaFOLLQ/GlrA+0ZHJoFUbOr5SJN8zykPspXIXlpDJY/\ngqFUZRROeab9GVgmhbdOJcD/63RhxPahFUGbckRONqMe6DYAv6/mOG0pWd3cPSts\ndcS7buj5DyniwRY8yooMH6ptx5vpP/pZzBPBeZD2U4IsthyxB5Jaa8qrOkB5z160\nTXiM5ADMspZ0TfD9MJoq0tFpFPssKRFhWeEDYPvcUuN7U7lvcdHl4ezQ3NT/7Ffs\n1sR1yh/LRbdZ3B3Vc6q2WmD8mDC0p9kzl2o73iVtS946IkEj7FkRsZGww1teYxER\nROC745xrtjvcw9ZyyUjHZWGRIpJeMNsPquCDf0fkyHtB+J4AiNZqCQk23rxh+Kbp\nyMTNVKItJ5l92Svl20U9NbqMBOVYl1h54NEYLJq1/xHWFKPNK903zJZA9P2DMIIG\ntDCCBJygAwIBAgIQDcesVwX/IZkuQEMiDDpJhjANBgkqhkiG9w0BAQsFADBiMQsw\nCQYDVQQGEwJVUzEVMBMGA1UEChMMRGlnaUNlcnQgSW5jMRkwFwYDVQQLExB3d3cu\nZGlnaWNlcnQuY29tMSEwHwYDVQQDExhEaWdpQ2VydCBUcnVzdGVkIFJvb3QgRzQw\nHhcNMjUwNTA3MDAwMDAwWhcNMzgwMTE0MjM1OTU5WjBpMQswCQYDVQQGEwJVUzEX\nMBUGA1UEChMORGlnaUNlcnQsIEluYy4xQTA/BgNVBAMTOERpZ2lDZXJ0IFRydXN0\nZWQgRzQgVGltZVN0YW1waW5nIFJTQTQwOTYgU0hBMjU2IDIwMjUgQ0ExMIICIjAN\nBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAtHgx0wqYQXK+PEbAHKx126NGaHS0\nURedTa2NDZS1mZaDLFTtQ2oRjzUXMmxCqvkbsDpz4aH+qbxeLho8I6jY3xL1IusL\nopuW2qftJYJaDNs1+JH7Z+QdSKWM06qchUP+AbdJgMQB3h2DZ0Mal5kYp77jYMVQ\nXSZH++0trj6Ao+xh/AS7sQRuQL37QXbDhAktVJMQbzIBHYJBYgzWIjk8eDrYhXDE\npKk7RdoX0M980EpLtlrNyHw0Xm+nt5pnYJU3Gmq6bNMI1I7Gb5IBZK4ivbVCiZv7\nPNBYqHEpNVWC2ZQ8BbfnFRQVESYOszFI2Wv82wnJRfN20VRS3hpLgIR4hjzL0hpo\nYGk81coWJ+KdPvMvaB0WkE/2qHxJ0ucS638ZxqU14lDnki7CcoKCz6eum5A19WZQ\nHkqUJfdkDjHkccpL6uoG8pbF0LJAQQZxst7VvwDDjAmSFTUms+wV/FbWBqi7fTJn\njq3hj0XbQcd8hjj/q8d6ylgxCZSKi17yVp2NL+cnT6Toy+rN+nM8M7LnLqCrO2JP\n3oW//1sfuZDKiDEb1AQ8es9Xr/u6bDTnYCTKIsDq1BtmXUqEG1NqzJKS4kOmxkYp\n2WyODi7vQTCBZtVFJfVZ3j7OgWmnhFr4yUozZtqgPrHRVHhGNKlYzyjlroPxul+b\ngIspzOwbtmsgY1MCAwEAAaOCAV0wggFZMBIGA1UdEwEB/wQIMAYBAf8CAQAwHQYD\nVR0OBBYEFO9vU0rp5AZ8esrikFb2L9RJ7MtOMB8GA1UdIwQYMBaAFOzX44LScV1k\nTN8uZz/nupiuHA9PMA4GA1UdDwEB/wQEAwIBhjATBgNVHSUEDDAKBggrBgEFBQcD\nCDB3BggrBgEFBQcBAQRrMGkwJAYIKwYBBQUHMAGGGGh0dHA6Ly9vY3NwLmRpZ2lj\nZXJ0LmNvbTBBBggrBgEFBQcwAoY1aHR0cDovL2NhY2VydHMuZGlnaWNlcnQuY29t\nL0RpZ2lDZXJ0VHJ1c3RlZFJvb3RHNC5jcnQwQwYDVR0fBDwwOjA4oDagNIYyaHR0\ncDovL2NybDMuZGlnaWNlcnQuY29tL0RpZ2lDZXJ0VHJ1c3RlZFJvb3RHNC5jcmww\nIAYDVR0gBBkwFzAIBgZngQwBBAIwCwYJYIZIAYb9bAcBMA0GCSqGSIb3DQEBCwUA\nA4ICAQAXzvsWgBz+Bz0RdnEwvb4LyLU0pn/N0IfFiBowf0/Dm1wGc/Do7oVMY2mh\nXZXjDNJQa8j00DNqhCT3t+s8G0iP5kvN2n7Jd2E4/iEIUBO41P5F448rSYJ59Ib6\n1eoalhnd6ywFLerycvZTAz40y8S4F3/a+Z1jEMK/DMm/axFSgoR8n6c3nuZB9BfB\nwAQYK9FHaoq2e26MHvVY9gCDA/JYsq7pGdogP8HRtrYfctSLANEBfHU16r3J05qX\n3kId+ZOczgj5kjatVB+NdADVZKON/gnZruMvNYY2o1f4MXRJDMdTSlOLh0HCn2cQ\nLwQCqjFbqrXuvTPSegOOzr4EWj7PtspIHBldNE2K9i697cvaiIo2p61Ed2p8xMJb\n82Yosn0z4y25xUbI7GIN/TpVfHIqQ6Ku/qjTY6hc3hsXMrS+U0yy+GWqAXam4ToW\nd2UQ1KYT70kZjE4YtL8Pbzg0c1ugMZyZZd/BdHLiRu7hAWE6bTEm4XYRkA6Tl4KS\nFLFk43esaUeqGkH/wyW4N7OigizwJWeukcyIPbAvjSabnf7+Pu0VrFgoiovRDiyx\n3zEdmcif/sYQsfch28bZeUz2rtY/9TCA6TD8dC3JE3rYkrhLULy7Dc90G6e8Blqm\nyIjlgp2+VqsS9/wQD7yFylIz0scmbKvFoW2jNrbM1pD2T7m3XDCCBY0wggR1oAMC\nAQICEA6bGI750C3n79tQ4ghAGFowDQYJKoZIhvcNAQEMBQAwZTELMAkGA1UEBhMC\nVVMxFTATBgNVBAoTDERpZ2lDZXJ0IEluYzEZMBcGA1UECxMQd3d3LmRpZ2ljZXJ0\nLmNvbTEkMCIGA1UEAxMbRGlnaUNlcnQgQXNzdXJlZCBJRCBSb290IENBMB4XDTIy\nMDgwMTAwMDAwMFoXDTMxMTEwOTIzNTk1OVowYjELMAkGA1UEBhMCVVMxFTATBgNV\nBAoTDERpZ2lDZXJ0IEluYzEZMBcGA1UECxMQd3d3LmRpZ2ljZXJ0LmNvbTEhMB8G\nA1UEAxMYRGlnaUNlcnQgVHJ1c3RlZCBSb290IEc0MIICIjANBgkqhkiG9w0BAQEF\nAAOCAg8AMIICCgKCAgEAv+aQc2jeu+RdSjwwIjBpM+zCpyUuySE98orYWcLhKac9\nWKt2ms2uexuEDcQwH/MbpDgW61bGl20dq7J58soR0uRf1gU8Ug9SH8aeFaV+vp+p\nVxZZVXKvaJNwwrK6dZlqczKU0RBEEC7fgvMHhOZ0O21x4i0MG+4g1ckgHWMpLc7s\nXk7Ik/ghYZs06wXGXuxbGrzryc/NrDRAX7F6Zu53yEioZldXn1RYjgwrt0+nMNlW\n7sp7XeOtyU9e5TXnMcvak17cjo+A2raRmECQecN4x7axxLVqGDgDEI3Y1DekLgV9\niPWCPhCRcKtVgkEy19sEcypukQF8IUzUvK4bA3VdeGbZOjFEmjNAvwjXWkmkwuap\noGfdpCe8oU85tRFYF/ckXEaPZPfBaYh2mHY9WV1CdoeJl2l6SPDgohIbZpp0yt5L\nHucOY67m1O+SkjqePdwA5EUlibaaRBkrfsCUtNJhbesz2cXfSwQAzH0clcOP9yGy\nshG3u3/y1YxwLEFgqrFjGESVGnZifvaAsPvoZKYz0YkH4b235kOkGLimdwHhD5QM\nIR2yVCkliWzlDlJRR3S+Jqy2QXXeeqxfjT/JvNNBERJb5RBQ6zHFynIWIgnffEx1\nP2PsIV/EIFFrb7GrhotPwtZFX50g/KEexcCPorF+CiaZ9eRpL5gdLfXZqbId5RsC\nAwEAAaOCATowggE2MA8GA1UdEwEB/wQFMAMBAf8wHQYDVR0OBBYEFOzX44LScV1k\nTN8uZz/nupiuHA9PMB8GA1UdIwQYMBaAFEXroq/0ksuCMS1Ri6enIZ3zbcgPMA4G\nA1UdDwEB/wQEAwIBhjB5BggrBgEFBQcBAQRtMGswJAYIKwYBBQUHMAGGGGh0dHA6\nLy9vY3NwLmRpZ2ljZXJ0LmNvbTBDBggrBgEFBQcwAoY3aHR0cDovL2NhY2VydHMu\nZGlnaWNlcnQuY29tL0RpZ2lDZXJ0QXNzdXJlZElEUm9vdENBLmNydDBFBgNVHR8E\nPjA8MDqgOKA2hjRodHRwOi8vY3JsMy5kaWdpY2VydC5jb20vRGlnaUNlcnRBc3N1\ncmVkSURSb290Q0EuY3JsMBEGA1UdIAQKMAgwBgYEVR0gADANBgkqhkiG9w0BAQwF\nAAOCAQEAcKC/Q1xV5zhfoKN0Gz22Ftf3v1cHvZqsoYcs7IVeqRq7IviHGmlUIu2k\niHdtvRoU9BNKei8ttzjv9P+Aufih9/Jy3iS8UgPITtAq3votVs/59PesMHqai7Je\n1M/RQ0SbQyHrlnKhSLSZy51PpwYDE3cnRNTnf+hZqPC/Lwum6fI0POz3A8eHqNJM\nQBk1RmppVLC4oVaO7KTVPeix3P0c2PR3WlxUjG/voVA9/HYJaISfb8rbII01YBwC\nA8sgsKxYoA5AY8WYIsGyWfVVa88nq2x2zm8jLfR+cWojayL/ErhULSd+2DrZ8LaH\nlv1b0VysGMNNn3O3AamfV6peKOK5lDGCA3wwggN4AgEBMH0waTELMAkGA1UEBhMC\nVVMxFzAVBgNVBAoTDkRpZ2lDZXJ0LCBJbmMuMUEwPwYDVQQDEzhEaWdpQ2VydCBU\ncnVzdGVkIEc0IFRpbWVTdGFtcGluZyBSU0E0MDk2IFNIQTI1NiAyMDI1IENBMQIQ\nCE/cM09+RU7bww+P+ZIYNTANBglghkgBZQMEAgEFAKCB0TAaBgkqhkiG9w0BCQMx\nDQYLKoZIhvcNAQkQAQQwHAYJKoZIhvcNAQkFMQ8XDTI2MTAxOTE2MzUzNlowKwYL\nKoZIhvcNAQkQAgwxHDAaMBgwFgQUUdmr2gNJc9hPQmaspIJI5rNpxDkwLwYJKoZI\nhvcNAQkEMSIEIEbuO23pdi8TewuwkS0g0N9ZLv47spMTjTLZ+1qzL1hHMDcGCyqG\nSIb3DQEJEAIvMSgwJjAkMCIEIC2gnaf0Ex+f5y22xebpyWVnVa8EPx6nQswNISDh\nQev8MA0GCSqGSIb3DQEBAQUABIICAKZXY+RNuXRWssVCGapIAwTBo9MRYAUWKV/+\nqpny+6oGtYr1l/qD/fP0KLxM3X7xcYrTOC3dSNoJc2t1KE4QAjVShU9StKfpB67X\nd1a8b+mwIIzwJIpcqGOQnciVcCshz4XTS0hI5lgMVM+0/K9NEP0e+IL0Oa23ct6S\n7mvw5rpa/JLnWSEYirgDgblvTffa4bF+4NhUPhHK51j/IlNqB7UtvpOEYFnRcpiM\nRRRkFDJPC29Eq38Tjit+qqpd7YfGlHBYl3bqLwvWfs7j3+2XGr/l7lWLPc2UShbV\nbf9CA4hiTHcSYvg1ZANKgBl27LpX3xNPcbjplC7JzkmZjSFlEZzkBHCIgypGm35X\nuyKVjcLE79KtskZOkJYOBP/8FkqPHiGw6+bH4vUvrznn3rPrx+zV1pYUYyFSbDHF\nFTDzDuDVNnl6/YlrGGPR8GyKDKQ9g0Sv3riRVAwsZ6/JZrU2YKDW4hGrS+LRHvkU\nRWP70DT9pbOyoyipqaliRDU9dI6hsMUKL/qUmlbrKQXyjzwIZFzvBMYi7F0ZpfSC\n6gzw3Rwc+5FKcPHhov6Y9COQHYHBJXyI5qEFvtktiEEmr1F069/IRJeWzNkHfDFp\n51WVCrVlXmGX3z5h3WgxdhBDZ/OsXa0A2BKgqN12fWynEonlXJOVfWdeqvXpwGZC\n+yOF38y6\n</xades:EncapsulatedTimeStamp>\n</xades:SignatureTimeStamp>\n</xades:UnsignedSignatureProperties>\n</xades:UnsignedProperties>\n</xades:QualifyingProperties>\n</Object>\n</Signature>\n</signatures>', "bridge.html": '<!DOCTYPE html>\n<html>\n<head><meta charset="utf-8"><title>Surehand MCP Bridge</title></head>\n<body>\n<script src="js/bridge-core.js"></script>\n<script>AEMCPBridge.start();</script>\n</body>\n</html>\n', "css/panel.css": ':root { --bg: #232323; --fg: #d6d6d6; --muted: #8a8a8a; --ok: #3fb950; --bad: #f85149; --warn: #d29922; --line: #3a3a3a; }\n* { box-sizing: border-box; }\nbody { margin: 0; padding: 10px; background: var(--bg); color: var(--fg); font: 12px -apple-system, "Segoe UI", sans-serif; }\nheader { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }\n#title { font-weight: 600; font-size: 13px; }\n.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--warn); flex: none; }\n.dot.ok { background: var(--ok); } .dot.bad { background: var(--bad); }\n.muted { color: var(--muted); }\n.row { display: flex; gap: 6px; margin-bottom: 10px; }\nbutton { background: #3a3a3a; color: var(--fg); border: 1px solid #4a4a4a; border-radius: 4px; padding: 4px 10px; cursor: pointer; font: inherit; }\nbutton:hover { background: #454545; }\n.label { text-transform: uppercase; font-size: 10px; letter-spacing: .05em; color: var(--muted); margin-bottom: 4px; }\nul { list-style: none; padding: 0; margin: 0; }\nli { border-top: 1px solid var(--line); padding: 4px 0; word-break: break-all; }\nli .t { color: var(--muted); margin-right: 6px; }\nli.err .s { color: var(--bad); } li.ok .s { color: var(--ok); }\nfooter { margin-top: 10px; font-size: 10px; }\n.banner { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #2d2a12; border: 1px solid #5c531c; border-radius: 4px; padding: 6px 8px; margin-bottom: 10px; }\n.banner[hidden], [hidden] { display: none; }\n.setting { align-items: center; }\n.setting label { color: var(--muted); }\nselect { background: #3a3a3a; color: var(--fg); border: 1px solid #4a4a4a; border-radius: 4px; padding: 3px 6px; font: inherit; flex: 1; }\n.small { font-size: 10px; margin: -6px 0 10px; }\n.grid { display: grid; grid-template-columns: auto 1fr; gap: 6px 8px; align-items: center; margin-bottom: 8px; }\n.grid label { color: var(--muted); }\n#approvals { border: 1px solid #5c531c; background: #2d2a12; border-radius: 4px; padding: 6px 8px; margin-bottom: 10px; }\n.approval { border-top: 1px solid #4a4520; padding: 6px 0; }\n.approval:first-child { border-top: 0; }\n.approval .what { font-weight: 600; margin-bottom: 4px; }\n.approval pre, li pre { max-height: 160px; overflow: auto; background: #181818; padding: 6px; border-radius: 3px; margin: 4px 0; white-space: pre-wrap; word-break: break-word; font: 11px Menlo, Consolas, monospace; }\n.approval .row { margin: 4px 0 0; }\nbutton.allow { background: #1f4d2b; border-color: #2e6b3d; }\nbutton.deny { background: #5a1f1f; border-color: #7a2c2c; }\nli { cursor: pointer; }\nli .c { color: var(--muted); }\n', "index.html": '<!DOCTYPE html>\n<html>\n<head>\n  <meta charset="utf-8">\n  <title>Surehand MCP</title>\n  <link rel="stylesheet" href="css/panel.css">\n</head>\n<body>\n  <header>\n    <span id="dot" class="dot"></span>\n    <div>\n      <div id="title">Surehand MCP</div>\n      <div id="sub" class="muted">checking\u2026</div>\n    </div>\n  </header>\n  <div id="update" class="banner" hidden>\n    <span id="updateText"></span>\n    <button id="updateBtn">Update</button>\n  </div>\n\n  <section id="approvals" hidden>\n    <div class="label">Waiting for your approval</div>\n    <div id="approvalList"></div>\n  </section>\n\n  <section class="row">\n    <button id="test">Test</button>\n    <button id="diag" title="Copies a report to paste into a bug report or a chat">Copy diagnostics</button>\n    <button id="openLog" title="Show the full activity log file">Open log</button>\n  </section>\n\n  <section class="grid">\n    <label for="perm">Permissions</label>\n    <select id="perm">\n      <option value="full">Full access</option>\n      <option value="ask">Ask before every change</option>\n      <option value="read-only">Read-only</option>\n    </select>\n    <label for="shell">Shell commands</label>\n    <select id="shell">\n      <option value="on">Allowed</option>\n      <option value="off">Blocked</option>\n    </select>\n    <label for="profile">AI tools</label>\n    <select id="profile">\n      <option value="core">Core (faster, recommended)</option>\n      <option value="full">Full (all tools)</option>\n    </select>\n  </section>\n  <div id="note" class="muted small" hidden></div>\n\n  <section>\n    <div class="label">Activity <span class="muted" id="activityHint">(click an entry for details)</span></div>\n    <ul id="log"><li class="muted">No calls yet</li></ul>\n  </section>\n  <footer class="muted" id="foot"></footer>\n  <script src="js/bridge-core.js"></script>\n  <script src="js/panel.js"></script>\n</body>\n</html>\n', "js/bridge-core.js": `/* Surehand MCP bridge: a tiny HTTP server inside After Effects (CEP + Node) that evaluates
  * ExtendScript sent by the ae-mcp server. Binds to 127.0.0.1 only and requires the
  * shared token from ~/.aemcp/config.json.
  *
@@ -270,7 +270,7 @@ var init_define_AEMCP_CEP_FILES = __esm({
     res.on("close", function () { if (!finished) { finished = true; job.cancelled = true; clearTimeout(timer); clearInterval(watch); dropPending(job); } });
 
     if (body.approval && permissionMode() === "ask") {
-      // hold the edit until the user allows or denies it in the AE MCP panel
+      // hold the edit until the user allows or denies it in the Surehand MCP panel
       var p = {
         id: crypto.randomBytes(6).toString("hex"), at: new Date().toISOString(), tool: body.approval.tool || "edit",
         summary: String(body.approval.summary || "").slice(0, 4000), job: job,
@@ -279,15 +279,15 @@ var init_define_AEMCP_CEP_FILES = __esm({
         state.pending = state.pending.filter(function (x) { return x !== p; });
         if (finished) return;
         if (!allow) {
-          addLog({ at: new Date().toISOString(), ms: 0, ok: false, label: p.tool, preview: "denied in the AE MCP panel" });
-          return finish(200, { ok: false, denied: true, error: "The user denied this change in After Effects (AE MCP panel)." });
+          addLog({ at: new Date().toISOString(), ms: 0, ok: false, label: p.tool, preview: "denied in the Surehand MCP panel" });
+          return finish(200, { ok: false, denied: true, error: "The user denied this change in After Effects (Surehand MCP panel)." });
         }
         enqueue();
       };
       state.pending.push(p);
       openPanel();
       // waiting for a person: allow up to 10 minutes before giving up
-      setTimeout(function () { if (!finished && state.pending.indexOf(p) >= 0) { state.pending = state.pending.filter(function (x) { return x !== p; }); finish(200, { ok: false, denied: true, error: "No one approved this change in the AE MCP panel within 10 minutes." }); } }, 10 * 60 * 1000);
+      setTimeout(function () { if (!finished && state.pending.indexOf(p) >= 0) { state.pending = state.pending.filter(function (x) { return x !== p; }); finish(200, { ok: false, denied: true, error: "No one approved this change in the Surehand MCP panel within 10 minutes." }); } }, 10 * 60 * 1000);
       return;
     }
     enqueue();
@@ -587,7 +587,7 @@ var init_define_AEMCP_CEP_FILES = __esm({
     return ok;
   }
   $("diag").onclick = function () {
-    var lines = ["### AE MCP diagnostics", "time: " + new Date().toISOString()];
+    var lines = ["### Surehand MCP diagnostics", "time: " + new Date().toISOString()];
     var host = AEMCPBridge.hostInfo();
     lines.push("host: " + host.appName + " " + host.appVersion + " \xB7 bridge v" + AEMCPBridge.VERSION + " \xB7 port " + myPort);
     lines.push("os: " + process.platform + " " + os.release() + " " + os.arch() + " \xB7 CEP node " + process.versions.node);
@@ -65456,7 +65456,7 @@ init_define_AEMCP_CEP_FILES();
 import { mkdirSync, readFileSync as readFileSync2, writeFileSync } from "node:fs";
 import { homedir as homedir2 } from "node:os";
 import { dirname, join as join2 } from "node:path";
-var REPO = "ronyitzhaki/after-effects-mcp";
+var REPO = "ConformLabs/surehand-mcp";
 var RELEASES_URL = `https://github.com/${REPO}/releases/latest`;
 var CACHE = join2(homedir2(), ".aemcp", "update-check.json");
 var DAY = 24 * 3600 * 1e3;
@@ -65504,7 +65504,7 @@ async function checkForUpdate(force = false) {
   }
 }
 function updateMessage(u) {
-  return u?.updateAvailable ? `A newer version of AE MCP is available: v${u.latest} (you have v${u.current}). Download: ${u.url}` : null;
+  return u?.updateAvailable ? `A newer version of Surehand MCP is available: v${u.latest} (you have v${u.current}). Download: ${u.url}` : null;
 }
 
 // src/cli/setup.ts
@@ -65649,7 +65649,7 @@ function ensureExtension(force = false) {
   const dir = extensionDir();
   const current2 = installedExtensionHash();
   const present = existsSync2(join4(dir, "CSXS", "manifest.xml"));
-  if (!force && current2 === "273f538c85bc" && present) return { installed: false, updated: false };
+  if (!force && current2 === "fa100cce1c50" && present) return { installed: false, updated: false };
   const installedVersion = installedExtensionVersion();
   if (!force && present && installedVersion && compareVersions(installedVersion, VERSION) > 0) return { installed: false, updated: false };
   const updated = existsSync2(dir);
@@ -65660,7 +65660,7 @@ function ensureExtension(force = false) {
     writeFileSync3(p, content);
   }
   mkdirSync3(AEMCP_DIR, { recursive: true });
-  writeFileSync3(HASH_FILE, `${"273f538c85bc"} ${VERSION}`);
+  writeFileSync3(HASH_FILE, `${"fa100cce1c50"} ${VERSION}`);
   return { installed: true, updated };
 }
 function installedExtensionSignature() {
@@ -65870,7 +65870,7 @@ var BridgeError = class extends Error {
   }
   code;
 };
-var NOT_RUNNING_HELP = "Cannot reach After Effects. Make sure After Effects is running and the AE MCP bridge is loaded (it starts automatically with AE after install; you can also open Window > Extensions > AE MCP to check its status). If you just installed, restart After Effects.";
+var NOT_RUNNING_HELP = "Cannot reach After Effects. Make sure After Effects is running and the Surehand MCP bridge is loaded (it starts automatically with AE after install; you can also open Window > Extensions > Surehand MCP to check its status). If you just installed, restart After Effects.";
 var INSTANCES_DIR = () => join6(dirname4(configPath()), "instances");
 var selectedPort = null;
 var cache = null;
@@ -66000,7 +66000,7 @@ function explainBlocked(b) {
   if (b.waitingFor) facts.push(`waiting to run ${b.waitingFor}`);
   if (b.queue) facts.push(`${b.queue} more call${b.queue === 1 ? "" : "s"} queued`);
   const up = b.startedAt ? Date.now() - Date.parse(b.startedAt) : NaN;
-  const starting = up >= 0 && up < 12e4 ? ` The AE MCP bridge started ${secs(up)}s ago, so After Effects may still be starting up.` : "";
+  const starting = up >= 0 && up < 12e4 ? ` The Surehand MCP bridge started ${secs(up)}s ago, so After Effects may still be starting up.` : "";
   return `After Effects is busy or showing a dialog (${facts.join("; ")}).${starting} Check After Effects: close any open dialog or settings window (Project Settings, Preferences, an error or alert, a startup prompt) and retry. This call did not run and will not run later.`;
 }
 async function explainTimeout(port, timeoutMs) {
@@ -66008,7 +66008,7 @@ async function explainTimeout(port, timeoutMs) {
   const h = await probe(port, 1500);
   if (!h)
     return `After Effects did not respond within ${secs2}s, and its bridge is not answering either. AE may still be starting (or showing a startup dialog), or it is frozen or quitting. Call ae_status to check: it waits for AE to finish starting.`;
-  if (h.pendingApprovals) return `Still waiting for approval in After Effects (AE MCP panel) after ${secs2}s.`;
+  if (h.pendingApprovals) return `Still waiting for approval in After Effects (Surehand MCP panel) after ${secs2}s.`;
   if (h.busy) {
     const busy = Math.round((h.busyForMs || 0) / 1e3);
     return `After Effects has been busy for ${busy}s${h.busyWith ? ` (running ${h.busyWith})` : ""}. Either a long script or render is still running (it can't be interrupted and will finish on its own), or AE is blocked by an open dialog or settings window: check After Effects and close any dialog. For long jobs pass a larger timeoutSeconds.`;
@@ -66064,7 +66064,7 @@ async function waitForBridge(opts = {}) {
     if (Date.now() + (opts.intervalMs ?? 1e3) >= deadline) {
       const waited = secs(opts.waitMs ?? startupWaitMs());
       throw new BridgeError(
-        (err.code === "NOT_RUNNING" ? `After Effects is running, but its AE MCP bridge did not start within ${waited}s. ` : `After Effects is running, but its AE MCP bridge did not answer within ${waited}s. `) + "AE may still be starting, or be showing a startup dialog (crash recovery, missing fonts or plugins, an update or sign-in prompt): check After Effects, close any dialog, then call ae_status again. If AE has finished starting and this persists, open Window > Extensions > AE MCP to check the bridge, or restart After Effects." + setupHint(),
+        (err.code === "NOT_RUNNING" ? `After Effects is running, but its Surehand MCP bridge did not start within ${waited}s. ` : `After Effects is running, but its Surehand MCP bridge did not answer within ${waited}s. `) + "AE may still be starting, or be showing a startup dialog (crash recovery, missing fonts or plugins, an update or sign-in prompt): check After Effects, close any dialog, then call ae_status again. If AE has finished starting and this persists, open Window > Extensions > Surehand MCP to check the bridge, or restart After Effects." + setupHint(),
         "STARTING"
       );
     }
@@ -66996,7 +66996,7 @@ aemcp = (function () {
     try {
       if (opts.suppressDialogs !== false) { try { app.beginSuppressDialogs(); } catch (e) {} }
       try {
-        if (undo) app.beginUndoGroup(opts.undoGroup || "AE MCP");
+        if (undo) app.beginUndoGroup(opts.undoGroup || "Surehand MCP");
         rev0 = opts.report || opts.rollback ? A.revision() : null;
         // checkOnly (read-only mode): with project.revision, no property snapshot at all
         if (opts.report) { try { before = A.snapshot(opts.report, !!opts.checkOnly && rev0 !== null); } catch (e) { before = null; } }
@@ -67064,7 +67064,7 @@ function toJsLiteral(v) {
   return (JSON.stringify(v ?? null) ?? "null").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
 }
 function wrapBody(body, args, opts = {}) {
-  const runOpts = { undoGroup: opts.undoGroup === void 0 ? "AE MCP" : opts.undoGroup, depth: opts.depth, report: opts.report, checkOnly: opts.checkOnly || void 0, rollback: opts.rollback };
+  const runOpts = { undoGroup: opts.undoGroup === void 0 ? "Surehand MCP" : opts.undoGroup, depth: opts.depth, report: opts.report, checkOnly: opts.checkOnly || void 0, rollback: opts.rollback };
   return `(function(){
 if (typeof aemcp === 'undefined' || aemcp.version !== ${toJsLiteral(HELPER_VERSION)}) return ${toJsLiteral(NEED_HELPERS)};
 return aemcp.run(function(args, log){
@@ -67163,7 +67163,7 @@ function rollbackProblem(rb, what) {
   if (rb.verified) return "";
   const check2 = "Check the project before going on (Edit > Undo and Edit > Redo still work step by step).";
   const leftover = rb.leftover ? `
-A temporary folder "${rb.leftover}" (AE MCP's undo marker) couldn't be removed; it can be deleted.` : "";
+A temporary folder "${rb.leftover}" (Surehand MCP's undo marker) couldn't be removed; it can be deleted.` : "";
   if (!rb.undone)
     return `It couldn't be checked whether ${what} changed the project${rb.problem && rb.problem !== "unknown" ? ` (${rb.problem})` : ""}, so nothing was undone. ${check2}${leftover}`;
   const remaining = rb.remaining ? (formatChanges(rb.remaining) ?? "").replace(/^Changes[^\n]*:\n/, "") : "";
@@ -67287,14 +67287,14 @@ function clientEntry(file2) {
   return `${e.command} ${(e.args || []).join(" ")}${e.command && !existsSync5(e.command) ? "  (COMMAND MISSING)" : ""}`;
 }
 async function diagnostics() {
-  const L = ["### AE MCP diagnostics", `time: ${(/* @__PURE__ */ new Date()).toISOString()}`];
+  const L = ["### Surehand MCP diagnostics", `time: ${(/* @__PURE__ */ new Date()).toISOString()}`];
   L.push(`server: v${VERSION} (helpers ${HELPER_VERSION}) \xB7 tools profile: ${resolveProfile().name}`);
   L.push(`os: ${process.platform} ${release()} ${arch()} \xB7 node ${process.version} at ${process.execPath}`);
   const cfg = readJson(CONFIG_FILE, null);
   if (cfg) L.push(`config: ${JSON.stringify({ ...cfg, token: cfg.token ? `<set, ${cfg.token.length} chars>` : "MISSING" })}`);
   else L.push(`config: MISSING (${CONFIG_FILE})`);
   L.push(`installed server: ${existsSync5(INSTALLED_SERVER) ? INSTALLED_SERVER : "not installed (fine when using the .mcpb)"}`);
-  L.push(`extension: ${extensionDir()} \xB7 ${existsSync5(join7(extensionDir(), "CSXS", "manifest.xml")) ? `hash ${installedExtensionHash()} (bundled ${"273f538c85bc"})` : "MISSING"}`);
+  L.push(`extension: ${extensionDir()} \xB7 ${existsSync5(join7(extensionDir(), "CSXS", "manifest.xml")) ? `hash ${installedExtensionHash()} (bundled ${"fa100cce1c50"})` : "MISSING"}`);
   const sig = installedExtensionSignature();
   L.push(`extension signature: ${sig.ok ? "valid" : sig.problems.join("; ")}`);
   L.push(`PlayerDebugMode: ${debugMode()}`);
@@ -67364,7 +67364,7 @@ async function install(argv) {
   const flags = new Set(argv);
   const want = (name) => !flags.has("--skip-clients") && !flags.has(`--no-${name}`);
   console.log(bold(`
-After Effects MCP installer v${VERSION}`));
+Surehand MCP installer v${VERSION}`));
   console.log(dim(`${process.platform} \xB7 node ${process.version}`));
   if (!isMac && !isWin) warn("After Effects only runs on macOS and Windows; continuing anyway.");
   step("1/4  Installing the MCP server");
@@ -67412,7 +67412,7 @@ After Effects MCP installer v${VERSION}`));
   let restartClaude = false;
   if (want("claude-desktop")) {
     if (mcpbInstalled()) {
-      ok("Claude Desktop: already connected through the AE MCP extension (.mcpb)");
+      ok("Claude Desktop: already connected through the Surehand MCP extension (.mcpb)");
       registered.push("Claude Desktop");
     } else if (existsSync6(claudeDesktopDir())) {
       const cfg = readJson(claudeDesktopConfig(), {});
@@ -67728,8 +67728,8 @@ function permissions() {
 function usesShell(code) {
   return /callSystem|\bsystem\s*\[/.test(code);
 }
-var READ_ONLY_REFUSAL = "After Effects MCP is in read-only mode, so tools that change the project are disabled. The user can change this in After Effects: Window > Extensions > AE MCP > Permissions.";
-var SHELL_REFUSAL = 'Shell commands (system.callSystem) are disabled in the AE MCP permissions. The user can allow them in Window > Extensions > AE MCP > Permissions (or "allowShell": true in ~/.aemcp/config.json).';
+var READ_ONLY_REFUSAL = "Surehand MCP is in read-only mode, so tools that change the project are disabled. The user can change this in After Effects: Window > Extensions > Surehand MCP > Permissions.";
+var SHELL_REFUSAL = 'Shell commands (system.callSystem) are disabled in the Surehand MCP permissions. The user can allow them in Window > Extensions > Surehand MCP > Permissions (or "allowShell": true in ~/.aemcp/config.json).';
 function approvalSummary(tool, args) {
   if (!args) return tool;
   if (typeof args.code === "string") return args.code;
@@ -67808,7 +67808,7 @@ function registerJsxTools(server, tools) {
           const wantsReport = t.report ?? (!t.readOnly && !t.noUndo);
           return formatResult(
             await runJsx(t.jsx, args, {
-              undoGroup: t.tempItems ? "AE MCP " + t.title : t.readOnly || t.noUndo ? false : t.title,
+              undoGroup: t.tempItems ? "Surehand MCP " + t.title : t.readOnly || t.noUndo ? false : t.title,
               timeoutMs,
               report: wantsReport ? reportScope(args) : void 0,
               bridge: edits && perm.mode === "ask" ? { approval: { tool: t.title, summary: approvalSummary(t.name, args) } } : void 0
@@ -70055,7 +70055,7 @@ return r;`;
 async function renderPng(body, args) {
   const tmpDir = join9(homedir5(), ".aemcp", "tmp");
   mkdirSync6(tmpDir, { recursive: true });
-  const r = await runJsx(body, { ...args, tmpDir }, { undoGroup: "AE MCP preview", timeoutMs: 18e4 });
+  const r = await runJsx(body, { ...args, tmpDir }, { undoGroup: "Surehand MCP preview", timeoutMs: 18e4 });
   if (!r.ok) return { error: formatResult(r) };
   const info = r.result;
   let last = -1;
@@ -70077,7 +70077,7 @@ async function renderPng(body, args) {
   }
   return { info, data };
 }
-var UNDO_HISTORY = "changes the undo history outside AE MCP's control, so read-only mode couldn't reliably put the project back afterwards";
+var UNDO_HISTORY = "changes the undo history outside Surehand MCP's control, so read-only mode couldn't reliably put the project back afterwards";
 var word = (name) => new RegExp(`\\b${name}\\b`);
 function member(obj, name, call) {
   const o = obj ? `\\b${obj}\\s*` : "";
@@ -70120,17 +70120,17 @@ function readOnlyScriptRefusal(code, transpiled) {
   const why = /* @__PURE__ */ new Map();
   for (const b of READ_ONLY_BLOCKED) if (names.includes(b.name)) why.set(b.why, [...why.get(b.why) ?? [], b.name]);
   const reasons = [...why].map(([w, ns]) => `${ns.join(", ")}: ${w}.`);
-  return `Nothing ran. AE MCP is in read-only mode, and this script mentions ${names.join(", ")}.
+  return `Nothing ran. Surehand MCP is in read-only mode, and this script mentions ${names.join(", ")}.
 ${reasons.join("\n")}
-Scripts that mention these names are refused (the check reads the code, so a name in a string counts too, and so does the same method name on another object, such as obj.save()). To run it on purpose, the user can switch to edit mode (Full access, or Ask before every change) in After Effects: Window > Extensions > AE MCP > Permissions.`;
+Scripts that mention these names are refused (the check reads the code, so a name in a string counts too, and so does the same method name on another object, such as obj.save()). To run it on purpose, the user can switch to edit mode (Full access, or Ask before every change) in After Effects: Window > Extensions > Surehand MCP > Permissions.`;
 }
-var READ_ONLY_RUN_OPTIONS = { undoGroup: "AE MCP Script (read-only check)", report: ["*"], checkOnly: true, rollback: "changes" };
+var READ_ONLY_RUN_OPTIONS = { undoGroup: "Surehand MCP Script (read-only check)", report: ["*"], checkOnly: true, rollback: "changes" };
 function readOnlyRefusal(r) {
   const rb = r.rollback;
   if (!rb || !rb.undone && rb.verified) return null;
   if (!rb.verified) return `${READ_ONLY_REFUSAL}
 ${rollbackProblem(rb, "the script")}`;
-  const how = rb.verified === "sentinel" ? " (checked by AE MCP's undo marker; property values were not compared)" : "";
+  const how = rb.verified === "sentinel" ? " (checked by Surehand MCP's undo marker; property values were not compared)" : "";
   const ch = r.changes;
   if (ch && !ch.unlisted && (ch.items.length || ch.layers.length || ch.props.length))
     return `${READ_ONLY_REFUSAL}
@@ -70156,7 +70156,7 @@ function registerCoreTools(server) {
       inputSchema: {
         code: external_exports.string().describe("JavaScript source; a function body, use `return` to return data."),
         args: external_exports.record(external_exports.string(), external_exports.any()).optional().describe("JSON object exposed to the script as `args`."),
-        undoGroup: external_exports.string().optional().describe('Undo step name (default "AE MCP Script"). Pass "" to skip the undo group.'),
+        undoGroup: external_exports.string().optional().describe('Undo step name (default "Surehand MCP Script"). Pass "" to skip the undo group.'),
         depth: external_exports.number().int().min(0).max(8).optional().describe("How deep to serialize the returned value (default 4)."),
         timeoutSeconds: external_exports.number().min(1).max(3600).optional().describe("Max seconds to wait for the result (default 120)."),
         transpile: external_exports.boolean().optional().describe("Convert modern JS for ExtendScript (default true). Set false to send the code exactly as written."),
@@ -70175,7 +70175,7 @@ function registerCoreTools(server) {
         const refused = readOnly2 ? readOnlyScriptRefusal(code, t.source) : null;
         if (refused) return errorResult(refused);
         const r = await runJsx(evalBody(t.source), args ?? {}, {
-          ...readOnly2 ? READ_ONLY_RUN_OPTIONS : { undoGroup: undoGroup === "" ? false : undoGroup || "AE MCP Script", report: report === false ? void 0 : reportScope(args) },
+          ...readOnly2 ? READ_ONLY_RUN_OPTIONS : { undoGroup: undoGroup === "" ? false : undoGroup || "Surehand MCP Script", report: report === false ? void 0 : reportScope(args) },
           depth,
           timeoutMs: (timeoutSeconds ?? 120) * 1e3,
           bridge: perm.mode === "ask" ? { approval: { tool: "Run script", summary: approvalSummary("ae_run_script", { code }) } } : void 0
@@ -70231,7 +70231,7 @@ function registerCoreTools(server) {
         const body = "var f = new File(args.path); if (!f.exists) aemcp.fail('File not found in AE: ' + args.path);\n$.global.AEMCP_ARGS = args.args || {};\nreturn $.evalFile(f);";
         return formatResult(
           await runJsx(body, { path, args: args ?? {} }, {
-            undoGroup: "AE MCP Script File",
+            undoGroup: "Surehand MCP Script File",
             timeoutMs: (timeoutSeconds ?? 300) * 1e3,
             report: reportScope(args),
             bridge: perm.mode === "ask" ? { approval: { tool: "Run script file", summary: `${path}
@@ -70284,7 +70284,7 @@ ${source.slice(0, 1500)}` } } : void 0
               if (!h.waitingForAE) continue;
             }
             return errorResult(
-              `The AE MCP bridge answers (${aeLabel(h.host?.appVersion)}, bridge v${h.version} on port ${port}), but After Effects is not taking scripts. ${e.message}`
+              `The Surehand MCP bridge answers (${aeLabel(h.host?.appVersion)}, bridge v${h.version} on port ${port}), but After Effects is not taking scripts. ${e.message}`
             );
           }
         }
@@ -70570,7 +70570,7 @@ return { steps: __out, failed: __failed, rollback: args.atomic && __failed >= 0 
   const scope = [...new Set(steps.map((s) => s.args?.comp).filter((c) => c !== void 0 && c !== null))];
   const showReport = loadConfig().changeReport !== false;
   const r = await runJsx(body, { stepArgs, atomic: isAtomic }, {
-    undoGroup: name || "AE MCP Batch",
+    undoGroup: name || "Surehand MCP Batch",
     timeoutMs: 6e5,
     depth: 6,
     // an atomic batch always compares before/after: that is what makes its rollback safe
@@ -70619,7 +70619,7 @@ function registerWorkflowTools(server) {
       inputSchema: {
         steps: external_exports.array(external_exports.object({ tool: external_exports.string(), args: external_exports.record(external_exports.string(), external_exports.any()).optional() })).min(1).max(200),
         atomic: external_exports.boolean().optional().describe("Undo everything if a step fails (default true). false = keep successful steps and continue."),
-        name: external_exports.string().optional().describe('Undo step name shown in After Effects (default "AE MCP Batch").'),
+        name: external_exports.string().optional().describe('Undo step name shown in After Effects (default "Surehand MCP Batch").'),
         checkpoint: external_exports.boolean().optional().describe("Save a project checkpoint before running (see ae_checkpoint)."),
         verbose: external_exports.boolean().optional().describe("Return each step's full result (default: short summaries).")
       },
@@ -79636,7 +79636,7 @@ async function regressionSteps(tmpDir, say) {
   });
   await step2(NAMES[3], async () => {
     const comp = `${P}_frame`;
-    const made = await runJsx(`app.project.items.addComp(args.name, 320, 180, 1, 1, 25); return true;`, { name: comp }, { undoGroup: "AE MCP self-test" });
+    const made = await runJsx(`app.project.items.addComp(args.name, 320, 180, 1, 1, 25); return true;`, { name: comp }, { undoGroup: "Surehand MCP self-test" });
     if (!made.ok) return `couldn't create the test comp: ${made.error?.message}`;
     const file2 = join11(tmpDir, `${P}_frame.png`);
     const keep = "DO-NOT-OVERWRITE";
@@ -79708,7 +79708,7 @@ async function revisionSteps(features, say) {
 }
 return app.project.numItems;`,
       { comps: COMPS, layers: LAYERS },
-      { undoGroup: "AE MCP self-test", timeoutMs: 3e5 }
+      { undoGroup: "Surehand MCP self-test", timeoutMs: 3e5 }
     );
     return check2(r);
   });
@@ -79736,7 +79736,7 @@ return app.project.numItems;`,
     const comp = `${U}_${++k}`;
     const findLayer = `var c = null; for (var i = 1; i <= app.project.numItems; i++) if (app.project.item(i).name === "${comp}") c = app.project.item(i); var L = c && c.layer(1);`;
     const edit = async (code, label) => {
-      const r2 = await runJsx(code, {}, { undoGroup: `AE MCP self-test: ${label}` });
+      const r2 = await runJsx(code, {}, { undoGroup: `Surehand MCP self-test: ${label}` });
       if (!r2.ok) throw new Error(`${label} failed: ${r2.error?.message}`);
     };
     const state2 = async () => {
@@ -79836,7 +79836,7 @@ async function state() {
   return r.result;
 }
 async function manualEdit(value2) {
-  const r = await runJsx(`${OP} op.setValue(args.value); return 1;`, { value: value2 }, { undoGroup: "AE MCP self-test: manual edit" });
+  const r = await runJsx(`${OP} op.setValue(args.value); return 1;`, { value: value2 }, { undoGroup: "Surehand MCP self-test: manual edit" });
   if (!r.ok) throw new Error(`manual edit failed: ${r.error?.message}`);
 }
 var text = (r) => r.content[0]?.text ?? "";
@@ -79859,7 +79859,7 @@ async function rollbackSteps(say) {
   const skipStress = async (name, _fn) => warn(`${name}: skipped (undo-stress case; can crash After Effects; run with AEMCP_SELFTEST_UNDO_STRESS=1)`);
   const clean = async (problem) => problem ?? (await sentinelsLeft() ? `the rollback's temporary folder was left: ${await sentinelsLeft()}` : null);
   await step2("rollback: set up", async () => {
-    const r = await runJsx(`var c = app.project.items.addComp("${P3}", 640, 360, 1, 4, 25); c.layers.addSolid([0.2, 0.4, 0.6], "${P3} solid", 64, 64, 1); return 1;`, {}, { undoGroup: "AE MCP self-test" });
+    const r = await runJsx(`var c = app.project.items.addComp("${P3}", 640, 360, 1, 4, 25); c.layers.addSolid([0.2, 0.4, 0.6], "${P3} solid", 64, 64, 1); return 1;`, {}, { undoGroup: "Surehand MCP self-test" });
     return r.ok ? null : `couldn't create the test comp: ${r.error?.message}`;
   });
   await step2("rollback: manual edit, then an atomic batch that fails at step 1: the manual edit survives", async () => {
@@ -79874,7 +79874,7 @@ async function rollbackSteps(say) {
   });
   await step2("rollback: atomic batch that edits, then fails at step 2: rolled back once, the manual edit survives", async () => {
     await manualEdit(41);
-    const r = await runBatch({ steps: [script(`${OP} op.setValue(5);`), script('throw new Error("fails after an edit")')], name: "AE MCP self-test batch" }, FULL);
+    const r = await runBatch({ steps: [script(`${OP} op.setValue(5);`), script('throw new Error("fails after an edit")')], name: "Surehand MCP self-test batch" }, FULL);
     const after = await state();
     if (!/was rolled back \(nothing changed\)/.test(text(r))) return `unexpected reply: ${text(r)}`;
     return clean(after.opacity === 41 ? null : `Opacity is ${after.opacity}, expected 41 (5 = not rolled back, 100/37 = undone twice)`);
@@ -80058,7 +80058,7 @@ async function fullSelftest(before) {
   console.log(bold(`
 Full self-test: every major tool against this After Effects (temporary comps, removed afterwards)
 `));
-  const caps = await runJsx(CAPABILITIES_JSX, {}, { undoGroup: "AE MCP self-test", timeoutMs: 6e4 });
+  const caps = await runJsx(CAPABILITIES_JSX, {}, { undoGroup: "Surehand MCP self-test", timeoutMs: 6e4 });
   if (!caps.ok) {
     fail(`Could not read capabilities: ${caps.error?.message}`);
     return 1;
@@ -80135,7 +80135,7 @@ Full self-test: every major tool against this After Effects (temporary comps, re
     try {
       const body = s.jsx ?? ALL.find((t) => t.name === s.tool)?.jsx;
       if (!body) throw new Error(`unknown tool ${s.tool}`);
-      r = await runJsx(body, s.args ?? {}, { undoGroup: "AE MCP self-test", timeoutMs: 12e4, report: [C] });
+      r = await runJsx(body, s.args ?? {}, { undoGroup: "Surehand MCP self-test", timeoutMs: 12e4, report: [C] });
     } catch (e) {
       r = { ok: false, logs: [], error: { message: e.message } };
     }
@@ -80153,7 +80153,7 @@ for (var r = rq.numItems; r > args.rq; r--) rq.item(r).remove();
 for (var i = p.numItems; i >= 1; i--) { var it = p.item(i); if (it.id > args.maxId) it.remove(); }
 return p.numItems;`,
     { maxId, rq },
-    { undoGroup: "AE MCP self-test cleanup" }
+    { undoGroup: "Surehand MCP self-test cleanup" }
   );
   try {
     unlinkSync4(frame);
@@ -80182,7 +80182,7 @@ async function selftest(full = false) {
     fail(m);
   };
   console.log(bold(`
-After Effects MCP self-test v${VERSION}`));
+Surehand MCP self-test v${VERSION}`));
   console.log(`  ${process.platform} \xB7 node ${process.version}
 `);
   if (updateCheckEnabled()) {
@@ -80195,9 +80195,9 @@ After Effects MCP self-test v${VERSION}`));
   else bad(`No config at ${CONFIG_FILE}. Run the installer.`);
   const hash2 = installedExtensionHash();
   if (!existsSync10(join13(extensionDir(), "CSXS", "manifest.xml"))) bad(`After Effects extension missing at ${extensionDir()}. Run the installer.`);
-  else if (hash2 !== "273f538c85bc" && compareVersions(installedExtensionVersion() ?? "0", VERSION) > 0)
-    warn(`A newer After Effects extension (v${installedExtensionVersion()}) is installed than this server (v${VERSION}): another copy of AE MCP is newer. Update this one (ae-mcp update, or the latest .mcpb).`);
-  else if (hash2 !== "273f538c85bc") warn(`Extension at ${extensionDir()} is a different version (${hash2 ?? "unknown"} vs ${"273f538c85bc"}). Re-run the installer.`);
+  else if (hash2 !== "fa100cce1c50" && compareVersions(installedExtensionVersion() ?? "0", VERSION) > 0)
+    warn(`A newer After Effects extension (v${installedExtensionVersion()}) is installed than this server (v${VERSION}): another copy of Surehand MCP is newer. Update this one (ae-mcp update, or the latest .mcpb).`);
+  else if (hash2 !== "fa100cce1c50") warn(`Extension at ${extensionDir()} is a different version (${hash2 ?? "unknown"} vs ${"fa100cce1c50"}). Re-run the installer.`);
   else ok("After Effects extension installed");
   if (bundledExtensionSigned) {
     const sig = installedExtensionSignature();
@@ -80245,7 +80245,7 @@ After Effects MCP self-test v${VERSION}`));
   const before = full ? await projectState() : void 0;
   const job = await runJsx(
     `var c = app.project.items.addComp("__aemcp_selftest", 640, 360, 1, 2, 30);
-var t = c.layers.addText("AE MCP OK");
+var t = c.layers.addText("Surehand MCP OK");
 var p = t.property("ADBE Transform Group").property("ADBE Position");
 p.setValuesAtTimes([0, 1], [[100, 180], [540, 180]]);
 var fx = t.property("ADBE Effect Parade").addProperty("ADBE Drop Shadow");
@@ -80258,7 +80258,7 @@ var r = { keys: p.numKeys, effect: fx.matchName, exprError: t.property("ADBE Tra
 c.remove();
 return r;`,
     { png },
-    { undoGroup: "AE MCP self-test", timeoutMs: 6e4 }
+    { undoGroup: "Surehand MCP self-test", timeoutMs: 6e4 }
   );
   if (!job.ok) bad(`Test job failed: ${job.error?.message}`);
   else {
@@ -80285,7 +80285,7 @@ return r;`,
 async function summary(failures) {
   if (!failures) {
     console.log(`
-${green(bold("All checks passed. After Effects MCP is ready."))}
+${green(bold("All checks passed. Surehand MCP is ready."))}
 `);
     return 0;
   }
@@ -80330,7 +80330,7 @@ async function runUpdate() {
   }
   const latest = rel.tag_name.replace(/^v/, "");
   void checkForUpdate(true);
-  if (compareVersions(latest, VERSION) <= 0) return { ...base, ok: true, to: latest, message: `AE MCP is up to date (v${VERSION}).` };
+  if (compareVersions(latest, VERSION) <= 0) return { ...base, ok: true, to: latest, message: `Surehand MCP is up to date (v${VERSION}).` };
   if (!rel.assets.some((a) => a.name === SERVER_ASSET))
     return { ...base, ok: false, to: latest, url: rel.html_url, message: `v${latest} can't be installed automatically. Download it from ${rel.html_url}` };
   const tmp = INSTALLED_SERVER.replace(/\.mjs$/, ".download.mjs");
@@ -80364,7 +80364,7 @@ async function runUpdate() {
     updated: true,
     url: rel.html_url,
     restartAfterEffects: extension,
-    message: `Updated AE MCP from v${VERSION} to v${latest}. ` + (extension ? "Restart After Effects and your AI apps to use it." : "Restart your AI apps to use it.") + (running ? " (If you use the Claude Desktop extension (.mcpb), install the new AE-MCP.mcpb from the release page as well.)" : "")
+    message: `Updated Surehand MCP from v${VERSION} to v${latest}. ` + (extension ? "Restart After Effects and your AI apps to use it." : "Restart your AI apps to use it.") + (running ? " (If you use the Claude Desktop extension (.mcpb), install the new Surehand-MCP.mcpb from the release page as well.)" : "")
   };
 }
 async function updateCommand(args) {
@@ -80372,7 +80372,7 @@ async function updateCommand(args) {
   if (args.includes("--json")) console.log(JSON.stringify(r));
   else {
     console.log(bold(`
-AE MCP update`));
+Surehand MCP update`));
     (r.ok ? ok : fail)(r.message);
     if (!r.ok && r.url) warn(`Release page: ${r.url}`);
   }
@@ -80384,7 +80384,7 @@ init_define_AEMCP_CEP_FILES();
 import { existsSync as existsSync12, readdirSync as readdirSync6, readFileSync as readFileSync14, rmSync as rmSync4, writeFileSync as writeFileSync9 } from "node:fs";
 import { join as join14 } from "node:path";
 function uninstall(argv) {
-  console.log(bold("\nAfter Effects MCP uninstaller\n"));
+  console.log(bold("\nSurehand MCP uninstaller\n"));
   const keepConfig = argv.includes("--keep-config");
   if (existsSync12(extensionDir())) {
     rmSync4(extensionDir(), { recursive: true, force: true });
@@ -80807,7 +80807,7 @@ ${lines.join("\n")}`).join("\n\n") + "\n\n* = not loaded in this chat: run it wi
 // src/server.ts
 function createMcpServer(profile = resolveProfile()) {
   const instructions = INSTRUCTIONS + (profile.name === "full" ? "" : "\n- This chat has the core tools loaded. Many more (3D, audio, text styling, footage, render settings, masks, Essential Graphics, project management...) are available on demand: ae_tools lists them, ae_tools {describe: [...]} gives parameters, ae_call runs them. ae_run_script can do anything else.");
-  const server = new McpServer({ name: "after-effects", title: "Adobe After Effects", version: VERSION }, { instructions });
+  const server = new McpServer({ name: "after-effects", title: "Surehand MCP for Adobe After Effects", version: VERSION }, { instructions });
   const catalog = applyProfile(server, profile);
   registerCoreTools(server);
   registerJsxTools(server, ALL_JSX_TOOLS);
@@ -80894,11 +80894,11 @@ function startHttp() {
     }
   });
   http.listen(port, host, () => {
-    console.error(`AE MCP (HTTP) v${VERSION} listening on http://${host}:${port}/mcp`);
+    console.error(`Surehand MCP (HTTP) v${VERSION} listening on http://${host}:${port}/mcp`);
     if (!noAuth) console.error(`Auth: header "Authorization: Bearer <token>" or URL http://${host}:${port}/mcp/<token> (token in ~/.aemcp/config.json)`);
   });
 }
-var HELP = `ae-mcp v${VERSION} - MCP server for Adobe After Effects
+var HELP = `Surehand MCP v${VERSION} for Adobe After Effects (command: ae-mcp)
 
 Usage:
   ae-mcp                 run the MCP server over stdio (Claude Desktop, Claude Code, Cursor...)
