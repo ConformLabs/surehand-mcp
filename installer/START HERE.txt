@@ -60,7 +60,8 @@ Windows: "Windows protected your PC" -> click "More info" > "Run anyway".
 
 UPDATES & HELP
 --------------
-When a new version is out, After Effects shows it in Window > Extensions > Surehand MCP.
+When a new version is out, the Surehand panel in After Effects (Window > Extensions > Surehand MCP)
+shows "update ready" at the bottom; click it to install.
 Something wrong? Run "2. Test Installation"; if it finds a problem it prints a report
 (with no passwords or keys in it) that you can send along with your question.
 New versions and questions: https://github.com/ConformLabs/surehand-mcp

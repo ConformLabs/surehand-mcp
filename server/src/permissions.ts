@@ -1,7 +1,7 @@
 // Permission modes, set in the Surehand MCP panel or ~/.surehand/ae/config.json:
 //   "permissions": { "mode": "full" | "ask" | "read-only", "allowShell": true }
 // - full: everything runs (your AI app may still ask you per tool call)
-// - ask: every edit and script waits for Allow/Deny in After Effects (Window > Extensions > Surehand MCP)
+// - ask: every edit and script waits for Allow/Deny in After Effects (the Surehand panel, or its approval pop-up)
 // - read-only: tools that edit are refused; scripts run, but if one changes the project it is undone
 //   (scripts that call executeCommand, begin/endUndoGroup or purge are refused before they run)
 // allowShell: false refuses scripts that call system.callSystem (shell commands).
@@ -12,7 +12,7 @@ export type PermissionMode = "full" | "ask" | "read-only";
 
 const READ_ONLY_TEXT =
   "Surehand MCP is in read-only mode, so tools that change the project are disabled. " +
-  "The user can change this in After Effects: Window > Extensions > Surehand MCP > Permissions.";
+  "The user can change this with the mode selector (Full / Ask / Read-only) at the top of the Surehand panel in After Effects (Window > Extensions > Surehand MCP).";
 
 /**
  * The permissions in force. A config.json that is there but can't be read (and was never read
@@ -46,8 +46,8 @@ export function usesShell(code: string): boolean {
 export let READ_ONLY_REFUSAL = READ_ONLY_TEXT;
 
 export const SHELL_REFUSAL =
-  "Shell commands (system.callSystem) are disabled in the Surehand MCP permissions. The user can allow them in " +
-  "Window > Extensions > Surehand MCP > Permissions (or \"allowShell\": true in ~/.surehand/ae/config.json).";
+  "Shell commands (system.callSystem) are disabled in the Surehand MCP permissions. The user can allow them in the " +
+  "Surehand panel in After Effects: \u2630 menu \u203a AI may run shell commands \u203a Yes (or \"allowShell\": true in ~/.surehand/ae/config.json).";
 
 /**
  * What the approval prompt in After Effects shows for a tool call: the script, or the call's

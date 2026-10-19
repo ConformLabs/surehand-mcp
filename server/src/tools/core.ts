@@ -256,8 +256,8 @@ export function readOnlyScriptRefusal(code: string, transpiled?: string): string
     `Nothing ran. Surehand MCP is in read-only mode, and this script mentions ${names.join(", ")}.\n${reasons.join("\n")}\n` +
     "Scripts that mention these names are refused (the check reads the code, so a name in a string counts too, and so does " +
     "the same method name on another object, such as obj.save()). " +
-    "To run it on purpose, the user can switch to edit mode (Full access, or Ask before every change) in " +
-    "After Effects: Window > Extensions > Surehand MCP > Permissions."
+    "To run it on purpose, the user can switch to Full or Ask with the mode selector at the top of the " +
+    "Surehand panel in After Effects (Window > Extensions > Surehand MCP)."
   );
 }
 

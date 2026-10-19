@@ -30,18 +30,33 @@ Claude / ChatGPT ──MCP──> surehand-ae server (Node) ──localhost─�
 
 ## Download
 
-**[⬇ Download the latest release](https://github.com/ConformLabs/surehand-mcp/releases/latest)**: get
-`Surehand-MCP-<version>.zip` (everything, Mac + Windows), or just `Surehand-MCP.mcpb` if you only use Claude Desktop.
-Unzip it and open `START HERE.txt`.
+**[⬇ Download the latest release](https://github.com/ConformLabs/surehand-mcp/releases/latest)**:
+
+- **Mac:** `Surehand-MCP-<version>.pkg` (signed and notarized)
+- **Windows:** `Surehand-MCP-Setup-<version>.exe` (signed)
+- Only Claude Desktop: `Surehand-MCP.mcpb`
+- Everything in one folder (Mac + Windows scripts, for setups the installers don't cover): `Surehand-MCP-<version>.zip`;
+  unzip it and open `START HERE.txt`
 
 ## Requirements
 
-- After Effects 2020 (17.0) or newer on macOS or Windows, in any language (tested on After Effects 2025-2026; older versions best effort)
-- Nothing else: the `.mcpb` uses Claude Desktop's built-in Node.js, and the installer downloads Node.js if it is missing
+- After Effects CC 2019 (16.0) or newer on macOS or Windows, in any language (tested on After Effects 2025-2026; older versions best effort)
+- Nothing else: the `.pkg` and the Setup `.exe` include Node.js 24, the `.mcpb` uses Claude Desktop's built-in Node.js,
+  and the zip's installer downloads Node.js if it is missing
 
 ## Install
 
-Get the release folder (`npm run package` in `server/` builds `dist-zip/Surehand-MCP/` and a zip). It looks like this:
+**Mac:** double-click **`Surehand-MCP-<version>.pkg`** and follow the steps (no administrator password: everything goes
+into your own home folder). **Windows:** run **`Surehand-MCP-Setup-<version>.exe`** (per user, no administrator rights).
+Both install a private Node.js 24, the server, the After Effects extension, and connect the AI apps they find (see
+"The installer" below). Then restart After Effects once.
+
+**Claude Desktop only:** double-click **`Surehand-MCP.mcpb`** and click Install in Claude Desktop. Restart After Effects once.
+On first start the server installs its After Effects extension by itself.
+Use either the `.mcpb` or an installer for Claude Desktop, not both.
+
+**The zip** has the same installer as double-click scripts. Get the release folder (`npm run package` in `server/`
+builds `dist-zip/Surehand-MCP/` and a zip). It looks like this:
 
 ```
 Surehand-MCP/
@@ -52,14 +67,8 @@ Surehand-MCP/
   Support files/                 run.sh, run.ps1, surehand-ae.mjs, this README
 ```
 
-Then:
-
-**Claude Desktop only (easiest):** double-click **`Surehand-MCP.mcpb`** and click Install in Claude Desktop. Restart After Effects once.
-On first start the server installs its After Effects extension by itself.
-
-**Any app (Claude Desktop, Claude Code, ChatGPT desktop, Cursor, Codex):** double-click **1. Install** in the
-`2. Mac` or `3. Windows` folder, then restart After Effects once.
-Use either the `.mcpb` or the installer for Claude Desktop, not both.
+Then double-click **1. Install** in the `2. Mac` or `3. Windows` folder (any app: Claude Desktop, Claude Code,
+ChatGPT desktop, Cursor, Codex), then restart After Effects once.
 
 **Check it:** with After Effects open, double-click **2. Test Installation** in the same folder.
 
@@ -67,21 +76,24 @@ Use either the `.mcpb` or the installer for Claude Desktop, not both.
 macOS Gatekeeper or Windows SmartScreen blocks the files.
 
 The installer:
-- uses the Node.js on your PATH, or downloads a private Node.js 22 LTS into `~/.surehand/node` (checksum-verified)
+- uses the private Node.js 24 that the `.pkg` / Setup `.exe` put in `~/.surehand/node`; the zip's scripts use the Node.js on
+  your PATH, or download a private Node.js 22 LTS into `~/.surehand/node` (checksum-verified)
 - copies the MCP server to `~/.surehand/ae/server/surehand-ae.mjs` (one self-contained file)
 - installs the After Effects extension (`com.aemcp`) into your user CEP extensions folder. The extension
   is signed, so it loads without enabling unsigned extensions (`PlayerDebugMode`)
 - creates `~/.surehand/ae/config.json` with a random access token
 - registers the server with **Claude Desktop**, **Claude Code**, **ChatGPT desktop / Codex** (`~/.codex/config.toml`,
   created if the ChatGPT or Codex app is installed) and **Cursor** if they are installed
-  under the name `surehand-ae` (original config files are backed up once as `*.surehand.bak`); if Claude Desktop is open it offers to restart it,
+  under the name `surehand-ae`. Before a config file is changed, a timestamped backup is made next to it
+  (`*.surehand-<time>.bak`, the newest five are kept); the very first original also stays as `*.surehand.bak`. If Claude Desktop is open it offers to restart it,
   because a running Claude Desktop overwrites its config file
 
 The server also checks the After Effects extension every time it starts and installs or updates it if needed, so
 updating is just: replace the `.mcpb` (or re-run the installer) and restart After Effects.
 
 The bridge starts automatically with After Effects; nothing needs to be opened.
-To see its status, open **Window > Extensions > Surehand MCP** (green dot = connected, plus a log of recent calls).
+To see its status, open **Window > Extensions > Surehand MCP** (green dot = connected, plus the latest calls; the full
+list is under **☰ › Activity history**).
 
 To uninstall: double-click **4. Uninstall** (and remove the `.mcpb` in Claude Desktop >
 Settings > Extensions if you used it).
@@ -163,7 +175,7 @@ To rotate the token, delete `token` from `~/.surehand/ae/config.json` and re-run
 29 tools** is loaded (about 9k tokens instead of 27k for all 98), and **every other tool stays available on demand**:
 `ae_tools` lists all tools by category (or gives full parameter details of chosen ones), and `ae_call` runs any tool by
 name with the same validation, permissions, change report and activity log. Loading everything up front is optional:
-switch to **Full** in After Effects (**Window > Extensions > Surehand MCP > AI tools**), in Claude Desktop's
+switch to **All tools** in the Surehand panel in After Effects (**☰ › Tools the AI sees › All tools**), in Claude Desktop's
 extension settings ("Enable all tools") for the `.mcpb`, or with `"toolProfile": "full"` in `~/.surehand/ae/config.json`, then
 restart the AI app. Advanced: `"toolProfile": "core,ae_import_files,ae_render_queue_start"` adds single tools.
 
@@ -403,23 +415,23 @@ mean opening the old `.aep` in place of your project, so it isn't done automatic
 
 ## Control and trust
 
-**Permissions** (After Effects: Window > Extensions > Surehand MCP, or `"permissions"` in `~/.surehand/ae/config.json`; applies to
-the next request, no restart):
+**Permissions** (the mode selector **Full / Ask / Read-only** at the top of the Surehand panel in After Effects, or
+`"permissions"` in `~/.surehand/ae/config.json`; applies to the next request, no restart):
 
 | Mode | What happens |
 |---|---|
-| Full access (default) | Everything runs. Your AI app may still ask you before each tool call. |
-| Ask before every change | Every edit and script waits in the Surehand MCP panel, showing the exact code or arguments, until you click **Allow** or **Deny**. The panel opens by itself. Reads are not held. |
+| Full (default) | Everything runs. Your AI app may still ask you before each tool call. |
+| Ask | Every edit and script waits in the Surehand MCP panel, showing the exact code or arguments, until you click **Allow** or **Deny**. When the panel is closed, an approval pop-up appears instead. Reads are not held. |
 | Read-only | Tools that edit are refused. Scripts still run (to read information), but if one changes the project it is undone immediately and the AI is told what it tried to change. Scripts that touch the undo history (`executeCommand`, `beginUndoGroup`, `endUndoGroup`, `purge`) or do things that can't be undone (opening, closing or saving projects, `newProject`, `quit`, rendering, `scheduleTask`, saving preferences) are refused before they run. This is a text check (comments are ignored, escapes are decoded; a name inside a string or on another object counts too): a call assembled at runtime gets past it, and is then undone at most once, checked with a temporary undo marker, and reported if the project isn't back. |
 
-**Shell commands** (`system.callSystem`) can be blocked separately. These are safeguards against mistakes, not a
+**Shell commands** (`system.callSystem`) can be blocked separately (**☰ › AI may run shell commands**). These are safeguards against mistakes, not a
 sandbox: a script can still read and write files.
 
 **Activity log.** Every tool call is recorded in `~/.surehand/ae/activity.jsonl` with time, AI app, tool, arguments
-(including the full script code), duration and result. The Surehand MCP panel shows the latest calls (click one for its code),
-**Open log** reveals the file, and `surehand-ae activity` prints it.
+(including the full script code), duration and result. The Surehand MCP panel shows the latest calls, **☰ › Activity history** lists them (click one for what
+changed), **Open log file** there reveals the file, and `surehand-ae activity` prints it.
 
-**Several After Effects versions at once.** Each running After Effects registers its own bridge (ports 8765+). The AI
+**Several After Effects versions at once.** Each running After Effects registers its own bridge (ports 8765–8774). The AI
 controls the one you used most recently; `ae_status` lists all of them and switches with `instance: "2025"` (or a
 version or port). Set a permanent preference with `"instance": "2026"` in the config.
 
@@ -440,7 +452,7 @@ Please share reports from other versions.
 |---|---|
 | "Cannot reach After Effects" | Make sure AE is running. Open **Window > Extensions > Surehand MCP** to see the bridge status. If **Surehand MCP** is missing from the menu, re-run the installer and fully restart AE. |
 | Extension missing from the menu | Run `selftest`: it checks the extension's files against its signature (After Effects silently skips a signed extension whose files changed). Re-running the installer rewrites them. As a last resort, allowing unsigned extensions also works: set `PlayerDebugMode` to `1` with `defaults write com.adobe.CSXS.12 PlayerDebugMode 1` (macOS) or in the registry under `HKCU\Software\Adobe\CSXS.12` (Windows). |
-| "Port 8765 is already in use" | Only one After Effects instance can host the bridge. Close the other instance, or change `bridgePort` in `~/.surehand/ae/config.json` and restart AE + your AI app. |
+| "Ports 8765-8774 are all in use" | Each After Effects takes the first free port from 8765 to 8774, so this means ten bridges are running or other programs hold those ports. Close other After Effects instances (or the program using the ports), or change `bridgePort` (the first port of the range) in `~/.surehand/ae/config.json` and restart AE + your AI app. |
 | "Token mismatch" | Re-run the installer (it keeps the existing token) and restart AE. |
 | Scripts can't write files or use the network | Enable **Settings > Scripting & Expressions > Allow Scripts to Write Files and Access Network** in After Effects. Frame previews and the built-in tools work without it. |
 | A call times out | ExtendScript can't be interrupted: long scripts or renders keep AE busy, and modal dialogs block it. Check AE, then retry. Pass `timeoutSeconds` for long jobs. |
@@ -449,10 +461,11 @@ Please share reports from other versions.
 
 **Reporting a problem:** run **2. Test Installation**. If anything fails, it prints a diagnostics report at the end
 (no secrets in it). You can also click **Copy diagnostics** in the Surehand MCP panel, or run `surehand-ae diagnostics`.
-The panel also shows recent calls, and a banner when a new version is out (checked against GitHub at most once a day;
-turn off with `"updateCheck": false` in `~/.surehand/ae/config.json`).
+The panel also shows recent calls, and **· update ready** next to the version at the bottom when a new version is out
+(checked against GitHub at most once a day; turn off with `"updateCheck": false` in `~/.surehand/ae/config.json`).
 
-**Updating:** click **Update** in that banner, or run `surehand-ae update` (`node ~/.surehand/ae/server/surehand-ae.mjs update`;
+**Updating:** click the version at the bottom of the panel (or **☰ › Check for updates…**) and install from the
+**Updates** screen, or run `surehand-ae update` (`node ~/.surehand/ae/server/surehand-ae.mjs update`;
 `update --check` only reports). It downloads the server from the latest GitHub release, checks its SHA-256 checksum and that it
 starts, replaces the installed one (the old one is kept as `surehand-ae.mjs.previous`) and updates the After Effects extension. Restart After Effects and your
 AI apps afterwards. If you use the Claude Desktop extension (.mcpb), install the new `Surehand-MCP.mcpb` from the release page
@@ -467,7 +480,7 @@ is in `~/.surehand/migration.log`. Until After Effects is restarted once, the ol
 `~/.aemcp`, so a copy of `config.json`, an `instances` folder, a small `server/ae-mcp.mjs` that starts the new server and
 `MOVED.txt` stay there; uninstalling removes them too.
 With the Claude Desktop extension: the 1.4 `.mcpb` is a new extension to Claude Desktop (named `surehand-ae`), so after
-installing it remove the old Surehand MCP entry in **Settings > Extensions**.
+installing it remove the old **After Effects MCP** entry in **Settings > Extensions**.
 
 **Environment variables** (each also works with the older `AEMCP_` prefix): `SUREHAND_AE_CONFIG` (config file; instances are
 looked up next to it), `SUREHAND_AE_BRIDGE_PORT`, `SUREHAND_AE_TOKEN`, `SUREHAND_AE_HTTP_PORT`, `SUREHAND_AE_HTTP_TOKEN`,

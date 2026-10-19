@@ -95,7 +95,7 @@ const HELP = `Surehand MCP v${VERSION} for Adobe After Effects (command: surehan
 
 Usage:
   surehand-ae                 run the MCP server over stdio (Claude Desktop, Claude Code, Cursor...)
-  surehand-ae [--tools core|full]   core (default, ~20 tools) or every tool
+  surehand-ae [--tools core|full]   core (default, 29 tools) or every tool
   surehand-ae --http [--port 8766] [--host 127.0.0.1] [--no-auth]
                          run over Streamable HTTP at /mcp (ChatGPT via a tunnel)
   surehand-ae install [--skip-clients] [--no-claude-desktop|--no-claude-code|--no-cursor|--no-codex]
