@@ -362,7 +362,7 @@ describe("Surehand panel: ☰ menu", () => {
 
   it("builds After Effects' panel menu with checkable settings", () => {
     const xml = panel().menuXml(config());
-    expect(xml).toContain('<MenuItem Id="shellYes" Label="Yes" Enabled="true" Checkable="true" Checked="true"/>');
+    expect(xml).toContain('<MenuItem Id="shellYes" Label="Allowed" Enabled="true" Checkable="true" Checked="true"/>');
     expect(xml).toContain('<MenuItem Id="toolsCore" Label="Core (faster)" Enabled="true" Checkable="true" Checked="true"/>');
     expect(xml).toContain('Label="About &amp; help…"');
     panel().menu("shellNo");

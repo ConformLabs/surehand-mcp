@@ -47,7 +47,7 @@ export let READ_ONLY_REFUSAL = READ_ONLY_TEXT;
 
 export const SHELL_REFUSAL =
   "Shell commands (system.callSystem) are disabled in the Surehand MCP permissions. The user can allow them in the " +
-  "Surehand panel in After Effects: \u2630 menu \u203a AI may run shell commands \u203a Yes (or \"allowShell\": true in ~/.surehand/ae/config.json).";
+  "Surehand panel in After Effects: \u2630 menu \u203a Shell commands in scripts \u203a Allowed (or \"allowShell\": true in ~/.surehand/ae/config.json).";
 
 /**
  * What the approval prompt in After Effects shows for a tool call: the script, or the call's

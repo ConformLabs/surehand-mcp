@@ -424,7 +424,7 @@ mean opening the old `.aep` in place of your project, so it isn't done automatic
 | Ask | Every edit and script waits in the Surehand MCP panel, showing the exact code or arguments, until you click **Allow** or **Deny**. When the panel is closed, an approval pop-up appears instead. Reads are not held. |
 | Read-only | Tools that edit are refused. Scripts still run (to read information), but if one changes the project it is undone immediately and the AI is told what it tried to change. Scripts that touch the undo history (`executeCommand`, `beginUndoGroup`, `endUndoGroup`, `purge`) or do things that can't be undone (opening, closing or saving projects, `newProject`, `quit`, rendering, `scheduleTask`, saving preferences) are refused before they run. This is a text check (comments are ignored, escapes are decoded; a name inside a string or on another object counts too): a call assembled at runtime gets past it, and is then undone at most once, checked with a temporary undo marker, and reported if the project isn't back. |
 
-**Shell commands** (`system.callSystem`) can be blocked separately (**☰ › AI may run shell commands**). These are safeguards against mistakes, not a
+**Shell commands** (`system.callSystem`) can be blocked separately (**☰ › Shell commands in scripts**). These are safeguards against mistakes, not a
 sandbox: a script can still read and write files.
 
 **Activity log.** Every tool call is recorded in `~/.surehand/ae/activity.jsonl` with time, AI app, tool, arguments
