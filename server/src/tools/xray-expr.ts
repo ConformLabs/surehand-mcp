@@ -29,9 +29,10 @@ function unescape(src: string, j: number): [string, number] {
   if (c === "x" && hex(2) >= 0) return [String.fromCharCode(hex(2)), j + 4];
   if (c === "u" && hex(4) >= 0) return [String.fromCharCode(hex(4)), j + 6];
   if (c === "u" && src[j + 2] === "{") {
-    const close = src.indexOf("}", j);
-    const cp = parseInt(src.slice(j + 3, close), 16);
-    if (cp <= 0x10ffff) return [String.fromCodePoint(cp), close + 1];
+    const close = src.indexOf("}", j + 3);
+    const digits = close > j + 3 ? src.slice(j + 3, close) : "";
+    const cp = /^[\da-fA-F]{1,8}$/.test(digits) ? parseInt(digits, 16) : NaN;
+    if (cp >= 0 && cp <= 0x10ffff) return [String.fromCodePoint(cp), close + 1];
   }
   const end = c === "\r" && src[j + 2] === "\n" ? j + 3 : j + 2;
   return [c in ESC && !(c === "0" && /\d/.test(src[j + 2] ?? "")) ? ESC[c] : c, end];
@@ -187,7 +188,10 @@ export function parseExpression(src: string): ParsedExpression {
     if (w) assigned.set(t.v, (assigned.get(t.v) ?? 0) + w);
   });
   const text = (from: number, to: number) => {
-    const s = src.slice(toks[from].s, toks[Math.max(from, to - 1)].e).replace(/\s+/g, " ");
+    // ranges can run past the last token when a call is never closed: clamp, never read undefined
+    const last = toks.length - 1;
+    if (last < 0 || from > last) return "";
+    const s = src.slice(toks[from].s, toks[Math.min(last, Math.max(from, to - 1))].e).replace(/\s+/g, " ");
     return s.length > 100 ? s.slice(0, 97) + "..." : s;
   };
 
@@ -201,7 +205,8 @@ export function parseExpression(src: string): ParsedExpression {
       else if (depth === 1 && is(j, /^,$/)) args.push([start, j]), (start = j + 1);
     }
     if (j > start) args.push([start, Math.min(j, toks.length)]);
-    return { args, end: j + 1 };
+    // an unclosed call ends at the last token
+    return { args, end: Math.min(j + 1, toks.length) };
   };
 
   const sel = (args: [number, number][], all = false): Sel => {

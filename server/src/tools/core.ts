@@ -31,7 +31,7 @@ var dispW = reg[2] * par, fit = max / Math.max(dispW, reg[3]);
 var zoom = args.region ? Math.min(8, fit) : Math.min(1, fit);
 var W = Math.max(4, Math.round(dispW * zoom)), H = Math.max(4, Math.round(reg[3] * zoom));
 var tmp = app.project.items.addComp("__aemcp_preview", W, H, 1, c.duration, c.frameRate);
-var restore = [], info = null;
+var restore = [], info = null, tmpLeft = false;
 try {
   // a difference image needs an opaque black base, or "identical" areas show as transparent
   var bgSpec = args.background || (args.compareWith ? "#000000" : null);
@@ -85,8 +85,9 @@ try {
 } finally {
   // never leave anything behind, even if rendering fails
   for (var k = 0; k < restore.length; k++) { try { var R = restore[k][0]; if (restore[k][1]) R.locked = false; R.enabled = true; if (restore[k][1]) R.locked = true; } catch (e) {} }
-  try { tmp.remove(); } catch (e) {}
+  try { tmp.remove(); } catch (e) { tmpLeft = true; }
 }
+if (info && tmpLeft) info.tmpLeft = true;
 return info;`;
 
 export const CONTACT_SHEET_JSX = `${OUTPUT_GUARD_JSX}
@@ -152,7 +153,7 @@ return r;`;
  * Run a JSX body that saves a PNG (it receives args.tmpDir and returns {path, ...}),
  * wait until AE has finished writing it, and return it base64-encoded.
  */
-async function renderPng(body: string, args: Record<string, unknown>): Promise<{ error: CallToolResult } | { info: any; data: string }> {
+async function renderPng(body: string, args: Record<string, unknown>): Promise<{ error: CallToolResult } | { info: any; data: string; note: string }> {
   // A folder both AE and this process can access (system temp dirs can be sandboxed per app on macOS)
   const tmpDir = join(homedir(), ".aemcp", "tmp");
   mkdirSync(tmpDir, { recursive: true });
@@ -161,6 +162,7 @@ async function renderPng(body: string, args: Record<string, unknown>): Promise<{
   const r = await runJsx(body, { ...args, tmpDir }, { ...RENDER_RUN_OPTIONS, undoGroup: "Surehand MCP preview", timeoutMs: 180_000 });
   if (!r.ok) return { error: formatResult(r) };
   const info = r.result as any;
+  const note = renderCleanupNote(r, info?.tmpLeft, "__aemcp_preview");
   // saveFrameToPng may finish writing asynchronously; wait for a stable non-empty file
   let last = -1;
   for (let i = 0; i < 150; i++) {
@@ -178,7 +180,7 @@ async function renderPng(body: string, args: Record<string, unknown>): Promise<{
       unlinkSync(info.path);
     } catch {}
   }
-  return { info, data };
+  return { info, data, note };
 }
 
 // What read-only mode refuses before a script runs (the one list): calls that change the undo history
@@ -266,6 +268,18 @@ export function readOnlyScriptRefusal(code: string, transpiled?: string): string
  */
 /** Rendering tools: their temporary comp leaves no undo step behind (rolled back and checked like read-only mode). */
 export const RENDER_RUN_OPTIONS: RunOptions = { report: ["*"], checkOnly: true, rollback: "changes" };
+
+/**
+ * What a render left behind that the user should know about ("" when nothing): a temporary comp the
+ * JSX couldn't remove (`tmpLeft`) that the rollback didn't take away either, or a rollback that couldn't
+ * be verified.
+ */
+export function renderCleanupNote(r: RunResult, tmpLeft: unknown, tmpName: string): string {
+  const rb = r.rollback, notes: string[] = [];
+  if (tmpLeft && !(rb?.undone && rb.verified)) notes.push(`The temporary comp "${tmpName}" could not be removed; it can be deleted from the Project panel.`);
+  if (rb && !rb.verified) notes.push(rollbackProblem(rb, "the render"));
+  return notes.join("\n");
+}
 export const READ_ONLY_RUN_OPTIONS: RunOptions = { undoGroup: "Surehand MCP Script (read-only check)", report: ["*"], checkOnly: true, rollback: "changes" };
 
 /** The refusal for a read-only script that changed the project (or may have), else null. */
@@ -550,13 +564,14 @@ export function registerCoreTools(server: McpServer) {
         const body = RENDER_FRAME_JSX;
         const out = await renderPng(body, args);
         if ("error" in out) return out.error;
-        const { info, data } = out;
+        const { info, data, note } = out;
         const parts = [`Frame of "${info.comp}" at ${info.time}s (${info.width}x${info.height}`];
         if (info.region) parts.push(`, region ${info.region.join(",")} at ${info.zoom}x`);
         parts.push(")");
         if (args.layers?.length) parts.push(`, only layers ${args.layers.join(", ")}`);
         if (info.compare) parts.push(`; difference vs "${info.compare.comp}" at ${info.compare.time}s (black = identical)`);
         if (args.outputPath) parts.push(`; saved to ${info.path}`);
+        if (note) parts.push(`\n${note}`);
         return { content: [{ type: "image", data, mimeType: "image/png" }, { type: "text", text: parts.join("") }] };
       } catch (e) {
         return errorResult(e);
@@ -591,14 +606,14 @@ export function registerCoreTools(server: McpServer) {
         const body = CONTACT_SHEET_JSX;
         const out = await renderPng(body, args);
         if ("error" in out) return out.error;
-        const { info, data } = out;
+        const { info, data, note } = out;
         return {
           content: [
             { type: "image", data, mimeType: "image/png" },
             {
               type: "text",
               text: `Contact sheet of "${info.comp}": ${info.times.length} frames (${info.columns}x${info.rows}, left-to-right, top-to-bottom) at ` +
-                `${info.times.map((t: number) => Math.round(t * 100) / 100 + "s").join(", ")}${args.outputPath ? `; saved to ${info.path}` : ""}`,
+                `${info.times.map((t: number) => Math.round(t * 100) / 100 + "s").join(", ")}${args.outputPath ? `; saved to ${info.path}` : ""}${note ? `\n${note}` : ""}`,
             },
           ],
         };

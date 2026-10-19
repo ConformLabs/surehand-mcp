@@ -11,6 +11,12 @@ let comps: FakeComp[];
 let calls: { kind: "render" | "batch"; opts: any }[];
 /** what the batch does to the scene (run), or a failing batch */
 let batchEdit: (() => void) | "fail" = () => {};
+/** the open project's path (null = unsaved) */
+let project: string | null;
+/** renders after this many frames throw (the frames already written stay on disk) */
+let failAfterFrames: number | null;
+/** the temporary comp couldn't be removed, and the rollback did not undo it */
+let tmpLeft: boolean;
 
 function draw(c: FakeComp): Buffer {
   const px = new Uint8Array(c.width * c.height * 4);
@@ -45,13 +51,14 @@ function fakeRender(args: any) {
       times = args.times ?? Array.from({ length: n }, (_, i) => (i * (c!.duration - 1 / c!.frameRate)) / Math.max(1, n - 1));
     }
     const frames = times.map((time, j) => {
+      if (failAfterFrames !== null && failAfterFrames-- <= 0) throw new Error("saveFrameToPng failed");
       const path = join(args.dir, `${args.prefix}${c!.id}_${j}.png`);
       writeFileSync(path, draw(c!));
       return { time, path };
     });
     out.push({ id: c.id, name: c.name, width: c.width, height: c.height, pixelAspect: c.pixelAspect, frameRate: c.frameRate, renderW: c.width, renderH: c.height, frames });
   }
-  return { ok: true, logs: [], result: { project: "/work/spot.aep", comps: out } };
+  return { ok: true, logs: [], result: { project, comps: out, tmpLeft }, rollback: tmpLeft ? { undone: false, verified: false, problem: "unknown" } : { undone: true, verified: true } };
 }
 
 vi.mock("../src/jsx.js", async (original) => {
@@ -96,6 +103,9 @@ beforeEach(() => {
   ];
   calls = [];
   batchEdit = () => {};
+  project = "/work/spot.aep";
+  failAfterFrames = null;
+  tmpLeft = false;
 });
 
 const proofsDir = () => join(home, ".aemcp", "proofs");
@@ -206,6 +216,56 @@ describe("ae_prove_identical", () => {
     expect(calls.filter((c) => c.kind === "render").every((c) => !c.opts.bridge)).toBe(true);
     const shell = await prove({ action: "run", steps: [{ tool: "ae_run_script", args: { code: "system.callSystem('ls')" } }] }, { mode: "full", allowShell: false });
     expect(text(shell)).toMatch(/Shell commands/);
+  });
+
+  it("another project is NOT PROVEN (comp ids belong to one project)", async () => {
+    const id = idOf(await prove({ action: "capture", frames: 1 }, FULL));
+    project = "/work/other.aep";
+    let r = await prove({ action: "compare", id }, FULL);
+    expect(text(r)).toMatch(/Verdict: NOT PROVEN: the reference was captured in \/work\/spot\.aep, but the open project is \/work\/other\.aep \(comp ids may refer to different comps\)/);
+    expect(text(r)).not.toMatch(/identical/i);
+    project = null;
+    r = await prove({ action: "compare", id }, FULL);
+    expect(text(r)).toMatch(/Verdict: NOT PROVEN: .*the open project is an unsaved project/);
+  });
+
+  it("an unsaved project: compared when the comps still match, with a note; a renamed comp is NOT PROVEN", async () => {
+    project = null;
+    const id = idOf(await prove({ action: "capture", frames: 1 }, FULL));
+    let r = await prove({ action: "compare", id }, FULL);
+    expect(text(r)).toMatch(/Verdict: IDENTICAL/);
+    expect(text(r)).toMatch(/Note: the reference was captured in an unsaved project, so it can't be confirmed that this is the same project/);
+    // saved in the meantime: still the comps of the capture
+    project = "/work/new.aep";
+    expect(text(await prove({ action: "compare", id }, FULL))).toMatch(/Verdict: IDENTICAL/);
+    comps[0].name = "Other";
+    r = await prove({ action: "compare", id }, FULL);
+    expect(text(r)).toMatch(/Verdict: NOT PROVEN: the reference was captured in an unsaved project and comp id 12 \("Main"\) now has another name/);
+  });
+
+  it("a render that fails half way leaves no frames in ~/.aemcp/tmp", async () => {
+    const id = idOf(await prove({ action: "capture", frames: 3 }, FULL));
+    failAfterFrames = 2;
+    await expect(prove({ action: "compare", id }, FULL)).rejects.toThrow(/saveFrameToPng failed/);
+    expect(readdirSync(join(home, ".aemcp", "tmp"))).toEqual([]);
+  });
+
+  it("run: if the comparison fails after the batch, it says the batch WAS applied and gives the proof id", async () => {
+    batchEdit = () => (failAfterFrames = 0);
+    const r = await prove({ action: "run", frames: 1, steps: [{ tool: "ae_set_property", args: { layer: 1 } }] }, FULL);
+    expect(r.isError).toBe(true);
+    expect(text(r)).toMatch(/^The batch WAS applied \(one undo step\), but the comparison failed: saveFrameToPng failed\nThe reference frames are kept as proof (\S+): compare again with ae_prove_identical \{action: "compare", id: "\1"\}/);
+    expect(text(r)).toMatch(/Batch done: 1 steps/);
+  });
+
+  it("a temporary comp that could not be removed is reported", async () => {
+    tmpLeft = true;
+    const cap = await prove({ action: "capture", frames: 1 }, FULL);
+    expect(text(cap)).toMatch(/The temporary comp "__aemcp_proof" could not be removed; it can be deleted from the Project panel\./);
+    const r = await prove({ action: "compare", id: idOf(cap) }, FULL);
+    expect(text(r)).toMatch(/__aemcp_proof" could not be removed/);
+    tmpLeft = false;
+    expect(text(await prove({ action: "compare", id: idOf(cap) }, FULL))).not.toMatch(/could not be removed/);
   });
 
   it("keeps at most 30 proofs and none older than 7 days", () => {

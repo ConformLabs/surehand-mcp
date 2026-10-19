@@ -99,6 +99,16 @@ export function jsxAnnotations(t: JsxTool) {
   return { readOnlyHint, destructiveHint: !readOnlyHint && !!t.destructive, idempotentHint: !!t.readOnly || !!t.idempotent, openWorldHint: false };
 }
 
+/** Runs a tool's own formatter; a formatter bug must never hide the result (or the edits it reports): fall back to plain JSON. */
+export function applyFormat(format: NonNullable<JsxTool["format"]>, result: unknown, args: Record<string, unknown>): string {
+  try {
+    return format(result, args);
+  } catch (e) {
+    const why = e instanceof Error ? e.message : String(e);
+    return `${JSON.stringify(result) ?? "null"}\n(The summary for this result could not be built (${why}); this is the raw result.)`;
+  }
+}
+
 export function registerJsxTools(server: McpServer, tools: JsxTool[]) {
   for (const t of tools) {
     server.registerTool(
@@ -122,7 +132,7 @@ export function registerJsxTools(server: McpServer, tools: JsxTool[]) {
             report: wantsReport ? reportScope(args) : undefined,
             bridge: edits && perm.mode === "ask" ? { approval: { tool: t.title, summary: approvalSummary(t.name, args) } } : undefined,
           });
-          if (r.ok && t.format) r.result = t.format(r.result, args);
+          if (r.ok && t.format) r.result = applyFormat(t.format, r.result, args);
           return formatResult(r);
         } catch (e) {
           return errorResult(e);

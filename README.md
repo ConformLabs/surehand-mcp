@@ -263,9 +263,15 @@ change, and it renders the same frames again and compares them pixel by pixel. T
 **identical within tolerance** (by default less than half an 8-bit step, so only the rounding of 16/32-bit projects passes; `tolerance: 0` asks for bit-identical), or **differs**, with, for each frame, the largest
 channel difference, how many pixels changed, the largest color difference (ΔE), the area that changed, and a
 difference image of the worst frame (black = identical). If a comp was deleted or resized since the capture, it says so.
+What is compared is the sampled video frames, alpha included: audio, the comp's background color and the times between
+the sampled frames are not, and 32-bit values above 1.0 are clamped when the frames are saved, so differences in
+over-bright areas can be missed. Comp ids belong to one project: a proof captured in a saved project is only compared in
+that same file (otherwise the verdict is not proven); one captured in an unsaved project is compared if every comp still
+has its name, with a note that the project itself couldn't be confirmed.
 `action: "run"` does it in one call: capture, the edits as `ae_batch` steps (one undo step, all or nothing), compare.
 Reference frames are stored in `~/.aemcp/proofs/` for 7 days (30 proofs at most). Rendering works like
-`ae_render_frame`: a temporary comp that is removed again, so the project is left as it was. Capture and compare are
+`ae_render_frame`: through a temporary comp that is removed again and leaves no undo step behind (After Effects still
+marks the project as changed); if the temporary comp can't be removed, the result says so. Capture and compare are
 allowed in read-only mode; `run` makes edits, so it follows the same permissions as `ae_batch`.
 
 ### Project history
@@ -275,7 +281,8 @@ every item (comps, footage with its file paths, solids, folders), comp settings,
 timing, parent and track matte, every property that isn't at its default or is animated (values, keyframes with
 interpolation and easing), expressions, effects, masks, text, markers and the render queue. Taking one doesn't change
 the project and adds no undo step; snapshots are kept in `~/.aemcp/history` (the last 100 per project), and every
-`ae_checkpoint save` stores one too, so checkpoints can be compared. A **diff** compares two snapshots, or a snapshot with
+`ae_checkpoint save` stores one too, so checkpoints can be compared (with a 15 s time budget, so saving stays quick; if
+that isn't enough, the checkpoint says the snapshot is partial and a full one can be taken with `snapshot`). A **diff** compares two snapshots, or a snapshot with
 the project as it is now, and lists what changed, grouped by comp, with a summary first:
 
 ```

@@ -3,7 +3,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { randomBytes } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import { z } from "zod";
@@ -11,7 +11,7 @@ import { runJsx } from "../jsx.js";
 import { permissions, READ_ONLY_REFUSAL } from "../permissions.js";
 import { decodePng, encodePng, type Image } from "../png.js";
 import { errorResult } from "./registry.js";
-import { RENDER_RUN_OPTIONS } from "./core.js";
+import { RENDER_RUN_OPTIONS, renderCleanupNote } from "./core.js";
 import { runBatch } from "./workflow.js";
 
 export const MAX_PROOFS = 30;
@@ -25,7 +25,7 @@ const proofsRoot = () => join(homedir(), ".aemcp", "proofs");
  * width, height, pixelAspect} to render again (a deleted comp or a changed size is reported, not rendered).
  */
 export const PROVE_RENDER_JSX = `
-var out = [], seen = {}, max = args.maxSize || 1920;
+var out = [], seen = {}, max = args.maxSize || 1920, tmpLeft = false;
 var byId = function (id) {
   for (var i = 1; i <= app.project.numItems; i++) { var it = app.project.item(i); if (it.id === id) return it; }
   return null;
@@ -72,10 +72,10 @@ for (var ci = 0; ci < args.comps.length; ci++) {
       var waited = 0; while (!f.exists && waited < 10000) { $.sleep(50); waited += 50; }
       frames.push({ time: times[j], path: f.fsName });
     }
-  } finally { try { tmp.remove(); } catch (e) {} }
+  } finally { try { tmp.remove(); } catch (e) { tmpLeft = true; } }
   out.push({ id: c.id, name: c.name, width: c.width, height: c.height, pixelAspect: par, frameRate: c.frameRate, renderW: W, renderH: H, frames: frames });
 }
-return { project: app.project.file ? app.project.file.fsName : null, comps: out };`;
+return { project: app.project.file ? app.project.file.fsName : null, comps: out, tmpLeft: tmpLeft };`;
 
 interface Rendered {
   id: number;
@@ -112,9 +112,10 @@ async function waitForFiles(paths: string[]) {
 async function render(comps: unknown[], extra: { times?: number[]; frames?: number; maxSize: number }, dir: string, prefix: string) {
   const r = await runJsx(PROVE_RENDER_JSX, { comps, ...extra, dir, prefix }, { ...RENDER_RUN_OPTIONS, undoGroup: "Surehand MCP proof", timeoutMs: 600_000, depth: 6 });
   if (!r.ok) throw new Error(r.error?.message || "After Effects could not render the frames.");
-  const res = r.result as { project: string | null; comps: Rendered[] };
+  const res = r.result as { project: string | null; comps: Rendered[]; tmpLeft?: boolean };
+  const note = renderCleanupNote(r, res.tmpLeft, "__aemcp_proof");
   await waitForFiles(res.comps.flatMap((c) => (c.frames ?? []).map((f) => f.path)));
-  return res;
+  return { ...res, note };
 }
 
 // ---------- storage ----------
@@ -160,7 +161,7 @@ function loadManifest(id?: string): Manifest | string {
 const stamp = () => new Date().toISOString().replace(/[-:]/g, "").replace("T", "-").replace(/\.(\d{3})Z$/, "$1");
 
 /** Render reference frames and store them with a manifest under ~/.aemcp/proofs/<id>/. */
-export async function captureProof(input: { comps?: (number | string)[]; times?: number[]; frames?: number; maxSize?: number }): Promise<Manifest> {
+export async function captureProof(input: { comps?: (number | string)[]; times?: number[]; frames?: number; maxSize?: number }): Promise<Manifest & { note?: string }> {
   pruneProofs(MAX_PROOFS - 1);
   const id = `${stamp()}-${randomBytes(2).toString("hex")}`;
   const dir = join(proofsRoot(), id);
@@ -180,7 +181,7 @@ export async function captureProof(input: { comps?: (number | string)[]; times?:
       })),
     };
     writeFileSync(join(dir, "manifest.json"), JSON.stringify(m, null, 1));
-    return m;
+    return res.note ? { ...m, note: res.note } : m;
   } catch (e) {
     rmSync(dir, { recursive: true, force: true });
     throw e;
@@ -272,6 +273,27 @@ const frameLabel = (t: number, fps: number) => `${r2(t)}s (f${Math.round(t * fps
 
 export const DEFAULT_TOLERANCE = 0.5;
 
+/**
+ * Why the open project can't be compared with the proof's reference (null when it can). Comp ids are only
+ * unique within one project: a reference captured in a saved project is compared only in that same file. A
+ * reference captured in an unsaved project (no path to check) is compared only if every comp still has the
+ * same id, name and size, and the result says the project could not be confirmed.
+ */
+export function otherProject(m: Pick<Manifest, "project" | "comps">, res: { project: string | null; comps: Rendered[] }): string | null {
+  const ids = "comp ids may refer to different comps";
+  if (m.project && res.project !== m.project)
+    return `the reference was captured in ${m.project}, but the open project is ${res.project ?? "an unsaved project"} (${ids})`;
+  if (!m.project) {
+    const renamed = m.comps.filter((c) => {
+      const now = res.comps.find((r) => r.id === c.id);
+      return now && !now.missing && now.name !== c.name;
+    });
+    if (renamed.length)
+      return `the reference was captured in an unsaved project and ${renamed.map((c) => `comp id ${c.id} ("${c.name}")`).join(", ")} now has another name, so it can't be confirmed that this is the same project (${ids})`;
+  }
+  return null;
+}
+
 export interface Comparison { verdict: "identical" | "identical within tolerance" | "differs" | "incomplete"; text: string; image?: { data: string; label: string } }
 
 /** Render the proof's comps and times again and compare them with the stored reference frames. */
@@ -284,14 +306,20 @@ export async function compareProof(input: { id?: string; tolerance?: number }): 
   const tmp = join(homedir(), ".aemcp", "tmp");
   mkdirSync(tmp, { recursive: true });
   const specs = m.comps.map((c) => ({ id: c.id, times: c.frames.map((f) => f.time), width: c.width, height: c.height, pixelAspect: c.pixelAspect }));
-  const res = await render(specs, { maxSize: m.maxSize }, tmp, `aemcp_proof_${Date.now()}_`);
+  const prefix = `aemcp_proof_${Date.now()}_${randomBytes(2).toString("hex")}_`;
   const lines: string[] = [];
   const problems: string[] = [];
   const differing: string[] = [];
+  const notes: string[] = [];
   let frames = 0, top = 0;
   let worst: { score: [number, number]; a: Image; b: Image; label: string } | null = null;
   try {
-    for (const c of m.comps) {
+    const res = await render(specs, { maxSize: m.maxSize }, tmp, prefix);
+    if (res.note) notes.push(res.note);
+    const other = otherProject(m, res);
+    if (other) problems.push(other);
+    else if (!m.project) notes.push("Note: the reference was captured in an unsaved project, so it can't be confirmed that this is the same project; the comps were matched by id, and their names are unchanged.");
+    for (const c of other ? [] : m.comps) {
       const now = res.comps.find((r) => r.id === c.id);
       const title = `"${c.name}" (id ${c.id})`;
       if (!now || now.missing) {
@@ -342,11 +370,10 @@ export async function compareProof(input: { id?: string; tolerance?: number }): 
       }
     }
   } finally {
-    for (const r of res.comps)
-      for (const f of r.frames ?? [])
-        try {
-          unlinkSync(f.path);
-        } catch {}
+    // also when the render failed half way: every frame this comparison wrote starts with its prefix
+    try {
+      for (const f of readdirSync(tmp)) if (f.startsWith(prefix)) rmSync(join(tmp, f), { force: true });
+    } catch {}
   }
   const tolText = !tol ? "tolerance 0: bit-identical" : input.tolerance === undefined ? `default tolerance ${tol}/255: less than one 8-bit step` : `tolerance ${tol}/255 per channel`;
   let verdict: Comparison["verdict"];
@@ -365,8 +392,6 @@ export async function compareProof(input: { id?: string; tolerance?: number }): 
     verdict = "identical within tolerance";
     head = `Verdict: IDENTICAL WITHIN TOLERANCE: all ${frames} frames match within ${tol}/255 per channel (largest difference ${r2(top)}/255${top < 1 ? ": high-bit-depth rounding, invisible in 8-bit output; pass tolerance 0 to require bit-identical" : ""}).`;
   }
-  const notes: string[] = [];
-  if (m.project !== res.project) notes.push(`Note: the reference was captured in ${m.project ?? "an unsaved project"}; the open project is ${res.project ?? "unsaved"}.`);
   const text = [head, `Proof ${m.id} (reference captured ${m.createdAt}).`, ...lines, ...notes].join("\n");
   if (!worst) return { verdict, text };
   const pic = diffPicture(worst.a, worst.b, tol);
@@ -407,7 +432,10 @@ export interface ProveInput {
 }
 
 export async function prove(input: ProveInput, perm: { mode: string; allowShell: boolean }): Promise<CallToolResult> {
-  if (input.action === "capture") return { content: [{ type: "text", text: describeCapture(await captureProof(input)) }] };
+  if (input.action === "capture") {
+    const m = await captureProof(input);
+    return { content: [{ type: "text", text: describeCapture(m) + (m.note ? `\n${m.note}` : "") }] };
+  }
   if (input.action === "compare") {
     const c = await compareProof(input);
     return typeof c === "string" ? errorResult(c) : comparisonResult(c);
@@ -421,15 +449,17 @@ export async function prove(input: ProveInput, perm: { mode: string; allowShell:
   const batchText = b.content.map((c) => (c.type === "text" ? c.text : "")).join("\n");
   if (b.isError)
     return { isError: true, content: [{ type: "text", text: `${batchText}\n\nNothing was compared: the batch did not complete. The reference frames are kept as proof ${m.id}.` }] };
-  let c: Comparison | string;
   try {
-    c = await compareProof({ id: m.id, tolerance: input.tolerance });
+    const c = await compareProof({ id: m.id, tolerance: input.tolerance });
+    if (typeof c === "string") throw new Error(c);
+    return comparisonResult(c, `Edits (one undo step):\n${batchText}${m.note ? `\n${m.note}` : ""}`);
   } catch (e: any) {
-    c = `The comparison failed: ${e?.message ?? e}`;
+    // whatever fails after the batch, never let it look as if the edits were not made
+    return {
+      isError: true,
+      content: [{ type: "text", text: `The batch WAS applied (one undo step), but the comparison failed: ${e?.message ?? e}\nThe reference frames are kept as proof ${m.id}: compare again with ae_prove_identical {action: "compare", id: "${m.id}"}.\n\n${batchText}` }],
+    };
   }
-  if (typeof c === "string")
-    return { isError: true, content: [{ type: "text", text: `The batch WAS applied, but: ${c}\nCompare again with ae_prove_identical {action: "compare", id: "${m.id}"}.\n\n${batchText}` }] };
-  return comparisonResult(c, `Edits (one undo step):\n${batchText}`);
 }
 
 export function registerProveTools(server: McpServer) {
@@ -441,7 +471,8 @@ export function registerProveTools(server: McpServer) {
         "Prove a structural change (un-precompose, bake expressions, reorder effects, simplify a rig) left the render unchanged, or show which " +
         "frames and areas differ. capture: render reference frames (default: active comp, 5 frames over the work area), returns a proof id. " +
         "compare: render them again and compare pixel by pixel (verdict, per-frame max difference, changed pixels, ΔE, area, difference image). " +
-        "run: capture, ae_batch steps, compare, in one call. For un-precompose, prove the parent comp.",
+        "run: capture, ae_batch steps, compare, in one call. For un-precompose, prove the parent comp. " +
+        "Only the sampled video frames are compared (alpha included; not audio, the comp background color or times between samples; 32 bpc values above 1.0 are clamped).",
       inputSchema: {
         action: z.enum(["capture", "compare", "run"]),
         comps: z.array(z.union([z.number().int(), z.string()])).min(1).max(4).optional().describe("capture/run: comps to prove (item id or exact name; default the active comp)."),

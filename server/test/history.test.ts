@@ -147,6 +147,46 @@ describe("history diff engine", () => {
     expect(diffText(a, b, { detail: "Nope" })).toMatch(/^No layer changes in comp "Nope" \(comps with changes: "Main", "Side"\)/);
   });
 
+  it("masks: mode, inverted and the other mask settings, by readable name; snapshots without them are not compared", () => {
+    const mask = (a?: Record<string, unknown>) => layer("L1", 1, "T", {}, { groups: { "ADBE Mask Parade/Mask 1": { path: "Masks/Mask 1", match: "ADBE Mask Atom", i: 1, ...(a ? { a } : {}) } } });
+    const base = { maskMode: "ADD", inverted: false, maskFeatherFalloff: "FFO_SMOOTH", maskMotionBlur: "SAME_AS_LAYER", rotoBezier: false, locked: false, color: [1, 0, 0] };
+    const a = snap([comp(1, "Main", [mask(base)])]);
+    const b = snap([comp(1, "Main", [mask({ ...base, maskMode: "SUBTRACT", inverted: true, maskFeatherFalloff: "FFO_LINEAR", maskMotionBlur: "OFF", color: [0, 1, 0] })])]);
+    const t = diffText(a, b);
+    expect(t).toContain("~ T > Masks/Mask 1: mode Add -> Subtract; inverted off -> on; feather falloff Smooth -> Linear; motion blur Same as layer -> Off; color [1,0,0] -> [0,1,0]");
+    expect(t).toMatch(/^Summary: 1 mask changed$/m);
+    expect(diffText(snap([comp(1, "Main", [mask()])]), a)).toBe("Summary: No differences.");
+  });
+
+  it("keyframes beyond 500 are compared by checksum", () => {
+    const keys = Array.from({ length: 500 }, (_, i) => ({ t: i / 25, v: i }));
+    const a = snap([comp(1, "Main", [layer("L1", 1, "T", { [OPA]: P("Transform/Opacity", { k: keys, n: 900, ks: 111 }) })])]);
+    const b = clone(a);
+    b.items["1"].layers!.L1.props[OPA].ks = 222;
+    expect(diffText(a, b)).toContain("~ T > Transform/Opacity: keyframes changed after key 500 (keys beyond 500 compared by checksum)");
+    b.items["1"].layers!.L1.props[OPA].k![3].v = 7;
+    expect(diffText(a, b)).toContain("~ T > Transform/Opacity: keyframes: @0.12s 3 -> 7 (keys beyond 500 compared by checksum)");
+  });
+
+  it("an expression added to a property at its default value is not a value change", () => {
+    const a = base();
+    const b = clone(a);
+    b.items["1"].layers!.L1.props[OPA] = P("Transform/Opacity", { v: 100, vd: true, x: "value" });
+    expect(diffText(a, b)).toBe('Summary: 1 expression changed\n\nComp "Main" (id 1):\n  ~ Title > Transform/Opacity: expression added: "value"');
+    expect(diffText(b, a)).toContain("~ Title > Transform/Opacity: expression removed");
+    // AE didn't say the value is at its default: it is shown with the expression, not as a change of its own
+    delete b.items["1"].layers!.L1.props[OPA].vd;
+    expect(diffText(a, b)).toContain('~ Title > Transform/Opacity: expression added: "value" (static value 100)');
+    expect(diffText(a, b)).toMatch(/^Summary: 1 expression changed$/m);
+    expect(diffText(b, a)).toContain("~ Title > Transform/Opacity: expression removed (static value was 100, now default)");
+  });
+
+  it("says when render queue items beyond the first 50 were not read", () => {
+    const a = base(), b = clone(a);
+    b.stats.rqNotRead = 12;
+    expect(diffText(a, b)).toContain("Note: Only the first 50 render queue items were read; the other 12 were not compared.");
+  });
+
   it("formats values readably", () => {
     expect(fmt(0.123456)).toBe("0.123");
     expect(fmt([1, 2, 3, 4, 5])).toBe("[5 values]");
@@ -174,7 +214,10 @@ const PVT = { NO_VALUE: 6412, ThreeD_SPATIAL: 6413, ThreeD: 6414, TwoD_SPATIAL: 
 const KIT = { LINEAR: 6612, BEZIER: 6613, HOLD: 6614 };
 const BlendingMode = { NORMAL: 5212, ADD: 5220 };
 const TrackMatteType = { NO_TRACK_MATTE: 5012 };
-const GLOBALS: Record<string, unknown> = { CompItem, FolderItem, FootageItem, SolidSource, PlaceholderSource, AVLayer, ShapeLayer, TextLayer, TextDocument, Shape, MarkerValue, PropertyType: PT, PropertyValueType: PVT, KeyframeInterpolationType: KIT, BlendingMode, TrackMatteType };
+const MaskMode = { NONE: 6812, ADD: 6813, SUBTRACT: 6814 };
+const MaskFeatherFalloff = { FFO_LINEAR: 7213, FFO_SMOOTH: 7212 };
+const MaskMotionBlur = { SAME_AS_LAYER: 7012, ON: 7013, OFF: 7014 };
+const GLOBALS: Record<string, unknown> = { MaskMode, MaskFeatherFalloff, MaskMotionBlur, CompItem, FolderItem, FootageItem, SolidSource, PlaceholderSource, AVLayer, ShapeLayer, TextLayer, TextDocument, Shape, MarkerValue, PropertyType: PT, PropertyValueType: PVT, KeyframeInterpolationType: KIT, BlendingMode, TrackMatteType };
 
 /** Every object is behind a proxy that throws on any write or edit method: the snapshot must only read. */
 const writes: string[] = [];
@@ -203,11 +246,12 @@ function guard<T>(o: T, path = "app"): T {
 
 let reads = 0;
 interface FProp { name: string; matchName: string; propertyType: number; [k: string]: any }
-function prop(name: string, matchName: string, value: unknown, o: { mod?: boolean; keys?: { t: number; v: unknown }[]; expr?: string; vt?: number } = {}): FProp {
+function prop(name: string, matchName: string, value: unknown, o: { mod?: boolean; keys?: { t: number; v: unknown }[]; expr?: string; vt?: number; exprNotModified?: boolean } = {}): FProp {
   const keys = o.keys ?? [];
   return {
     name, matchName, propertyType: PT.PROPERTY, propertyValueType: o.vt ?? PVT.OneD,
-    get isModified() { return o.mod ?? (value !== 0 || keys.length > 0 || !!o.expr); },
+    // exprNotModified: an AE whose isModified ignores expressions
+    get isModified() { return o.mod ?? (value !== 0 || keys.length > 0 || (!!o.expr && !o.exprNotModified)); },
     get value() { reads++; return value; },
     valueAtTime: () => value, numKeys: keys.length, isSpatial: false,
     keyTime: (k: number) => keys[k - 1].t, keyValue: (k: number) => keys[k - 1].v,
@@ -335,6 +379,54 @@ describe("snapshot ExtendScript", () => {
     expect(s.items["1"].layers!.L30.props["ADBE Transform Group/ADBE Position"].v).toEqual([29, 29]);
   });
 
+  it("records mask settings (mode, inverted...) with each mask", async () => {
+    const atom = Object.assign(group("Mask 1", "ADBE Mask Atom", [prop("Mask Opacity", "ADBE Mask Opacity", 100, { mod: false })]), {
+      maskMode: MaskMode.SUBTRACT, inverted: true, maskFeatherFalloff: MaskFeatherFalloff.FFO_SMOOTH, maskMotionBlur: MaskMotionBlur.SAME_AS_LAYER, rotoBezier: false, locked: false, color: [0.5, 0.25, 1],
+    });
+    const s = await capture(fakeProject([fakeLayer(7, 1, "A", { extra: [group("Masks", "ADBE Mask Parade", [atom], { indexed: true })] })]));
+    expect(s.items["1"].layers!.L7.groups["ADBE Mask Parade/Mask 1"]).toEqual({
+      path: "Masks/Mask 1", match: "ADBE Mask Atom", i: 1,
+      a: { maskMode: "SUBTRACT", inverted: true, maskFeatherFalloff: "FFO_SMOOTH", maskMotionBlur: "SAME_AS_LAYER", rotoBezier: false, locked: false, color: [0.5, 0.25, 1] },
+    });
+  });
+
+  it("stores keyframed Source Text in full, and a checksum of the keys beyond 500", async () => {
+    const td = (text: string, fillColor: number[]) => Object.assign(new TextDocument(), { text, font: "Inter", fontSize: 40, fillColor });
+    const source = prop("Source Text", "ADBE Text Document", td("A", [1, 0, 0]), { vt: PVT.TEXT_DOCUMENT, keys: [{ t: 0, v: td("A", [1, 0, 0]) }, { t: 1, v: td("A", [0, 0, 1]) }] });
+    const many = (last: number) => Array.from({ length: 700 }, (_, i) => ({ t: i / 25, v: i === 650 ? last : i }));
+    const mk = (last: number) => fakeProject([fakeLayer(7, 1, "T", { extra: [group("Text", "ADBE Text Properties", [source]), group("FX", "ADBE Fake Group", [prop("Amount", "ADBE Fake Amount", 1, { keys: many(last) })])] })]);
+    const a = await capture(mk(650)), b = await capture(mk(651));
+    const L = a.items["1"].layers!.L7;
+    expect((L.props["ADBE Text Properties/ADBE Text Document"].k![1].v as any).fillColor).toEqual([0, 0, 1]);
+    const amount = L.props["ADBE Fake Group/ADBE Fake Amount"];
+    expect(amount.k).toHaveLength(500);
+    expect(amount.n).toBe(700);
+    expect(typeof amount.ks).toBe("number");
+    expect(formatDiff(diffSnapshots(a, b))).toContain("keyframes changed after key 500 (keys beyond 500 compared by checksum)");
+  });
+
+  it("an expression on a default value deep in a comp is kept by the pruned walk; where isModified ignores expressions, groups are not skipped", async () => {
+    // layers 1-25 confirm group skipping; layer 30 has only an expression on a default value (and, where
+    // isModified ignores expressions, layer 3 too: what tells the walk not to trust isModified on groups)
+    const mk = (exprNotModified: boolean) =>
+      fakeProject(
+        Array.from({ length: 32 }, (_, i) => {
+          const n = i + 1, ex = n === 30 || (exprNotModified && n === 3) ? "value" : undefined;
+          const opacity = prop("Opacity", "ADBE Opacity", 100, { expr: ex, exprNotModified, mod: !!ex && !exprNotModified });
+          const transform = group("Transform", "ADBE Transform Group", [prop("Position", "ADBE Position", n <= 25 ? [n, 0] : [960, 540], { vt: PVT.TwoD, mod: n <= 25 }), opacity]);
+          return Object.assign(fakeLayer(n, n, `N${n}`), { property: (k: number | string) => (k === 1 || k === "ADBE Transform Group" ? transform : undefined), numProperties: 1 });
+        }),
+      );
+    for (const ignored of [false, true]) {
+      const app = mk(ignored);
+      const pruned = await capture(app), full = await capture(app, { full: true });
+      const p = pruned.items["1"].layers!.L30.props["ADBE Transform Group/ADBE Opacity"];
+      expect(pruned.stats.pruning).toBe(ignored ? "off (isModified ignores expressions)" : "on");
+      expect(p).toEqual({ path: "Transform/Opacity", v: 100, x: "value", ...(ignored ? { vd: true } : {}) });
+      expect(formatDiff(diffSnapshots(pruned, full))).toBe("Summary: No differences.");
+    }
+  });
+
   it("limits to some comps, and reports comps not reached in the time budget", async () => {
     const app = fakeProject([fakeLayer(7, 1, "A")], { otherComp: true });
     const scoped = await capture(app, { comps: ["Other"] });
@@ -359,7 +451,10 @@ vi.mock("../src/jsx.js", async (original) => {
       if (body.includes("p.save();")) {
         return { ok: true, result: fakeApp.__projectFile, logs: [] };
       }
-      if (body.includes("aemcp.revision()")) return { ok: true, result: await runSnapshotJsx(fakeApp, args), logs: [] };
+      if (body.includes("aemcp.revision()")) {
+        fakeApp.__budgets?.push(args.budgetMs);
+        return { ok: true, result: await runSnapshotJsx(fakeApp, fakeApp.__forceBudget === undefined ? args : { ...args, budgetMs: fakeApp.__forceBudget }), logs: [] };
+      }
       return { ok: true, result: fakeApp.project.file.fsName, logs: [] };
     },
   };
@@ -405,6 +500,21 @@ describe("history storage", () => {
     expect(index[0]).toMatchObject({ checkpoint: cp.id, label: "v13" });
     expect(resolveRef(cp.id, index, [{ id: cp.id, label: "v13", file: cp.file }])).toEqual({ entry: index[0] });
   });
+
+  it("the checkpoint's snapshot has a 15 s budget of its own and says when it is partial", async () => {
+    const root = mkdtempSync(join(tmpdir(), "aemcp-proj-"));
+    const file = join(root, "Big.aep");
+    writeFileSync(file, "aep");
+    fakeApp = fakeProject([fakeLayer(7, 1, "A")], { otherComp: true });
+    fakeApp.__projectFile = file;
+    fakeApp.project.file = { fsName: file };
+    fakeApp.__budgets = [];
+    fakeApp.__forceBudget = -1; // as if the 15 s ran out before the first comp
+    const { saveCheckpoint } = await import("../src/tools/workflow.js");
+    const cp = await saveCheckpoint("big");
+    expect(fakeApp.__budgets).toEqual([15_000]);
+    expect(cp.note).toMatch(/^History snapshot \S+ linked to this checkpoint is partial \(2 comps not read in 15 s\): take a full one with ae_project_history \{action: "snapshot"\}\.$/);
+  });
 });
 
 describe("ae_project_history tool", () => {
@@ -427,6 +537,10 @@ describe("ae_project_history tool", () => {
     expect(d).toContain('~ layer #1 "Headline": renamed from "Title"');
     expect(d).toContain("~ Headline > Transform/Opacity: default -> 50");
     expect((await handler({ action: "list" })).content[0].text).toMatch(/^History of .*Tool\.aep \(newest first\):\n\S+ {2}snapshot "v11" {2}revision 42, 1 comps, 2 layers$/);
+    // the project changes while the current project is read
+    let rev = 42;
+    Object.defineProperty(fakeApp.project, "revision", { get: () => rev++ });
+    expect((await handler({ action: "diff", from: "v11" })).content[0].text).toMatch(/\nNote: the project changed while the current project was being read \(revision 42 -> 43\)/);
     const bad = await handler({ action: "diff", from: "v99" });
     expect(bad.isError).toBe(true);
     expect(bad.content[0].text).toMatch(/^from: No snapshot or checkpoint "v99"/);

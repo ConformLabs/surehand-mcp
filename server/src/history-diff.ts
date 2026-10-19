@@ -3,9 +3,29 @@
 
 export interface Key { t: number; v?: unknown; ip?: string; e?: string; f?: string; tan?: unknown; lb?: number }
 /** A property that is not at its default, is animated or has an expression (keyed by match-name path). */
-export interface Prop { path: string; v?: unknown; x?: string; xoff?: boolean; k?: Key[]; n?: number }
+export interface Prop {
+  path: string;
+  v?: unknown;
+  /** After Effects says the static value is at its default (only an expression is set) */
+  vd?: boolean;
+  x?: string;
+  xoff?: boolean;
+  /** the first 500 keyframes */
+  k?: Key[];
+  /** the number of keyframes, when there are more than 500 */
+  n?: number;
+  /** checksum of the times and values of the keyframes beyond 500 */
+  ks?: number;
+}
 /** A child of an indexed group (effect, mask, shape group, text animator...). */
-export interface Group { path: string; match: string; i: number; on?: boolean }
+export interface Group {
+  path: string;
+  match: string;
+  i: number;
+  on?: boolean;
+  /** masks: mode, inverted, feather falloff, motion blur, RotoBezier, locked, color */
+  a?: Record<string, unknown>;
+}
 export interface Layer { key: string; index: number; name: string; type: string; attrs: Record<string, unknown>; props: Record<string, Prop>; groups: Record<string, Group> }
 export interface Item {
   id: number;
@@ -19,7 +39,17 @@ export interface Item {
   /** the time budget ran out inside this comp */
   partial?: boolean;
 }
-export interface Stats { comps: number; layers: number; visited: number; stored: number; ms: number; pruning: string; revisionAfter?: number | null }
+export interface Stats {
+  comps: number;
+  layers: number;
+  visited: number;
+  stored: number;
+  ms: number;
+  pruning: string;
+  revisionAfter?: number | null;
+  /** render queue items beyond the first 50, not read */
+  rqNotRead?: number;
+}
 export interface Snapshot {
   format: 1;
   id: string;
@@ -62,7 +92,7 @@ export function parseSnapshotLines(text: string, meta: { id: string; label?: str
     else if (r[0] === "I") s.items[r[1]] = { id: r[1], ...r[2] };
     else if (r[0] === "C" && it) Object.assign(it, { layers: it.layers ?? {}, markers: r[2].markers?.length ? r[2].markers : undefined, partial: r[2].partial || undefined });
     else if (r[0] === "L" && it) (it.layers ??= {})[r[2]] = { key: r[2], ...r[3], props: {}, groups: {} };
-    else if (r[0] === "g" && L(r)) L(r)!.groups[r[3]] = { path: r[4], match: r[5], i: r[6], ...(r[7] === false ? { on: false } : {}) };
+    else if (r[0] === "g" && L(r)) L(r)!.groups[r[3]] = { path: r[4], match: r[5], i: r[6], ...(r[7] === false ? { on: false } : {}), ...(r[8] ? { a: r[8] } : {}) };
     else if (r[0] === "p" && L(r)) L(r)!.props[r[3]] = { path: r[4], ...r[5] };
     else if (r[0] === "Q") s.rq[r[1]] = r[2];
   }
@@ -121,6 +151,11 @@ export function lineDiff(a: string, b: string, max = 10): string[] {
   return out.length > max ? [...out.slice(0, max), `(${out.length - max} more changed lines)`] : out;
 }
 
+/** Mask settings in the order AE shows them, with readable names; enum values as AE shows them ("SAME_AS_LAYER" -> "Same as layer"). */
+const MASK_FIELDS: Record<string, string> = { maskMode: "mode", inverted: "inverted", maskFeatherFalloff: "feather falloff", maskMotionBlur: "motion blur", rotoBezier: "RotoBezier", locked: "locked", color: "color" };
+const enumText = (v: unknown) => (typeof v === "string" && /^[A-Z][A-Z0-9_]*$/.test(v) ? v.replace(/^FFO_/, "").replace(/_/g, " ").toLowerCase().replace(/^./, (c) => c.toUpperCase()) : v);
+const maskShow = (v: unknown) => (typeof v === "string" ? enumText(v) as string : fmt(v));
+
 const KEY_FIELDS: Record<string, string> = { ip: "interpolation", e: "ease", f: "flags", lb: "label" };
 
 function keyChange(a: Key, b: Key): string {
@@ -173,6 +208,9 @@ function lis(seq: number[]): Set<number> {
 const kind = (k: string) => (/^ADBE Effect Parade\/[^/]+$/.test(k) ? "effect" : /^ADBE Mask Parade\/[^/]+$/.test(k) ? "mask" : "group");
 type Inc = (k: string, n?: number) => void;
 
+/** A property's static value; undefined = at its default (not stored, or AE says it is at its default). */
+const staticValue = (p?: Prop) => (!p || p.vd ? undefined : p.v);
+
 function diffLayer(la: Layer, lb: Layer, name: string, inc: Inc, out: string[]) {
   const ga = la.groups;
   // groups renamed in place (same match name and position under the same parent): compare their contents
@@ -207,6 +245,15 @@ function diffLayer(la: Layer, lb: Layer, name: string, inc: Inc, out: string[]) 
     out.push(`~ ${name} > ${gb[k].path}: turned ${gb[k].on === false ? "off" : "on"}`);
     inc("groups switched");
   }
+  // mask settings (snapshots from before they were recorded have none: not compared)
+  for (const k of common) {
+    const a = ga[k].a, b = gb[k].a;
+    if (!a || !b || same(a, b)) continue;
+    const d = Object.keys(MASK_FIELDS).filter((f) => !same(a[f], b[f])).map((f) => `${MASK_FIELDS[f]} ${maskShow(a[f])} -> ${maskShow(b[f])}`);
+    if (!d.length) continue;
+    out.push(`~ ${name} > ${gb[k].path}: ${d.join("; ")}`);
+    inc("masks changed");
+  }
   // stacking order of the children that exist on both sides, per parent
   for (const p of new Set(common.map(parentOf))) {
     const kids = common.filter((k) => parentOf(k) === p).sort((x, y) => ga[x].i - ga[y].i);
@@ -221,20 +268,29 @@ function diffLayer(la: Layer, lb: Layer, name: string, inc: Inc, out: string[]) 
     const a = la.props[k], b = pb[k];
     if (same(a, b) || gone.some((g) => k.startsWith(g + "/"))) continue;
     const parts: string[] = [], extra: string[] = [];
+    let staticNote = "";
     if (a?.k || b?.k) {
       const na = a?.n ?? a?.k?.length, nb = b?.n ?? b?.k?.length, kd = diffKeys(a?.k, b?.k);
+      const beyond = a?.n || b?.n ? " (keys beyond 500 compared by checksum)" : "";
       if (!a?.k) parts.push(`now animated, ${nb} keyframes${a?.v !== undefined ? ` (was ${fmt(a.v)})` : ""}`);
       else if (!b?.k) parts.push(`keyframes removed (${na}), now ${fmt(b?.v)}`);
-      else if (kd.length || na !== nb) parts.push(`keyframes${na !== nb ? ` ${na} -> ${nb}` : ""}${kd.length ? `: ${kd.join("; ")}` : ""}`);
+      else if (kd.length || na !== nb) parts.push(`keyframes${na !== nb ? ` ${na} -> ${nb}` : ""}${kd.length ? `: ${kd.join("; ")}` : ""}${beyond}`);
+      else if (a.ks !== b.ks) parts.push(`keyframes changed after key 500${beyond}`);
       if (parts.length) inc("keyframe changes");
-    } else if (!same(a?.v, b?.v)) {
-      parts.push(fmtChange(a?.v, b?.v));
-      inc("values changed");
+    } else if (!same(staticValue(a), staticValue(b))) {
+      // a property present only because an expression was added or removed (the other side is at its
+      // default): its static value is shown with the expression change, not as a value change of its own
+      if (!a && b?.x) staticNote = ` (static value ${fmt(b.v)})`;
+      else if (!b && a?.x) staticNote = ` (static value was ${fmt(a.v)}, now default)`;
+      else {
+        parts.push(fmtChange(staticValue(a), staticValue(b)));
+        inc("values changed");
+      }
     }
     const xa = a?.x ?? "", xb = b?.x ?? "", toggled = !a?.xoff !== !b?.xoff && xa && xb;
     if (xa !== xb) {
-      if (!xa) parts.push(`expression added: ${xb.includes("\n") ? `(${xb.split("\n").length} lines)` : fmt(xb, 80)}`);
-      else if (!xb) parts.push("expression removed");
+      if (!xa) parts.push(`expression added: ${xb.includes("\n") ? `(${xb.split("\n").length} lines)` : fmt(xb, 80)}${staticNote}`);
+      else if (!xb) parts.push(`expression removed${staticNote}`);
       else parts.push("expression changed:"), extra.push(...lineDiff(xa, xb));
     }
     if (toggled) parts.push(`expression ${b?.xoff ? "disabled" : "enabled"}`);
@@ -322,6 +378,8 @@ export function diffSnapshots(a: Snapshot, b: Snapshot): DiffResult {
     else if (d.length) rq.push(`~ ${name}: ${d.join("; ")}`);
   }
   if (rq.length) inc("render queue changes", rq.length);
+  const notRead = Math.max(a.stats?.rqNotRead ?? 0, b.stats?.rqNotRead ?? 0);
+  if (notRead) notes.push(`Only the first 50 render queue items were read; the other ${notRead} were not compared.`);
   section("Render queue", rq);
   return { counts, sections, notes };
 }

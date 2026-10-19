@@ -310,7 +310,7 @@ function findLayer(m: Model, spec: LayerSpec, own: Target, parentGuard = false):
 }
 
 function expressionSection(m: Model) {
-  let total = 0, disabled = 0, cutShort = 0;
+  let total = 0, disabled = 0, cutShort = 0, unparsed = 0, unparsedAt: string | undefined;
   const errors: { at: string; error: string }[] = [];
   const broken: { at: string; ref: string; problem: string }[] = [];
   const fragile: { at: string; ref: string; why: string; now?: string }[] = [];
@@ -327,7 +327,15 @@ function expressionSection(m: Model) {
     if (cut) cutShort++;
     const at = m.at(c, l, prop), from = m.at(c, l), own = { comp: c, layer: l };
     if (err && enabled) errors.push({ at, error: err.length > 200 ? err.slice(0, 197) + "..." : err });
-    const parsed = parseExpression(src);
+    let parsed: ReturnType<typeof parseExpression>;
+    try {
+      parsed = parseExpression(src);
+    } catch {
+      // the reader is lenient by design; if it ever fails, say so instead of losing the report
+      unparsed++;
+      unparsedAt ??= at;
+      continue;
+    }
     const seen = new Set<string>();
     const once = (key: string) => !seen.has(key) && !!seen.add(key);
     const flag = (ref: ExprRef, why: string, now?: string) => {
@@ -410,6 +418,7 @@ function expressionSection(m: Model) {
       disabled,
       withErrors: errors.length,
       sourcesCutShort: cutShort || undefined,
+      unparsed: unparsed ? { count: unparsed, example: unparsedAt, note: "these expressions could not be read, so their links are not in the lists below" } : undefined,
       engine: m.d.engine,
       errors: m.cap("expressions.errors", errors),
       broken: m.cap("expressions.broken", broken),
@@ -599,7 +608,7 @@ export function xraySummary(r: ReturnType<typeof analyzeXray>): string {
   if (rd) out.push(`${rd.queue.length ? `render queue ${n("render.queue", rd.queue)} item(s) reaching ${rd.reachable.fromRenderQueue} of ${rd.reachable.of} comps` : "render queue empty"}, precomp depth ${rd.maxPrecompDepth}`);
   if (e) {
     const fc = e.fragileCounts, k = (c: string) => fc[c] ?? 0;
-    out.push(`${e.total} expressions (${e.withErrors} with errors, ${n("expressions.broken", e.broken)} broken links, ${k("index") + k("relative")} index-based, ${k("effectDefaultName") + k("paramName") + k("propertyName")} language-dependent)`);
+    out.push(`${e.total} expressions (${e.withErrors} with errors, ${n("expressions.broken", e.broken)} broken links, ${k("index") + k("relative")} index-based, ${k("effectDefaultName") + k("paramName") + k("propertyName")} language-dependent${e.unparsed ? `, ${e.unparsed.count} could not be read` : ""})`);
   }
   if (mi) {
     const fonts = "missingOrSubstituted" in mi.fonts ? `${n("missing.fonts", mi.fonts.missingOrSubstituted)} fonts` : "fonts not checked";

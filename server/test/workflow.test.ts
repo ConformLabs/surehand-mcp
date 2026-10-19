@@ -333,6 +333,27 @@ describe("ae_batch: atomic rollback", () => {
     expect(fake.undos.n).toBe(0);
     expect(opacity()).toBe(10);
   });
+
+  it("a step's result formatter that throws never hides the batch's edits: plain JSON instead", async () => {
+    const { ALL_JSX_TOOLS } = await import("../src/tools/all.js");
+    const info = ALL_JSX_TOOLS.find((t) => t.name === "ae_get_project_info")!;
+    const saved = { format: info.format, jsx: info.jsx };
+    info.jsx = "return { items: 1 };";
+    info.format = () => {
+      throw new Error("formatter bug");
+    };
+    try {
+      withManualEdit();
+      const r = await runBatch({ steps: [script(`${OP} op.setValue(10);`), { tool: "ae_get_project_info", args: {} }], verbose: true }, full);
+      expect(r.isError).toBeFalsy();
+      expect(text(r)).toMatch(/^Batch done: 2 steps in one undo step\./);
+      expect(text(r)).toMatch(/2\. ae_get_project_info: \{"items":1\}\n\(The summary for this result could not be built \(formatter bug\); this is the raw result\.\)/s);
+      expect(text(r)).toContain("Opacity: 50 -> 10");
+      expect(opacity()).toBe(10);
+    } finally {
+      Object.assign(info, saved);
+    }
+  });
 });
 
 describe("ae_run_script in read-only mode", () => {

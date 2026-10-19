@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { parseExpression, tokenize, type ExprRef } from "../src/tools/xray-expr.js";
 import { analyzeXray, formatXray, heavyEffect, type XData } from "../src/tools/xray-analyze.js";
 import { xrayTools } from "../src/tools/xray.js";
+import { applyFormat } from "../src/tools/registry.js";
+import { renderCleanupNote } from "../src/tools/core.js";
 import { fakeProject, type FakeProjectSpec } from "./fake-ae.js";
 
 const kinds = (src: string) => parseExpression(src).refs.map((r) => r.kind);
@@ -56,6 +58,34 @@ describe("expression tokenizer", () => {
     expect(() => tokenize('comp("unterminated\n thisComp.layer(')).not.toThrow();
     expect(() => tokenize("`open ${ never closed")).not.toThrow();
     expect(() => tokenize("/* open comment")).not.toThrow();
+  });
+});
+
+describe("expression reader never throws", () => {
+  it("unclosed calls and invalid escapes", () => {
+    for (const src of ["thisComp.layer(", 'thisComp.layer("a"', "effect(", 'comp("a").layer(', "footage(", 'comp("a").layer("b").effect(', "thisLayer(", "x = thisComp.layer(", "content(", "mask(", 'thisComp.layer("a").effect("b").param(', '"\\u{-5}"', '"\\u{110000}"', '"\\u{41"', '"\\u{}"', '"\\u{zz}"', "`\\u{-1}`", '"\\x', '"\\u12', "\\"])
+      expect(() => parseExpression(src), src).not.toThrow();
+    expect(refs("thisComp.layer(")).toEqual(["layer thisComp > dynamic()"]);
+    expect(refs('thisComp.layer("a"')).toEqual(['layer thisComp > "a"']);
+    expect(tokenize('"\\u{41}\\u{-5}"')[0].v).toBe("Au{-5}");
+  });
+
+  it("random token soup and truncated real expressions", () => {
+    const pieces = ["thisComp", "comp", "footage", "layer", "effect", "content", "mask", "param", "parent", "source", "thisLayer", "index", "var", "x", "=", ".", "?.", "(", ")", "[", "]", "{", "}", ",", ";", "+", "-", "/", "/re/g", '"a"', "'b", "`t${", "}`", "1", "\\u{-5}", '"\\u{41', "\\", "\n", "//c", "/*", "*/", "try", "hasParent"];
+    let seed = 7;
+    const rnd = (n: number) => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff), seed % n);
+    for (let n = 0; n < 20_000; n++) {
+      let src = "";
+      for (let k = rnd(16); k > 0; k--) src += pieces[rnd(pieces.length)] + (rnd(3) ? "" : " ");
+      expect(() => parseExpression(src), JSON.stringify(src)).not.toThrow();
+    }
+    for (let n = 0; n < 5_000; n++) {
+      let src = "";
+      for (let k = rnd(40); k > 0; k--) src += String.fromCharCode(rnd(128));
+      expect(() => parseExpression(src), JSON.stringify(src)).not.toThrow();
+    }
+    const real = 'const ctrl = thisComp.layer("CTRL");\nvar s = ctrl.effect("Size")("Slider");\ncomp(`Shot ${index}`).layer(index + 1).content("Group 1").content("Path").path + footage("a.png").sourceText';
+    for (let i = 0; i <= real.length; i++) expect(() => parseExpression(real.slice(0, i)), real.slice(0, i)).not.toThrow();
   });
 });
 
@@ -325,6 +355,17 @@ describe("X-ray analysis", () => {
     expect(text.split("\n")[0]).toMatch(/15004 expressions/);
   });
 
+  it("an expression the reader can't read is counted as unparsed, with an example, and the report still comes", () => {
+    const d = data();
+    d.comps[0].layers![1].ex!.push(["Transform/Rotation", undefined as unknown as string, "", 1]);
+    const text = formatXray(d);
+    const rep = JSON.parse(text.split("\n")[1]);
+    expect(rep.expressions.unparsed).toMatchObject({ count: 1, example: "Main > 2: Shot > Transform/Rotation" });
+    expect(rep.expressions.total).toBe(5);
+    expect(rep.expressions.broken.length).toBeGreaterThan(0);
+    expect(text.split("\n")[0]).toMatch(/, 1 could not be read\)/);
+  });
+
   it("partial scans say so, and unscanned comps are not reported as broken targets", () => {
     const d = data({ partial: { reason: "time budget (5 s) used up" } });
     d.comps[1].layers = undefined;
@@ -427,10 +468,37 @@ describe("ae_project_xray JSX (fake After Effects)", () => {
     expect(tool.format!(res.result, {}).split("\n")[0]).toMatch(/PARTIAL: layer limit/);
   });
 
+  it("one unreadable render queue item doesn't stop the others from being read", () => {
+    const fp = fakeProject({ ...INHERITED, rq: [{ comp: "No Such Comp", render: true }, { comp: "Main", render: true }] });
+    const raw = JSON.parse(fp.run(tool.jsx, { sections: ["render"] }).result);
+    expect(raw.rq).toEqual([{ comp: fp.comps[0].id, status: "QUEUED", render: true, file: "/renders/Main.mov" }]);
+  });
+
   it("works without the font API (before AE 24)", () => {
     const fp = fakeProject({ ...INHERITED, fonts: null });
     const rep = JSON.parse(tool.format!(fp.run(tool.jsx, { sections: ["missing"] }).result, {}).split("\n")[1]);
     expect(rep.missing.fonts.note).toMatch(/24\.0/);
     expect(rep.missing.fonts.textLayerFonts).toEqual([{ font: "Gotham-Bold", textLayers: 1 }]);
+  });
+});
+
+describe("result formatting never hides a result", () => {
+  it("a formatter that throws falls back to the plain JSON result", () => {
+    const boom = () => {
+      throw new Error("bad data");
+    };
+    expect(applyFormat(boom, { a: 1 }, {})).toBe('{"a":1}\n(The summary for this result could not be built (bad data); this is the raw result.)');
+    expect(applyFormat((r) => `ok ${JSON.stringify(r)}`, [1], {})).toBe("ok [1]");
+  });
+
+  it("render tools: a temporary comp that stayed behind or an unverified rollback is reported", () => {
+    const ok = { ok: true, logs: [], rollback: { undone: true, verified: true } };
+    expect(renderCleanupNote(ok, false, "__aemcp_preview")).toBe("");
+    // removed by the rollback after all
+    expect(renderCleanupNote(ok, true, "__aemcp_preview")).toBe("");
+    const notUndone = { ok: true, logs: [], rollback: { undone: false, verified: false, problem: "unknown" } };
+    const note = renderCleanupNote(notUndone, true, "__aemcp_preview");
+    expect(note).toMatch(/^The temporary comp "__aemcp_preview" could not be removed; it can be deleted from the Project panel\.\n/);
+    expect(note).toMatch(/It couldn't be checked whether the render changed the project/);
   });
 });

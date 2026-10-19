@@ -12,7 +12,7 @@ import { evalBody, formatChanges, rollbackProblem, runJsx } from "../jsx.js";
 import { approvalSummary, permissions, READ_ONLY_REFUSAL, SHELL_REFUSAL, usesShell } from "../permissions.js";
 import { reservedGlobalsHint, transpileUserCode } from "../transpile.js";
 import { ALL_JSX_TOOLS } from "./all.js";
-import { errorResult, formatResult, reportScope } from "./registry.js";
+import { applyFormat, errorResult, formatResult, reportScope } from "./registry.js";
 
 // ---------- checkpoints ----------
 
@@ -193,7 +193,10 @@ export async function runBatch({ steps, atomic, name, checkpoint, verbose }: Bat
   }
   if (edits && perm.mode === "read-only") return errorResult(READ_ONLY_REFUSAL);
   let cp = "";
-  if (checkpoint) cp = `Checkpoint saved first: ${(await saveCheckpoint("before-batch")).file}\n`;
+  if (checkpoint) {
+    const c = await saveCheckpoint("before-batch");
+    cp = `Checkpoint saved first: ${c.file}\n${c.note ? `${c.note}\n` : ""}`;
+  }
 
   const isAtomic = atomic !== false;
   const body =
@@ -221,7 +224,7 @@ return { steps: __out, failed: __failed, rollback: args.atomic && __failed >= 0 
   const lines = res.steps.map((s, i) => {
     if (!s.ok) return `${i + 1}. ${steps[i].tool}: FAILED: ${s.error}${s.line ? ` (line ${s.line})` : ""}${hints[i] ? `\n   Hint: ${hints[i]}` : ""}`;
     const format = batchable.get(steps[i].tool)?.format;
-    const txt = s.result === undefined || s.result === null ? "ok" : format ? format(s.result, steps[i].args ?? {}) : JSON.stringify(s.result);
+    const txt = s.result === undefined || s.result === null ? "ok" : format ? applyFormat(format, s.result, steps[i].args ?? {}) : JSON.stringify(s.result);
     return `${i + 1}. ${steps[i].tool}: ${verbose ? txt : txt.length > 160 ? txt.slice(0, 157) + "..." : txt}`;
   });
   const changes = showReport ? formatChanges(r.changes) : null;

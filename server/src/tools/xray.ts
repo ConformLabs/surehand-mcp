@@ -126,9 +126,12 @@ for (var i = 1; i <= P.numItems; i++) {
 try {
   var RQ = P.renderQueue;
   for (var q = 1; q <= RQ.numItems; q++) {
-    var ri = RQ.item(q), ro = { comp: ri.comp.id, status: aemcp.enumName(RQItemStatus, ri.status), render: ri.render };
-    try { var om = ri.outputModule(1); if (om.file) ro.file = om.file.fsName; } catch (e) {}
-    D.rq.push(ro);
+    // one unreadable item doesn't stop the rest from being read
+    try {
+      var ri = RQ.item(q), ro = { comp: ri.comp.id, status: aemcp.enumName(RQItemStatus, ri.status), render: ri.render };
+      try { var om = ri.outputModule(1); if (om.file) ro.file = om.file.fsName; } catch (e) {}
+      D.rq.push(ro);
+    } catch (e) {}
   }
 } catch (e) {}
 if (has("missing")) {
