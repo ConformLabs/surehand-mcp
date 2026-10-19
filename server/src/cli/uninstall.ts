@@ -2,6 +2,7 @@ import { existsSync, lstatSync, readdirSync, rmSync, unlinkSync } from "node:fs"
 import { join, sep } from "node:path";
 import { migrationLog } from "../migrate.js";
 import { appDir, legacyDir, MOVED_NOTE, newAppDir, surehandRoot } from "../paths.js";
+import { stopBackground } from "./chatgpt.js";
 import { CLIENT_IDS, disconnectClient } from "./clients.js";
 import { bold, extensionDir, ok, warn } from "./util.js";
 
@@ -9,7 +10,7 @@ import { bold, extensionDir, ok, warn } from "./util.js";
 // installer/run.sh and installer/run.ps1 (uninstall without Node.js) carry the same list: a test keeps them equal.
 export const OWN_FILES = [
   "server", "config.json", "runtime.json", "extension-hash", "bridge-status.json", "instances", "update-check.json",
-  "activity.jsonl", "tmp", "renders", "compat", "install.log", MOVED_NOTE,
+  "activity.jsonl", "tmp", "renders", "compat", "install.log", "chatgpt.json", "chatgpt.lock", MOVED_NOTE,
 ];
 
 /** Removes our own entries of `dir` (all with `all`); returns what was kept. `node` is left to the launcher. */
@@ -45,6 +46,10 @@ export function uninstall(argv: string[]) {
   // Only what Surehand MCP itself writes is removed. Checkpoints (copies of the user's projects) and
   // anything else stay unless --all is passed. ~/.surehand/node (a Node runtime the installer may have
   // downloaded) may be running this very process, so the uninstall wrapper deletes it after we exit.
+  // ChatGPT on the web, if it runs in the background (its status file holds the connector address with the token)
+  try {
+    if (stopBackground().stopped) ok("Stopped ChatGPT on the web");
+  } catch {}
   const dir = appDir();
   const kept = clean(dir, keepConfig, all);
   // after the move from 1.3, ~/.aemcp only holds compatibility files (and whatever of the user's was left there);
