@@ -228,6 +228,21 @@ describe("Surehand panel: main view", () => {
     await waitFor(() => /Ready/.test($("statusText").textContent));
   });
 
+  it("talks to the bridge extension's bridge, never to its own fallback bridge while that one runs (seen live: two bridges in one AE)", () => {
+    const pick = (dom.window as any).SurehandPanel.pickPort;
+    const inst = (port: number, startedAt: string) => ({ port, startedAt, listening: true });
+    // the panel started its own bridge on 8767 while the real one listens on 8765: the real one
+    expect(pick([inst(8765, "2026-10-19T22:31:18Z"), inst(8767, "2026-10-19T22:31:20Z")], 8767, 8765)).toBe(8765);
+    // file order doesn't matter
+    expect(pick([inst(8767, "2026-10-19T22:31:20Z"), inst(8765, "2026-10-19T22:31:18Z")], 8767, 8765)).toBe(8765);
+    // no own bridge: the configured port, else the oldest
+    expect(pick([inst(8770, "2026-10-19T22:00:00Z"), inst(8765, "2026-10-19T22:10:00Z")], null, 8765)).toBe(8765);
+    expect(pick([inst(8771, "2026-10-19T22:10:00Z"), inst(8770, "2026-10-19T22:00:00Z")], null, 8765)).toBe(8770);
+    // only its own bridge: that one
+    expect(pick([inst(8767, "2026-10-19T22:31:20Z")], 8767, 8765)).toBe(8767);
+    expect(pick([], null, 8765)).toBe(null);
+  });
+
   it("picks the layout from the panel's size", async () => {
     const w = dom.window as any;
     const size = (width: number, height: number) => {

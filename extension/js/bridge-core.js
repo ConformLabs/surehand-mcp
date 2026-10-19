@@ -250,6 +250,13 @@
     } catch (e) {}
   }
 
+  /** Stops this bridge (the panel's own fallback bridge steps aside when the real one is running). */
+  function stop() {
+    unregister();
+    try { if (state.server) state.server.close(); } catch (e) {}
+    state.server = null; state.listening = false; state.started = false;
+  }
+
   function unregister() {
     try { if (state.listening) fs.unlinkSync(instanceFile()); } catch (e) {}
   }
@@ -584,7 +591,7 @@
 
   var api = {
     start: start, state: state, loadConfig: loadConfig, hostInfo: hostInfo, permissionMode: permissionMode, paths: paths,
-    popupDecision: popupDecision, checkPopup: checkPopup, isPaused: isPaused, setPaused: setPaused, updateConfig: updateConfig, welcome: welcome,
+    stop: stop, popupDecision: popupDecision, checkPopup: checkPopup, isPaused: isPaused, setPaused: setPaused, updateConfig: updateConfig, welcome: welcome,
     VERSION: VERSION, PAUSED_MESSAGE: PAUSED_MESSAGE, PANEL_ID: PANEL_ID, POPUP_ID: POPUP_ID, SUMMARY_MAX: SUMMARY_MAX, MIN_SHOWN_MS: MIN_SHOWN_MS,
     HELLO_EVENT: HELLO_EVENT, WELCOME_EVENT: WELCOME_EVENT,
   };

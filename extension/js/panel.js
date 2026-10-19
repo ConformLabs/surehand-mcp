@@ -91,17 +91,46 @@
   }
 
   // The bridge of this instance: with several AE instances, match on this AE's version.
-  function findMyPort(cb) {
-    var host = AEMCPBridge.hostInfo();
-    var dir = P().instances, best = null;
+  /**
+   * The bridge of this After Effects that the AI uses: the bridge extension's, never the panel's own fallback
+   * bridge when the real one is running (two bridges in one After Effects would split approvals and pause).
+   * Among this AE version's live instances: not this page's own, then the configured port, then the oldest.
+   */
+  function candidates() {
+    var host = AEMCPBridge.hostInfo(), dir = P().instances, list = [];
     try {
       fs.readdirSync(dir).forEach(function (f) {
         var info = readJson(path.join(dir, f));
-        if (info && info.host && info.host.appVersion === host.appVersion) best = info.port;
+        if (info && info.listening && info.host && info.host.appVersion === host.appVersion) list.push(info);
       });
     } catch (e) {}
-    myPort = best || AEMCPBridge.state.port || AEMCPBridge.loadConfig().bridgePort;
+    return list;
+  }
+  function pickPort(list, ownPort, cfgPort) {
+    var others = list.filter(function (i) { return i.port !== ownPort; });
+    var pool = others.length ? others : list;
+    pool.sort(function (a, b) {
+      if ((a.port === cfgPort) !== (b.port === cfgPort)) return a.port === cfgPort ? -1 : 1;
+      return String(a.startedAt || "").localeCompare(String(b.startedAt || ""));
+    });
+    return pool.length ? pool[0].port : null;
+  }
+  function ownPort() { return AEMCPBridge.state && AEMCPBridge.state.started ? AEMCPBridge.state.port : null; }
+  function findMyPort(cb) {
+    var cfg = AEMCPBridge.loadConfig();
+    myPort = pickPort(candidates(), ownPort(), cfg.bridgePort) || ownPort() || (AEMCPBridge.state && AEMCPBridge.state.port) || cfg.bridgePort;
     cb();
+  }
+  /** The panel started its own bridge (the real one wasn't up yet) and the real one is up now: step aside. */
+  function yieldOwnBridge() {
+    var own = ownPort();
+    if (!own) return;
+    var other = pickPort(candidates().filter(function (i) { return i.port !== own; }), null, AEMCPBridge.loadConfig().bridgePort);
+    if (!other) return;
+    http.get({ host: "127.0.0.1", port: other, path: "/health", headers: Control.headers(other, AEMCPBridge.loadConfig().token) }, function (res) {
+      res.resume();
+      if (res.statusCode === 200) { try { AEMCPBridge.stop(); } catch (e) {} myPort = other; Control.hello(); }
+    }).on("error", function () {});
   }
 
   // ---------- the server's command line (menu screens) ----------
@@ -1085,7 +1114,8 @@
   }
 
   // ---------- refresh loop ----------
-  var triedStart = false;
+  var triedStart = false, healthFailures = 0, yieldTick = 0;
+  var START_AFTER_FAILURES = Math.max(1, Math.round(8000 / POLL_MS));
   function refresh() {
     S.cfg = readConfig();
     S.update = S.update || readJson(P().updateCheck);
@@ -1093,16 +1123,21 @@
     renderModes();
     call("GET", "/health", null, function (err, h) {
       if (err) {
-        if (!triedStart) {
+        // the bridge extension starts with After Effects: give it ~8 s before starting the panel's own
+        healthFailures++;
+        if (!triedStart && healthFailures >= START_AFTER_FAILURES) {
           triedStart = true;
           AEMCPBridge.start();
           setTimeout(function () { findMyPort(refresh); }, 500);
           return;
         }
+        if (!triedStart) findMyPort(function () {}); // the real bridge may have registered meanwhile
         S.bridgeError = AEMCPBridge.state.error ? "Bridge problem: " + AEMCPBridge.state.error : "Bridge not running";
         renderHeader();
         return;
       }
+      healthFailures = 0;
+      if (++yieldTick % 5 === 0) yieldOwnBridge();
       S.health = h;
       S.bridgeError = h.configProblem && h.authorized === false ? "Settings file can\u2019t be read: " + h.configProblem
         : h.authorized === false ? "Token mismatch: re-run the installer" : null;
@@ -1122,7 +1157,7 @@
 
   window.addEventListener("resize", applyLayout);
   document.addEventListener("visibilitychange", function () { if (!document.hidden) refresh(); });
-  window.SurehandPanel = { state: S, menu: onMenu, refresh: refresh, menuXml: menuXml, openScreen: openScreen, closeScreen: closeScreen, answer: answer };
+  window.SurehandPanel = { pickPort: pickPort, state: S, menu: onMenu, refresh: refresh, menuXml: menuXml, openScreen: openScreen, closeScreen: closeScreen, answer: answer };
 
   readActivity();
   applyLayout();
