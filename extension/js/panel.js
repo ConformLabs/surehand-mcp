@@ -148,7 +148,9 @@
     opts = opts || {};
     var rt = runtime();
     if (!rt) return cb({ friendly: NO_RUNTIME });
-    if (opts.since && rt.version && UI.cmpVersions(rt.version, opts.since) < 0) return cb({ friendly: TOO_OLD });
+    // the server says which panel commands it has (runtime.json panelCommands); the version number alone
+    // can't tell (a beta or dev build of 1.4 still says 1.3.x until it's released)
+    if (opts.since && !(rt.panelCommands >= 1) && rt.version && UI.cmpVersions(rt.version, opts.since) < 0) return cb({ friendly: TOO_OLD });
     var env = {};
     Object.keys(process.env).forEach(function (k) { env[k] = process.env[k]; });
     env.AEMCP_NO_AUTOSETUP = "1";
@@ -439,7 +441,7 @@
     if (e.keyCode === 9) document.body.classList.add("kbd");
     var tag = e.target && e.target.tagName;
     if (S.screen) {
-      if (e.keyCode === 27) { e.preventDefault(); closeScreen(); }
+      if (e.keyCode === 27) { e.preventDefault(); goBack(); }
       return;
     }
     // Enter never allows, not even on a focused Allow button (Space or a click does, deliberately)
@@ -458,7 +460,8 @@
     var box = $("setup");
     box.hidden = st.kind !== "idle";
     if (box.hidden) return;
-    var list = S.clients && S.clients.list || [];
+    // ChatGPT on the web has its own screen (a secure link, not a setting): not offered here
+    var list = (S.clients && S.clients.list || []).filter(function (c) { return c.action !== "start"; });
     var configured = list.filter(function (c) { return c.configured; });
     var todo = list.filter(function (c) { return c.installed !== false && !c.configured && c.connectable !== false; });
     var pick = todo.filter(function (c) { return /claude.?desktop/i.test(c.id + " " + c.name); })[0] || todo[0];
@@ -497,10 +500,12 @@
     }, { since: "1.4.0" });
   }
   function connectClient(c, fromSetup) {
+    if (c.id === "chatgpt-web") return openScreen("chatgpt");
+    var redraw = redrawLater();
     runCli(["connect", c.id, "--json"], function (err, r) {
       if (err) return toast(err.friendly, true);
       toast(r.message || (r.ok === false ? "Could not set up " + c.name + "." : c.name + " is set up. Restart it to use Surehand."), r.ok === false);
-      loadClients(function () { if (S.screen === "connect") openScreen("connect"); });
+      loadClients(redraw);
     }, { since: "1.4.0", timeout: 60000 });
     if (fromSetup) $("setupBtn").disabled = true;
     setTimeout(function () { $("setupBtn").disabled = false; }, 3000);
@@ -775,6 +780,7 @@
     checkpoints: { title: "Checkpoints", render: screenCheckpoints },
     history: { title: "Activity history", render: screenHistory },
     test: { title: "Connection test", render: screenTest },
+    chatgpt: { title: "ChatGPT on the web", render: screenChatgpt, parent: "connect" },
     update: { title: "Updates", render: screenUpdate },
     about: { title: "About & help", render: screenAbout },
   };
@@ -798,7 +804,21 @@
   }
   /** cb runs only if the same screen is still open (answers can come back late). */
   function still(token, cb) { return function () { if (token === screenToken) cb.apply(null, arguments); }; }
-  $("back").onclick = closeScreen;
+  /**
+   * For an answer that comes back later: draws the screen that is open now again, but only if it is still
+   * the same one (the user may have opened another meanwhile: never draw a screen over a different one).
+   */
+  function redrawLater() {
+    var token = screenToken, id = S.screen;
+    return function () { if (id && token === screenToken && S.screen === id) openScreen(id); };
+  }
+  /** Back (and Esc): a sub-screen goes back to the screen it came from. */
+  function goBack() {
+    var parent = S.screen && SCREENS[S.screen] && SCREENS[S.screen].parent;
+    if (parent) openScreen(parent);
+    else closeScreen();
+  }
+  $("back").onclick = goBack;
   $("ver").onclick = function () { openScreen("update"); };
   function loading(body, text) { body.innerHTML = ""; body.appendChild(el("div", { cls: "loading", text: text || "Loading\u2026" })); }
   function message(body, text) { body.appendChild(el("div", { cls: "msg", text: text })); }
@@ -817,15 +837,23 @@
       if (S.clients.error) message(list, S.clients.error);
       var recent = UI.lastClient(S.activity), recentAt = S.activity[0] ? Date.parse(S.activity[0].at) : 0;
       S.clients.list.forEach(function (c) {
-        var inUse = c.inUse !== undefined ? c.inUse : c.configured && recent === c.name && Date.now() - recentAt < 15 * 60 * 1000;
-        var state = c.configured ? (inUse ? "Connected \u00b7 in use now" : "Set up" + (c.note ? " \u00b7 " + c.note : ""))
-          : c.installed === false ? "Not installed" : c.note || "Installed, not set up";
-        var btn = null;
-        if (c.configured) btn = button("link", "Remove", function () { disconnectClient(c); }, { "aria-label": "Remove " + c.name });
-        else if (c.installed !== false) btn = button(c.action === "start" ? "secondary pill sm" : "primary pill sm", c.action === "start" ? "Start" : "Set up", function () { connectClient(c); }, { "aria-label": "Set up " + c.name });
+        var web = c.action === "start"; // ChatGPT on the web: a secure link that runs, not a setting
+        var inUse = web ? c.configured : c.inUse !== undefined ? c.inUse : c.configured && recent === c.name && Date.now() - recentAt < 15 * 60 * 1000;
+        var state, btn = null;
+        if (web) {
+          state = c.note || (c.configured ? "Running" : "Not running");
+          btn = button(c.configured ? "secondary pill sm" : "primary pill sm", c.configured ? "Open" : "Start", function () { openScreen("chatgpt"); },
+            { "aria-label": (c.configured ? "Open " : "Start ") + c.name });
+        } else {
+          state = c.configured ? (inUse ? "Connected \u00b7 in use now" : "Connected" + (c.note ? " \u00b7 " + shortNote(c.note) : ""))
+            : c.installed === false ? "Not installed" : "Not connected" + (c.note ? " \u00b7 " + shortNote(c.note) : "");
+          if (c.configured) btn = button("link", "Remove", function () { disconnectClient(c); }, { "aria-label": "Remove " + c.name });
+          else if (c.installed !== false) btn = button("primary pill sm", "Set up", function () { connectClient(c); }, { "aria-label": "Set up " + c.name });
+        }
         list.appendChild(el("div", { cls: "client" + (c.configured ? "" : " unset") }, [
           el("span", { cls: "cdot", "aria-hidden": "true" }),
-          el("div", { style: "flex-grow:1;min-width:0" }, [el("div", { cls: "cname", text: c.name }), el("div", { cls: "cstate" + (inUse ? " live" : ""), text: state })]),
+          el("div", { style: "flex-grow:1;min-width:0" }, [el("div", { cls: "cname", text: c.name }),
+            el("div", { cls: "cstate" + (inUse ? " live" : ""), text: state, title: c.note && !web ? c.note : null })]),
           btn,
         ]));
       });
@@ -834,11 +862,17 @@
       body.appendChild(foot);
     }));
   }
+  /** A note from the server, cut to its first part for the row (the whole one is the row's tooltip). */
+  function shortNote(note) {
+    var n = String(note).split(/[;(]/)[0].replace(/\s+$/, "");
+    return n.length > 48 ? n.slice(0, 46) + "\u2026" : n;
+  }
   function disconnectClient(c) {
+    var redraw = redrawLater();
     runCli(["disconnect", c.id, "--json"], function (err, r) {
       if (err) return toast(err.friendly, true);
       toast(r.message || (r.ok === false ? "Could not remove " + c.name + "." : "Removed from " + c.name + ". Restart it to apply."), r.ok === false);
-      loadClients(function () { if (S.screen === "connect") openScreen("connect"); });
+      loadClients(redraw);
     }, { since: "1.4.0" });
   }
   /** The MCP settings for any other app: this install's node + server. */
@@ -849,6 +883,84 @@
     var text = typeof snippet === "string" ? snippet : JSON.stringify(snippet || { mcpServers: { "surehand-ae": { command: rt.node, args: [rt.server] } } }, null, 2);
     if (copyText(text)) toast("Settings copied: paste them into your app\u2019s MCP settings.");
     else toast("Could not copy to the clipboard.", true);
+  }
+
+  // ChatGPT on the web: the server and a secure link (tunnel) run in the background, also with this panel
+  // closed (`chatgpt --background / --status / --stop`). The address contains the access key: shown here
+  // and copied on request, never written to the activity feed.
+  var CHAT_POLL_MS = window.SUREHAND_CHAT_POLL_MS || 1000, CHAT_WAIT_MS = window.SUREHAND_CHAT_WAIT_MS || 60000;
+  var chatWaitSince = 0;
+  function screenChatgpt(body, action, token) {
+    loading(body);
+    chatgptCli("--status", token, body);
+  }
+  function chatgptCli(what, token, body) {
+    runCli(["chatgpt", what, "--json"], still(token, function (err, s) {
+      if (err) { body.innerHTML = ""; return message(body, err.friendly); }
+      drawChatgpt(body, s || {}, token);
+    }), { since: "1.4.0", timeout: 30000 });
+  }
+  function installCommand(s) {
+    return s.installCommand || (process.platform === "win32" ? "winget install --id Cloudflare.cloudflared" : "brew install cloudflared");
+  }
+  function copyBox(text, onCopy) {
+    return el("div", { cls: "urlbox" }, [el("span", { cls: "mono", text: text }), button("btn-green-outline", "Copy", onCopy)]);
+  }
+  function drawChatgpt(body, s, token) {
+    body.innerHTML = "";
+    var st = s.state || "stopped";
+    if (st !== "starting") chatWaitSince = 0;
+    var box = el("div", { cls: "cg" });
+    body.appendChild(box);
+    var start = function () {
+      chatWaitSince = Date.now();
+      drawChatgpt(body, { state: "starting" }, token);
+      chatgptCli("--background", token, body);
+    };
+    if (st === "starting") {
+      if (!chatWaitSince) chatWaitSince = Date.now();
+      if (Date.now() - chatWaitSince > CHAT_WAIT_MS) {
+        chatWaitSince = 0;
+        return drawChatgpt(body, { state: "error", error: "The secure link didn\u2019t start within a minute. Check the internet connection." }, token);
+      }
+      box.appendChild(el("div", { cls: "lead", role: "status", text: "Starting the secure link\u2026" }));
+      box.appendChild(el("div", { cls: "line", text: "This takes a few seconds." }));
+      setTimeout(still(token, function () { chatgptCli("--status", token, body); }), CHAT_POLL_MS);
+    } else if (st === "running" && s.url) {
+      box.appendChild(el("div", { cls: "lead", text: "ChatGPT can reach After Effects through this address." }));
+      box.appendChild(copyBox(s.url, function () {
+        if (copyText(s.url)) toast("Copied \u2014 keep it private: it contains your access key");
+        else toast("Could not copy to the clipboard.", true);
+      }));
+      box.appendChild(el("ol", { cls: "steps" }, [
+        el("li", { text: "In ChatGPT: Settings \u203a Apps & Connectors \u203a Advanced settings \u203a Developer mode on." }),
+        el("li", { text: "Create a connector and paste this address. Authentication: No authentication." }),
+        el("li", { text: "Keep this computer awake while you use it." }),
+      ]));
+      box.appendChild(el("div", { cls: "acts" }, [button("secondary pill sm", "Stop", function (ev) {
+        ev.target.disabled = true;
+        runCli(["chatgpt", "--stop", "--json"], still(token, function (err) {
+          if (err) { ev.target.disabled = false; return toast(err.friendly, true); }
+          toast("Stopped. ChatGPT can\u2019t reach After Effects until you start it again.");
+          drawChatgpt(body, { state: "stopped" }, token);
+        }), { since: "1.4.0", timeout: 30000 });
+      })]));
+    } else if (st === "needs-tunnel") {
+      var cmd = installCommand(s);
+      box.appendChild(el("div", { cls: "lead", text: "ChatGPT needs a free tunnel tool, cloudflared." }));
+      box.appendChild(el("div", { cls: "line", text: "Install it in a terminal with:" }));
+      box.appendChild(copyBox(cmd, function () { if (copyText(cmd)) toast("Command copied."); else toast("Could not copy to the clipboard.", true); }));
+      box.appendChild(el("div", { cls: "acts" }, [button("primary pill sm", "Try again", start)]));
+    } else if (st === "error") {
+      box.appendChild(el("div", { cls: "lead bad", text: "The secure link didn\u2019t start." }));
+      if (s.error) box.appendChild(el("div", { cls: "line", text: s.error }));
+      box.appendChild(el("div", { cls: "acts" }, [button("primary pill sm", "Try again", start)]));
+    } else {
+      box.appendChild(el("div", { cls: "line", text: "ChatGPT on the web can\u2019t start programs on this computer, so Surehand opens a secure link it can reach." }));
+      box.appendChild(el("div", { cls: "line", text: "It keeps running, also with this panel closed, until you stop it." }));
+      box.appendChild(el("div", { cls: "acts" }, [button("primary pill sm", "Start", start)]));
+    }
+    if (st !== "starting") loadClients(); // the Connect screen's row
   }
 
   // Checkpoints
@@ -865,7 +977,7 @@
       body.innerHTML = "";
       if (err) return message(body, "After Effects isn\u2019t answering: " + err.message);
       if (!project) return message(body, "Save your project first: checkpoints are copies of a saved project.");
-      action.appendChild(button("primary pill sm", "Save one now", function () { saveCheckpoint(project, token); }));
+      action.appendChild(button("primary pill sm", "Save one now", function (ev) { saveCheckpoint(project, token, ev && ev.target); }));
       var intro = el("div", { cls: "intro" }, ["Safety copies of ", el("span", { cls: "ink", text: path.basename(project) }),
         ". Opening one makes a new file next to your project; your project is never overwritten."]);
       body.appendChild(intro);
@@ -883,26 +995,58 @@
   }
   function checkpointCard(project, cp, token, fromCli) {
     var acts = el("div", { cls: "cp-acts" });
-    var out = el("pre", { cls: "details", hidden: true });
+    var out = el("div", { cls: "diffout", hidden: true });
     var canCompare = fromCli && (cp.history || cp.hasHistory || cp.canCompare || cp.snapshot);
     if (canCompare) acts.appendChild(button("btn-green-outline", "Compare with now", function () {
       out.hidden = false;
       out.textContent = "Comparing\u2026";
       runCli(["checkpoint-diff", cp.id, "--project", project], still(token, function (err, json, text) {
-        out.textContent = err ? err.friendly : (json && (json.text || json.message)) || text || "No differences.";
+        drawDiff(out, err ? err.friendly : (json && (json.text || json.message || json.error)) || text || "No differences.");
       }), { since: "1.4.0", text: true, timeout: 120000, asPanel: true });
     }));
     acts.appendChild(button("btn-plain", "Open a copy", function () { openCheckpoint(project, cp); }));
-    if (fromCli && !canCompare) acts.appendChild(el("span", { cls: "muted2", text: "saved before history existed" }));
+    if (fromCli && !canCompare) acts.appendChild(el("span", { cls: "muted2", text: "no history snapshot" }));
     return el("div", { cls: "cp" }, [
       el("div", { cls: "cp-row" }, [el("span", { cls: "ink", style: "font-weight:600", text: cp.label || cp.id }), el("span", { cls: "muted2", text: UI.whenLabel(cp.at, Date.now()) })]),
       acts, out,
     ]);
   }
-  /** As ae_checkpoint save: save the project, keep a timestamped copy (50 per project). */
-  function saveCheckpoint(project, token) {
+  /**
+   * A diff from the server: the "Summary:" line first, then the changes, and where it compares from and to
+   * ("From: ...", "To: ...") last, small.
+   */
+  function drawDiff(out, text) {
+    out.innerHTML = "";
+    var lines = String(text).replace(/\s+$/, "").split(/\r?\n/), head = [], sum = [], rest = [];
+    lines.forEach(function (l) {
+      if (/^(From|To):/.test(l)) head.push(l.replace(/\s+/g, " "));
+      else if (/^Summary:/.test(l)) sum.push(l.replace(/^Summary:\s*/, ""));
+      else rest.push(l);
+    });
+    while (rest.length && !rest[0].trim()) rest.shift();
+    if (sum.length) out.appendChild(el("div", { cls: "diff-sum", text: sum.join(" ") }));
+    if (rest.length) out.appendChild(el("pre", { cls: "details", text: rest.join("\n") }));
+    if (head.length) out.appendChild(el("div", { cls: "diff-meta", text: head.join("\n") }));
+  }
+  /**
+   * Save one now: through the server, as ae_checkpoint save (with its project history snapshot, so it can be
+   * compared), as the panel's own job (also while the AI is paused). An older server: saved here, without one.
+   */
+  function saveCheckpoint(project, token, btn) {
+    if (btn) btn.disabled = true;
+    var done = function () { if (btn) btn.disabled = false; };
+    runCli(["checkpoint-save", "--json", "--label", "saved in the panel", "--project", project], function (err, r) {
+      if (err && (err.friendly === TOO_OLD || err.friendly === NO_RUNTIME)) return saveCheckpointHere(project, token, done);
+      done();
+      if (err || !r || r.ok === false) return toast("Could not save the checkpoint: " + ((r && (r.error || r.message)) || (err && err.friendly) || "no answer"), true);
+      toast(r.checkpoint && r.checkpoint.history ? "Checkpoint saved." : "Checkpoint saved (no history snapshot, so it can\u2019t be compared).");
+      if (token === screenToken && S.screen === "checkpoints") openScreen("checkpoints");
+    }, { since: "1.4.0", asPanel: true, timeout: 300000 });
+  }
+  /** As ae_checkpoint save, without the history snapshot: save the project, keep a timestamped copy (50 per project). */
+  function saveCheckpointHere(project, token, done) {
     evalAE("(function(){var p=app.project;if(!p.file)return '';p.save();return p.file.fsName;})()", "panel: checkpoint", function (err, saved) {
-      if (err || !saved) return toast(err ? "Could not save: " + err.message : "Save your project first.", true);
+      if (err || !saved) { done(); return toast(err ? "Could not save: " + err.message : "Save your project first.", true); }
       try {
         var dir = checkpointDir(saved);
         fs.mkdirSync(dir, { recursive: true });
@@ -913,9 +1057,10 @@
         index.push({ id: id, at: new Date().toISOString(), label: "saved in the panel", file: file, project: saved });
         while (index.length > 50) { var old = index.shift(); try { fs.unlinkSync(old.file); } catch (e) {} }
         fs.writeFileSync(path.join(dir, "index.json"), JSON.stringify(index, null, 2));
-        toast("Checkpoint saved.");
-        if (S.screen === "checkpoints") openScreen("checkpoints");
+        toast("Checkpoint saved (no history snapshot: update the Surehand server to compare checkpoints).");
+        if (token === screenToken && S.screen === "checkpoints") openScreen("checkpoints");
       } catch (e) { toast("Could not save the checkpoint: " + e.message, true); }
+      done();
     }, 300000);
   }
   /** As ae_checkpoint restore: copy it next to the project under a new name and open that. */
@@ -1029,11 +1174,15 @@
     ]));
     var list = el("div", { cls: "list", style: "gap:2px" });
     checks.forEach(function (c) {
+      // the server's message says what was checked and what was found; its name ("update", "config"...) is a small label
       var name = c.name || c.label || c.title || c.id;
-      var fix = c.fix && (c.fix.connect || c.fix.client) ? button("primary pill sm", c.fix.label || "Fix", function () { connectClient({ id: c.fix.connect || c.fix.client, name: c.fix.name || name }); }) : null;
+      var text = c.message || name;
+      var fixId = c.fix && (c.fix.connect || c.fix.client);
+      var fix = fixId ? button("primary pill sm", "Fix", function () { connectClient({ id: fixId, name: c.fix.name || name }); },
+        { title: c.fix.label || null, "aria-label": c.fix.label || "Fix: " + text }) : null;
       list.appendChild(el("div", { cls: "check" + (c.ok ? "" : " bad") }, [
         el("span", { html: c.ok ? CHECK : CROSS }),
-        el("span", { cls: "ctext" }, [el("span", { style: "display:block", text: name }), c.message && !c.ok ? el("span", { cls: "cmsg", text: c.message }) : null]),
+        el("span", { cls: "ctext" }, [c.message && name ? el("span", { cls: "clabel", text: name }) : null, el("span", { cls: "cmain", text: text })]),
         fix,
       ]));
     });
@@ -1086,13 +1235,14 @@
     body.appendChild(el("div", { cls: "sfoot", text: "Updates come only from the official release and are checked before they\u2019re installed." }));
   }
   function runUpdate(body, latest) {
+    var token = screenToken;
     updating = true;
     drawUpdate(body, readJson(P().updateCheck) || { latest: latest }, false);
     runCli(["update", "--json"], function (err, r) {
       updating = false;
       if (r && r.ok && r.updated) { updatedTo = r.to; toast("Updated to " + r.to + ". Restart After Effects and your AI apps."); }
       else toast((r && r.message) || (err && err.friendly) || "The update did not finish.", true);
-      if (S.screen === "update") drawUpdate(body, readJson(P().updateCheck) || { latest: latest }, false);
+      if (token === screenToken && S.screen === "update") drawUpdate(body, readJson(P().updateCheck) || { latest: latest }, false);
     }, { timeout: 180000 });
   }
 

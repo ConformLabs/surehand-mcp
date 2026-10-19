@@ -4,7 +4,7 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { VERSION } from "../config.js";
 import { claudeDesktopRunning, connectClient, isOurEntry, mcpbInstalled, moveFromLegacy, repointLegacyClients } from "./clients.js";
-import { bundledExtensionSigned, ensureConfig, ensureDebugMode, ensureExtension, runtimeFile } from "./setup.js";
+import { bundledExtensionSigned, ensureConfig, ensureDebugMode, ensureExtension, PANEL_COMMANDS, runtimeFile } from "./setup.js";
 import {
   LEGACY_SERVER_NAME, SERVER_NAME, ask, bold, claudeCodeConfig, claudeDesktopConfig, claudeDesktopDir, claudeDesktopExe, chatgptDesktopInstalled, codexConfig, configPath,
   cursorConfig, dim, extensionDir, fail, findClaudeCli, installedServer, isMac, isWin, ok, readJson, sleep, stableNodePath, step, warn, CSXS_VERSIONS,
@@ -61,7 +61,7 @@ export async function install(argv: string[]) {
   if (self !== INSTALLED_SERVER) copyFileSync(self, INSTALLED_SERVER);
   if (!isWin) chmodSync(INSTALLED_SERVER, 0o755);
   ok(`Server: ${INSTALLED_SERVER}`);
-  writeFileSync(runtimeFile(), JSON.stringify({ node: stableNodePath(), server: INSTALLED_SERVER, version: VERSION }, null, 2));
+  writeFileSync(runtimeFile(), JSON.stringify({ node: stableNodePath(), server: INSTALLED_SERVER, version: VERSION, panelCommands: PANEL_COMMANDS }, null, 2));
   ensureConfig();
   ok(`Config: ${configPath()}`);
 

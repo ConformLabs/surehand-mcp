@@ -194,11 +194,14 @@ export function setupHint(): string {
  *  Checkpoints screens: it runs `node <server> <command>`). Only the standalone server
  *  (~/.surehand/ae/server) records itself: the Claude Desktop extension is updated by installing a new .mcpb. */
 export const runtimeFile = () => appFile("runtime.json");
+/** The panel's ☰ screens run these server commands (clients, connect, checkpoints, test, update --check...):
+ *  the panel checks this level instead of the version number (betas and dev builds keep older numbers). */
+export const PANEL_COMMANDS = 1;
 export function recordRuntime() {
   try {
     const server = installedServer();
     if (fileURLToPath(import.meta.url) !== server) return;
-    const info = { node: stableNodePath(), server, version: VERSION };
+    const info = { node: stableNodePath(), server, version: VERSION, panelCommands: PANEL_COMMANDS };
     if (JSON.stringify(readJson(runtimeFile(), null)) === JSON.stringify(info)) return;
     writeFileAtomic(runtimeFile(), JSON.stringify(info, null, 2));
   } catch {}

@@ -227,6 +227,25 @@ pre.details { margin: 6px 0 0; max-height: 160px; overflow: auto; background: #1
 .check .ctext { flex-grow: 1; min-width: 0; }
 .check.bad .ctext { color: var(--ivory); }
 .check .cmsg { display: block; color: var(--muted); margin-top: 2px; }
+.check .clabel { display: block; color: var(--muted2); font-size: 10px; margin-bottom: 1px; }
+.check .cmain { display: block; line-height: 1.45; word-break: break-word; }
+.check.bad .cmain { color: var(--ivory); }
+
+/* ChatGPT on the web */
+.cg { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.cg .lead { color: var(--ivory); font-weight: 600; line-height: 1.5; }
+.cg .lead.bad { color: var(--red-soft); }
+.cg .line { color: var(--text2); line-height: 1.5; word-break: break-word; }
+.cg .acts { display: flex; gap: 8px; }
+.urlbox { display: flex; align-items: flex-start; gap: 8px; padding: 9px 10px; border-radius: 7px; background: var(--card); border: 1px solid var(--seg-line); }
+.urlbox .mono { flex-grow: 1; min-width: 0; color: var(--ivory); word-break: break-all; line-height: 1.45; -webkit-user-select: text; user-select: text; }
+.urlbox button { flex: none; }
+.steps { margin: 0; padding-left: 18px; color: var(--text2); line-height: 1.6; }
+
+/* Checkpoints: Compare with now */
+.diffout { display: flex; flex-direction: column; gap: 6px; }
+.diff-sum { color: var(--ivory); line-height: 1.5; }
+.diff-meta { color: var(--muted2); font-size: 10px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
 
 .upd { margin: 12px; padding: 14px 12px; border-radius: 9px; background: var(--green-bg); border: 1px solid var(--green); display: flex; flex-direction: column; gap: 8px; }
 .upd.current { border-color: #2E5A43; }

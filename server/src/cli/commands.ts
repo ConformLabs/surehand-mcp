@@ -5,6 +5,8 @@
 // move anything or change any settings: at most they report that the move is pending.
 const MOVING_COMMANDS = new Set(["setup", "connect", "disconnect", "chatgpt"]);
 
-export function movesLegacyBeforeRunning(cmd: string | undefined): boolean {
+export function movesLegacyBeforeRunning(cmd: string | undefined, args: string[] = []): boolean {
+  // `chatgpt --status` / `--stop` only read or stop what runs
+  if (cmd === "chatgpt" && (args.includes("--status") || args.includes("--stop"))) return false;
   return !cmd || cmd.startsWith("-") || MOVING_COMMANDS.has(cmd);
 }

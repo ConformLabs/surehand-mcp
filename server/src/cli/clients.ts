@@ -16,6 +16,7 @@ import {
   hasCodexBlock, isMac, isWin, removeCodexBlock, run, stableNodePath, writeTextWithBackup,
 } from "./util.js";
 import { spawnSync } from "node:child_process";
+import { chatgptStatus, tunnelTool } from "./chatgpt.js";
 
 export type ClientId = "claude-desktop" | "claude-code" | "codex" | "cursor";
 export const CLIENT_IDS: ClientId[] = ["claude-desktop", "claude-code", "codex", "cursor"];
@@ -193,15 +194,25 @@ export function clientInfo(id: ClientId): ClientInfo {
 }
 
 export const CHATGPT_WEB_HOWTO =
-  "ChatGPT on the web can't start programs on this computer, so it connects over the internet: run the server's `chatgpt` command " +
-  '(Mac/Windows folder: "3. Connect ChatGPT"), which starts a local server with a secure tunnel and prints a connector URL; ' +
-  "in ChatGPT: Settings > Apps & Connectors > Advanced settings > Developer mode > Create, paste that URL. Keep that window open while you use it.";
+  "ChatGPT on the web can't start programs on this computer, so it connects over the internet: start it in the Surehand panel " +
+  "(\u2630 > Connect an AI app > ChatGPT (web)), or run the server's `chatgpt` command " +
+  '(Mac/Windows folder: "3. Connect ChatGPT"), which starts a local server with a secure tunnel and gives a connector URL; ' +
+  "in ChatGPT: Settings > Apps & Connectors > Advanced settings > Developer mode > Create, paste that URL. Keep this computer awake while you use it.";
+
+/** ChatGPT (web): "connected" while the background server + tunnel runs; a short status for the panel. */
+export function chatgptWebInfo(): ClientInfo {
+  const s = chatgptStatus();
+  const note =
+    s.state === "running" ? "Running"
+    : s.state === "starting" ? "Starting\u2026"
+    : s.state === "needs-tunnel" || (s.state === "stopped" && !tunnelTool()) ? "Needs cloudflared"
+    : s.state === "error" ? "Didn\u2019t start"
+    : "Not running";
+  return { id: "chatgpt-web", name: NAMES["chatgpt-web"], installed: true, configured: s.state === "running", configPath: null, note, howTo: CHATGPT_WEB_HOWTO };
+}
 
 export function listClients(): ClientInfo[] {
-  return [
-    ...CLIENT_IDS.map(clientInfo),
-    { id: "chatgpt-web", name: NAMES["chatgpt-web"], installed: true, configured: false, configPath: null, note: null, howTo: CHATGPT_WEB_HOWTO },
-  ];
+  return [...CLIENT_IDS.map(clientInfo), chatgptWebInfo()];
 }
 
 /** The settings to paste into any other MCP app (the panel's "Copy the settings"). */
@@ -211,17 +222,19 @@ export function settingsSnippet(entry = serverEntry()): string {
 
 /**
  * `clients --json` for the panel's Connect screen:
- * {clients: [{id, name, installed, configured, inUse?, note?, action?: "start"}], snippet?}
- * (inUse: the app is running now, so a change needs a restart; chatgpt-web has action "start").
+ * {clients: [{id, name, installed, configured, inUse?, note?, action?: "start", howTo?}], snippet?}
+ * (inUse: the app is running now, so a change needs a restart; chatgpt-web has action "start", a short
+ * note ("Running", "Not running", "Needs cloudflared"...) and the long explanation in howTo).
  */
 export function clientsJson(): { clients: Record<string, unknown>[]; snippet?: string } {
   const clients = listClients().map((c) => {
     const o: Record<string, unknown> = { id: c.id, name: c.name, installed: c.installed, configured: c.configured };
     if (c.id === "claude-desktop" && c.installed && claudeDesktopRunning()) o.inUse = true;
+    if (c.note) o.note = c.note;
     if (c.id === "chatgpt-web") {
       o.action = "start";
-      o.note = c.howTo;
-    } else if (c.note) o.note = c.note;
+      o.howTo = c.howTo;
+    }
     return o;
   });
   return existsSync(installedServer()) ? { clients, snippet: settingsSnippet() } : { clients };
@@ -287,7 +300,7 @@ export function connectClient(id: string, entry = serverEntry()): ClientAction {
 }
 
 export function disconnectClient(id: string): ClientAction {
-  if (id === "chatgpt-web") return { ok: true, message: "ChatGPT on the web is connected only while the Connect ChatGPT window is open: close it, and remove the connector in ChatGPT's settings.", restartHint: null };
+  if (id === "chatgpt-web") return { ok: true, message: "ChatGPT on the web is connected only while its secure link runs: stop it (surehand-ae chatgpt --stop, or close the Connect ChatGPT window), and remove the connector in ChatGPT's settings.", restartHint: null };
   if (!CLIENT_IDS.includes(id as ClientId)) return { ok: false, message: `Unknown app "${id}". Known: ${[...CLIENT_IDS, "chatgpt-web"].join(", ")}.`, restartHint: null };
   const cid = id as ClientId;
   let changed = false;
