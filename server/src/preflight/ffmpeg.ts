@@ -501,10 +501,22 @@ export function runTool(
       done();
       reject(e);
     });
-    child.on("close", (code) => {
+    let settled = false;
+    const finish = (code: number | null) => {
+      if (settled) return;
+      settled = true;
       done();
       if (partial && o.onStderrLine) o.onStderrLine(partial);
       resolve({ code, stderrTail: tail, aborted, ...(timedOut ? { timedOut } : {}) });
+    };
+    child.on("close", (code) => finish(code));
+    // a killed program whose own children still hold the pipes open never "closes": stop waiting for them
+    child.on("exit", (code) => {
+      if (aborted || timedOut) {
+        child.stdout.destroy();
+        child.stderr.destroy();
+        finish(code);
+      }
     });
   });
 }
