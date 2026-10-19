@@ -8,11 +8,11 @@ const interp = z.enum(["linear", "bezier", "hold"]);
 const pair = z.array(z.number()).min(2).max(3);
 
 const findKey = `
-function keyIndex(p, k) {
+function keyIndex(p, k, fd) {
   if (k.index !== undefined) { if (k.index < 1 || k.index > p.numKeys) aemcp.fail("Keyframe index " + k.index + " out of range 1-" + p.numKeys); return k.index; }
-  if (k.time === undefined) aemcp.fail("Each keyframe needs index or time");
-  var i = p.nearestKeyIndex(k.time);
-  if (!p.numKeys || Math.abs(p.keyTime(i) - k.time) > 0.0005) aemcp.fail("No keyframe at " + k.time + "s on " + p.name);
+  if (k.time === undefined && k.frame === undefined) aemcp.fail("Each keyframe needs index, time or frame");
+  var t = k.frame !== undefined ? k.frame * fd : k.time, i = p.nearestKeyIndex(t);
+  if (!p.numKeys || Math.abs(p.keyTime(i) - t) > 0.0005) aemcp.fail("No keyframe at " + (k.frame !== undefined ? "frame " + k.frame + " (" + t + "s)" : t + "s") + " on " + p.name);
   return i;
 }
 function easeList(p, e) {
@@ -37,8 +37,10 @@ export const keyframeTools: JsxTool[] = [
           z.object({
             index: z.number().int().optional(),
             time: z.number().optional().describe("Find the key at this time (seconds) if no index."),
+            frame: z.number().int().optional().describe("Find the key at this whole frame if no index."),
             value: anyValue.optional(),
             moveTo: z.number().optional().describe("New time in seconds (all attributes are kept)."),
+            moveToFrame: z.number().int().optional().describe("New time as a whole frame, instead of moveTo."),
             interpolation: interp.optional(),
             inInterpolation: interp.optional(),
             outInterpolation: interp.optional(),
@@ -55,7 +57,7 @@ export const keyframeTools: JsxTool[] = [
           }),
         )
         .optional(),
-      remove: z.array(z.union([z.number().int(), z.object({ time: z.number() })])).optional().describe("Keyframes to delete: indices or {time}."),
+      remove: z.array(z.union([z.number().int(), z.object({ time: z.number() }), z.object({ frame: z.number().int() })])).optional().describe("Keyframes to delete: indices, {time} (seconds) or {frame}."),
     },
     destructive: true,
     jsx: `${findKey}
@@ -64,15 +66,16 @@ if (p.propertyType !== PropertyType.PROPERTY) aemcp.fail("'" + p.name + "' is a 
 var I = function (n) { return aemcp.interp(n); };
 // resolve all targets to times first: moving/removing keys changes indices
 var edits = [], keys = args.keys || [];
-for (var i = 0; i < keys.length; i++) edits.push({ spec: keys[i], time: p.keyTime(keyIndex(p, keys[i])) });
+for (var i = 0; i < keys.length; i++) edits.push({ spec: keys[i], time: p.keyTime(keyIndex(p, keys[i], c.frameDuration)) });
 var removeTimes = [];
-for (var r = 0; r < (args.remove || []).length; r++) { var rm = args.remove[r]; removeTimes.push(p.keyTime(keyIndex(p, typeof rm === "number" ? { index: rm } : rm))); }
+for (var r = 0; r < (args.remove || []).length; r++) { var rm = args.remove[r]; removeTimes.push(p.keyTime(keyIndex(p, typeof rm === "number" ? { index: rm } : rm, c.frameDuration))); }
 for (var j = 0; j < edits.length; j++) {
   var e = edits[j], k = e.spec, idx = p.nearestKeyIndex(e.time);
-  if (k.moveTo !== undefined && Math.abs(k.moveTo - e.time) > 0.0005) {
+  var to = k.moveToFrame !== undefined ? k.moveToFrame * c.frameDuration : k.moveTo;
+  if (to !== undefined && Math.abs(to - e.time) > 0.0005) {
     var d = aemcp.captureKey(p, idx);
     p.removeKey(idx);
-    idx = aemcp.restoreKey(p, d, k.moveTo);
+    idx = aemcp.restoreKey(p, d, to);
   }
   if (k.value !== undefined) p.setValueAtKey(idx, aemcp.toAEValue(p, k.value));
   var ii = I(k.inInterpolation || k.interpolation), oi = I(k.outInterpolation || k.interpolation);
@@ -107,19 +110,22 @@ return { property: p.name, numKeys: p.numKeys, keyframes: aemcp.keyframes(p) };`
     input: {
       from: z.object({ comp: z.union([z.number().int(), z.string()]).optional(), layer: layerRef, path: z.string() }),
       to: z.array(z.object({ comp: z.union([z.number().int(), z.string()]).optional(), layer: layerRef, path: z.string() })).min(1),
-      startTime: z.number().optional().describe("Only keys at or after this time."),
-      endTime: z.number().optional().describe("Only keys at or before this time."),
+      startTime: z.number().optional().describe("Only keys at or after this time (seconds)."),
+      endTime: z.number().optional().describe("Only keys at or before this time (seconds)."),
+      startFrame: z.number().int().optional().describe("Only keys at or after this whole frame of the source comp."),
+      endFrame: z.number().int().optional().describe("Only keys at or before this whole frame of the source comp."),
       offset: z.number().optional().describe("Shift the copies by this many seconds (e.g. to place them at the target's time)."),
+      offsetFrames: z.number().int().optional().describe("Shift the copies by this many whole frames of the target comp, instead of offset."),
       replace: z.boolean().optional().describe("Remove the target's existing keyframes first."),
     },
     destructive: true,
     jsx: `
 var sc = aemcp.findComp(args.from.comp), src = aemcp.resolveProp(aemcp.findLayer(sc, args.from.layer), args.from.path);
 if (!src.numKeys) aemcp.fail("'" + src.name + "' has no keyframes");
-var keys = [];
+var keys = [], st = args.startFrame !== undefined ? args.startFrame * sc.frameDuration : args.startTime, et = args.endFrame !== undefined ? args.endFrame * sc.frameDuration : args.endTime;
 for (var k = 1; k <= src.numKeys; k++) {
   var t = src.keyTime(k);
-  if ((args.startTime === undefined || t >= args.startTime - 0.0005) && (args.endTime === undefined || t <= args.endTime + 0.0005)) keys.push(aemcp.captureKey(src, k));
+  if ((st === undefined || t >= st - 0.0005) && (et === undefined || t <= et + 0.0005)) keys.push(aemcp.captureKey(src, k));
 }
 if (!keys.length) aemcp.fail("No keyframes in that time range");
 var out = [];
@@ -127,7 +133,8 @@ for (var i = 0; i < args.to.length; i++) {
   var tc = aemcp.findComp(args.to[i].comp), dst = aemcp.resolveProp(aemcp.findLayer(tc, args.to[i].layer), args.to[i].path);
   if (dst.propertyValueType !== src.propertyValueType) aemcp.fail("Can't copy " + aemcp.enumName(PropertyValueType, src.propertyValueType) + " keyframes to '" + dst.name + "' (" + aemcp.enumName(PropertyValueType, dst.propertyValueType) + ")");
   if (args.replace) while (dst.numKeys) dst.removeKey(1);
-  for (var j = 0; j < keys.length; j++) aemcp.restoreKey(dst, keys[j], keys[j].time + (args.offset || 0));
+  var off = args.offsetFrames !== undefined ? args.offsetFrames * tc.frameDuration : (args.offset || 0);
+  for (var j = 0; j < keys.length; j++) aemcp.restoreKey(dst, keys[j], keys[j].time + off);
   out.push({ comp: tc.name, property: dst.name, numKeys: dst.numKeys });
 }
 return { copied: keys.length, targets: out };`,

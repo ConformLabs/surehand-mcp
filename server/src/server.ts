@@ -8,6 +8,7 @@ import { registerWorkflowTools } from "./tools/workflow.js";
 import { registerProveTools } from "./tools/prove.js";
 import { registerHistoryTools } from "./tools/history.js";
 import { registerPreflightTools } from "./tools/preflight.js";
+import { registerFileTools } from "./tools/files.js";
 import { registerOnDemandTools } from "./tools/ondemand.js";
 import { registerJsxTools } from "./tools/registry.js";
 import { ALL_JSX_TOOLS } from "./tools/all.js";
@@ -31,6 +32,7 @@ export function createMcpServer(profile: ToolProfile = resolveProfile()): McpSer
   registerProveTools(server);
   registerHistoryTools(server);
   registerPreflightTools(server);
+  registerFileTools(server);
   server.registerResource(
     "extendscript-cheatsheet",
     "aemcp://docs/extendscript",

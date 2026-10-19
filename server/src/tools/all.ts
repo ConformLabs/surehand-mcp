@@ -5,6 +5,7 @@ import { effectTools } from "./effects.js";
 import { footageTools } from "./footage.js";
 import { inspectTools } from "./inspect.js";
 import { keyframeTools } from "./keyframes.js";
+import { precisionTools } from "./precision.js";
 import { layerTools } from "./layer.js";
 import { projectTools } from "./project.js";
 import { propertyTools } from "./property.js";
@@ -17,5 +18,5 @@ import { xrayTools } from "./xray.js";
 export const ALL_JSX_TOOLS: JsxTool[] = [
   ...projectTools, ...compTools, ...layerTools, ...propertyTools, ...effectTools, ...renderTools, ...appTools,
   ...inspectTools, ...keyframeTools, ...footageTools, ...textTools, ...egpTools, ...healthTools, ...sceneTools,
-  ...xrayTools,
+  ...xrayTools, ...precisionTools,
 ];

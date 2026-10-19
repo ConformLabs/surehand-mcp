@@ -55,30 +55,40 @@ return o;`,
   {
     name: "ae_import_files",
     title: "Import files",
-    description: "Import footage, images, audio, image sequences, or AE/PSD/AI files into the project.",
+    description:
+      "Import footage, images, audio, image sequences, or AE/PSD/AI files into the project. When After Effects can't import a file the way importAs asks " +
+      "(e.g. a PNG as a comp), the result says so for that file (importAsRejected) and what it was imported as; strictImportAs refuses the whole call instead.",
     input: {
       paths: z.array(z.string()).min(1).describe("Absolute file paths."),
       folder: itemRef.optional().describe("Project folder to put the imported items in."),
       sequence: z.boolean().optional().describe("Import the first file as an image sequence."),
       importAs: z.enum(["footage", "comp", "comp_cropped_layers", "project"]).optional().describe("For layered files (PSD/AI) or .aep."),
+      strictImportAs: z.boolean().optional().describe("Refuse the whole call (nothing imported) if any file can't be imported as importAs."),
       addToComp: z.union([z.number().int(), z.string()]).optional().describe("Also add each imported item as a layer to this comp (id/name/'active')."),
     },
     jsx: `
 var out = [], folder = args.folder !== undefined ? aemcp.findItem(args.folder) : null;
 var comp = args.addToComp !== undefined ? aemcp.findComp(args.addToComp) : null;
+var m = { footage: ImportAsType.FOOTAGE, comp: ImportAsType.COMP, comp_cropped_layers: ImportAsType.COMP_CROPPED_LAYERS, project: ImportAsType.PROJECT };
+// every file checked before anything is imported
+var opts = [], rejected = [];
 for (var i = 0; i < args.paths.length; i++) {
   var f = new File(args.paths[i]);
-  if (!f.exists) aemcp.fail("File not found: " + args.paths[i]);
-  var io = new ImportOptions(f);
+  if (!f.exists) aemcp.fail("File not found: " + args.paths[i] + ". Nothing was imported.");
+  var io = new ImportOptions(f), rej = false;
   if (args.sequence) io.sequence = true;
-  if (args.importAs) {
-    var m = { footage: ImportAsType.FOOTAGE, comp: ImportAsType.COMP, comp_cropped_layers: ImportAsType.COMP_CROPPED_LAYERS, project: ImportAsType.PROJECT };
-    if (io.canImportAs(m[args.importAs])) io.importAs = m[args.importAs];
-  }
-  var it = app.project.importFile(io);
+  if (args.importAs) { if (io.canImportAs(m[args.importAs])) io.importAs = m[args.importAs]; else { rej = true; rejected.push(f.fsName); } }
+  opts.push({ io: io, rejected: rej });
+}
+if (rejected.length && args.strictImportAs)
+  aemcp.fail("After Effects can't import " + rejected.join(", ") + " as " + args.importAs + " (ImportOptions.canImportAs is false). Nothing was imported.");
+for (var j = 0; j < opts.length; j++) {
+  var it = app.project.importFile(opts[j].io);
   if (folder) it.parentFolder = folder;
   if (comp && (it instanceof FootageItem || it instanceof CompItem)) comp.layers.add(it);
-  out.push(aemcp.itemInfo(it));
+  var info = aemcp.itemInfo(it);
+  if (opts[j].rejected) { info.importAsRejected = args.importAs; info.note = "After Effects can't import this file as " + args.importAs + "; it was imported as " + aemcp.itemType(it) + " instead"; }
+  out.push(info);
 }
 return out;`,
   },

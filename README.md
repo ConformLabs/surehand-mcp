@@ -17,7 +17,7 @@
 
 Surehand MCP connects **Claude** (Desktop / Code), **ChatGPT** (desktop app or web), Cursor, Codex, or any MCP client to **Adobe® After Effects®**.
 The AI can run any script inside After Effects (modern JavaScript, converted for AE's ExtendScript engine automatically),
-read information back, and use up to 98 ready-made tools for projects, comps, layers, keyframes (Graph Editor level),
+read information back, and use up to 106 ready-made tools for projects, comps, layers, keyframes (Graph Editor level),
 text styling and animators, footage, effects, shapes, masks, 3D cameras/lights/materials, audio, color management,
 Essential Graphics and rendering (including background renders with aerender). Batch edits run many steps as one
 undo step, checkpoints keep safety copies of the project, structural changes can be proven not to change the render,
@@ -172,7 +172,7 @@ To rotate the token, delete `token` from `~/.surehand/ae/config.json` and re-run
 | `ae_get_scripting_guide` | ExtendScript cheat sheet for the model (also an MCP resource `aemcp://docs/extendscript`). |
 
 **Tool profiles.** Every tool description is sent to the AI in every chat, so by default only a **core set of
-29 tools** is loaded (about 9k tokens instead of 27k for all 98), and **every other tool stays available on demand**:
+29 tools** is loaded (about 9k tokens instead of 33k for all 106), and **every other tool stays available on demand**:
 `ae_tools` lists all tools by category (or gives full parameter details of chosen ones), and `ae_call` runs any tool by
 name with the same validation, permissions, change report and activity log. Loading everything up front is optional:
 switch to **All tools** in the Surehand panel in After Effects (**☰ › Tools the AI sees › All tools**), in Claude Desktop's
@@ -211,8 +211,8 @@ unknown effect name gets suggestions.
 - **Seeing the result:** `ae_render_frame` (a frame as an image; options: zoom into a region, render only some layers,
   transparency on a checkerboard or a color, difference image against another time or comp), `ae_render_contact_sheet`
   (a grid of frames across time, labelled with time and frame number, to judge motion and easing)
-- **Existing files are not replaced silently:** Save As in `ae_save_project` and the `outputPath` of `ae_render_frame` and
-  `ae_render_contact_sheet` refuse when a file is already there, and the error says to pass `overwrite: true` to replace it
+- **Existing files are not replaced silently:** Save As in `ae_save_project`, the `outputPath` of `ae_render_frame` and
+  `ae_render_contact_sheet`, and `ae_export_frames` refuse when a file is already there, and the error says to pass `overwrite: true` to replace it
 - **Measuring:** `ae_get_layer_bounds` (exact on-screen boxes after transforms, parenting, 3D and camera; in-frame and
   action/title-safe checks), `ae_sample_pixels` (rendered RGBA/hex at points), `ae_get_comp_map` (nested precomps,
   parenting, track mattes, expression references)
@@ -224,7 +224,22 @@ unknown effect name gets suggestions.
 - **Effects, shapes & masks:** `ae_list_available_effects`, `ae_get_effect_params` (an effect's exact parameter names, types, defaults and ranges, without touching your layers), `ae_apply_effect`, `ae_set_effect_params`, `ae_remove_effect`, `ae_apply_preset`, `ae_add_shape`, `ae_add_mask`
 - **Keyframes (Graph Editor level):** `ae_edit_keyframes` (value, move in time, in/out interpolation, speed + influence per
   dimension, continuous/auto-Bezier, spatial tangents, roving, keyframe color labels, delete), `ae_copy_keyframes` (between
-  properties/layers/comps, time range, offset), `ae_set_time_remap` (keys or freeze frame)
+  properties/layers/comps, time range, offset), `ae_set_time_remap` (keys or freeze frame). The keyframe tools take whole
+  frames (`frame`, `moveToFrame`, `frames`, `offsetFrames`) as well as seconds.
+- **Precision timing and easing:** `ae_get_keyframes` (a keyframe table across many layers and properties: whole frame and
+  exact time of every key, exact value, interpolation, speed + influence per dimension exactly as After Effects stores them,
+  tangents, roving; keys between frames are flagged; optional normalised curve numbers per segment), `ae_set_keyframe_table`
+  (write such a table back, many properties in one undo step, every attribute exact), `ae_copy_ease` (the exact ease of a
+  reference key onto keys of other properties and layers, with a stated rule for different dimension counts),
+  `ae_audit_easing` (motion consistency against the project's own most-used curves: lists the segments that match none),
+  `ae_retime_keyframes` (scale around an anchor, offset or stagger by whole frames, conform to a new frame rate; keeps the
+  curves' shape, refuses keys colliding on a frame)
+- **Measured layout:** `ae_align_layers` (align, distribute and centre by real on-screen bounds, through parenting, scale,
+  rotation and text glyph boxes, not anchor points; reports any residual after the move)
+- **Files and exports:** `ae_find_files` (globs, `~`, Unicode names in either normalisation, depth and result limits, no
+  symlink loops; After Effects not needed), `ae_export_frames` (PNG stills of comps, single layers or footage, frame lists
+  and ranges, several exports per call, never replacing a file without `overwrite: true`); `ae_import_files` says when a
+  file couldn't be imported the way `importAs` asked
 - **Text:** `ae_style_text_range` (per-character styling by range or matching words), `ae_set_paragraph` (justification,
   indents, spacing, box size), `ae_add_text_animator` (animator properties + range/wiggly/expression selector)
 - **Footage:** `ae_set_footage_interpretation` (conform frame rate, alpha, fields, pulldown, loop, pixel aspect),

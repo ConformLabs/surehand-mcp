@@ -5,6 +5,9 @@ export const INSTRUCTIONS = `This server controls a running Adobe After Effects 
   missing items, footage specs and what makes it heavy (run it with ae_call if it isn't loaded).
 - Prefer the specific tools (ae_create_comp, ae_add_layer, ae_set_keyframes, ae_apply_effect...) for common edits; use ae_run_script for anything else - the full AE scripting API is available.
 - Use ae_get_properties to discover property paths/match names before setting values.
+- For exact timing work use the keyframe table (ae_get_keyframes / ae_set_keyframe_table: frames or seconds, exact speed and
+  influence), ae_copy_ease, ae_retime_keyframes (whole frames) and ae_audit_easing; for layout, ae_align_layers moves layers by
+  their measured on-screen bounds. ae_find_files locates files on disk; ae_export_frames saves PNG stills.
 - After visual changes, look at the result: ae_render_frame (one frame; can zoom a region, solo layers, show alpha, diff),
   ae_render_contact_sheet (motion over time). Check layout numerically with ae_get_layer_bounds.
 - For a structural change that should not change the picture (un-precompose, bake expressions, reorder effects, simplify a rig),
@@ -13,7 +16,7 @@ export const INSTRUCTIONS = `This server controls a running Adobe After Effects 
   safe areas over time, text size and reading speed, missing items, file codec/levels/loudness); action "schema" helps write the spec.
 - Every edit returns a "Changes" list of exactly what changed in the project; use it to confirm the edit did what you meant.
 - Every tool call is one undo step; ae_undo reverts it.
-- Tools never replace an existing file silently: ae_save_project (Save As), ae_render_frame and ae_render_contact_sheet (outputPath) refuse and say so. Pass overwrite: true only when replacing it is intended.
+- Tools never replace an existing file silently: ae_save_project (Save As), ae_render_frame and ae_render_contact_sheet (outputPath) and ae_export_frames refuse and say so. Pass overwrite: true only when replacing it is intended.
 - Read the resource aemcp://docs/extendscript before writing non-trivial ExtendScript.`;
 
 export const EXTENDSCRIPT_DOC = `# After Effects ExtendScript cheat sheet (for ae_run_script)
