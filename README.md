@@ -260,7 +260,7 @@ Some changes should not change the picture at all: un-precomposing, duplicating 
 expressions, reordering effects, simplifying a rig. `ae_prove_identical` checks that. It renders reference frames of the
 comps (by default the active comp, 5 frames across the work area, full size, at most 1920 px), you or the AI make the
 change, and it renders the same frames again and compares them pixel by pixel. The answer is **identical**,
-**identical within tolerance** (for example 1/255 for rounding), or **differs**, with, for each frame, the largest
+**identical within tolerance** (by default less than half an 8-bit step, so only the rounding of 16/32-bit projects passes; `tolerance: 0` asks for bit-identical), or **differs**, with, for each frame, the largest
 channel difference, how many pixels changed, the largest color difference (ΔE), the area that changed, and a
 difference image of the worst frame (black = identical). If a comp was deleted or resized since the capture, it says so.
 `action: "run"` does it in one call: capture, the edits as `ae_batch` steps (one undo step, all or nothing), compare.

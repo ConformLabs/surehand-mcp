@@ -137,7 +137,7 @@ describe("ae_prove_identical", () => {
     const id = idOf(await prove({ action: "capture", frames: 2 }, FULL));
     comps[0].shade = 201;
     const strict = await prove({ action: "compare", id }, FULL);
-    expect(text(strict)).toMatch(/Verdict: DIFFERS in 2 of 2 frames \(tolerance 0: bit-identical\)/);
+    expect(text(strict)).toMatch(/Verdict: DIFFERS in 2 of 2 frames \(default tolerance 0\.5\/255: less than one 8-bit step\)/);
     expect(text(strict)).toMatch(/16 px \(3\.13%\) beyond the tolerance, max channel difference 1\/255/);
     const loose = await prove({ action: "compare", id, tolerance: 1 }, FULL);
     expect(text(loose)).toMatch(/Verdict: IDENTICAL WITHIN TOLERANCE: all 2 frames match within 1\/255 per channel \(largest difference 1\/255\)/);

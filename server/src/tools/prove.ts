@@ -11,6 +11,7 @@ import { runJsx } from "../jsx.js";
 import { permissions, READ_ONLY_REFUSAL } from "../permissions.js";
 import { decodePng, encodePng, type Image } from "../png.js";
 import { errorResult } from "./registry.js";
+import { RENDER_RUN_OPTIONS } from "./core.js";
 import { runBatch } from "./workflow.js";
 
 export const MAX_PROOFS = 30;
@@ -109,7 +110,7 @@ async function waitForFiles(paths: string[]) {
 }
 
 async function render(comps: unknown[], extra: { times?: number[]; frames?: number; maxSize: number }, dir: string, prefix: string) {
-  const r = await runJsx(PROVE_RENDER_JSX, { comps, ...extra, dir, prefix }, { undoGroup: "Surehand MCP proof", timeoutMs: 600_000, depth: 6 });
+  const r = await runJsx(PROVE_RENDER_JSX, { comps, ...extra, dir, prefix }, { ...RENDER_RUN_OPTIONS, undoGroup: "Surehand MCP proof", timeoutMs: 600_000, depth: 6 });
   if (!r.ok) throw new Error(r.error?.message || "After Effects could not render the frames.");
   const res = r.result as { project: string | null; comps: Rendered[] };
   await waitForFiles(res.comps.flatMap((c) => (c.frames ?? []).map((f) => f.path)));
@@ -155,7 +156,8 @@ function loadManifest(id?: string): Manifest | string {
   }
 }
 
-const stamp = () => new Date().toISOString().replace(/[-:]/g, "").replace("T", "-").replace(/\..+$/, "");
+// to the millisecond, so "the latest proof" (ids sorted) is right even for proofs made in the same second
+const stamp = () => new Date().toISOString().replace(/[-:]/g, "").replace("T", "-").replace(/\.(\d{3})Z$/, "$1");
 
 /** Render reference frames and store them with a manifest under ~/.aemcp/proofs/<id>/. */
 export async function captureProof(input: { comps?: (number | string)[]; times?: number[]; frames?: number; maxSize?: number }): Promise<Manifest> {
@@ -268,13 +270,17 @@ const r2 = (n: number) => Math.round(n * 100) / 100;
 const pct = (n: number, total: number) => (n / total < 0.0001 && n > 0 ? "<0.01" : String(r2((100 * n) / total)));
 const frameLabel = (t: number, fps: number) => `${r2(t)}s (f${Math.round(t * fps)})`;
 
+export const DEFAULT_TOLERANCE = 0.5;
+
 export interface Comparison { verdict: "identical" | "identical within tolerance" | "differs" | "incomplete"; text: string; image?: { data: string; label: string } }
 
 /** Render the proof's comps and times again and compare them with the stored reference frames. */
 export async function compareProof(input: { id?: string; tolerance?: number }): Promise<Comparison | string> {
   const m = loadManifest(input.id);
   if (typeof m === "string") return m;
-  const tol = input.tolerance ?? 0;
+  // default: under half an 8-bit step, so 16/32 bpc rounding (e.g. 0.02/255 after a precompose) doesn't count,
+  // while any change that shows in 8-bit output does; tolerance 0 asks for bit-identical
+  const tol = input.tolerance ?? DEFAULT_TOLERANCE;
   const tmp = join(homedir(), ".aemcp", "tmp");
   mkdirSync(tmp, { recursive: true });
   const specs = m.comps.map((c) => ({ id: c.id, times: c.frames.map((f) => f.time), width: c.width, height: c.height, pixelAspect: c.pixelAspect }));
@@ -342,7 +348,7 @@ export async function compareProof(input: { id?: string; tolerance?: number }): 
           unlinkSync(f.path);
         } catch {}
   }
-  const tolText = tol ? `tolerance ${tol}/255 per channel` : "tolerance 0: bit-identical";
+  const tolText = !tol ? "tolerance 0: bit-identical" : input.tolerance === undefined ? `default tolerance ${tol}/255: less than one 8-bit step` : `tolerance ${tol}/255 per channel`;
   let verdict: Comparison["verdict"];
   let head: string;
   if (differing.length) {
@@ -357,7 +363,7 @@ export async function compareProof(input: { id?: string; tolerance?: number }): 
     head = `Verdict: IDENTICAL: all ${frames} frames are bit-identical to the reference.`;
   } else {
     verdict = "identical within tolerance";
-    head = `Verdict: IDENTICAL WITHIN TOLERANCE: all ${frames} frames match within ${tol}/255 per channel (largest difference ${r2(top)}/255).`;
+    head = `Verdict: IDENTICAL WITHIN TOLERANCE: all ${frames} frames match within ${tol}/255 per channel (largest difference ${r2(top)}/255${top < 1 ? ": high-bit-depth rounding, invisible in 8-bit output; pass tolerance 0 to require bit-identical" : ""}).`;
   }
   const notes: string[] = [];
   if (m.project !== res.project) notes.push(`Note: the reference was captured in ${m.project ?? "an unsaved project"}; the open project is ${res.project ?? "unsaved"}.`);
@@ -443,7 +449,7 @@ export function registerProveTools(server: McpServer) {
         frames: z.number().int().min(1).max(24).optional().describe("capture/run: number of frames spread over each comp's work area (default 5)."),
         maxSize: z.number().int().min(64).max(4096).optional().describe("capture/run: longest rendered side in pixels (default 1920; larger comps are scaled down)."),
         id: z.string().optional().describe("compare: the proof id from capture (default the latest proof)."),
-        tolerance: z.number().min(0).max(255).optional().describe("compare/run: allowed difference per channel, 0-255 (default 0 = bit-identical; 1 allows rounding)."),
+        tolerance: z.number().min(0).max(255).optional().describe("compare/run: allowed difference per channel, 0-255 (default 0.5: less than one 8-bit step, so only 16/32 bpc rounding is allowed; 0 = bit-identical)."),
         steps: z.array(z.object({ tool: z.string(), args: z.record(z.string(), z.any()).optional() })).min(1).max(200).optional().describe("run: the edits, as ae_batch steps."),
         atomic: z.boolean().optional().describe("run: as ae_batch (default true: a failed step undoes everything, and nothing is compared)."),
         name: z.string().optional().describe("run: undo step name."),

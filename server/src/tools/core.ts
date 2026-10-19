@@ -156,9 +156,9 @@ async function renderPng(body: string, args: Record<string, unknown>): Promise<{
   // A folder both AE and this process can access (system temp dirs can be sandboxed per app on macOS)
   const tmpDir = join(homedir(), ".aemcp", "tmp");
   mkdirSync(tmpDir, { recursive: true });
-  // One undo group, so the temporary comps are created and removed in a single, invisible step
-  // (otherwise Edit > Undo in AE could bring a temporary comp back).
-  const r = await runJsx(body, { ...args, tmpDir }, { undoGroup: "Surehand MCP preview", timeoutMs: 180_000 });
+  // The temporary comp is created and removed in one undo group, which the guarded rollback then undoes
+  // again: Edit > Undo in AE keeps undoing the user's own last step, not an invisible preview step.
+  const r = await runJsx(body, { ...args, tmpDir }, { ...RENDER_RUN_OPTIONS, undoGroup: "Surehand MCP preview", timeoutMs: 180_000 });
   if (!r.ok) return { error: formatResult(r) };
   const info = r.result as any;
   // saveFrameToPng may finish writing asynchronously; wait for a stable non-empty file
@@ -264,6 +264,8 @@ export function readOnlyScriptRefusal(code: string, transpiled?: string): string
  * compared over every comp, and undone in the same call if it changed anything (aemcp.jsxinc). Where AE
  * has app.project.revision only items and layer attributes are compared (checkOnly), not property values.
  */
+/** Rendering tools: their temporary comp leaves no undo step behind (rolled back and checked like read-only mode). */
+export const RENDER_RUN_OPTIONS: RunOptions = { report: ["*"], checkOnly: true, rollback: "changes" };
 export const READ_ONLY_RUN_OPTIONS: RunOptions = { undoGroup: "Surehand MCP Script (read-only check)", report: ["*"], checkOnly: true, rollback: "changes" };
 
 /** The refusal for a read-only script that changed the project (or may have), else null. */
