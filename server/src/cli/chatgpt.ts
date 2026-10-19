@@ -211,12 +211,30 @@ function supervise() {
   });
   srv.on("exit", (code) => finish({ state: "error", ...base, tunnel: tool.kind, error: `The Surehand server stopped (${srvLast || `exit code ${code}`}).` }, 1));
 
+  // "running" only once the tunnel gave its address and the local server answers
   let url = "";
+  let serverUp = false;
+  const ready = () => {
+    if (url && serverUp && !done) writeStatus({ state: "running", ...base, tunnel: tool.kind, url });
+  };
   const found = (publicBase: string) => {
     if (url || done) return;
     url = `${publicBase}/mcp/${cfg.token}`;
-    writeStatus({ state: "running", ...base, tunnel: tool.kind, url });
+    ready();
   };
+  const probe = () => {
+    if (done || serverUp) return;
+    fetch(`http://127.0.0.1:${port}/health`)
+      .then((r) => r.ok)
+      .catch(() => false)
+      .then((ok) => {
+        if (ok) {
+          serverUp = true;
+          ready();
+        } else setTimeout(probe, 200);
+      });
+  };
+  probe();
   let tunnelLast = "";
   const t =
     tool.kind === "cloudflared"
