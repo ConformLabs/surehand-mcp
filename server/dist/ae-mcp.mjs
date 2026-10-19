@@ -129,22 +129,49 @@ var init_define_AEMCP_CEP_FILES = __esm({
     try { if (state.listening) fs.unlinkSync(instanceFile()); } catch (e) {}
   }
 
+  // CEP accepts scripts even while a dialog (Project Settings, a render...) blocks ExtendScript,
+  // and After Effects runs them whenever it is free again: possibly long after the AI gave up.
+  // So each job first sends this no-op, and the job itself is only sent once it has come back
+  // (AE is free right now) and only if the job is still wanted.
+  var READY_SCRIPT = "'aemcp-ready'";
+
+  // the client gave up on it (timeout or cancel), or its deadline has passed
+  function dead(job) { return job.cancelled || Date.now() >= job.deadline; }
+
+  function skip(job) {
+    addLog({ at: new Date().toISOString(), ms: 0, ok: false, skipped: true, size: job.script.length, label: job.label, preview: "not run: the AI gave up before After Effects was free" });
+  }
+
   // ExtendScript is single threaded: run one script at a time.
   function pump() {
     if (state.busy || !state.queue.length) return;
     var job = state.queue.shift();
-    if (job.cancelled) return pump();
+    if (dead(job)) { skip(job); return pump(); }
     state.busy = true;
-    var t0 = Date.now();
-    state.current = { startedAt: t0, label: job.label };
-    evalScript(job.script, function (result) {
-      state.busy = false;
-      state.current = null;
-      var ms = Date.now() - t0;
-      var ok = result !== "EvalScript error." && result.indexOf('{"ok":false') !== 0;
-      addLog({ at: new Date().toISOString(), ms: ms, ok: ok, size: job.script.length, label: job.label, preview: String(result).slice(0, 160) });
-      job.done(result);
-      pump();
+    // waiting: the no-op has not come back yet, so After Effects isn't taking scripts right now
+    state.current = { startedAt: Date.now(), label: job.label, waiting: true };
+    evalScript(READY_SCRIPT, function () {
+      if (dead(job)) {
+        state.busy = false;
+        state.current = null;
+        skip(job);
+        return pump();
+      }
+      state.current.waiting = false;
+      job.started = true;
+      var t0 = Date.now();
+      evalScript(job.script, function (result) {
+        state.busy = false;
+        state.current = null;
+        var ms = Date.now() - t0;
+        var ok = result !== "EvalScript error." && result.indexOf('{"ok":false') !== 0;
+        // a script AE has started can't be interrupted: say so if the client had given up meanwhile
+        var late = !!job.cancelled;
+        var preview = (late ? "ran after the AI gave up: " : "") + String(result).slice(0, 160);
+        addLog({ at: new Date().toISOString(), ms: ms, ok: ok, late: late || undefined, size: job.script.length, label: job.label, preview: preview });
+        job.done(result);
+        pump();
+      });
     });
   }
 
@@ -177,6 +204,8 @@ var init_define_AEMCP_CEP_FILES = __esm({
     return {
       ok: true, name: "aemcp-bridge", version: VERSION, host: hostInfo(), port: state.port, pid: process.pid,
       busy: state.busy, busyForMs: cur ? Date.now() - cur.startedAt : 0, busyWith: cur ? cur.label || null : null,
+      // AE has not accepted the no-op sent before the current job: a dialog is open, or AE is busy/starting
+      waitingForAE: !!(cur && cur.waiting), waitingForMs: cur && cur.waiting ? Date.now() - cur.startedAt : 0,
       queue: state.queue.length, pendingApprovals: state.pending.length, permissionMode: permissionMode(),
       startedAt: state.startedAt, lastActivated: state.lastActivated, authorized: authorized(req, token),
     };
@@ -185,28 +214,60 @@ var init_define_AEMCP_CEP_FILES = __esm({
   function handleEval(req, res, body) {
     if (!body || typeof body.script !== "string") return send(res, 400, { ok: false, error: "missing script" });
     var finished = false;
+    var timer = null;
+    var watch = null;
+    // answer the client once. From then on the job is unwanted: if it hasn't started it never will,
+    // and if it is running its log entry says it finished after the AI gave up.
+    function finish(status, obj) {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      clearInterval(watch);
+      job.cancelled = true;
+      send(res, status, obj);
+    }
     var job = {
       script: body.script,
       label: body.label || null,
-      done: function (result) {
-        if (finished) return;
-        finished = true;
-        clearTimeout(timer);
-        send(res, 200, { ok: true, result: result });
-      },
+      done: function (result) { finish(200, { ok: true, result: result }); },
     };
     var timeoutMs = Math.max(1000, Math.min(Number(body.timeoutMs) || 120000, 24 * 3600 * 1000));
-    var timer = null;
-    var startTimer = function () {
+    // optional (sent by newer servers): give up early if After Effects hasn't accepted any script for
+    // this long, i.e. it is blocked by a dialog. Never applies to a script that has started.
+    var startTimeoutMs = Number(body.startTimeoutMs) > 0 ? Math.max(500, Number(body.startTimeoutMs)) : 0;
+    function checkBlocked() {
+      if (finished || job.started) return clearInterval(watch);
+      var cur = state.current;
+      if (!cur || !cur.waiting) return; // idle, or queued behind a script that is running: keep waiting
+      var waited = Date.now() - cur.startedAt;
+      if (waited < startTimeoutMs) return;
+      finish(503, {
+        ok: false, blocked: true, waitingForMs: waited, waitingFor: cur.label || null,
+        queue: state.queue.filter(function (j) { return j !== job && !j.cancelled; }).length, startedAt: state.startedAt,
+        error: "After Effects is busy or showing a dialog: it has not accepted a script for " + Math.round(waited / 1000) + "s. " +
+          "Close any open dialog in After Effects and retry. The script did not run and will not run later.",
+      });
+    }
+    function enqueue() {
+      job.deadline = Date.now() + timeoutMs; // never start it after this
       timer = setTimeout(function () {
-        if (finished) return;
-        finished = true;
-        job.cancelled = true; // drop it if it has not started yet
-        send(res, 504, { ok: false, error: "Timed out after " + Math.round(timeoutMs / 1000) + "s waiting for After Effects (it may be busy, rendering, or showing a dialog)." });
+        finish(504, {
+          ok: false,
+          error: "Timed out after " + Math.round(timeoutMs / 1000) + "s waiting for After Effects (it may be busy, rendering, or showing a dialog). " +
+            (job.started
+              ? "The script had already started: it can't be interrupted and will finish on its own."
+              : "The script did not run and will not run later."),
+        });
       }, timeoutMs);
-    };
+      state.queue.push(job);
+      pump();
+      if (startTimeoutMs && !finished) {
+        watch = setInterval(checkBlocked, Math.min(250, startTimeoutMs));
+        checkBlocked();
+      }
+    }
     // client went away (or the AI app cancelled the request) before we answered: don't run it if still queued
-    res.on("close", function () { if (!finished) { finished = true; job.cancelled = true; clearTimeout(timer); dropPending(job); } });
+    res.on("close", function () { if (!finished) { finished = true; job.cancelled = true; clearTimeout(timer); clearInterval(watch); dropPending(job); } });
 
     if (body.approval && permissionMode() === "ask") {
       // hold the edit until the user allows or denies it in the AE MCP panel
@@ -218,23 +279,18 @@ var init_define_AEMCP_CEP_FILES = __esm({
         state.pending = state.pending.filter(function (x) { return x !== p; });
         if (finished) return;
         if (!allow) {
-          finished = true;
           addLog({ at: new Date().toISOString(), ms: 0, ok: false, label: p.tool, preview: "denied in the AE MCP panel" });
-          return send(res, 200, { ok: false, denied: true, error: "The user denied this change in After Effects (AE MCP panel)." });
+          return finish(200, { ok: false, denied: true, error: "The user denied this change in After Effects (AE MCP panel)." });
         }
-        startTimer();
-        state.queue.push(job);
-        pump();
+        enqueue();
       };
       state.pending.push(p);
       openPanel();
       // waiting for a person: allow up to 10 minutes before giving up
-      setTimeout(function () { if (!finished && state.pending.indexOf(p) >= 0) { state.pending = state.pending.filter(function (x) { return x !== p; }); finished = true; send(res, 200, { ok: false, denied: true, error: "No one approved this change in the AE MCP panel within 10 minutes." }); } }, 10 * 60 * 1000);
+      setTimeout(function () { if (!finished && state.pending.indexOf(p) >= 0) { state.pending = state.pending.filter(function (x) { return x !== p; }); finish(200, { ok: false, denied: true, error: "No one approved this change in the AE MCP panel within 10 minutes." }); } }, 10 * 60 * 1000);
       return;
     }
-    startTimer();
-    state.queue.push(job);
-    pump();
+    enqueue();
   }
 
   function dropPending(job) {
@@ -65358,7 +65414,9 @@ function loadConfig() {
     changeReport: file2.changeReport,
     permissions: file2.permissions,
     instance: file2.instance,
-    scriptFolders: file2.scriptFolders
+    scriptFolders: file2.scriptFolders,
+    blockedAfterSeconds: file2.blockedAfterSeconds,
+    startupWaitSeconds: file2.startupWaitSeconds
   };
 }
 
@@ -65591,7 +65649,7 @@ function ensureExtension(force = false) {
   const dir = extensionDir();
   const current2 = installedExtensionHash();
   const present = existsSync2(join4(dir, "CSXS", "manifest.xml"));
-  if (!force && current2 === "e7fd3866173c" && present) return { installed: false, updated: false };
+  if (!force && current2 === "15d4fbaf4171" && present) return { installed: false, updated: false };
   const installedVersion = installedExtensionVersion();
   if (!force && present && installedVersion && compareVersions(installedVersion, VERSION) > 0) return { installed: false, updated: false };
   const updated = existsSync2(dir);
@@ -65602,7 +65660,7 @@ function ensureExtension(force = false) {
     writeFileSync3(p, content);
   }
   mkdirSync3(AEMCP_DIR, { recursive: true });
-  writeFileSync3(HASH_FILE, `${"e7fd3866173c"} ${VERSION}`);
+  writeFileSync3(HASH_FILE, `${"15d4fbaf4171"} ${VERSION}`);
   return { installed: true, updated };
 }
 function installedExtensionSignature() {
@@ -65796,12 +65854,13 @@ The server is running locally at http://127.0.0.1:${port}/mcp (token in ~/.aemcp
 
 // src/cli/diagnostics.ts
 init_define_AEMCP_CEP_FILES();
-import { spawnSync as spawnSync3 } from "node:child_process";
+import { spawnSync as spawnSync4 } from "node:child_process";
 import { arch, release } from "node:os";
 import { join as join7 } from "node:path";
 
 // src/bridge.ts
 init_define_AEMCP_CEP_FILES();
+import { spawnSync as spawnSync3 } from "node:child_process";
 import { readdirSync as readdirSync3, readFileSync as readFileSync6 } from "node:fs";
 import { dirname as dirname4, join as join6 } from "node:path";
 var BridgeError = class extends Error {
@@ -65886,6 +65945,16 @@ async function resolvePort() {
   if (list.length === 1) return list[0].port;
   return [...list].sort((a, b) => Date.parse(b.lastActivated || b.startedAt || "0") - Date.parse(a.lastActivated || a.startedAt || "0"))[0].port;
 }
+function seconds(env, file2, def) {
+  const v = env !== void 0 && env !== "" ? Number(env) : file2;
+  return typeof v === "number" && Number.isFinite(v) && v >= 0 ? v * 1e3 : def;
+}
+function blockedAfterMs() {
+  return seconds(process.env.AEMCP_BLOCKED_AFTER_SECONDS, loadConfig().blockedAfterSeconds, 3e3);
+}
+function startupWaitMs() {
+  return seconds(process.env.AEMCP_STARTUP_WAIT_SECONDS, loadConfig().startupWaitSeconds, 15e3);
+}
 async function request(path, init = {}) {
   const cfg = loadConfig();
   const port = init.port ?? await resolvePort();
@@ -65920,20 +65989,31 @@ async function request(path, init = {}) {
   }
   const body = await res.json().catch(() => ({}));
   if (res.status === 401) throw new BridgeError("Bridge rejected the token. Re-run the installer so server and AE share ~/.aemcp/config.json, then restart AE.", "AUTH");
+  if (body.blocked) throw new BridgeError(explainBlocked(body), "BLOCKED");
   if (body.denied) throw new BridgeError(body.error || "The change was denied in After Effects.", "DENIED");
   if (!res.ok || body.ok === false) throw new BridgeError(body.error || `Bridge error HTTP ${res.status}`, "BRIDGE");
   return body;
 }
+var secs = (ms) => Math.max(1, Math.round((ms || 0) / 1e3));
+function explainBlocked(b) {
+  const facts = [`it has not accepted a script for ${secs(b.waitingForMs)}s`];
+  if (b.waitingFor) facts.push(`waiting to run ${b.waitingFor}`);
+  if (b.queue) facts.push(`${b.queue} more call${b.queue === 1 ? "" : "s"} queued`);
+  const up = b.startedAt ? Date.now() - Date.parse(b.startedAt) : NaN;
+  const starting = up >= 0 && up < 12e4 ? ` The AE MCP bridge started ${secs(up)}s ago, so After Effects may still be starting up.` : "";
+  return `After Effects is busy or showing a dialog (${facts.join("; ")}).${starting} Check After Effects: close any open dialog or settings window (Project Settings, Preferences, an error or alert, a startup prompt) and retry. This call did not run and will not run later.`;
+}
 async function explainTimeout(port, timeoutMs) {
-  const secs = Math.round(timeoutMs / 1e3);
+  const secs2 = Math.round(timeoutMs / 1e3);
   const h = await probe(port, 1500);
-  if (!h) return `After Effects did not respond within ${secs}s, and its bridge is not answering either. AE may be frozen or quitting.`;
-  if (h.pendingApprovals) return `Still waiting for approval in After Effects (AE MCP panel) after ${secs}s.`;
+  if (!h)
+    return `After Effects did not respond within ${secs2}s, and its bridge is not answering either. AE may still be starting (or showing a startup dialog), or it is frozen or quitting. Call ae_status to check: it waits for AE to finish starting.`;
+  if (h.pendingApprovals) return `Still waiting for approval in After Effects (AE MCP panel) after ${secs2}s.`;
   if (h.busy) {
     const busy = Math.round((h.busyForMs || 0) / 1e3);
     return `After Effects has been busy for ${busy}s${h.busyWith ? ` (running ${h.busyWith})` : ""}. Either a long script or render is still running (it can't be interrupted and will finish on its own), or AE is blocked by an open dialog or settings window: check After Effects and close any dialog. For long jobs pass a larger timeoutSeconds.`;
   }
-  return `After Effects did not finish within ${secs}s.`;
+  return `After Effects did not finish within ${secs2}s.`;
 }
 async function health(port) {
   return request("/health", { method: "GET", timeoutMs: 3e3, port });
@@ -65942,11 +66022,54 @@ async function evalRaw(script2, timeoutMs = 12e4, opts = {}) {
   const extra = opts.approval ? 10 * 60 * 1e3 : 0;
   const body = await request("/eval", {
     method: "POST",
-    body: JSON.stringify({ script: script2, timeoutMs, label: opts.label, approval: opts.approval }),
+    // startTimeoutMs: the bridge answers early (blocked) if After Effects doesn't take the script that soon
+    body: JSON.stringify({ script: script2, timeoutMs, startTimeoutMs: blockedAfterMs() || void 0, label: opts.label, approval: opts.approval }),
     timeoutMs: timeoutMs + 5e3 + extra,
     cancel: opts.cancel
   });
   return String(body.result ?? "");
+}
+function aeProcessRunning() {
+  try {
+    if (process.platform === "darwin") {
+      const r = spawnSync3("ps", ["-axo", "comm="], { encoding: "utf8", timeout: 3e3 });
+      if (r.status !== 0) return null;
+      return r.stdout.split("\n").some((l) => /\/Contents\/MacOS\/After Effects$/.test(l.trim()));
+    }
+    if (process.platform === "win32") {
+      const r = spawnSync3("tasklist", ["/FI", "IMAGENAME eq AfterFX.exe", "/NH"], { encoding: "utf8", timeout: 5e3 });
+      if (r.status !== 0) return null;
+      return r.stdout.toLowerCase().includes("afterfx.exe");
+    }
+  } catch {
+  }
+  return null;
+}
+async function waitForBridge(opts = {}) {
+  const deadline = Date.now() + (opts.waitMs ?? startupWaitMs());
+  const isRunning = opts.isAERunning ?? aeProcessRunning;
+  for (; ; ) {
+    if (opts.port === void 0) cache = null;
+    const port = opts.port ?? await resolvePort();
+    let err;
+    try {
+      return { port, health: await health(port) };
+    } catch (e) {
+      if (!(e instanceof BridgeError) || e.code === "AUTH") throw e;
+      err = e;
+    }
+    const running = isRunning();
+    if (err.code === "NOT_RUNNING" && running !== true)
+      throw new BridgeError((running === false ? "After Effects is not running. " : "") + NOT_RUNNING_HELP + setupHint(), "NOT_RUNNING");
+    if (Date.now() + (opts.intervalMs ?? 1e3) >= deadline) {
+      const waited = secs(opts.waitMs ?? startupWaitMs());
+      throw new BridgeError(
+        (err.code === "NOT_RUNNING" ? `After Effects is running, but its AE MCP bridge did not start within ${waited}s. ` : `After Effects is running, but its AE MCP bridge did not answer within ${waited}s. `) + "AE may still be starting, or be showing a startup dialog (crash recovery, missing fonts or plugins, an update or sign-in prompt): check After Effects, close any dialog, then call ae_status again. If AE has finished starting and this persists, open Window > Extensions > AE MCP to check the bridge, or restart After Effects." + setupHint(),
+        "STARTING"
+      );
+    }
+    await new Promise((r) => setTimeout(r, opts.intervalMs ?? 1e3));
+  }
 }
 
 // src/jsx.ts
@@ -67130,7 +67253,7 @@ var CATEGORIES = {
 import { existsSync as existsSync5, readFileSync as readFileSync7 } from "node:fs";
 function debugMode() {
   return CSXS_VERSIONS.map((v) => {
-    const r = isWin ? spawnSync3("reg", ["query", `HKCU\\Software\\Adobe\\CSXS.${v}`, "/v", "PlayerDebugMode"], { encoding: "utf8" }) : isMac ? spawnSync3("defaults", ["read", `com.adobe.CSXS.${v}`, "PlayerDebugMode"], { encoding: "utf8" }) : null;
+    const r = isWin ? spawnSync4("reg", ["query", `HKCU\\Software\\Adobe\\CSXS.${v}`, "/v", "PlayerDebugMode"], { encoding: "utf8" }) : isMac ? spawnSync4("defaults", ["read", `com.adobe.CSXS.${v}`, "PlayerDebugMode"], { encoding: "utf8" }) : null;
     return `${v}:${r && r.status === 0 && /(^|\s)1\s*$/m.test(r.stdout) ? "on" : "off"}`;
   }).join(" ");
 }
@@ -67148,7 +67271,7 @@ async function diagnostics() {
   if (cfg) L.push(`config: ${JSON.stringify({ ...cfg, token: cfg.token ? `<set, ${cfg.token.length} chars>` : "MISSING" })}`);
   else L.push(`config: MISSING (${CONFIG_FILE})`);
   L.push(`installed server: ${existsSync5(INSTALLED_SERVER) ? INSTALLED_SERVER : "not installed (fine when using the .mcpb)"}`);
-  L.push(`extension: ${extensionDir()} \xB7 ${existsSync5(join7(extensionDir(), "CSXS", "manifest.xml")) ? `hash ${installedExtensionHash()} (bundled ${"e7fd3866173c"})` : "MISSING"}`);
+  L.push(`extension: ${extensionDir()} \xB7 ${existsSync5(join7(extensionDir(), "CSXS", "manifest.xml")) ? `hash ${installedExtensionHash()} (bundled ${"15d4fbaf4171"})` : "MISSING"}`);
   const sig = installedExtensionSignature();
   L.push(`extension signature: ${sig.ok ? "valid" : sig.problems.join("; ")}`);
   L.push(`PlayerDebugMode: ${debugMode()}`);
@@ -67180,7 +67303,7 @@ async function diagnostics() {
 
 // src/cli/install.ts
 init_define_AEMCP_CEP_FILES();
-import { spawn as spawn2, spawnSync as spawnSync4 } from "node:child_process";
+import { spawn as spawn2, spawnSync as spawnSync5 } from "node:child_process";
 import { chmodSync, copyFileSync as copyFileSync2, existsSync as existsSync6, mkdirSync as mkdirSync5, readdirSync as readdirSync4, readFileSync as readFileSync8, writeFileSync as writeFileSync4 } from "node:fs";
 import { dirname as dirname5, join as join8 } from "node:path";
 import { fileURLToPath as fileURLToPath3 } from "node:url";
@@ -67193,25 +67316,25 @@ function mcpbInstalled() {
 }
 function claudeDesktopRunning() {
   if (isMac)
-    return (spawnSync4("ps", ["-axo", "comm="], { encoding: "utf8" }).stdout || "").split("\n").some((l) => l.trim().endsWith(".app/Contents/MacOS/Claude"));
-  if (isWin) return (spawnSync4("tasklist", ["/FI", "IMAGENAME eq claude.exe", "/NH"], { encoding: "utf8" }).stdout || "").toLowerCase().includes("claude.exe");
+    return (spawnSync5("ps", ["-axo", "comm="], { encoding: "utf8" }).stdout || "").split("\n").some((l) => l.trim().endsWith(".app/Contents/MacOS/Claude"));
+  if (isWin) return (spawnSync5("tasklist", ["/FI", "IMAGENAME eq claude.exe", "/NH"], { encoding: "utf8" }).stdout || "").toLowerCase().includes("claude.exe");
   return false;
 }
 async function quitClaudeDesktop() {
-  if (isMac) spawnSync4("osascript", ["-e", 'tell application "Claude" to quit']);
-  else if (isWin) spawnSync4("taskkill", ["/IM", "claude.exe", "/T"]);
+  if (isMac) spawnSync5("osascript", ["-e", 'tell application "Claude" to quit']);
+  else if (isWin) spawnSync5("taskkill", ["/IM", "claude.exe", "/T"]);
   for (let i = 0; i < 40; i++) {
     if (!claudeDesktopRunning()) return true;
     await sleep(500);
   }
   if (isWin) {
-    spawnSync4("taskkill", ["/IM", "claude.exe", "/T", "/F"]);
+    spawnSync5("taskkill", ["/IM", "claude.exe", "/T", "/F"]);
     await sleep(1e3);
   }
   return !claudeDesktopRunning();
 }
 function startClaudeDesktop() {
-  if (isMac) spawnSync4("open", ["-a", "Claude"]);
+  if (isMac) spawnSync5("open", ["-a", "Claude"]);
   else if (isWin && existsSync6(claudeDesktopExe())) spawn2(claudeDesktopExe(), [], { detached: true, stdio: "ignore" }).unref();
 }
 async function install(argv) {
@@ -69983,7 +70106,7 @@ ${formatChanges(ch)}`;
   return `${READ_ONLY_REFUSAL}
 This script wrote to the project (perhaps only values that were already set), so its changes were undone.`;
 }
-var READ_ONLY_STILL_RUNNING = "Read-only mode: a script can't be interrupted, and when it ends, the read-only rollback still runs inside After Effects in the same run (whatever the script changed is undone, once, as usual), but this reply can't show its result. Check the project (ae_status, ae_get_project_info) before going on.";
+var READ_ONLY_STILL_RUNNING = "Read-only mode: if After Effects had already started the script, it can't be interrupted, and when it ends, the read-only rollback still runs inside After Effects in the same run (whatever the script changed is undone, once, as usual), but this reply can't show its result. Check the project (ae_status, ae_get_project_info) before going on.";
 async function runReadOnly(code, timeoutMs = 12e4) {
   const t = transpileUserCode(code);
   const refused = readOnlyScriptRefusal(code, t.source);
@@ -70106,13 +70229,32 @@ ${source.slice(0, 1500)}` } } : void 0
           if (!m) return errorResult(`No running After Effects matches "${instance}". Running: ${list.map((i) => `${i.label} (port ${i.port})`).join(", ") || "none"}.`);
           selectInstance(m.port);
         }
-        const port = await resolvePort();
-        const h = await health(port);
-        const r = await runJsx(
-          "return { appVersion: app.version, buildName: app.buildName, language: String(app.isoLanguage), os: $.os, extendScriptVersion: $.version, memoryInUse: app.memoryInUse, isRenderEngine: app.isRenderEngine, project: aemcp.projectInfo(), canWriteFiles: (function(){ try { return app.preferences.getPrefAsLong('Main Pref Section', 'Pref_SCRIPTING_FILE_NETWORK_SECURITY') === 1; } catch (e) { return null; } })() };",
-          {},
-          { undoGroup: false, timeoutMs: 15e3 }
-        );
+        const deadline = Date.now() + startupWaitMs();
+        const conn = await waitForBridge();
+        const port = conn.port;
+        let h = conn.health;
+        const statusScript = "return { appVersion: app.version, buildName: app.buildName, language: String(app.isoLanguage), os: $.os, extendScriptVersion: $.version, memoryInUse: app.memoryInUse, isRenderEngine: app.isRenderEngine, project: aemcp.projectInfo(), canWriteFiles: (function(){ try { return app.preferences.getPrefAsLong('Main Pref Section', 'Pref_SCRIPTING_FILE_NETWORK_SECURITY') === 1; } catch (e) { return null; } })() };";
+        let r;
+        for (; ; ) {
+          try {
+            r = await runJsx(statusScript, {}, { undoGroup: false, timeoutMs: 15e3, bridge: { label: "ae_status" } });
+            break;
+          } catch (e) {
+            if (!(e instanceof BridgeError) || e.code !== "BLOCKED" && e.code !== "TIMEOUT") throw e;
+            const up = h.startedAt ? Date.now() - Date.parse(h.startedAt) : NaN;
+            if (e.code === "BLOCKED" && up >= 0 && up < 12e4 && Date.now() + 1e3 < deadline) {
+              while (Date.now() + 1e3 < deadline) {
+                await new Promise((res) => setTimeout(res, 1e3));
+                h = await health(port).catch(() => h);
+                if (!h.waitingForAE) break;
+              }
+              if (!h.waitingForAE) continue;
+            }
+            return errorResult(
+              `The AE MCP bridge answers (${aeLabel(h.host?.appVersion)}, bridge v${h.version} on port ${port}), but After Effects is not taking scripts. ${e.message}`
+            );
+          }
+        }
         const out = formatResult(r);
         const head = [`Connected to ${aeLabel(h.host?.appVersion)} (bridge v${h.version} on port ${port}, MCP server v${VERSION}).`];
         if (list.length > 1)
@@ -79963,9 +80105,9 @@ After Effects MCP self-test v${VERSION}`));
   else bad(`No config at ${CONFIG_FILE}. Run the installer.`);
   const hash2 = installedExtensionHash();
   if (!existsSync10(join13(extensionDir(), "CSXS", "manifest.xml"))) bad(`After Effects extension missing at ${extensionDir()}. Run the installer.`);
-  else if (hash2 !== "e7fd3866173c" && compareVersions(installedExtensionVersion() ?? "0", VERSION) > 0)
+  else if (hash2 !== "15d4fbaf4171" && compareVersions(installedExtensionVersion() ?? "0", VERSION) > 0)
     warn(`A newer After Effects extension (v${installedExtensionVersion()}) is installed than this server (v${VERSION}): another copy of AE MCP is newer. Update this one (ae-mcp update, or the latest .mcpb).`);
-  else if (hash2 !== "e7fd3866173c") warn(`Extension at ${extensionDir()} is a different version (${hash2 ?? "unknown"} vs ${"e7fd3866173c"}). Re-run the installer.`);
+  else if (hash2 !== "15d4fbaf4171") warn(`Extension at ${extensionDir()} is a different version (${hash2 ?? "unknown"} vs ${"15d4fbaf4171"}). Re-run the installer.`);
   else ok("After Effects extension installed");
   if (bundledExtensionSigned) {
     const sig = installedExtensionSignature();
@@ -80066,7 +80208,7 @@ ${red(bold(`${failures} problem(s) found.`))} See README > Troubleshooting.`);
 
 // src/cli/update-cmd.ts
 init_define_AEMCP_CEP_FILES();
-import { spawnSync as spawnSync5 } from "node:child_process";
+import { spawnSync as spawnSync6 } from "node:child_process";
 import { createHash as createHash4 } from "node:crypto";
 import { copyFileSync as copyFileSync4, existsSync as existsSync11, mkdirSync as mkdirSync10, renameSync as renameSync2, rmSync as rmSync3, writeFileSync as writeFileSync8 } from "node:fs";
 import { dirname as dirname8 } from "node:path";
@@ -80110,7 +80252,7 @@ async function runUpdate() {
     if (got !== want) throw new Error(`checksum mismatch (expected ${want.slice(0, 12)}\u2026, got ${got.slice(0, 12)}\u2026)`);
     mkdirSync10(dirname8(INSTALLED_SERVER), { recursive: true });
     writeFileSync8(tmp, bytes);
-    const v = spawnSync5(process.execPath, [tmp, "--version"], { encoding: "utf8", timeout: 3e4 });
+    const v = spawnSync6(process.execPath, [tmp, "--version"], { encoding: "utf8", timeout: 3e4 });
     if (v.status !== 0 || v.stdout.trim() !== latest) throw new Error(`the downloaded server did not start correctly (${(v.stderr || v.stdout).trim().slice(0, 200)})`);
     if (existsSync11(INSTALLED_SERVER)) copyFileSync4(INSTALLED_SERVER, `${INSTALLED_SERVER}.previous`);
     renameSync2(tmp, INSTALLED_SERVER);
@@ -80118,7 +80260,7 @@ async function runUpdate() {
     rmSync3(tmp, { force: true });
     return { ...base, ok: false, to: latest, url: rel.html_url, message: `Update to v${latest} failed: ${e.message}. Nothing was changed.` };
   }
-  const setup = spawnSync5(process.execPath, [INSTALLED_SERVER, "setup"], { encoding: "utf8", timeout: 6e4, env: { ...process.env, AEMCP_NO_UPDATE_CHECK: "1" } });
+  const setup = spawnSync6(process.execPath, [INSTALLED_SERVER, "setup"], { encoding: "utf8", timeout: 6e4, env: { ...process.env, AEMCP_NO_UPDATE_CHECK: "1" } });
   let extension = false;
   try {
     extension = !!JSON.parse(setup.stdout).extensionInstalled;
