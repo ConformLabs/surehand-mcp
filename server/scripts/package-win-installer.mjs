@@ -87,35 +87,9 @@ if (has("osslsigncode")) {
   console.log(`node.exe signature: ${signer.trim()}${v.status === 0 ? " (verified)" : " (digest matches; certificate chain not checked on this machine)"}`);
 } else console.log("osslsigncode not found: skipping the node.exe signature check");
 
-// --- icon (multi-size .ico with PNG images, from server/assets/icon.png; macOS sips) ---
-const icon = join(CACHE, "surehand-mcp.ico");
-const iconSrc = join(SERVER, "assets", "icon.png");
-if (!existsSync(icon) || statSync(icon).mtimeMs < statSync(iconSrc).mtimeMs) {
-  const sizes = [16, 24, 32, 48, 64, 256];
-  const pngs = sizes.map((s) => {
-    const out = join(CACHE, `icon-${s}.png`);
-    run("sips", ["-z", String(s), String(s), "-s", "format", "png", iconSrc, "--out", out], { stdio: "ignore" });
-    const data = readFileSync(out);
-    rmSync(out);
-    return { s, data };
-  });
-  const header = Buffer.alloc(6 + 16 * pngs.length);
-  header.writeUInt16LE(0, 0);
-  header.writeUInt16LE(1, 2);
-  header.writeUInt16LE(pngs.length, 4);
-  let offset = header.length;
-  pngs.forEach(({ s, data }, i) => {
-    const e = 6 + 16 * i;
-    header.writeUInt8(s >= 256 ? 0 : s, e);
-    header.writeUInt8(s >= 256 ? 0 : s, e + 1);
-    header.writeUInt16LE(1, e + 4); // planes
-    header.writeUInt16LE(32, e + 6); // bits per pixel
-    header.writeUInt32LE(data.length, e + 8);
-    header.writeUInt32LE(offset, e + 12);
-    offset += data.length;
-  });
-  writeFileSync(icon, Buffer.concat([header, ...pngs.map((p) => p.data)]));
-}
+// --- icon: the Surehand MCP app icon (brand/Surehand.ico, 16-256 px) ---
+const icon = join(ROOT, "brand", "Surehand.ico");
+if (!existsSync(icon)) throw new Error(`missing ${icon}`);
 
 // --- makensis ---
 const version = pkg.version;

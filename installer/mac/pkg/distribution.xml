@@ -4,6 +4,8 @@
     <title>Surehand MCP</title>
     <welcome file="welcome.html" mime-type="text/html"/>
     <conclusion file="conclusion.html" mime-type="text/html"/>
+    <background file="background-light.tiff" alignment="bottomleft" scaling="none"/>
+    <background-darkAqua file="background-dark.tiff" alignment="bottomleft" scaling="none"/>
     <options customize="never" require-scripts="false" hostArchitectures="arm64,x86_64"/>
     <!-- Per-user install into the home folder only: no administrator password, nothing outside ~ is touched. -->
     <domains enable_anywhere="false" enable_currentUserHome="true" enable_localSystem="false"/>

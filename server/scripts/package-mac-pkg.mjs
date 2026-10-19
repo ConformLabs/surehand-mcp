@@ -270,6 +270,7 @@ const res = join(BUILD, "resources");
 mkdirSync(res, { recursive: true });
 for (const page of ["welcome.html", "conclusion.html"])
   writeFileSync(join(res, page), readFileSync(join(PKG_SRC, "resources", page), "utf8").replaceAll("@VERSION@", version));
+for (const image of ["background-light.tiff", "background-dark.tiff"]) copyFileSync(join(PKG_SRC, "resources", image), join(res, image));
 const dist = join(BUILD, "distribution.xml");
 writeFileSync(dist, readFileSync(join(PKG_SRC, "distribution.xml"), "utf8").replaceAll("@VERSION@", version).replaceAll("@COMPONENT_PKG@", componentName));
 mkdirSync(OUT_DIR, { recursive: true });

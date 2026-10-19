@@ -1,4 +1,9 @@
-# Surehand MCP for Adobe® After Effects®
+<h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="brand/png/lockup-dark.png">
+    <img src="brand/png/lockup-light.png" width="520" alt="Surehand MCP for Adobe® After Effects®">
+  </picture>
+</h1>
 
 [![CI](https://github.com/ConformLabs/surehand-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/ConformLabs/surehand-mcp/actions/workflows/ci.yml)
 
@@ -325,6 +330,7 @@ extension/           After Effects extension (signed): invisible bridge (auto-st
 installer/           run.sh / run.ps1: find or download Node.js, then run an ae-mcp command
   START HERE.txt       plain-language install guide (copied into the release)
   mac/, windows/       double-click launchers for a source checkout (the release generates its own)
+brand/               the logo: master SVGs, PNG sizes, Surehand.icns / Surehand.ico (see brand/README.md)
 .github/workflows/   CI: unit tests + real launcher install/test/uninstall on macOS and Windows
 ```
 
