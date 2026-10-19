@@ -12,8 +12,9 @@ import { keyframeTools } from "../src/tools/keyframes.js";
 import { footageTools } from "../src/tools/footage.js";
 import { egpTools, healthTools, textTools } from "../src/tools/text.js";
 import { sceneTools } from "../src/tools/scene.js";
+import { xrayTools } from "../src/tools/xray.js";
 
-const allTools = [...projectTools, ...compTools, ...layerTools, ...propertyTools, ...effectTools, ...renderTools, ...appTools, ...inspectTools, ...keyframeTools, ...footageTools, ...textTools, ...egpTools, ...healthTools, ...sceneTools];
+const allTools = [...projectTools, ...compTools, ...layerTools, ...propertyTools, ...effectTools, ...renderTools, ...appTools, ...inspectTools, ...keyframeTools, ...footageTools, ...textTools, ...egpTools, ...healthTools, ...sceneTools, ...xrayTools];
 
 /** Rough ES3 lint: things ExtendScript cannot parse. */
 function es3Problems(src: string): string[] {
@@ -137,7 +138,7 @@ describe("tool profiles", () => {
   it("every core tool exists", async () => {
     const { CORE_TOOLS } = await import("../src/tools/profile.js");
     const names = new Set(allTools.map((t) => t.name));
-    for (const n of ["ae_status", "ae_run_script", "ae_get_scripting_guide", "ae_render_frame", "ae_render_contact_sheet", "ae_batch", "ae_checkpoint", "ae_list_scripts", "ae_run_script_file", "ae_tools", "ae_call"]) names.add(n);
+    for (const n of ["ae_status", "ae_run_script", "ae_get_scripting_guide", "ae_render_frame", "ae_render_contact_sheet", "ae_batch", "ae_checkpoint", "ae_prove_identical", "ae_list_scripts", "ae_run_script_file", "ae_tools", "ae_call"]) names.add(n);
     for (const t of CORE_TOOLS) expect(names.has(t), t).toBe(true);
   });
 });

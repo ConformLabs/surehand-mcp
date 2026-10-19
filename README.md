@@ -11,10 +11,11 @@
 
 Surehand MCP connects **Claude** (Desktop / Code), **ChatGPT** (desktop app or web), Cursor, Codex, or any MCP client to **Adobe® After Effects®**.
 The AI can run any script inside After Effects (modern JavaScript, converted for AE's ExtendScript engine automatically),
-read information back, and use up to 94 ready-made tools for projects, comps, layers, keyframes (Graph Editor level),
+read information back, and use up to 97 ready-made tools for projects, comps, layers, keyframes (Graph Editor level),
 text styling and animators, footage, effects, shapes, masks, 3D cameras/lights/materials, audio, color management,
 Essential Graphics and rendering (including background renders with aerender). Batch edits run many steps as one
-undo step, checkpoints keep safety copies of the project, and your own scripts can be listed and run. It can *see* and *measure* its work (frames, contact sheets, zoomed regions, difference
+undo step, checkpoints keep safety copies of the project, structural changes can be proven not to change the render,
+project history shows what changed between versions, and your own scripts can be listed and run. It can *see* and *measure* its work (frames, contact sheets, zoomed regions, difference
 images, exact layer bounds, pixel colors), and every edit returns an exact list of what changed in the project.
 
 ```
@@ -153,7 +154,7 @@ To rotate the token, delete `token` from `~/.aemcp/config.json` and re-run the i
 | `ae_get_scripting_guide` | ExtendScript cheat sheet for the model (also an MCP resource `aemcp://docs/extendscript`). |
 
 **Tool profiles.** Every tool description is sent to the AI in every chat, so by default only a **core set of
-28 tools** is loaded (about 9k tokens instead of 26k for all 94), and **every other tool stays available on demand**:
+29 tools** is loaded (about 9k tokens instead of 27k for all 97), and **every other tool stays available on demand**:
 `ae_tools` lists all tools by category (or gives full parameter details of chosen ones), and `ae_call` runs any tool by
 name with the same validation, permissions, change report and activity log. Loading everything up front is optional:
 switch to **Full** in After Effects (**Window > Extensions > Surehand MCP > AI tools**), in Claude Desktop's
@@ -163,8 +164,8 @@ restart the AI app. Advanced: `"toolProfile": "core,ae_import_files,ae_render_qu
 Core set: `ae_status`, `ae_run_script`, `ae_get_scripting_guide`, `ae_render_frame`, `ae_render_contact_sheet`,
 `ae_get_project_info`, `ae_get_comp_info`, `ae_get_layer_info`, `ae_get_selection`, `ae_get_properties`,
 `ae_find_properties`, `ae_get_layer_bounds`, `ae_get_comp_map`, `ae_create_comp`, `ae_add_layer`, `ae_add_shape`, `ae_set_property`, `ae_set_keyframes`,
-`ae_set_expression`, `ae_apply_effect`, `ae_get_effect_params`, `ae_undo`, `ae_batch`, `ae_checkpoint`, `ae_list_scripts`,
-`ae_run_script_file`, `ae_tools`, `ae_call`.
+`ae_set_expression`, `ae_apply_effect`, `ae_get_effect_params`, `ae_undo`, `ae_batch`, `ae_checkpoint`, `ae_prove_identical`,
+`ae_list_scripts`, `ae_run_script_file`, `ae_tools`, `ae_call`.
 
 **Any After Effects language.** Property, effect and menu names are translated in non-English After Effects. Common
 English names still work everywhere: property paths like `Transform/Opacity`, effects like "Gaussian Blur" and menu
@@ -176,7 +177,10 @@ unknown effect name gets suggestions.
 
 - **Workflow:** `ae_batch` (many tool steps or scripts in one call and ONE undo step, with one change report; atomic by
   default: if a step fails everything is undone), `ae_checkpoint` (save a timestamped copy of the project, list, restore
-  as a new file next to the original; the original is never overwritten), `ae_list_scripts` (your scripts: AE's Scripts
+  as a new file next to the original; the original is never overwritten; each checkpoint also gets a history snapshot),
+  `ae_project_history` (snapshot the project, list snapshots and checkpoints, diff any two of them or the current
+  project: see Project history below), `ae_prove_identical` (evidence that a
+  structural change left the render unchanged, see "Proven edits" below), `ae_list_scripts` (your scripts: AE's Scripts
   folder, ScriptUI Panels, and folders listed as `"scriptFolders"` in `~/.aemcp/config.json`, with their descriptions)
   + `ae_run_script_file`
 - **3D:** `ae_set_camera` (one/two-node, focal length in mm, depth of field; reports angle of view), `ae_set_light`
@@ -209,7 +213,8 @@ unknown effect name gets suggestions.
   `ae_set_proxy`, `ae_relink_footage` (find missing files by name in a folder tree, keeps sequences)
 - **Essential Graphics:** `ae_essential_graphics` (add properties as controllers, template name), `ae_export_mogrt`
 - **Project:** `ae_project_health` (missing footage/fonts/effects, expression errors, unused footage, empty comps/folders,
-  duplicate comp names)
+  duplicate comp names); `ae_project_xray` (explains an inherited project: what the render queue pulls in, what
+  every expression depends on and which links are fragile, what is missing, footage specs, what makes it heavy)
 - **Render:** `ae_list_render_queue`, `ae_add_to_render_queue`, `ae_get_render_settings` / `ae_set_render_settings` (every
   render-settings and output-module setting as editable key/value pairs), `ae_queue_in_media_encoder`,
   `ae_render_background` + `ae_render_jobs` (aerender in a separate process, with progress and cancel; After Effects stays
@@ -217,6 +222,18 @@ unknown effect name gets suggestions.
 
 Comps can be referenced by id, name, or omitted for the active comp; layers by 1-based index or name; properties by
 paths like `"Transform/Position"` or `"Effects/Gaussian Blur/Blurriness"` (display names or match names).
+
+### Project X-ray
+
+Opening someone else's project? Ask the AI to X-ray it (`ae_project_xray`). It reads the whole project without changing
+anything and explains how it works instead of tidying it: which comps the render queue actually renders and the
+precomps each one pulls in (and which comps nothing renders), what every expression reads and which layers the rig
+hangs on, which links are already broken or will break when a layer is renamed or reordered or the project is opened
+in another After Effects language, which plug-ins, footage and fonts are missing, how the footage is specified
+(frame rates that don't match their comps, very large sources) and what makes it slow to render (heavy effects, effects
+hidden on shy or disabled layers, high motion blur samples, the 3D renderer, frame blending, footage scaled far down).
+You get a plain-language answer; the AI gets precise locations (comp > layer > property). Big projects are read
+within a time budget and say so when the answer is partial; `comps` and `sections` narrow it down.
 
 ### Change report
 
@@ -237,11 +254,61 @@ active comp and any comp named in the call. If a script fails halfway, the repor
 `ae_undo` reports what was reverted. On very large comps (tens of thousands of properties) this adds up to about a
 second per edit; turn it off with `"changeReport": false` in `~/.aemcp/config.json`, or per script with `report: false`.
 
+### Proven edits
+
+Some changes should not change the picture at all: un-precomposing, duplicating a comp deeply, baking or collapsing
+expressions, reordering effects, simplifying a rig. `ae_prove_identical` checks that. It renders reference frames of the
+comps (by default the active comp, 5 frames across the work area, full size, at most 1920 px), you or the AI make the
+change, and it renders the same frames again and compares them pixel by pixel. The answer is **identical**,
+**identical within tolerance** (by default less than half an 8-bit step, so only the rounding of 16/32-bit projects passes; `tolerance: 0` asks for bit-identical), or **differs**, with, for each frame, the largest
+channel difference, how many pixels changed, the largest color difference (ΔE), the area that changed, and a
+difference image of the worst frame (black = identical). If a comp was deleted or resized since the capture, it says so.
+What is compared is the sampled video frames, alpha included: audio, the comp's background color and the times between
+the sampled frames are not, and 32-bit values above 1.0 are clamped when the frames are saved, so differences in
+over-bright areas can be missed. Comp ids belong to one project: a proof captured in a saved project is only compared in
+that same file (otherwise the verdict is not proven); one captured in an unsaved project is compared if every comp still
+has its name, with a note that the project itself couldn't be confirmed.
+`action: "run"` does it in one call: capture, the edits as `ae_batch` steps (one undo step, all or nothing), compare.
+Reference frames are stored in `~/.aemcp/proofs/` for 7 days (30 proofs at most). Rendering works like
+`ae_render_frame`: through a temporary comp that is removed again and leaves no undo step behind (After Effects still
+marks the project as changed); if the temporary comp can't be removed, the result says so. Capture and compare are
+allowed in read-only mode; `run` makes edits, so it follows the same permissions as `ae_batch`.
+
+### Project history
+
+"What changed between v11 and v12?" `ae_project_history` answers it. A **snapshot** is a record of the open project:
+every item (comps, footage with its file paths, solids, folders), comp settings, every layer with its switches,
+timing, parent and track matte, every property that isn't at its default or is animated (values, keyframes with
+interpolation and easing), expressions, effects, masks, text, markers and the render queue. Taking one doesn't change
+the project and adds no undo step; snapshots are kept in `~/.aemcp/history` (the last 100 per project), and every
+`ae_checkpoint save` stores one too, so checkpoints can be compared (with a 15 s time budget, so saving stays quick; if
+that isn't enough, the checkpoint says the snapshot is partial and a full one can be taken with `snapshot`). A **diff** compares two snapshots, or a snapshot with
+the project as it is now, and lists what changed, grouped by comp, with a summary first:
+
+```
+Summary: 1 layer added, 1 layer renamed, 2 values changed, 1 keyframe change, 1 expression changed, 1 effect added
+Comp "Main" (id 12):
+  + layer #1 "Logo" (shape)
+  ~ layer #2 "Title": renamed from "Headline"
+  + Title > Effects/Glow (ADBE Glo2)
+  ~ Title > Transform/Opacity: keyframes: @1s 100 -> 80
+  ~ Title > Transform/Position: expression changed:
+        - wiggle(2, 10)
+        + wiggle(3, 10)
+```
+
+Refer to versions by label ("v11"), snapshot or checkpoint id, `latest`, `previous` or `current`. Long diffs are cut
+with a count of what's left; `detail` shows one comp in full. A big project takes a while to read (seconds for
+thousands of layers): `comps` limits a snapshot to some comps and `timeBudgetSeconds` caps the time (comps not reached
+are reported, never silently skipped). Checkpoints saved before this feature have no snapshot; comparing them would
+mean opening the old `.aep` in place of your project, so it isn't done automatically.
+
 ### Example prompts
 
 - "Make a 10 second 1080p comp with a dark gradient background and the title 'Summer Sale' that pops in with an overshoot, then show me frame 1s."
 - "List every expression in the active comp that has an error and fix them."
 - "Rename all layers in the selected comp to Title Case and color-label text layers yellow."
+- "Un-precompose 'Logo Precomp' into the main comp and prove the render didn't change."
 - "Import /Users/me/footage/*.mov, make a comp for each clip and add them all to the render queue as ProRes."
 
 ## Control and trust
@@ -270,7 +337,7 @@ version or port). Set a permanent preference with `"instance": "2026"` in the co
 If After Effects doesn't answer, the error says what it is busy with and for how long, and suggests checking for an open
 dialog. `ae_status` shows the same.
 
-**Compatibility check.** `ae-mcp selftest --full` runs every major tool (41 steps) against temporary comps (removed
+**Compatibility check.** `ae-mcp selftest --full` runs every major tool (over 60 steps) against temporary comps (removed
 afterwards; if the open project has no unsaved changes, the Save As and checkpoint-restore checks briefly switch to a
 scratch project and then reopen it), lists which scripting features your After Effects version has, and saves a report to `~/.aemcp/compat/`.
 All steps pass on After Effects 2025 (25.6) and 2026 (26.5) on macOS and on 2026 on Windows 11, also with 2025 and 2026

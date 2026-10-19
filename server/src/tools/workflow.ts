@@ -12,7 +12,7 @@ import { evalBody, formatChanges, rollbackProblem, runJsx } from "../jsx.js";
 import { approvalSummary, permissions, READ_ONLY_REFUSAL, SHELL_REFUSAL, usesShell } from "../permissions.js";
 import { reservedGlobalsHint, transpileUserCode } from "../transpile.js";
 import { ALL_JSX_TOOLS } from "./all.js";
-import { errorResult, formatResult, reportScope } from "./registry.js";
+import { applyFormat, errorResult, formatResult, reportScope } from "./registry.js";
 
 // ---------- checkpoints ----------
 
@@ -36,8 +36,14 @@ function readIndex(dir: string): Checkpoint[] {
 
 const stamp = () => new Date().toISOString().replace(/[:T]/g, "-").replace(/\..+$/, "");
 
+/** Run after every saved checkpoint (project history links a snapshot to it); returns a note for the user. */
+const checkpointHooks: ((cp: Checkpoint) => Promise<string | undefined>)[] = [];
+export function onCheckpointSaved(hook: (cp: Checkpoint) => Promise<string | undefined>) {
+  checkpointHooks.push(hook);
+}
+
 /** Save the open project and copy it into the checkpoint folder. */
-export async function saveCheckpoint(label?: string): Promise<Checkpoint> {
+export async function saveCheckpoint(label?: string): Promise<Checkpoint & { note?: string }> {
   const r = await runJsx(
     `var p = app.project;
 if (!p.file) aemcp.fail("The project has never been saved, so there is nothing to checkpoint yet. Save it first (ae_save_project with a path).");
@@ -62,7 +68,16 @@ return p.file.fsName;`,
     } catch {}
   }
   writeFileSync(join(dir, "index.json"), JSON.stringify(index, null, 2));
-  return index[index.length - 1];
+  const cp: Checkpoint & { note?: string } = { ...index[index.length - 1] };
+  const notes: string[] = [];
+  for (const hook of checkpointHooks) {
+    try {
+      const n = await hook(cp);
+      if (n) notes.push(n);
+    } catch {} // a hook never fails the checkpoint
+  }
+  if (notes.length) cp.note = notes.join("\n");
+  return cp;
 }
 
 /** A restore target next to the project that does not exist yet (an earlier restore is never overwritten). */
@@ -178,7 +193,10 @@ export async function runBatch({ steps, atomic, name, checkpoint, verbose }: Bat
   }
   if (edits && perm.mode === "read-only") return errorResult(READ_ONLY_REFUSAL);
   let cp = "";
-  if (checkpoint) cp = `Checkpoint saved first: ${(await saveCheckpoint("before-batch")).file}\n`;
+  if (checkpoint) {
+    const c = await saveCheckpoint("before-batch");
+    cp = `Checkpoint saved first: ${c.file}\n${c.note ? `${c.note}\n` : ""}`;
+  }
 
   const isAtomic = atomic !== false;
   const body =
@@ -205,7 +223,8 @@ return { steps: __out, failed: __failed, rollback: args.atomic && __failed >= 0 
   const res = r.result as { steps: { ok: boolean; result?: unknown; error?: string; line?: number }[]; failed: number };
   const lines = res.steps.map((s, i) => {
     if (!s.ok) return `${i + 1}. ${steps[i].tool}: FAILED: ${s.error}${s.line ? ` (line ${s.line})` : ""}${hints[i] ? `\n   Hint: ${hints[i]}` : ""}`;
-    const txt = s.result === undefined || s.result === null ? "ok" : JSON.stringify(s.result);
+    const format = batchable.get(steps[i].tool)?.format;
+    const txt = s.result === undefined || s.result === null ? "ok" : format ? applyFormat(format, s.result, steps[i].args ?? {}) : JSON.stringify(s.result);
     return `${i + 1}. ${steps[i].tool}: ${verbose ? txt : txt.length > 160 ? txt.slice(0, 157) + "..." : txt}`;
   });
   const changes = showReport ? formatChanges(r.changes) : null;
@@ -281,7 +300,7 @@ export function registerWorkflowTools(server: McpServer) {
         if (action === "save") {
           if (permissions().mode === "read-only") return errorResult(READ_ONLY_REFUSAL);
           const c = await saveCheckpoint(label);
-          return { content: [{ type: "text", text: `Checkpoint ${c.id}${c.label ? ` (${c.label})` : ""} saved: ${c.file}` }] };
+          return { content: [{ type: "text", text: `Checkpoint ${c.id}${c.label ? ` (${c.label})` : ""} saved: ${c.file}${c.note ? `\n${c.note}` : ""}` }] };
         }
         const r = await runJsx("return app.project.file ? app.project.file.fsName : null;", {}, { undoGroup: false });
         const project = r.result as string | null;

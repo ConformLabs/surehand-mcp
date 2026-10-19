@@ -33,6 +33,9 @@ await build({
       "try { Object.defineProperty(globalThis, 'localStorage', { value: undefined, configurable: true, writable: true }); } catch {}",
   },
   legalComments: "none",
+  // keeps the single file well under the 5 MiB limit for Claude Desktop extensions (names are kept, so
+  // stack traces still name the function; ExtendScript bodies are string literals and stay as written)
+  minifyWhitespace: true,
 });
 chmodSync("dist/ae-mcp.mjs", 0o755);
 console.log(`built dist/ae-mcp.mjs v${pkg.version} (extension ${Object.keys(cepFiles).length} files, ${cepHash})`);

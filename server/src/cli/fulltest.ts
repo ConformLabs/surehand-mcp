@@ -10,6 +10,7 @@ import { transpileUserCode } from "../transpile.js";
 import { ALL_JSX_TOOLS } from "../tools/all.js";
 import { CONTACT_SHEET_JSX, RENDER_FRAME_JSX } from "../tools/core.js";
 import { restoreCheckpoint, saveCheckpoint } from "../tools/workflow.js";
+import { captureSnapshot } from "../tools/history.js";
 import { regressionSteps } from "./fulltest-regression.js";
 import { revisionSteps } from "./fulltest-revision.js";
 import { rollbackSteps } from "./fulltest-rollback.js";
@@ -117,6 +118,47 @@ async function projectSafetyTests(tmpDir: string, before: ProjectState | undefin
   return results;
 }
 
+/**
+ * Project history's pruned walk (groups whose isModified is false are skipped) must not lose an expression
+ * on a property at its default value deep in a comp, whether or not this AE's isModified counts expressions:
+ * 32 nulls, the first 25 with a moved Position (so skipping gets confirmed), layer 30 with only an expression
+ * on Opacity. The pruned and the full snapshot must be identical and both hold the expression. The comp is
+ * removed by the full self-test's cleanup (like every other item it creates).
+ */
+async function historySteps(say: (ok: boolean, line: string) => void): Promise<StepResult[]> {
+  const name = "project history: snapshots keep an expression on a default value (layer 30)";
+  const H = `${C}_history`;
+  const t0 = Date.now();
+  let problem: string | null = null, how = "";
+  try {
+    const made = await runJsx(
+      `var c = app.project.items.addComp(args.name, 640, 360, 1, 2, 25);
+for (var i = 1; i <= 32; i++) {
+  var L = c.layers.addNull(); L.moveToEnd(); L.name = "N" + i;
+  if (i <= 25) L.property("ADBE Transform Group").property("ADBE Position").setValue([100 + i, 100]);
+  if (i === 30) L.property("ADBE Transform Group").property("ADBE Opacity").expression = "value";
+}
+return c.id;`,
+      { name: H },
+      { undoGroup: "Surehand MCP self-test", timeoutMs: 120_000 },
+    );
+    if (!made.ok) throw new Error(`could not build the test comp: ${made.error?.message}`);
+    // the default snapshot reads every group; "fast" skips unmodified ones and must notice that AE's
+    // group isModified ignores expressions (then it stops skipping)
+    const snap = await captureSnapshot({ comps: [H], timeBudgetSeconds: 60 }, { id: "default" });
+    const fast = await captureSnapshot({ comps: [H], timeBudgetSeconds: 60, fast: true }, { id: "fast" });
+    const opa = (s: typeof snap) => Object.values(s.items[String(made.result)]?.layers ?? {}).find((l) => l.name === "N30")?.props["ADBE Transform Group/ADBE Opacity"];
+    how = `fast mode: ${fast.stats.pruning}; ${fast.stats.visited} vs ${snap.stats.visited} properties looked at`;
+    if (opa(snap)?.x !== "value") problem = "the snapshot doesn't have the expression on layer 30";
+    else if (opa(fast)?.x !== "value") problem = `the fast snapshot lost the expression on layer 30 (${how})`;
+  } catch (e: any) {
+    problem = e?.message ?? String(e);
+  }
+  const ms = Date.now() - t0;
+  say(!problem, problem ? `${name}: ${problem}` : `${name} (${ms} ms; ${how})`);
+  return [{ step: name, ok: !problem, ms, error: problem ?? undefined }];
+}
+
 /** `before`: the project state before any self-test edits (the project-switching checks need it). */
 export async function fullSelftest(before?: ProjectState): Promise<number> {
   console.log(bold(`\nFull self-test: every major tool against this After Effects (temporary comps, removed afterwards)\n`));
@@ -169,6 +211,15 @@ export async function fullSelftest(before?: ProjectState): Promise<number> {
     { name: "render queue add", tool: "ae_add_to_render_queue", args: { comp: C, outputPath: join(tmpDir, "fulltest.mov") } },
     { name: "render settings", tool: "ae_set_render_settings", args: { renderSettings: { Quality: "Draft" } }, needs: "renderSettingsApi" },
     { name: "project health", tool: "ae_project_health", args: {} },
+    {
+      name: "project X-ray",
+      tool: "ae_project_xray",
+      args: { comps: [C], timeBudgetSeconds: 30 },
+      check: (r) => {
+        const text = ALL.find((t) => t.name === "ae_project_xray")!.format!(r.result, {});
+        return /^Project X-ray: /.test(text) && /"expressions":\{"total":[1-9]/.test(text) ? null : `unexpected X-ray result: ${text.slice(0, 200)}`;
+      },
+    },
     { name: "camera", tool: "ae_set_camera", args: { comp: C, focalLength: 50, type: "two-node", depthOfField: true } },
     { name: "light", tool: "ae_set_light", args: { comp: C, type: "SPOT", intensity: 120, castsShadows: true } },
     { name: "3D material", tool: "ae_set_material", args: { comp: C, layers: ["BG"], castsShadows: "on", specular: 30 } },
@@ -211,6 +262,7 @@ export async function fullSelftest(before?: ProjectState): Promise<number> {
   results.push(...(await revisionSteps(features, (good, line) => (good ? ok : fail)(line))));
   results.push(...(await rollbackSteps((good, line) => (good ? ok : fail)(line))));
   results.push(...(await regressionSteps(tmpDir, (good, line) => (good ? ok : fail)(line))));
+  results.push(...(await historySteps((good, line) => (good ? ok : fail)(line))));
 
   // clean up everything the test created
   await runJsx(

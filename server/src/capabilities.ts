@@ -33,7 +33,7 @@ export const FEATURE_NOTES: Record<string, string> = {
   essentialGraphics: "ae_essential_graphics",
   mogrtExport: "ae_export_mogrt",
   fontsApi: "ae_get_fonts (AE 24.0+)",
-  missingFontsApi: "missing-font check in ae_project_health (AE 24.0+)",
+  missingFontsApi: "missing-font check in ae_project_health and ae_project_xray (AE 24.0+)",
   keyframeLabels: "keyframe color labels in ae_edit_keyframes (AE 22.6+)",
   layerIds: "stable layer ids for the change report (AE 22.0+; older versions match layers by index+name)",
   anyLayerTrackMatte: "track matte to any layer in ae_set_layer_attributes (AE 23.0+)",
