@@ -16,7 +16,6 @@
   var UI = window.SurehandUI;
   var $ = function (id) { return document.getElementById(id); };
   var REPO_URL = "https://github.com/ConformLabs/surehand-mcp";
-  var WIKI_URL = REPO_URL + "/wiki";
   var POLL_MS = 1500;
   // a new request can't be answered for this long (no answer meant for the previous card lands on it)
   // (a little more than the bridge's 1 s, which counts from when the panel reports the card shown)
@@ -823,7 +822,7 @@
   $("ver").onclick = function () { openScreen("update"); };
   function loading(body, text) { body.innerHTML = ""; body.appendChild(el("div", { cls: "loading", text: text || "Loading\u2026" })); }
   function message(body, text) { body.appendChild(el("div", { cls: "msg", text: text })); }
-  var TUNNEL_HELP_URL = WIKI_URL + "/ChatGPT-on-the-web";
+  var TUNNEL_HELP_URL = "https://github.com/ConformLabs/surehand-mcp/wiki/ChatGPT-on-the-web";
   function openUrl(u) {
     try { window.cep.util.openURLInDefaultBrowser(u); } catch (e) { copyText(u); toast("Link copied: " + u); }
   }
@@ -1257,7 +1256,7 @@
     body.appendChild(el("div", { cls: "about" }, [el("span", { html: logo }),
       el("div", {}, [el("div", { cls: "t", text: "Surehand MCP" }), el("div", { cls: "s", text: "for Adobe\u00ae After Effects\u00ae \u00b7 version " + AEMCPBridge.VERSION })])]));
     var links = el("div", { cls: "links" });
-    [["Getting started", WIKI_URL], ["Troubleshooting", WIKI_URL + "/Troubleshooting"], ["Report a problem", REPO_URL + "/issues"]].forEach(function (l) {
+    [["Getting started", REPO_URL + "#readme"], ["Troubleshooting", REPO_URL + "#troubleshooting"], ["Report a problem", REPO_URL + "/issues"]].forEach(function (l) {
       var b = button("", "", function () { openUrl(l[1]); });
       b.appendChild(el("span", { text: l[0] }));
       b.appendChild(el("span", { text: "\u203a", "aria-hidden": "true" }));
