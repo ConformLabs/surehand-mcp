@@ -24,6 +24,9 @@ export interface AemcpConfig {
   blockedAfterSeconds?: number;
   /** how long ae_status waits for an After Effects that is still starting (default 15) */
   startupWaitSeconds?: number;
+  /** Preflight: ffmpeg / ffprobe to use instead of searching (absolute paths) */
+  ffmpegPath?: string;
+  ffprobePath?: string;
 }
 
 export function configPath(): string {
@@ -50,5 +53,7 @@ export function loadConfig(): AemcpConfig {
     scriptFolders: file.scriptFolders,
     blockedAfterSeconds: file.blockedAfterSeconds,
     startupWaitSeconds: file.startupWaitSeconds,
+    ffmpegPath: file.ffmpegPath,
+    ffprobePath: file.ffprobePath,
   };
 }
