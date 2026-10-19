@@ -99,10 +99,12 @@ export async function regressionSteps(tmpDir: string, say: (ok: boolean, line: s
   // ---- T2: the revision fast path must not hide a real edit in full mode ----
   await step(NAMES[2], async () => {
     const name = `${P}_reported`;
+    const rev0 = await peek("return app.project.revision === undefined ? null : app.project.revision;");
     const r = await call("ae_run_script", { code: `app.project.items.addFolder(${JSON.stringify(name)}); return 1;` });
     const made = await countNamed(name);
+    const rev1 = await peek("return app.project.revision === undefined ? null : app.project.revision;");
     if (r.isError || made !== 1) return `edit did not run (found ${made}): ${r.text.slice(0, 200)}`;
-    return /Changes:/.test(r.text) && !/Changes: none/.test(r.text) ? null : `the edit wasn't reported: ${r.text.slice(0, 200)}`;
+    return /^Changes( \([^)]*\))?:\s*\n\+ folder /m.test(r.text) && !/Changes: none/.test(r.text) ? null : `the edit wasn't reported (revision ${rev0} -> ${rev1}, items ${await peek("return app.project.numItems;")}): ${JSON.stringify(r.text.slice(0, 300))}`;
   });
 
   // ---- T4b: a frame preview never overwrites an existing file ----

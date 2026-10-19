@@ -79627,10 +79627,12 @@ async function regressionSteps(tmpDir, say) {
   });
   await step2(NAMES[2], async () => {
     const name = `${P}_reported`;
+    const rev0 = await peek("return app.project.revision === undefined ? null : app.project.revision;");
     const r = await call("ae_run_script", { code: `app.project.items.addFolder(${JSON.stringify(name)}); return 1;` });
     const made = await countNamed(name);
+    const rev1 = await peek("return app.project.revision === undefined ? null : app.project.revision;");
     if (r.isError || made !== 1) return `edit did not run (found ${made}): ${r.text.slice(0, 200)}`;
-    return /Changes:/.test(r.text) && !/Changes: none/.test(r.text) ? null : `the edit wasn't reported: ${r.text.slice(0, 200)}`;
+    return /^Changes( \([^)]*\))?:\s*\n\+ folder /m.test(r.text) && !/Changes: none/.test(r.text) ? null : `the edit wasn't reported (revision ${rev0} -> ${rev1}, items ${await peek("return app.project.numItems;")}): ${JSON.stringify(r.text.slice(0, 300))}`;
   });
   await step2(NAMES[3], async () => {
     const comp = `${P}_frame`;
