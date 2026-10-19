@@ -427,4 +427,21 @@ describe("ae_preflight", () => {
     expect((await callTool({ spec: {}, target: "file" })).content[0].text).toMatch(/needs file/);
     expect((await callTool({ spec: { video: { widht: 1 } } })).content[0].text).toMatch(/video/);
   });
+
+  it("no ffmpeg: never PASS, one line for the skipped checks, and a hint to ask about the download", async () => {
+    const { fileURLToPath } = await import("node:url");
+    const why = "ffmpeg / ffprobe were not found, so the rendered file can't be checked.";
+    fake.file = { findings: [], probe: {}, skipped: [`black: ${why}`, `flash: ${why}`, `legalRange: ${why}`] };
+    try {
+      const r = await callTool({ spec: { black: { maxSeconds: 0.5 }, flash: { check: true } }, target: "file", file: fileURLToPath(import.meta.url) });
+      const t: string = r.content[0].text;
+      expect(t.split("\n")[0]).toBe("WARNINGS (1)");
+      expect(t).toMatch(/the rendered file was NOT checked/);
+      expect(t).toContain(`black, flash, legalRange: ${why}`);
+      expect(t.split(why).length - 1).toBe(1);
+      expect(t).toMatch(/allowFfmpegDownload: true/);
+    } finally {
+      fake.file = null;
+    }
+  });
 });

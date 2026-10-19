@@ -114,15 +114,29 @@ async function runPreflight(args: Record<string, any>): Promise<CallToolResult> 
     if (fc) {
       findings.push(...fc.findings);
       skipped.push(...(fc.skipped ?? []));
+      // nothing in the file was measured without ffmpeg: never let that read as a PASS
+      if (!fc.tool && !fc.findings.length)
+        findings.push({ check: "file", severity: "warn", message: "the rendered file was NOT checked: ffmpeg isn't available (see \"not checked\" below)" });
       if (!fc.tool && args.allowFfmpegDownload !== true)
         notes.push("ffmpeg isn't installed, so the file checks didn't run. Ask the user whether to download it once (a pinned, checksum-verified build into ~/.aemcp/ffmpeg), then call again with allowFfmpegDownload: true; or they can install it themselves (brew install ffmpeg / winget install ffmpeg).");
       if (!timeBase) {
-        const fps = Number(fc.probe.frameRate ?? fc.probe.fps ?? spec.video?.frameRate);
+        // the file's own frame rate (probe.video.frameRate); the spec's only when the file has no video
+        const v = (fc.probe.video ?? {}) as { frameRate?: number };
+        const fps = Number(v.frameRate ?? fc.probe.frameRate ?? spec.video?.frameRate);
         if (fps > 0) timeBase = { fps };
       }
     }
     titleParts.push(`file ${args.file}`);
   }
+
+  // one line for checks skipped for the same reason (e.g. "ffmpeg not found" for every file check)
+  const byReason = new Map<string, string[]>();
+  for (const line of skipped) {
+    const m = /^([^:]{1,40}): (.+)$/s.exec(line);
+    const key = m ? m[2] : line;
+    byReason.set(key, [...(byReason.get(key) ?? []), m ? m[1] : ""]);
+  }
+  skipped.splice(0, skipped.length, ...[...byReason].map(([why, names]) => (names.every(Boolean) ? `${names.join(", ")}: ${why}` : why)));
 
   const title = `Preflight against ${spec.name ? `"${spec.name}"` : "the delivery spec"}: ${titleParts.join("; ")}`;
   const text = formatReport({ title, findings, timeBase, skipped, notes, probe: fc?.probe, maxFindings: args.maxFindings });

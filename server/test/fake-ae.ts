@@ -287,8 +287,9 @@ export function fakeProject(spec: FakeProjectSpec) {
   class PlaceholderSource extends FootageSource {}
   class Layer {}
   class AVLayer extends Layer {}
-  class TextLayer extends AVLayer {}
-  class ShapeLayer extends AVLayer {}
+  // as in After Effects: text and shape layers are NOT AVLayer subclasses (instanceof AVLayer is false)
+  class TextLayer extends Layer {}
+  class ShapeLayer extends Layer {}
   class CameraLayer extends Layer {}
   class LightLayer extends Layer {}
   class PropertyBase {}

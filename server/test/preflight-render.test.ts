@@ -135,7 +135,7 @@ describe.skipIf(!ff)("rendered-file checks with ffmpeg", () => {
       expect(r.thumbnails!.map((t) => t.label)).toEqual([expect.stringMatching(/^frozen/), expect.stringMatching(/^black/), expect.stringMatching(/^black/)]);
       for (const t of r.thumbnails!) {
         expect(t.path.startsWith(join(home, ".aemcp", "tmp"))).toBe(true);
-        expect(readFileSync(t.path).subarray(1, 4).toString()).toBe("PNG");
+        expect([...readFileSync(t.path).subarray(0, 3)]).toEqual([0xff, 0xd8, 0xff]); // JPEG
       }
     } finally {
       Object.assign(process.env, saved);

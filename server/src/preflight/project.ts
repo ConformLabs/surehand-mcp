@@ -129,7 +129,8 @@ function active(L, t) { return t >= L.inPoint - 1e-6 && t < L.outPoint - 1e-6; }
 function shown(L) {
   if (!L.enabled) return false;
   try { if (L.guideLayer) return false; } catch (e) {}
-  return L instanceof AVLayer;
+  // in After Effects TextLayer and ShapeLayer are not AVLayer subclasses (instanceof AVLayer is false for them)
+  return L instanceof AVLayer || L instanceof TextLayer || L instanceof ShapeLayer;
 }
 // a nesting context: the delivered comp, or a precomp seen through a layer. times[i]: the local time of global
 // sample i, or null where the context isn't visible (the precomp layer is inactive, transparent or past its source)

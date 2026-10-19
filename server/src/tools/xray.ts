@@ -82,7 +82,8 @@ function layer(L) {
   try { if (L.parent) o.par = L.parent.index; } catch (e) {}
   try { src = L.source; } catch (e) {}
   if (src) o.src = src.id;
-  if (L instanceof AVLayer) {
+  // TextLayer and ShapeLayer are not AVLayer subclasses in After Effects
+  if (L instanceof AVLayer || L instanceof TextLayer || L instanceof ShapeLayer) {
     try { if (L.adjustmentLayer) { o.adj = 1; o.inP = r4(L.inPoint); o.outP = r4(L.outPoint); } } catch (e) {}
     if (has("weight")) {
       try { if (L.collapseTransformation) o.cl = 1; } catch (e) {}

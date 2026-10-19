@@ -540,6 +540,8 @@ export interface LegalSection {
   last: number;
   /** frame with the largest out-of-range share, and the shares there (percent) */
   worst: number;
+  /** frames in the section that are out of range (sections join runs less than a second apart) */
+  badFrames?: number;
   lumaPct: number;
   chromaPct: number;
 }
@@ -553,7 +555,7 @@ export interface Extremes {
 }
 
 /** Frames whose out-of-range share is above `maxPct`, grouped into sections (from the marked plane averages). */
-export function legalSections(a: Analysis, plan: LegalPlan, maxPct: number): { sections: LegalSection[]; frames: number; worst: { i: number; pct: number } } {
+export function legalSections(a: Analysis, plan: LegalPlan, maxPct: number, gap = 1): { sections: LegalSection[]; frames: number; worst: { i: number; pct: number } } {
   const f = a.frames;
   const lo = plan.lo ?? 16 * 256, hi = plan.hi ?? 200 * 256;
   const frac = (avg: number | undefined) => (avg === undefined ? 0 : Math.min(1, Math.max(0, (avg - lo) / (hi - lo))));
@@ -569,10 +571,11 @@ export function legalSections(a: Analysis, plan: LegalPlan, maxPct: number): { s
       if (pct > worst.pct) worst = { i, pct };
     }
   }
-  const sections = frameRuns(bad).map(([first, last]) => {
+  const sections = frameRuns(bad, gap).map(([first, last]) => {
     let w = first;
     for (let i = first; i <= last; i++) if (Math.max(pctY(i), pctC(i)) > Math.max(pctY(w), pctC(w))) w = i;
-    return { first, last, worst: w, lumaPct: pctY(w), chromaPct: pctC(w) };
+    const badFrames = bad.filter((i) => i >= first && i <= last).length;
+    return { first, last, worst: w, lumaPct: pctY(w), chromaPct: pctC(w), badFrames };
   });
   return { sections, frames: bad.length, worst };
 }
@@ -582,7 +585,8 @@ const pctText = (p: number) => `${p >= 1 ? round(p, 1) : p >= 0.01 ? round(p, 2)
 
 /** Findings for the out-of-range sections; `extremes` (by worst frame) adds the code values found there. */
 export function evaluateLegal(a: Analysis, plan: LegalPlan, maxPct: number, fps: number, extremes: Map<number, Extremes> = new Map()): Marked[] {
-  const { sections, frames, worst } = legalSections(a, plan, maxPct);
+  // runs less than a second apart make one section: one finding per problem area, not one per flicker
+  const { sections, frames, worst } = legalSections(a, plan, maxPct, Math.max(1, Math.round(fps)));
   if (!sections.length) return [];
   const time = (i: number) => a.frames.t[i] ?? i / fps;
   const depth = plan.bitDepth === 8 ? "8-bit code values" : `${plan.bitDepth}-bit code values, scaled to 8-bit`;
@@ -595,11 +599,11 @@ export function evaluateLegal(a: Analysis, plan: LegalPlan, maxPct: number, fps:
     if (plan.chroma && sec.chromaPct > maxPct)
       parts.push(`${pctText(sec.chromaPct)} have chroma outside ${plan.chroma.min}-${plan.chroma.max}${x ? ` (chroma ${round(x.cmin, 1)}-${round(x.cmax, 1)})` : ""}`);
     const t0 = time(sec.first), t1 = time(sec.last) + 1 / fps;
-    const n = sec.last - sec.first + 1;
+    const n = sec.last - sec.first + 1, nb = sec.badFrames ?? n;
     out.push({
       check: "legalRange",
       severity: "fail",
-      message: `Out of legal range ${fmtTime(t0)}-${fmtTime(t1)} (${n} frame${n > 1 ? "s" : ""}); worst at ${fmtTime(time(sec.worst))}: ${parts.join("; ")}. Measured on the file's ${depth}${maxPct ? `; ${maxPct}% allowed per frame` : ""}.`,
+      message: `Out of legal range ${fmtTime(t0)}-${fmtTime(t1)} (${nb === n ? `${n} frame${n > 1 ? "s" : ""}` : `${nb} of ${n} frames`}); worst at ${fmtTime(time(sec.worst))}: ${parts.join("; ")}. Measured on the file's ${depth}${maxPct ? `; ${maxPct}% allowed per frame` : ""}.`,
       at: [round(t0, 3), round(t1, 3)],
       fix: "Find the bright / saturated element at that time and bring it into range (correct its color, or limit the output with a legalizer such as Broadcast Colors on an adjustment layer).",
       thumb: { at: time(sec.worst), prio: 1, label: `out of legal range at ${fmtTime(time(sec.worst))}` },
@@ -908,8 +912,9 @@ export async function checkFile(path: string, spec: Spec, opts: CheckFileOptions
       const id = randomBytes(5).toString("hex");
       for (const [i, f] of picks.entries()) {
         const at = Math.max(0, Math.min(f.thumb!.at, (info.duration ?? f.thumb!.at + 1) - 1 / fps));
-        const out = join(dir, `preflight-${id}-${i + 1}.png`);
-        const r = await runTool(ff.ffmpeg, ["-hide_banner", "-nostdin", "-loglevel", "error", "-ss", at.toFixed(3), "-i", path, "-frames:v", "1", "-vf", "scale='min(960,iw)':-2", "-y", out], {
+        // JPEG at 960 px: a full PNG frame is about 1 MB of base64 per image for the AI to read
+        const out = join(dir, `preflight-${id}-${i + 1}.jpg`);
+        const r = await runTool(ff.ffmpeg, ["-hide_banner", "-nostdin", "-loglevel", "error", "-ss", at.toFixed(3), "-i", path, "-frames:v", "1", "-vf", "scale='min(960,iw)':-2", "-q:v", "3", "-y", out], {
           signal: opts.signal,
         });
         if (r.aborted) throw abortError();
