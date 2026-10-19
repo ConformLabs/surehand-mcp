@@ -149,6 +149,20 @@ try {
 } finally { sheet.remove(); }
 return r;`;
 
+/** saveFrameToPng may finish writing asynchronously: wait (up to ~15 s) for a non-empty file whose size is stable. */
+export async function waitForFile(path: string, tries = 150): Promise<boolean> {
+  let last = -1;
+  for (let i = 0; i < tries; i++) {
+    if (existsSync(path)) {
+      const size = statSync(path).size;
+      if (size > 0 && size === last) return true;
+      last = size;
+    }
+    await sleep(100);
+  }
+  return existsSync(path);
+}
+
 /**
  * Run a JSX body that saves a PNG (it receives args.tmpDir and returns {path, ...}),
  * wait until AE has finished writing it, and return it base64-encoded.
@@ -163,17 +177,7 @@ async function renderPng(body: string, args: Record<string, unknown>): Promise<{
   if (!r.ok) return { error: formatResult(r) };
   const info = r.result as any;
   const note = renderCleanupNote(r, info?.tmpLeft, "__aemcp_preview");
-  // saveFrameToPng may finish writing asynchronously; wait for a stable non-empty file
-  let last = -1;
-  for (let i = 0; i < 150; i++) {
-    if (existsSync(info.path)) {
-      const size = statSync(info.path).size;
-      if (size > 0 && size === last) break;
-      last = size;
-    }
-    await sleep(100);
-  }
-  if (!existsSync(info.path)) return { error: errorResult(`After Effects did not write the image to ${info.path}`) };
+  if (!(await waitForFile(info.path))) return { error: errorResult(`After Effects did not write the image to ${info.path}`) };
   const data = readFileSync(info.path).toString("base64");
   if (!args.outputPath) {
     try {

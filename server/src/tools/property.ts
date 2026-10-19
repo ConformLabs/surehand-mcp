@@ -2,8 +2,8 @@ import { z } from "zod";
 import { anyValue, compRef, layerRef, propPath, type JsxTool } from "./registry.js";
 
 const easeSchema = z
-  .union([z.number(), z.object({ speed: z.number().optional(), influence: z.number().optional() })])
-  .describe("Temporal ease: influence % (e.g. 75 = strong easy-ease) or {speed, influence}.");
+  .union([z.number(), z.object({ speed: z.number().optional(), influence: z.number().optional() }), z.array(z.object({ speed: z.number(), influence: z.number() })).min(1).max(3)])
+  .describe("Temporal ease: influence % (e.g. 75 = strong easy-ease), {speed, influence}, or one {speed, influence} per dimension (2D/3D values; 1 for Position and other spatial properties).");
 
 export const propertyTools: JsxTool[] = [
   {
@@ -88,8 +88,8 @@ return aemcp.propInfo(p, {});`,
     name: "ae_set_keyframes",
     title: "Set keyframes",
     description:
-      "Create keyframes on a property in one call, with optional interpolation (linear/bezier/hold) and temporal easing. " +
-      'Example: path "Transform/Position", keyframes [{time:0,value:[0,540]},{time:1,value:[960,540],easeIn:80}].',
+      "Create keyframes on a property in one call, with optional interpolation (linear/bezier/hold) and temporal easing. Place keys by time (seconds) or frame (whole frames). " +
+      'Example: path "Transform/Position", keyframes [{time:0,value:[0,540]},{frame:24,value:[960,540],easeIn:80}].',
     input: {
       comp: compRef,
       layer: layerRef,
@@ -97,7 +97,8 @@ return aemcp.propInfo(p, {});`,
       keyframes: z
         .array(
           z.object({
-            time: z.number().describe("Seconds (comp time)."),
+            time: z.number().optional().describe("Seconds (comp time)."),
+            frame: z.number().int().optional().describe("Whole frame from the comp's start, instead of time."),
             value: anyValue,
             interpolation: z.enum(["linear", "bezier", "hold"]).optional().describe("Both in and out."),
             inInterpolation: z.enum(["linear", "bezier", "hold"]).optional(),
@@ -117,17 +118,26 @@ var c = aemcp.findComp(args.comp), l = aemcp.findLayer(c, args.layer), p = aemcp
 if (!p.canVaryOverTime) aemcp.fail("Property '" + p.name + "' cannot be animated");
 if (args.clearExisting) while (p.numKeys > 0) p.removeKey(1);
 var times = [], vals = [];
-for (var i = 0; i < args.keyframes.length; i++) { times.push(args.keyframes[i].time); vals.push(aemcp.toAEValue(p, args.keyframes[i].value)); }
+for (var i = 0; i < args.keyframes.length; i++) {
+  var kf = args.keyframes[i];
+  if (kf.frame === undefined && kf.time === undefined) aemcp.fail("Each keyframe needs time (seconds) or frame (whole frames)");
+  times.push(kf.frame !== undefined ? kf.frame * c.frameDuration : kf.time); vals.push(aemcp.toAEValue(p, kf.value));
+}
 p.setValuesAtTimes(times, vals);
+function easeList(e, cur) {
+  if (!(e instanceof Array)) return aemcp.easeArr(p, e);
+  if (e.length !== cur.length) aemcp.fail("'" + p.name + "' takes " + cur.length + " ease value(s) per key side, got " + e.length);
+  var a = []; for (var q = 0; q < e.length; q++) a.push(new KeyframeEase(e[q].speed, Math.max(0.1, Math.min(100, e[q].influence)))); return a;
+}
 for (var j = 0; j < args.keyframes.length; j++) {
-  var k = args.keyframes[j], idx = p.nearestKeyIndex(k.time);
+  var k = args.keyframes[j], idx = p.nearestKeyIndex(times[j]);
   var ii = aemcp.interp(k.inInterpolation || k.interpolation), oi = aemcp.interp(k.outInterpolation || k.interpolation);
   if (ii || oi) p.setInterpolationTypeAtKey(idx, ii || p.keyInInterpolationType(idx), oi || p.keyOutInterpolationType(idx));
   var ei = k.easeIn !== undefined ? k.easeIn : (args.easyEase ? 33.333 : undefined);
   var eo = k.easeOut !== undefined ? k.easeOut : (args.easyEase ? 33.333 : undefined);
   if ((ei !== undefined || eo !== undefined) && p.propertyValueType !== PropertyValueType.NO_VALUE) {
     try {
-      p.setTemporalEaseAtKey(idx, ei !== undefined ? aemcp.easeArr(p, ei) : p.keyInTemporalEase(idx), eo !== undefined ? aemcp.easeArr(p, eo) : p.keyOutTemporalEase(idx));
+      p.setTemporalEaseAtKey(idx, ei !== undefined ? easeList(ei, p.keyInTemporalEase(idx)) : p.keyInTemporalEase(idx), eo !== undefined ? easeList(eo, p.keyOutTemporalEase(idx)) : p.keyOutTemporalEase(idx));
     } catch (e) { log("ease not applied at key " + idx + ": " + e.message); }
   }
 }
@@ -136,14 +146,22 @@ return { property: p.name, numKeys: p.numKeys, keyframes: aemcp.keyframes(p) };`
   {
     name: "ae_remove_keyframes",
     title: "Remove keyframes",
-    description: "Remove keyframes from a property: all of them, or those at specific times.",
-    input: { comp: compRef, layer: layerRef, path: propPath, times: z.array(z.number()).optional().describe("Omit to remove all keyframes.") },
+    description: "Remove keyframes from a property: all of them, or those at specific times (seconds) or frames.",
+    input: {
+      comp: compRef,
+      layer: layerRef,
+      path: propPath,
+      times: z.array(z.number()).optional().describe("Seconds. Omit times and frames to remove all keyframes."),
+      frames: z.array(z.number().int()).optional().describe("Whole frames from the comp's start."),
+    },
     idempotent: true,
     destructive: true,
     jsx: `
 var c = aemcp.findComp(args.comp), l = aemcp.findLayer(c, args.layer), p = aemcp.resolveProp(l, args.path), n = 0;
-if (!args.times) { var v = p.numKeys ? p.valueAtTime(c.time, true) : null; while (p.numKeys > 0) { p.removeKey(1); n++; } if (v !== null) try { p.setValue(v); } catch (e) {} }
-else for (var i = 0; i < args.times.length; i++) { var k = p.nearestKeyIndex(args.times[i]); if (p.numKeys && Math.abs(p.keyTime(k) - args.times[i]) < c.frameDuration / 2) { p.removeKey(k); n++; } }
+var ts = args.times ? args.times.slice(0) : (args.frames ? [] : null);
+if (args.frames) for (var f = 0; f < args.frames.length; f++) ts.push(args.frames[f] * c.frameDuration);
+if (!ts) { var v = p.numKeys ? p.valueAtTime(c.time, true) : null; while (p.numKeys > 0) { p.removeKey(1); n++; } if (v !== null) try { p.setValue(v); } catch (e) {} }
+else for (var i = 0; i < ts.length; i++) { var k = p.nearestKeyIndex(ts[i]); if (p.numKeys && Math.abs(p.keyTime(k) - ts[i]) < c.frameDuration / 2) { p.removeKey(k); n++; } }
 return { removed: n, remaining: p.numKeys };`,
   },
   {

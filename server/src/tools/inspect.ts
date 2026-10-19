@@ -5,7 +5,7 @@ import { compRef, layerRef, type JsxTool } from "./registry.js";
 // expression returns everything as a string, evaluated once. The expression is written in ES3
 // style so it also works with the Legacy ExtendScript expression engine. The temporary layer
 // is removed again in the same undo step (tempItems).
-const evalViaExpression = `
+export const evalViaExpression = `
 function evalExpr(comp, expr, t) {
   var tl = comp.layers.addText("");
   tl.name = "__aemcp_probe";
@@ -18,6 +18,32 @@ function evalExpr(comp, expr, t) {
     if (err) aemcp.fail("Expression evaluation failed: " + err);
     return v;
   } finally { tl.remove(); }
+}`;
+
+/**
+ * On-screen corners of layers in comp pixels at time t, through AE's own toComp() (transforms, parenting, 3D and the
+ * active camera), in one expression evaluation. measureLayers(c, [indices], t, includeExtents) returns
+ * { "i<index>": { x0, y0, x1, y1, xs: [4], ys: [4], rect: [left, top, width, height], threeD } | { err } }.
+ * Shared by ae_get_layer_bounds and ae_align_layers.
+ */
+export const MEASURE_JSX = `${evalViaExpression}
+function measureLayers(c, idx, t, ext) {
+  var expr = "var ids=[" + idx.join(",") + "],ext=" + (ext ? "true" : "false") + ",s='';" +
+    "for(var i=0;i<ids.length;i++){var L=thisComp.layer(ids[i]);s+=ids[i]+':';" +
+    "try{var r=L.sourceRectAtTime(time,ext);var a=L.toComp([r.left,r.top]),b=L.toComp([r.left+r.width,r.top]),c=L.toComp([r.left+r.width,r.top+r.height]),d=L.toComp([r.left,r.top+r.height]);" +
+    "s+=[r.left,r.top,r.width,r.height,a[0],a[1],b[0],b[1],c[0],c[1],d[0],d[1]].join(',');}catch(e){s+='ERR '+e.message;}s+='|';}s";
+  var raw = evalExpr(c, expr, t), res = {}, parts = raw.split("|");
+  for (var p = 0; p < parts.length; p++) {
+    if (!parts[p]) continue;
+    var colon = parts[p].indexOf(":"), li = Number(parts[p].substr(0, colon)), body = parts[p].substr(colon + 1);
+    if (body.indexOf("ERR") === 0) { res["i" + li] = { err: body.substr(4) }; continue; }
+    var n = body.split(","), xs = [Number(n[4]), Number(n[6]), Number(n[8]), Number(n[10])], ys = [Number(n[5]), Number(n[7]), Number(n[9]), Number(n[11])];
+    var threeD = false, L = c.layer(li);
+    try { for (var q = L; q; q = q.parent) if (q.threeDLayer) threeD = true; } catch (e) {}
+    res["i" + li] = { x0: Math.min.apply(null, xs), x1: Math.max.apply(null, xs), y0: Math.min.apply(null, ys), y1: Math.max.apply(null, ys), xs: xs, ys: ys,
+      rect: [Number(n[0]), Number(n[1]), Number(n[2]), Number(n[3])], threeD: threeD };
+  }
+  return res;
 }`;
 
 export const inspectTools: JsxTool[] = [
@@ -33,40 +59,35 @@ export const inspectTools: JsxTool[] = [
       layers: z.array(layerRef).optional().describe("Layers to measure (default: all layers, up to 300)."),
       selectedOnly: z.boolean().optional().describe("Measure only the layers selected in After Effects."),
       time: z.number().optional().describe("Seconds (default: the comp's current time)."),
+      frame: z.number().int().optional().describe("Whole frame number from the comp's start (frame 0 = time 0), instead of time."),
       includeExtents: z.boolean().optional().describe("Include stroke widths, effects and other extents (default false = content box)."),
     },
     readOnly: true,
     tempItems: true,
-    jsx: `${evalViaExpression}
-var c = aemcp.findComp(args.comp), t = args.time === undefined ? c.time : args.time, idx = [];
+    jsx: `${MEASURE_JSX}
+var c = aemcp.findComp(args.comp), t = args.frame !== undefined ? args.frame * c.frameDuration : (args.time === undefined ? c.time : args.time), idx = [];
 if (args.layers) { for (var i = 0; i < args.layers.length; i++) idx.push(aemcp.findLayer(c, args.layers[i]).index); }
 else if (args.selectedOnly) { for (var j = 0; j < c.selectedLayers.length; j++) idx.push(c.selectedLayers[j].index); if (!idx.length) aemcp.fail("No layers are selected"); }
 else { for (var k = 1; k <= Math.min(c.numLayers, 300); k++) idx.push(k); }
 if (!idx.length) aemcp.fail("The comp has no layers");
-var expr = "var ids=[" + idx.join(",") + "],ext=" + (args.includeExtents ? "true" : "false") + ",s='';" +
-  "for(var i=0;i<ids.length;i++){var L=thisComp.layer(ids[i]);s+=ids[i]+':';" +
-  "try{var r=L.sourceRectAtTime(time,ext);var a=L.toComp([r.left,r.top]),b=L.toComp([r.left+r.width,r.top]),c=L.toComp([r.left+r.width,r.top+r.height]),d=L.toComp([r.left,r.top+r.height]);" +
-  "s+=[r.left,r.top,r.width,r.height,a[0],a[1],b[0],b[1],c[0],c[1],d[0],d[1]].join(',');}catch(e){s+='ERR '+e.message;}s+='|';}s";
-var raw = evalExpr(c, expr, t), out = [], W = c.width, H = c.height;
-var parts = raw.split("|");
-for (var p = 0; p < parts.length; p++) {
-  if (!parts[p]) continue;
-  var colon = parts[p].indexOf(":"), li = Number(parts[p].substr(0, colon)), body = parts[p].substr(colon + 1), L = c.layer(li);
+var m = measureLayers(c, idx, t, !!args.includeExtents), out = [], W = c.width, H = c.height;
+var r1 = function (v) { return Math.round(v * 10) / 10; };
+for (var p = 0; p < idx.length; p++) {
+  var li = idx[p], b = m["i" + li], L = c.layer(li);
   var o = { index: li, name: L.name, type: aemcp.layerType(L), visible: L.enabled && L.inPoint <= t && t < L.outPoint };
-  if (body.indexOf("ERR") === 0) { o.bounds = null; o.note = L instanceof CameraLayer || L instanceof LightLayer ? "cameras and lights have no bounds" : body; out.push(o); continue; }
-  var n = body.split(","), xs = [Number(n[4]), Number(n[6]), Number(n[8]), Number(n[10])], ys = [Number(n[5]), Number(n[7]), Number(n[9]), Number(n[11])];
-  var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs), y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
-  var r1 = function (v) { return Math.round(v * 10) / 10; };
+  if (!b || b.err) { o.bounds = null; o.note = L instanceof CameraLayer || L instanceof LightLayer ? "cameras and lights have no bounds" : (b ? b.err : "not measured"); out.push(o); continue; }
+  var x0 = b.x0, x1 = b.x1, y0 = b.y0, y1 = b.y1;
   o.bounds = { left: r1(x0), top: r1(y0), right: r1(x1), bottom: r1(y1), width: r1(x1 - x0), height: r1(y1 - y0), centerX: r1((x0 + x1) / 2), centerY: r1((y0 + y1) / 2) };
-  o.corners = [[r1(xs[0]), r1(ys[0])], [r1(xs[1]), r1(ys[1])], [r1(xs[2]), r1(ys[2])], [r1(xs[3]), r1(ys[3])]];
-  o.layerRect = { left: r1(Number(n[0])), top: r1(Number(n[1])), width: r1(Number(n[2])), height: r1(Number(n[3])) };
+  o.corners = [[r1(b.xs[0]), r1(b.ys[0])], [r1(b.xs[1]), r1(b.ys[1])], [r1(b.xs[2]), r1(b.ys[2])], [r1(b.xs[3]), r1(b.ys[3])]];
+  o.layerRect = { left: r1(b.rect[0]), top: r1(b.rect[1]), width: r1(b.rect[2]), height: r1(b.rect[3]) };
   o.inFrame = x1 <= 0 || y1 <= 0 || x0 >= W || y0 >= H ? "outside" : (x0 >= 0 && y0 >= 0 && x1 <= W && y1 <= H ? "full" : "partial"); // parenthesized: ExtendScript nests ?: left-to-right
   o.actionSafe = x0 >= W * 0.05 && x1 <= W * 0.95 && y0 >= H * 0.05 && y1 <= H * 0.95;
   o.titleSafe = x0 >= W * 0.1 && x1 <= W * 0.9 && y0 >= H * 0.1 && y1 <= H * 0.9;
+  if (b.threeD) o.threeD = "3D: the box of the layer's 4 corners projected through the active camera";
   if (o.bounds.width === 0 && o.bounds.height === 0) o.note = "empty at this time (no content)";
   out.push(o);
 }
-return { comp: c.name, size: [W, H], time: t, layers: out };`,
+return { comp: c.name, size: [W, H], time: t, frame: Math.round(t / c.frameDuration), layers: out };`,
   },
   {
     name: "ae_sample_pixels",

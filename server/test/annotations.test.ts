@@ -90,6 +90,16 @@ const EXPECTED: Record<string, Hints> = {
   ae_get_expressions: R,
   ae_check_expression: EI, // sets the expression on the real property, then restores it
   ae_replace_in_expressions: E, // a repeat replaces again (e.g. "a" -> "ab")
+  // precision: keyframe tables, easing, retiming, measured layout
+  ae_get_keyframes: R,
+  ae_set_keyframe_table: DI, // replace removes the property's keys first
+  ae_copy_ease: EI,
+  ae_audit_easing: R,
+  ae_retime_keyframes: E, // offset/stagger again shifts again
+  ae_align_layers: EI, // measures with a temporary probe inside its own undo step
+  // files & export
+  ae_find_files: R, // runs in the MCP server, reads the file system only
+  ae_export_frames: DI, // overwrite replaces existing PNGs; the temporary comp leaves no undo step
   // effects, shapes & masks
   ae_list_available_effects: R,
   ae_get_effect_params: EI, // temporary layer
