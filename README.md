@@ -4,6 +4,12 @@
     <img src="brand/png/lockup-light.png" width="520" alt="Surehand MCP for Adobe® After Effects®">
   </picture>
 </h1>
+<p>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="brand/conformlabs-endorsement-reversed.svg">
+    <img src="brand/conformlabs-endorsement.svg" width="200" alt="A Conform Labs product">
+  </picture>
+</p>
 
 [![CI](https://github.com/ConformLabs/surehand-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/ConformLabs/surehand-mcp/actions/workflows/ci.yml)
 
