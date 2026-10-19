@@ -9,6 +9,8 @@ export const INSTRUCTIONS = `This server controls a running Adobe After Effects 
   ae_render_contact_sheet (motion over time). Check layout numerically with ae_get_layer_bounds.
 - For a structural change that should not change the picture (un-precompose, bake expressions, reorder effects, simplify a rig),
   use ae_prove_identical (action "run" with the edits as batch steps) to get pixel evidence that the render is unchanged.
+- Before delivery, ae_preflight checks the comp and/or its render against the user's own delivery spec (size, frame rate,
+  safe areas over time, text size and reading speed, missing items, file codec/levels/loudness); action "schema" helps write the spec.
 - Every edit returns a "Changes" list of exactly what changed in the project; use it to confirm the edit did what you meant.
 - Every tool call is one undo step; ae_undo reverts it.
 - Tools never replace an existing file silently: ae_save_project (Save As), ae_render_frame and ae_render_contact_sheet (outputPath) refuse and say so. Pass overwrite: true only when replacing it is intended.

@@ -11,7 +11,7 @@
 
 Surehand MCP connects **Claude** (Desktop / Code), **ChatGPT** (desktop app or web), Cursor, Codex, or any MCP client to **Adobe® After Effects®**.
 The AI can run any script inside After Effects (modern JavaScript, converted for AE's ExtendScript engine automatically),
-read information back, and use up to 97 ready-made tools for projects, comps, layers, keyframes (Graph Editor level),
+read information back, and use up to 98 ready-made tools for projects, comps, layers, keyframes (Graph Editor level),
 text styling and animators, footage, effects, shapes, masks, 3D cameras/lights/materials, audio, color management,
 Essential Graphics and rendering (including background renders with aerender). Batch edits run many steps as one
 undo step, checkpoints keep safety copies of the project, structural changes can be proven not to change the render,
@@ -154,7 +154,7 @@ To rotate the token, delete `token` from `~/.aemcp/config.json` and re-run the i
 | `ae_get_scripting_guide` | ExtendScript cheat sheet for the model (also an MCP resource `aemcp://docs/extendscript`). |
 
 **Tool profiles.** Every tool description is sent to the AI in every chat, so by default only a **core set of
-29 tools** is loaded (about 9k tokens instead of 27k for all 97), and **every other tool stays available on demand**:
+29 tools** is loaded (about 9k tokens instead of 27k for all 98), and **every other tool stays available on demand**:
 `ae_tools` lists all tools by category (or gives full parameter details of chosen ones), and `ae_call` runs any tool by
 name with the same validation, permissions, change report and activity log. Loading everything up front is optional:
 switch to **Full** in After Effects (**Window > Extensions > Surehand MCP > AI tools**), in Claude Desktop's
@@ -212,6 +212,7 @@ unknown effect name gets suggestions.
 - **Footage:** `ae_set_footage_interpretation` (conform frame rate, alpha, fields, pulldown, loop, pixel aspect),
   `ae_set_proxy`, `ae_relink_footage` (find missing files by name in a folder tree, keeps sequences)
 - **Essential Graphics:** `ae_essential_graphics` (add properties as controllers, template name), `ae_export_mogrt`
+- **Checks:** `ae_preflight` (check the delivered comp and its render against your own delivery spec; see Preflight below)
 - **Project:** `ae_project_health` (missing footage/fonts/effects, expression errors, unused footage, empty comps/folders,
   duplicate comp names); `ae_project_xray` (explains an inherited project: what the render queue pulls in, what
   every expression depends on and which links are fragile, what is missing, footage specs, what makes it heavy)
@@ -234,6 +235,42 @@ in another After Effects language, which plug-ins, footage and fonts are missing
 hidden on shy or disabled layers, high motion blur samples, the 3D renderer, frame blending, footage scaled far down).
 You get a plain-language answer; the AI gets precise locations (comp > layer > property). Big projects are read
 within a time budget and say so when the answer is partial; `comps` and `sections` narrow it down.
+
+### Preflight
+
+Before you deliver, ask the AI to preflight the comp (`ae_preflight`). It checks the project, and optionally the
+rendered file, against **your delivery spec**: a small JSON file with the numbers from your client's or
+broadcaster's delivery document (or the same thing inline in the chat). Nothing is built in: there are no house
+presets, every section of the spec is optional, and a check only runs when its section is there. The AI can help you
+write the spec (`action: "schema"` gives it the fields).
+
+In the project, for the delivered comp (`comp` in the spec, otherwise the active comp):
+
+- **Video:** comp size, frame rate, pixel aspect ratio and duration (exact, with a tolerance in frames, or a range).
+- **Project:** bit depth, working color space, missing footage, fonts and effects, expression errors, disabled layers
+  that still carry effects (the same collector as Project X-ray, limited to the delivered comp and its precomps).
+- **Safe areas over time:** every visible text layer, and any layer you name (wildcards like `Logo*`), on every frame
+  (or every Nth frame) where it is visible: its box after position, scale, rotation, anchor point and parents, and through
+  the precomps it sits in, against title-safe, action-safe or the frame. Problems come back as time ranges, for example
+  "Title: outside title-safe 00:00:02:03–00:00:03:10 (2.12s–3.40s), 46 px past it on the right at most". Layers that are off,
+  transparent (opacity 0) or outside their in/out points are not visible and are not checked. 3D layers are reported
+  as not checked (check them with `ae_get_layer_bounds`, which projects through the camera).
+- **Text:** smallest cap height (estimated as 0.7 x the font size x the layer's scale, since real fonts vary from about
+  0.65 to 0.75), reading speed (characters per second while the text is visible, spaces included, line breaks not),
+  shortest time on screen, paragraph text that overflows its box (After Effects 24.6 or later), and characters the font
+  has no glyph for (After Effects 25.1 or later); on older versions the report says the check isn't available.
+
+On a rendered file (`target: "file"` or `"both"`): codec, container, bit depth, chroma subsampling, alpha, field order,
+color tags, legal range, black and frozen frames, loudness and true peak, and a flash check. File checks need ffmpeg:
+the one on your system, or a one-time download. The flash check is a **pre-check** to catch obvious problems early; it
+is not a certified PSE / Harding test.
+
+The report starts with the verdict (**PASS**, **FAIL (n)** or **WARNINGS (n)**), then the findings grouped by check
+and sorted by time, with timecode in the comp's frame rate and seconds, where the problem is (comp > layer) and a
+short fix, then what was not checked and why (a section not in the spec, a check that needs a newer After Effects,
+no ffmpeg). For files it also shows what ffprobe found and up to four frames at the worst problems. Preflight changes
+nothing in the project and leaves no undo step, so it also runs in read-only mode. Long comps are checked within a
+time budget (`timeBudgetSeconds`, default 120 s); a partial check says so.
 
 ### Change report
 

@@ -6,7 +6,7 @@ import { z } from "zod";
 import type { JsxTool } from "./registry.js";
 import { formatXray, SECTIONS, type XData } from "./xray-analyze.js";
 
-const XRAY_JSX = `
+export const XRAY_JSX = `
 var P = app.project, t0 = new Date().getTime();
 var secs = args.sections && args.sections.length ? args.sections : ["render", "expressions", "missing", "footage", "weight"], want = {};
 for (var s = 0; s < secs.length; s++) want["k:" + secs[s]] = true;

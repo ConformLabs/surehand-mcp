@@ -225,6 +225,22 @@ export interface FakeLayerSpec {
   frameBlend?: "FRAME_MIX" | "PIXEL_MOTION";
   inPoint?: number;
   outPoint?: number;
+  // geometry and text, for Preflight (defaults: anchor [0,0], position [960,540], rotation 0, opacity 100)
+  anchor?: number[];
+  position?: number[];
+  rotation?: number;
+  opacity?: number;
+  startTime?: number;
+  /** animated values by match name ("ADBE Position", "ADBE Opacity", "ADBE Text Document"...): value at a time */
+  anim?: Record<string, (t: number) => unknown>;
+  /** sourceRectAtTime [left, top, width, height] (default: text [0,-50,400,60], others the source size) */
+  rect?: number[] | ((t: number) => number[]);
+  /** text layers: the text (default: the layer name), font size (default 50), paragraph box overflow */
+  text?: string;
+  fontSize?: number;
+  boxOverflow?: boolean;
+  /** characters the text's font has no glyph for (the font gets hasGlyphsFor, as in AE 25.1+) */
+  glyphsMissing?: string;
 }
 export interface FakeCompSpec {
   name: string;
@@ -294,8 +310,18 @@ export function fakeProject(spec: FakeProjectSpec) {
         return true;
       },
     });
-  const prop = (name: string, matchName: string, extra: Record<string, unknown> = {}) =>
-    watch(Object.assign(new PropertyBase(), { name, matchName, propertyType: PropertyType.PROPERTY, canSetExpression: true, expression: "", expressionError: "", expressionEnabled: true, ...extra }), name);
+  const prop = (name: string, matchName: string, extra: Record<string, unknown> = {}, anim?: (t: number) => unknown) =>
+    watch(
+      Object.assign(new PropertyBase(), {
+        name, matchName, propertyType: PropertyType.PROPERTY, canSetExpression: true, expression: "", expressionError: "", expressionEnabled: true, numKeys: anim ? 2 : 0,
+        valueAtTime(this: any, t: number) {
+          calls.push("valueAtTime");
+          return anim ? anim(t) : this.value;
+        },
+        ...extra,
+      }),
+      name,
+    );
   const group = (name: string, matchName: string, children: any[], extra: Record<string, unknown> = {}): any => {
     const g: any = Object.assign(new PropertyBase(), { name, matchName, propertyType: PropertyType.NAMED_GROUP, children, ...extra });
     Object.defineProperty(g, "numProperties", { get: () => g.children.length });
@@ -322,7 +348,7 @@ export function fakeProject(spec: FakeProjectSpec) {
     const it: any = Object.assign(new CompItem(), {
       id: nextId++, name: c.name, width: c.width ?? 1920, height: c.height ?? 1080, pixelAspect: 1, frameRate: c.fps ?? 25, duration: c.duration ?? 10,
       motionBlur: !!c.motionBlur, shutterAngle: 180, shutterPhase: -90, motionBlurSamplesPerFrame: c.samples ?? 16, motionBlurAdaptiveSampleLimit: 128,
-      frameBlending: true, renderer: c.renderer ?? "ADBE Advanced 3d", usedIn: [], layers: [] as any[], time: 0,
+      frameBlending: true, renderer: c.renderer ?? "ADBE Advanced 3d", usedIn: [], layers: [] as any[], time: 0, frameDuration: 1 / (c.fps ?? 25), displayStartTime: 0,
     });
     Object.defineProperty(it, "numLayers", { get: () => it.layers.length });
     it.layer = (k: number | string) => (typeof k === "number" ? it.layers[k - 1] : it.layers.find((l: any) => l.name === k)) ?? null;
@@ -338,10 +364,20 @@ export function fakeProject(spec: FakeProjectSpec) {
       const Cls = type === "text" ? TextLayer : type === "shape" ? ShapeLayer : type === "camera" ? CameraLayer : AVLayer;
       const source = ls.source ? byName(ls.source) : undefined;
       if (source && !source.usedIn.includes(comp)) source.usedIn.push(comp);
-      const transform = group("Transform", "ADBE Transform Group", [prop("Opacity", "ADBE Opacity", { value: 100 }), prop("Scale", "ADBE Scale", { value: ls.scale ?? [100, 100, 100] }), prop("Position", "ADBE Position", { value: [960, 540] })]);
+      const an = ls.anim ?? {};
+      const transform = group("Transform", "ADBE Transform Group", [
+        prop("Anchor Point", "ADBE Anchor Point", { value: ls.anchor ?? [0, 0, 0] }, an["ADBE Anchor Point"]),
+        prop("Position", "ADBE Position", { value: ls.position ?? [960, 540, 0] }, an["ADBE Position"]),
+        prop("Scale", "ADBE Scale", { value: ls.scale ?? [100, 100, 100] }, an["ADBE Scale"]),
+        prop("Z Rotation", "ADBE Rotate Z", { value: ls.rotation ?? 0 }, an["ADBE Rotate Z"]),
+        prop("Opacity", "ADBE Opacity", { value: ls.opacity ?? 100 }, an["ADBE Opacity"]),
+      ]);
       const children: any[] = [transform];
       if (type !== "camera") children.push(group("Effects", "ADBE Effect Parade", effectGroups(ls)));
-      if (type === "text") children.push(group("Text", "ADBE Text Properties", [prop("Source Text", "ADBE Text Document", { value: { font: ls.font ?? "ArialMT", text: ls.name } })]));
+      const doc = (text: string) => ({ font: ls.font ?? "ArialMT", text, fontSize: ls.fontSize ?? 50, boxText: ls.boxOverflow !== undefined, boxOverflow: ls.boxOverflow,
+        ...(ls.glyphsMissing !== undefined ? { fontObject: { hasGlyphsFor: (ch: string) => !ls.glyphsMissing!.includes(ch) } } : {}) });
+      const textAnim = an["ADBE Text Document"];
+      if (type === "text") children.push(group("Text", "ADBE Text Properties", [prop("Source Text", "ADBE Text Document", { value: doc(ls.text ?? ls.name) }, textAnim && ((t: number) => doc(String(textAnim(t)))))]));
       for (const [path, e] of Object.entries(ls.expressions ?? {})) {
         const segs = path.split("/");
         let g: any = { children };
@@ -360,6 +396,12 @@ export function fakeProject(spec: FakeProjectSpec) {
         nullLayer: type === "null", adjustmentLayer: type === "adjustment", source: source ?? null, collapseTransformation: !!ls.collapse, timeRemapEnabled: !!ls.timeRemap,
         frameBlendingType: ls.frameBlend ? (globals.FrameBlendingType as any)[ls.frameBlend] : (globals.FrameBlendingType as any).NO_FRAME_BLEND,
         motionBlur: !!ls.motionBlur, threeDLayer: !!ls.threeD, inPoint: ls.inPoint ?? 0, outPoint: ls.outPoint ?? comp.duration, parent: null, children,
+        startTime: ls.startTime ?? 0, stretch: 100,
+        sourceRectAtTime: (t: number) => {
+          calls.push("sourceRectAtTime");
+          const r = typeof ls.rect === "function" ? ls.rect(t) : (ls.rect ?? (type === "text" ? [0, -50, 400, 60] : [0, 0, source?.width ?? 100, source?.height ?? 100]));
+          return { left: r[0], top: r[1], width: r[2], height: r[3] };
+        },
       });
       Object.defineProperty(L, "numProperties", { get: () => L.children.length });
       L.property = (k: number | string) => (typeof k === "number" ? L.children[k - 1] : L.children.find((x: any) => x.name === k || x.matchName === k)) ?? null;
