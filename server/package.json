@@ -15,6 +15,7 @@
     "test": "vitest run",
     "start": "node dist/ae-mcp.mjs",
     "package": "node scripts/package.mjs",
+    "package:mac-pkg": "node scripts/package-mac-pkg.mjs",
     "sign": "node scripts/sign-extension.mjs",
     "test:mac": "node scripts/test-mac.mjs",
     "test:windows": "node scripts/test-windows.mjs",

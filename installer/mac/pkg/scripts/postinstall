@@ -1,0 +1,59 @@
+#!/bin/bash
+# Surehand MCP installer package: runs after the payload (~/.aemcp/node/bin/node, ~/.aemcp/server/ae-mcp.mjs) is in place.
+# Hands over to the server's own installer ("ae-mcp install"), which installs the After Effects extension, writes
+# ~/.aemcp/config.json and connects the AI apps it finds. Never fails the package: problems go to ~/.aemcp/install.log
+# and the user can re-run the install from the docs.
+# Arguments from Installer: $1 package path, $2 install location (the payload root, ~/.aemcp), $3 target volume.
+
+# The home folder this package was installed into: the parent of the payload root, else $HOME.
+DEST="${2:-}"
+case "$DEST" in
+  */.aemcp) TARGET_HOME="${DEST%/.aemcp}" ;;
+  *) TARGET_HOME="${HOME:-}" ;;
+esac
+[ -n "$TARGET_HOME" ] && [ -d "$TARGET_HOME/.aemcp" ] || TARGET_HOME="$HOME"
+
+AEMCP="$TARGET_HOME/.aemcp"
+LOG="$AEMCP/install.log"
+NODE="$AEMCP/node/bin/node"
+SERVER="$AEMCP/server/ae-mcp.mjs"
+mkdir -p "$AEMCP" 2>/dev/null
+
+{
+  echo "=== Surehand MCP package install: $(date '+%Y-%m-%d %H:%M:%S %z') ==="
+  echo "user: $(id -un) ($(id -u))  home: $TARGET_HOME  install location: ${DEST:-?}"
+  echo "macOS $(sw_vers -productVersion 2>/dev/null) $(uname -m)"
+  ls -ln "$AEMCP/node/bin/node" "$AEMCP/server/ae-mcp.mjs"
+} >>"$LOG" 2>&1
+
+if [ ! -x "$NODE" ] || [ ! -f "$SERVER" ]; then
+  echo "ERROR: payload missing ($NODE or $SERVER). Nothing else was changed." >>"$LOG"
+  exit 0
+fi
+
+# A per-user package runs this as the installing user. If it ever runs as root (e.g. sudo installer ... -target
+# CurrentUserHomeDirectory), run the server's installer as the owner of that home folder, never as root.
+AS_USER=()
+if [ "$(id -u)" = "0" ]; then
+  OWNER="$(stat -f %Su "$TARGET_HOME" 2>/dev/null)"
+  if [ -z "$OWNER" ] || [ "$OWNER" = "root" ]; then
+    echo "ERROR: running as root for $TARGET_HOME; not connecting apps as root. Re-run the install from the docs." >>"$LOG"
+    exit 0
+  fi
+  chown -R "$OWNER" "$AEMCP" 2>>"$LOG"
+  AS_USER=(sudo -u "$OWNER" -H)
+fi
+
+# Installer gives scripts a minimal PATH; add the usual places for the claude and codex command line tools.
+export PATH="/opt/homebrew/bin:/usr/local/bin:$TARGET_HOME/.local/bin:$TARGET_HOME/.volta/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+export HOME="$TARGET_HOME"
+
+# stdin is /dev/null: "ae-mcp install" asks nothing without a terminal (it never quits a running Claude Desktop
+# unasked; it writes the setting and says to restart Claude Desktop). perl's alarm caps the run at 3 minutes.
+"${AS_USER[@]+"${AS_USER[@]}"}" /usr/bin/env PATH="$PATH" HOME="$TARGET_HOME" AEMCP_NO_UPDATE_CHECK=1 \
+  /usr/bin/perl -e 'alarm shift; exec @ARGV or die "exec: $!"' 180 "$NODE" "$SERVER" install </dev/null >>"$LOG" 2>&1
+STATUS=$?
+echo "ae-mcp install exited with status $STATUS" >>"$LOG"
+[ "$STATUS" = "0" ] || echo "Something did not finish; see above. Re-running the install later is safe." >>"$LOG"
+echo >>"$LOG"
+exit 0
