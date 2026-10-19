@@ -2,7 +2,9 @@
  * short feed of what the AI did. Settings and tools live in After Effects' own panel menu (☰),
  * whose screens slide over the feed. If the background bridge extension isn't running (some
  * hosts don't honour StartOn for invisible extensions), the panel starts the bridge itself.
- * Needs paths.js, panel-model.js and bridge-core.js. ES5 only. */
+ * Answers, Pause / Resume and the panel's own jobs carry the panel secret (control.js), which the AI
+ * app never has.
+ * Needs paths.js, panel-model.js, bridge-core.js and control.js. ES5 only. */
 (function () {
   "use strict";
   var http = require("http");
@@ -15,7 +17,13 @@
   var $ = function (id) { return document.getElementById(id); };
   var REPO_URL = "https://github.com/ConformLabs/surehand-mcp";
   var POLL_MS = 1500;
+  // a new request can't be answered for this long (no answer meant for the previous card lands on it)
+  // (a little more than the bridge's 1 s, which counts from when the panel reports the card shown)
+  var ARM_MS = window.SUREHAND_ARM_MS || 1200;
+  // "That request was withdrawn" stays this long before the next request shows
+  var GONE_MS = window.SUREHAND_GONE_MS || 1500;
   var myPort = null; // the bridge of THIS After Effects instance
+  var Control = window.SurehandControl;
 
   function P() { return window.SurehandPaths.current(require); }
   function readJson(file) {
@@ -49,7 +57,7 @@
     var data = body ? JSON.stringify(body) : null;
     var port = myPort || AEMCPBridge.state.port || cfg.bridgePort;
     var req = http.request({ host: "127.0.0.1", port: port, path: p, method: method,
-      headers: { authorization: "Bearer " + cfg.token, "content-type": "application/json" } }, function (res) {
+      headers: Control.headers(port, cfg.token) }, function (res) {
       var chunks = [];
       res.on("data", function (c) { chunks.push(c); });
       res.on("end", function () {
@@ -64,8 +72,17 @@
     if (data) req.write(data);
     req.end();
   }
+  /** The panel secret for this After Effects' bridge, asking for it when it isn't known yet. */
+  function secret() {
+    var port = myPort || AEMCPBridge.state.port;
+    var s = port ? Control.secretFor(port) : null;
+    if (!s) Control.hello();
+    return s;
+  }
+  var NO_SECRET = "The Surehand bridge in this After Effects hasn\u2019t answered yet. Try again in a moment.";
   /** Run ExtendScript for the panel itself (allowed while the AI is paused). */
   function evalAE(script, label, cb, timeoutMs) {
+    if (!secret()) return setTimeout(function () { cb(new Error(NO_SECRET)); }, 0);
     call("POST", "/eval", { script: script, timeoutMs: timeoutMs || 10000, label: label, fromPanel: true }, function (err, r) {
       if (err) return cb(err);
       if (!r.ok) return cb(new Error(r.error || "After Effects did not run it"));
@@ -106,6 +123,14 @@
     var env = {};
     Object.keys(process.env).forEach(function (k) { env[k] = process.env[k]; });
     env.AEMCP_NO_AUTOSETUP = "1";
+    delete env.SUREHAND_AE_PANEL_SECRET;
+    delete env.AEMCP_PANEL_SECRET;
+    if (opts.asPanel) {
+      // read-only checks the user started here (Compare with now, Test the connection): their jobs run as
+      // the panel's own, on this After Effects' bridge, also while the AI is paused
+      var sec = secret();
+      if (sec && myPort) { env.SUREHAND_AE_PANEL_SECRET = sec; env.SUREHAND_AE_BRIDGE_PORT = String(myPort); }
+    }
     var child;
     try {
       child = childProcess.execFile(rt.node, [rt.server].concat(args), { timeout: opts.timeout || 30000, windowsHide: true, maxBuffer: 8 * 1024 * 1024, env: env }, function (err, stdout, stderr) {
@@ -131,21 +156,54 @@
   }
 
   // ---------- config ----------
-  function readConfig() { return readJson(P().config) || AEMCPBridge.loadConfig(); }
+  var goodCfg = null; // the last config.json that could be read
+  /** { cfg } | { missing } | { error } */
+  function readConfigFile() {
+    var raw;
+    try { raw = fs.readFileSync(P().config, "utf8"); } catch (e) { return e.code === "ENOENT" ? { missing: true } : { error: e.code || e.message }; }
+    if (raw.charCodeAt(0) === 0xfeff) raw = raw.slice(1);
+    try { var c = JSON.parse(raw); return c && typeof c === "object" ? { cfg: c } : { error: "not a JSON object" }; } catch (e) { return { error: "not valid JSON" }; }
+  }
+  /** The settings to show: the file, or the last good copy while it can't be read (never defaults). */
+  function readConfig() {
+    var r = readConfigFile();
+    if (r.cfg) { goodCfg = r.cfg; return r.cfg; }
+    if (r.missing && !goodCfg) return AEMCPBridge.loadConfig(); // creates it
+    return goodCfg || {};
+  }
+  /**
+   * Changes config.json: read again right before, written atomically (temporary file + rename,
+   * readable only by the user). Refused while the file can't be read: writing would replace it.
+   */
   function writeConfig(change) {
-    var cfg = readConfig();
+    var file = P().config, r = readConfigFile();
+    if (r.error) r = readConfigFile(); // a torn read while someone writes it?
+    if (r.error) { toast("Not saved: the settings file can\u2019t be read (" + r.error + "). Check " + file, true); return false; }
+    var cfg = r.cfg || {};
     change(cfg);
+    var tmp = path.join(path.dirname(file), "." + path.basename(file) + "." + process.pid + "." + Date.now().toString(36) + ".tmp");
     try {
-      fs.mkdirSync(path.dirname(P().config), { recursive: true });
-      fs.writeFileSync(P().config, JSON.stringify(cfg, null, 2) + "\n");
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(tmp, JSON.stringify(cfg, null, 2) + "\n", { mode: 384 });
+      fs.renameSync(tmp, file);
+      if (process.platform !== "win32") { try { fs.chmodSync(file, 384); } catch (e) {} }
+      goodCfg = cfg;
       return true;
-    } catch (e) { toast("Could not save the setting: " + e.message, true); return false; }
+    } catch (e) {
+      try { fs.unlinkSync(tmp); } catch (x) {}
+      toast("Could not save the setting: " + e.message, true);
+      return false;
+    }
   }
 
   // ---------- state ----------
   var S = {
     layout: "default", cfg: {}, health: null, bridgeError: null, authorized: true, pending: [], paused: null,
     activity: [], renders: [], undone: {}, open: {}, clients: null, update: null, screen: null, answering: {},
+    // the bridge says whether it is paused (null: not known yet, then the config's flag is shown)
+    bridgePaused: null,
+    // this After Effects and its open project, for Undo: { port, pid, project, revision }
+    current: null,
   };
 
   // ---------- layout ----------
@@ -161,17 +219,18 @@
   // ---------- header: status, pause ----------
   function status() {
     return UI.statusFor({
-      bridgeError: S.bridgeError, paused: !!S.cfg.paused, pendingCount: S.pending.length,
+      bridgeError: S.bridgeError, paused: isPausedNow(), pendingCount: S.pending.length,
       client: UI.lastClient(S.activity), everConnected: S.activity.length > 0,
     });
   }
+  function isPausedNow() { return S.bridgePaused === null ? !!S.cfg.paused : S.bridgePaused; }
   function renderHeader() {
     var st = status();
     $("status").className = "status " + st.kind;
     $("statusText").textContent = S.layout === "narrow" ? st.short : st.text;
     $("status").title = st.text;
     $("tile").setAttribute("class", "tile " + st.tile);
-    var paused = !!S.cfg.paused;
+    var paused = isPausedNow();
     $("pause").hidden = paused;
     $("resume").hidden = !paused;
     var note = $("pausedNote");
@@ -187,17 +246,19 @@
     $("ver").textContent = AEMCPBridge.VERSION + (upd ? " \u00b7 update ready" : "");
     $("ver").className = "link" + (upd ? " update" : "");
   }
+  /** Pause / Resume: the bridge holds it (and saves it in the config); only the panel can change it. */
   function setPaused(on) {
-    if (!writeConfig(function (cfg) {
-      if (on) { cfg.paused = true; cfg.pausedAt = new Date().toISOString(); }
-      else { delete cfg.paused; delete cfg.pausedAt; }
-    })) return;
-    S.cfg = readConfig();
-    S.paused = on ? { refused: 0 } : null;
-    renderHeader();
-    renderSetup();
-    toast(on ? "AI paused: its calls are refused until you resume." : "Resumed: the AI can work again.");
-    (on ? $("resume") : $("pause")).focus();
+    if (!secret()) return toast(NO_SECRET, true);
+    call("POST", "/pause", { paused: on }, function (err, r) {
+      if (err || !r || !r.ok) return toast("Could not " + (on ? "pause" : "resume") + ": " + (err ? err.message : (r && r.error) || "no answer"), true);
+      S.bridgePaused = !!r.paused;
+      S.paused = r.paused || null;
+      S.cfg = readConfig();
+      renderHeader();
+      renderSetup();
+      toast((on ? "AI paused: its calls are refused until you resume." : "Resumed: the AI can work again.") + (r.saved === false ? " (Not saved in the settings file: it can\u2019t be read.)" : ""));
+      (on ? $("resume") : $("pause")).focus();
+    });
   }
   $("pause").onclick = function () { setPaused(true); };
   $("resume").onclick = function () { setPaused(false); };
@@ -247,24 +308,54 @@
   }
 
   // ---------- approvals ----------
-  var shownAsk = null, askOpen = false;
+  // The card shows the oldest request. A new card can't be answered for ARM_MS (its buttons show "…"),
+  // so a click or key meant for the previous card never lands on it. When the shown request goes away
+  // without an answer from here (answered in the pop-up, cancelled, timed out), "That request was
+  // withdrawn" shows for GONE_MS before the next one. Every answer names the request it is for.
+  var shownAsk = null, askOpen = false, armedAt = 0, goneUntil = 0, armTimer = null;
+  var answeredHere = {}; // requests answered in this panel (they go away without "withdrawn")
   function currentAsk() {
     for (var i = 0; i < S.pending.length; i++) if (!S.answering[S.pending[i].id]) return S.pending[i];
     return null;
   }
+  function armed() { return shownAsk && Date.now() - armedAt >= ARM_MS; }
+  function setArmed(on) {
+    $("allow").disabled = !on;
+    $("deny").disabled = !on;
+    $("allow").textContent = on ? "Allow" : "\u2026";
+    $("deny").textContent = on ? "Deny" : "\u2026";
+  }
   function renderAsk() {
     var p = currentAsk();
+    if (shownAsk && (!p || p.id !== shownAsk) && !S.answering[shownAsk] && !answeredHere[shownAsk]) {
+      // the request on screen went away without an answer from here: say so before showing another
+      goneUntil = Date.now() + GONE_MS;
+      shownAsk = null;
+      setTimeout(renderAsk, GONE_MS + 20);
+    }
+    if (Date.now() < goneUntil) {
+      $("ask").hidden = true;
+      $("askGone").hidden = false;
+      return;
+    }
+    $("askGone").hidden = true;
     $("ask").hidden = !p;
     if (!p) { shownAsk = null; return; }
     var waiting = S.pending.filter(function (x) { return !S.answering[x.id]; }).length;
     $("askTime").textContent = UI.countdown(p.deadline || new Date(Date.parse(p.at) + 600000).toISOString(), Date.now());
-    $("askHint").textContent = "Enter allows \u00b7 Esc denies" + (waiting > 1 ? " \u00b7 " + (waiting - 1) + " more after this" : "");
+    $("askHint").textContent = "Esc denies" + (waiting > 1 ? " \u00b7 " + (waiting - 1) + " more after this" : "");
     if (shownAsk === p.id) return;
     shownAsk = p.id;
     askOpen = false;
+    armedAt = Date.now();
+    setArmed(false);
+    clearTimeout(armTimer);
+    armTimer = setTimeout(function () { if (shownAsk === p.id) setArmed(true); }, ARM_MS);
     var v = UI.approvalView(p, UI.lastClient(S.activity));
     $("askWho").textContent = v.client + " asks";
     $("askTitle").textContent = v.title;
+    $("askSays").textContent = v.says || "";
+    $("askSays").hidden = !v.says;
     var chips = $("askChips");
     chips.innerHTML = "";
     v.chips.forEach(function (c) { chips.appendChild(el("span", { cls: "chip" + (c.danger ? " danger" : ""), text: c.text })); });
@@ -272,6 +363,7 @@
     $("askShow").setAttribute("aria-expanded", "false");
     $("askCode").textContent = v.code;
     $("askCode").hidden = true;
+    pollPending(); // tell the bridge which request is on screen
   }
   $("askShow").onclick = function () {
     askOpen = !askOpen;
@@ -281,13 +373,17 @@
   };
   function answer(allow) {
     var p = currentAsk();
-    if (!p) return;
+    // only the request on screen, and only once it has been there long enough to be read
+    if (!p || p.id !== shownAsk || !armed() || $("ask").hidden) return;
+    if (!secret()) return toast(NO_SECRET, true);
     S.answering[p.id] = true; // hide it at once; the bridge's list is the truth on the next poll
+    answeredHere[p.id] = true;
     renderAsk();
     renderHeader();
     call("POST", "/approve", { id: p.id, allow: allow, by: "panel" }, function (err, r) {
-      if (err) { delete S.answering[p.id]; toast("Could not answer: " + err.message, true); }
+      if (err) { delete S.answering[p.id]; delete answeredHere[p.id]; toast("Could not answer: " + err.message, true); }
       else if (r && r.httpStatus === 404) toast("Already answered (or the AI app cancelled it).");
+      else if (r && !r.ok) { delete S.answering[p.id]; delete answeredHere[p.id]; toast("Not answered: " + (r.error || "the bridge refused it"), true); }
       pollPending();
     });
   }
@@ -295,10 +391,12 @@
   $("deny").onclick = function () { answer(false); };
   function pollPending() {
     var visible = document.visibilityState ? document.visibilityState !== "hidden" : true;
-    call("GET", "/pending?ui=panel&visible=" + (visible ? "1" : "0"), null, function (err, r) {
+    var showing = shownAsk && !$("ask").hidden ? "&showing=" + encodeURIComponent(shownAsk) : "";
+    call("GET", "/pending?ui=panel&visible=" + (visible ? "1" : "0") + showing, null, function (err, r) {
       if (err || !r || !r.pending) return;
       S.pending = r.pending;
       S.paused = r.paused || null;
+      if (r.paused !== undefined) S.bridgePaused = !!r.paused;
       Object.keys(S.answering).forEach(function (id) {
         if (!r.pending.some(function (x) { return x.id === id; })) delete S.answering[id];
       });
@@ -307,7 +405,7 @@
     });
   }
 
-  // ---------- keyboard: Enter allows, Esc denies (or closes a screen) ----------
+  // ---------- keyboard: Esc denies (or closes a screen); there is no key that allows ----------
   document.addEventListener("keydown", function (e) {
     if (e.keyCode === 9) document.body.classList.add("kbd");
     var tag = e.target && e.target.tagName;
@@ -315,13 +413,10 @@
       if (e.keyCode === 27) { e.preventDefault(); closeScreen(); }
       return;
     }
+    // Enter never allows, not even on a focused Allow button (Space or a click does, deliberately)
+    if (e.keyCode === 13 && e.target && e.target.id === "allow") { e.preventDefault(); return; }
     if ($("ask").hidden || tag === "INPUT" || tag === "TEXTAREA") return;
-    if (e.keyCode === 13) {
-      // a focused control keeps its own Enter (Deny, Pause...); otherwise Enter allows
-      if ((tag === "BUTTON" || tag === "A") && e.target.id !== "allow") return;
-      e.preventDefault();
-      answer(true);
-    } else if (e.keyCode === 27) {
+    if (e.keyCode === 27) {
       e.preventDefault();
       answer(false);
     }
@@ -451,7 +546,7 @@
     var limit = S.layout === "wide" ? 5 : S.layout === "narrow" ? 6 : 7;
     var running = {};
     S.renders.forEach(function (r) { running[r.id] = true; });
-    var items = UI.feedItems(S.activity, { limit: Math.max(1, limit - S.renders.length), undone: S.undone, runningRenders: running });
+    var items = UI.feedItems(S.activity, { limit: Math.max(1, limit - S.renders.length), undone: S.undone, runningRenders: running, current: S.current });
     var key = JSON.stringify([S.layout, S.renders, items.map(function (i) { return [i.at, i.title, i.line, i.undoable, !!S.open[UI.entryKey(i.entry)]]; })]);
     if (!force && key === shownFeed) return;
     shownFeed = key;
@@ -515,8 +610,12 @@
    */
   function undo(it) {
     var e = it.entry;
-    var guard = typeof e.revision === "number" ? "try{if(app.project.revision!==" + e.revision + ")return 'changed';}catch(x){}" : "";
-    var script = "(function(){if(!app.project)return 'no project';" + guard + "app.executeCommand(16);return 'undone';})()";
+    if (!UI.canUndo(e, S.current)) return toast("The project changed since then: use Edit \u203a Undo in After Effects.", true);
+    // checked again inside After Effects, right before: same project, nothing changed since
+    var script = "(function(){if(!app.project)return 'no project';" +
+      "var f=app.project.file?app.project.file.fsName:'';if(f!==" + JSON.stringify(e.project) + ")return 'changed';" +
+      "try{if(app.project.revision!==" + e.revision + ")return 'changed';}catch(x){return 'changed';}" +
+      "app.executeCommand(16);return 'undone';})()";
     evalAE(script, "panel undo", function (err, r) {
       if (err) return toast("Could not undo: " + err.message, true);
       if (r === "changed") return toast("The project changed since then: use Edit \u203a Undo in After Effects.", true);
@@ -524,6 +623,26 @@
       S.undone[UI.entryKey(e)] = true;
       renderFeed(true);
       toast("Undone: " + it.title + ". Edit \u203a Redo brings it back.");
+    });
+  }
+
+  /**
+   * This After Effects and its open project ({ port, pid, project, revision }), for Undo: read only
+   * while the newest entry could be undone here (a tiny script, at most every 3 s, never while busy).
+   */
+  var lastCurrentAt = 0;
+  function updateCurrent() {
+    var e = S.activity[0], h = S.health;
+    if (!e || !e.undoGroup || typeof e.revision !== "number" || e.undoSteps !== 1 || !e.instance || !h || S.undone[UI.entryKey(e)]) { S.current = null; return; }
+    if (e.instance.port !== myPort || e.instance.pid !== h.pid) { S.current = null; return; }
+    if (h.busy || Date.now() - lastCurrentAt < 3000 || !secret()) return;
+    lastCurrentAt = Date.now();
+    var script = "(function(){var r='';try{r=String(app.project.revision);}catch(x){}return r+'|'+(app.project&&app.project.file?app.project.file.fsName:'');})()";
+    evalAE(script, "panel: project state", function (err, r) {
+      if (err || typeof r !== "string" || r.indexOf("|") < 0) { S.current = null; return renderFeed(); }
+      var i = r.indexOf("|"), rev = r.slice(0, i);
+      S.current = { port: myPort, pid: h.pid, project: r.slice(i + 1), revision: rev === "" ? null : Number(rev) };
+      renderFeed();
     });
   }
 
@@ -593,13 +712,13 @@
   }
   function onMenu(id) {
     if (id === "shellYes" || id === "shellNo") {
-      writeConfig(function (cfg) { var p = cfg.permissions || {}; cfg.permissions = { mode: p.mode || "full", allowShell: id === "shellYes" }; });
+      if (!writeConfig(function (cfg) { var p = cfg.permissions || {}; cfg.permissions = { mode: p.mode || "full", allowShell: id === "shellYes" }; })) return;
       S.cfg = readConfig();
       setMenu();
       return toast(id === "shellYes" ? "Scripts may run shell commands." : "Shell commands are blocked.");
     }
     if (id === "toolsCore" || id === "toolsAll") {
-      writeConfig(function (cfg) { cfg.toolProfile = id === "toolsAll" ? "full" : "core"; });
+      if (!writeConfig(function (cfg) { cfg.toolProfile = id === "toolsAll" ? "full" : "core"; })) return;
       S.cfg = readConfig();
       setMenu();
       return toast("Saved. Restart your AI app to apply the tool set.");
@@ -742,7 +861,7 @@
       out.textContent = "Comparing\u2026";
       runCli(["checkpoint-diff", cp.id, "--project", project], still(token, function (err, json, text) {
         out.textContent = err ? err.friendly : (json && (json.text || json.message)) || text || "No differences.";
-      }), { since: "1.4.0", text: true, timeout: 120000 });
+      }), { since: "1.4.0", text: true, timeout: 120000, asPanel: true });
     }));
     acts.appendChild(button("btn-plain", "Open a copy", function () { openCheckpoint(project, cp); }));
     if (fromCli && !canCompare) acts.appendChild(el("span", { cls: "muted2", text: "saved before history existed" }));
@@ -853,7 +972,7 @@
       if (!err && json && json.checks) return showChecks(body, json.checks, again);
       // the panel's own checks when the server can't run them
       localChecks(still(token, function (checks) { showChecks(body, checks, again, err && err.friendly); }));
-    }), { since: "1.4.0", timeout: 120000 });
+    }), { since: "1.4.0", timeout: 120000, asPanel: true });
   }
   function localChecks(cb) {
     var checks = [], host = AEMCPBridge.hostInfo();
@@ -985,10 +1104,13 @@
         return;
       }
       S.health = h;
-      S.bridgeError = h.authorized === false ? "Token mismatch: re-run the installer" : null;
-      if (h.paused !== undefined) S.paused = h.paused;
+      S.bridgeError = h.configProblem && h.authorized === false ? "Settings file can\u2019t be read: " + h.configProblem
+        : h.authorized === false ? "Token mismatch: re-run the installer" : null;
+      if (h.paused !== undefined) { S.paused = h.paused; S.bridgePaused = !!h.paused; }
       renderHeader();
+      if (!secret()) Control.hello();
       if (!S.bridgeError) pollPending(); // cheap local request; also the panel's heartbeat for the bridge
+      updateCurrent();
     });
     readActivity();
     S.renders = readRenders();
@@ -1000,11 +1122,12 @@
 
   window.addEventListener("resize", applyLayout);
   document.addEventListener("visibilitychange", function () { if (!document.hidden) refresh(); });
-  window.SurehandPanel = { state: S, menu: onMenu, refresh: refresh, menuXml: menuXml, openScreen: openScreen, closeScreen: closeScreen };
+  window.SurehandPanel = { state: S, menu: onMenu, refresh: refresh, menuXml: menuXml, openScreen: openScreen, closeScreen: closeScreen, answer: answer };
 
   readActivity();
   applyLayout();
   renderModes();
+  Control.hello();
   findMyPort(refresh);
   loadClients();
   setInterval(refresh, POLL_MS);

@@ -10,29 +10,66 @@ import { loadConfig } from "./config.js";
 
 export type PermissionMode = "full" | "ask" | "read-only";
 
-export function permissions(): { mode: PermissionMode; allowShell: boolean } {
-  const p = loadConfig().permissions || {};
+const READ_ONLY_TEXT =
+  "Surehand MCP is in read-only mode, so tools that change the project are disabled. " +
+  "The user can change this in After Effects: Window > Extensions > Surehand MCP > Permissions.";
+
+/**
+ * The permissions in force. A config.json that is there but can't be read (and was never read
+ * successfully by this process) fails closed: read-only, no shell, and the refusal says why.
+ */
+export function permissions(): { mode: PermissionMode; allowShell: boolean; unreadable?: string } {
+  const cfg = loadConfig();
+  if (cfg.unreadable) {
+    READ_ONLY_REFUSAL = configUnreadableRefusal(cfg.unreadable);
+    return { mode: "read-only", allowShell: false, unreadable: cfg.unreadable };
+  }
+  READ_ONLY_REFUSAL = READ_ONLY_TEXT;
+  const p = cfg.permissions || {};
   const mode: PermissionMode = p.mode === "ask" || p.mode === "read-only" ? p.mode : "full";
   return { mode, allowShell: p.allowShell !== false };
 }
+
+export const configUnreadableRefusal = (why: string) =>
+  `Surehand MCP's settings file can't be read (${why}), so changes to the project are refused until it is fixed. ` +
+  "Nothing was run. Ask the user to check the file (or re-run the installer, which keeps a good file as it is).";
 
 /** Shell access in script source (system.callSystem, including bracket access). */
 export function usesShell(code: string): boolean {
   return /callSystem|\bsystem\s*\[/.test(code);
 }
 
-export const READ_ONLY_REFUSAL =
-  "Surehand MCP is in read-only mode, so tools that change the project are disabled. " +
-  "The user can change this in After Effects: Window > Extensions > Surehand MCP > Permissions.";
+/**
+ * The refusal for edits while they aren't allowed. A live binding: permissions() sets it to the
+ * "settings file can't be read" text while that is the reason.
+ */
+export let READ_ONLY_REFUSAL = READ_ONLY_TEXT;
 
 export const SHELL_REFUSAL =
   "Shell commands (system.callSystem) are disabled in the Surehand MCP permissions. The user can allow them in " +
   "Window > Extensions > Surehand MCP > Permissions (or \"allowShell\": true in ~/.surehand/ae/config.json).";
 
-/** Short description of a tool call for the approval prompt in After Effects. */
+/**
+ * What the approval prompt in After Effects shows for a tool call: the script, or the call's
+ * arguments. Sent in full: the bridge checks all of it for risks, and shortens only what is shown
+ * (saying how much is not shown).
+ */
 export function approvalSummary(tool: string, args: Record<string, unknown> | undefined): string {
   if (!args) return tool;
   if (typeof args.code === "string") return args.code;
-  const json = JSON.stringify(args);
-  return json.length > 1500 ? json.slice(0, 1500) + "…" : json;
+  return JSON.stringify(args);
+}
+
+/** How much of a script file the approval prompt shows. */
+export const APPROVAL_FILE_CHARS = 4000;
+
+/** `text` cut to `max` characters, saying how many more there are. */
+export function truncateNote(text: string, max: number): string {
+  return text.length > max ? `${text.slice(0, max)}\n… ${text.length - max} more characters not shown` : text;
+}
+
+/** The approval for ae_run_script_file: the file's path and contents (the start of them; all are checked for risks). */
+export function scriptFileApproval(path: string, source: string): { tool: string; summary: string; full: string } {
+  const body = source ? source : "(the file could not be read here: After Effects runs it as it is on disk)";
+  return { tool: "Run script file", summary: `${path}\n\n${truncateNote(body, APPROVAL_FILE_CHARS)}`, full: `${path}\n\n${body}` };
 }

@@ -2,7 +2,7 @@
 // usable while a separate render process works, with progress, status and cancel.
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { spawn, type ChildProcess } from "node:child_process";
-import { createWriteStream, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { createWriteStream, existsSync, mkdirSync, readdirSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { z } from "zod";
 import { runJsx } from "../jsx.js";
@@ -28,6 +28,44 @@ interface Job {
 
 const jobs = new Map<string, Job>();
 const LOG_DIR = () => appFile("renders");
+
+/** How many background renders keep their files (renders/<id>.log and .json). */
+export const RENDERS_KEPT = 50;
+
+/**
+ * Removes the files of all but the newest `keep` renders in `dir` (by the newest of each job's
+ * files); `active` jobs (still running) are never removed.
+ */
+export function pruneRenders(dir: string, keep = RENDERS_KEPT, active: Set<string> = new Set()) {
+  let names: string[];
+  try {
+    names = readdirSync(dir);
+  } catch {
+    return;
+  }
+  const jobs = new Map<string, { files: string[]; at: number }>();
+  for (const n of names) {
+    const m = /^(r[0-9a-z]+)\.(log|json)$/.exec(n);
+    if (!m) continue;
+    let at = 0;
+    try {
+      at = statSync(join(dir, n)).mtimeMs;
+    } catch {}
+    const j = jobs.get(m[1]) ?? { files: [], at: 0 };
+    j.files.push(n);
+    j.at = Math.max(j.at, at);
+    jobs.set(m[1], j);
+  }
+  const old = [...jobs.entries()].sort((a, b) => b[1].at - a[1].at).slice(keep);
+  for (const [id, j] of old) {
+    if (active.has(id)) continue;
+    for (const f of j.files) {
+      try {
+        unlinkSync(join(dir, f));
+      } catch {}
+    }
+  }
+}
 
 /** aerender lives next to the After Effects app (macOS) or AfterFX.exe (Windows). */
 function aerenderPath(appPackage: string): string | null {
@@ -133,6 +171,8 @@ return { project: p.file.fsName, comp: name, frames: frames, app: Folder.appPack
         if (args.output) mkdirSync(dirname(args.output), { recursive: true });
 
         mkdirSync(LOG_DIR(), { recursive: true });
+        // keep the folder from growing forever: the newest renders only (never one still running)
+        pruneRenders(LOG_DIR(), RENDERS_KEPT - 1, new Set([...jobs.values()].filter((j) => j.status === "running").map((j) => j.id)));
         const id = `r${Date.now().toString(36)}`;
         const logPath = join(LOG_DIR(), `${id}.log`);
         const logStream = createWriteStream(logPath);

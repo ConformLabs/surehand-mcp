@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { setupHint } from "./cli/setup.js";
 import { configPath, loadConfig } from "./config.js";
 import { defaultConfigPath, env, legacyDir } from "./paths.js";
+import { callContext } from "./context.js";
 
 export class BridgeError extends Error {
   constructor(message: string, readonly code: "NOT_RUNNING" | "STARTING" | "BLOCKED" | "AUTH" | "TIMEOUT" | "BRIDGE" | "DENIED" | "CANCELLED" | "PAUSED") {
@@ -267,11 +268,23 @@ export async function health(port?: number): Promise<Health> {
   return request("/health", { method: "GET", timeoutMs: 3000, port });
 }
 
+/**
+ * Commands the Surehand panel runs for the user (Compare with now, Test the connection) get the
+ * panel's secret for this After Effects session in SUREHAND_AE_PANEL_SECRET: their jobs then run
+ * as the panel's own (also while the AI is paused). An AI app never has it.
+ */
+const panelSecret = () => env("PANEL_SECRET");
+const panelJob = () => (panelSecret() ? { fromPanel: true } : {});
+const panelHeaders = (): Record<string, string> => {
+  const s = panelSecret();
+  return s ? { "x-surehand-panel": s } : {};
+};
+
 export interface EvalOptions {
   /** shown in the Surehand MCP panel / bridge log */
   label?: string;
   /** in "ask" permission mode the bridge holds the call until the user approves it */
-  approval?: { tool: string; summary: string; client?: string };
+  approval?: { tool: string; summary: string; client?: string; /** the whole text, when summary shows only part of it: checked for risks */ full?: string };
   cancel?: AbortSignal;
 }
 
@@ -282,10 +295,14 @@ export async function evalRaw(script: string, timeoutMs = 120_000, opts: EvalOpt
   const body = await request("/eval", {
     method: "POST",
     // startTimeoutMs: the bridge answers early (blocked) if After Effects doesn't take the script that soon
-    body: JSON.stringify({ script, timeoutMs, startTimeoutMs: blockedAfterMs() || undefined, label: opts.label, approval: opts.approval }),
+    body: JSON.stringify({ script, timeoutMs, startTimeoutMs: blockedAfterMs() || undefined, label: opts.label, approval: opts.approval, ...panelJob() }),
     timeoutMs: timeoutMs + 5000 + extra,
     cancel: opts.cancel,
+    headers: panelHeaders(),
   });
+  // which After Effects ran it (bridge 1.4+): the panel offers Undo only there
+  const ctx = callContext.getStore();
+  if (ctx && body.instance && typeof body.instance.port === "number") ctx.instance = { port: body.instance.port, pid: typeof body.instance.pid === "number" ? body.instance.pid : undefined };
   return String(body.result ?? "");
 }
 

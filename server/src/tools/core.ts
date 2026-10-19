@@ -9,7 +9,7 @@ import { checkForUpdate, updateMessage } from "../update.js";
 import { VERSION } from "../config.js";
 import { codeExcerpt, ensureHelpers, errorHint, evalBody, formatChanges, rollbackProblem, runJsx, type RunOptions, type RunResult } from "../jsx.js";
 import { reservedGlobalsHint, transpileUserCode, withoutComments } from "../transpile.js";
-import { approvalSummary, permissions, READ_ONLY_REFUSAL, SHELL_REFUSAL, usesShell } from "../permissions.js";
+import { approvalSummary, permissions, READ_ONLY_REFUSAL, scriptFileApproval, SHELL_REFUSAL, usesShell } from "../permissions.js";
 import { compRef, errorResult, formatResult, layerRef, reportScope } from "./registry.js";
 import { appFile } from "../paths.js";
 
@@ -419,7 +419,7 @@ export function registerCoreTools(server: McpServer) {
             undoGroup: "Surehand MCP Script File",
             timeoutMs: (timeoutSeconds ?? 300) * 1000,
             report: reportScope(args),
-            bridge: perm.mode === "ask" ? { approval: { tool: "Run script file", summary: `${path}\n\n${source.slice(0, 1500)}` } } : undefined,
+            bridge: perm.mode === "ask" ? { approval: scriptFileApproval(path, source) } : undefined,
           }),
         );
       } catch (e) {

@@ -3,7 +3,7 @@ import { chmodSync, copyFileSync, existsSync, mkdirSync, writeFileSync } from "n
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { VERSION } from "../config.js";
-import { claudeDesktopRunning, connectClient, isOurEntry, mcpbInstalled, moveFromLegacy } from "./clients.js";
+import { claudeDesktopRunning, connectClient, isOurEntry, mcpbInstalled, moveFromLegacy, repointLegacyClients } from "./clients.js";
 import { bundledExtensionSigned, ensureConfig, ensureDebugMode, ensureExtension, runtimeFile } from "./setup.js";
 import {
   LEGACY_SERVER_NAME, SERVER_NAME, ask, bold, claudeCodeConfig, claudeDesktopConfig, claudeDesktopDir, claudeDesktopExe, chatgptDesktopInstalled, codexConfig, configPath,
@@ -45,6 +45,14 @@ export async function install(argv: string[]) {
     if (moved.repointed.length) ok(`Updated the connection settings of ${moved.repointed.join(", ")}`);
   } else if (moved.status === "failed")
     warn(`Your files from the previous version could not be moved (${moved.error}); everything keeps working from there. Details: ${moved.log}`);
+  else if (moved.status === "not-needed") {
+    // moved earlier: settings an app wrote back since (or one skipped then) still naming ~/.aemcp
+    const problems: string[] = [];
+    const fixed = repointLegacyClients(problems);
+    if (fixed.length) ok(`Updated the connection settings of ${fixed.join(", ")}`);
+    for (const p of problems) warn(p);
+  }
+  for (const n of moved.notes.filter((x) => x.startsWith("AI app settings"))) warn(n);
   const self = fileURLToPath(import.meta.url);
   const INSTALLED_SERVER = installedServer();
   // the Mac .pkg and the Windows installer run the already installed copy; there is no release folder with launchers
@@ -134,7 +142,7 @@ export async function install(argv: string[]) {
 
   Try asking Claude: ${bold('"Check After Effects is connected, then make a 1080p comp with an animated title."')}
   Check the installation any time with ${fromInstaller ? bold(`"${nodePath}" "${INSTALLED_SERVER}" selftest`) : `${bold("2. Test Installation")} (in the ${isWin ? "Windows" : "Mac"} folder)`}.
-${registered.includes("ChatGPT desktop") ? "  ChatGPT desktop app: restart it; ${SERVER_NAME} appears under Settings > Plugins > Servers.\n" : ""}  ChatGPT on the web: run ${fromInstaller ? bold(`"${nodePath}" "${INSTALLED_SERVER}" chatgpt`) : `${bold("3. Connect ChatGPT")} from the same folder`}.
+${registered.includes("ChatGPT desktop") ? `  ChatGPT desktop app: restart it; ${SERVER_NAME} appears under Settings > Plugins > Servers.\n` : ""}  ChatGPT on the web: run ${fromInstaller ? bold(`"${nodePath}" "${INSTALLED_SERVER}" chatgpt`) : `${bold("3. Connect ChatGPT")} from the same folder`}.
 
   Other MCP apps can use:  command ${nodePath}
                            args    ["${INSTALLED_SERVER}"]

@@ -79,7 +79,10 @@ describe("status", () => {
 describe("feed", () => {
   const at = (m: number) => new Date(Date.UTC(2026, 9, 19, 16, m)).toISOString();
   const log = [
-    { at: at(42), client: "claude-ai", tool: "ae_set_keyframes", args: { layer: "Title", comp: "Main" }, ms: 120, ok: true, summary: '{"keys":2}', changes: 2 },
+    {
+      at: at(42), client: "claude-ai", tool: "ae_set_keyframes", args: { layer: "Title", comp: "Main" }, ms: 120, ok: true, summary: '{"keys":2}', changes: 2,
+      undoGroup: "Set keyframes", undoSteps: 1, revision: 812, project: "/work/Spot.aep", instance: { port: 8765, pid: 4242 },
+    },
     { at: at(40), tool: "ae_apply_effect", args: { effect: "Deep Glow" }, ms: 50, ok: false, summary: "Effect not found: Deep Glow" },
     { at: at(31), tool: "ae_prove_identical", args: {}, ms: 900, ok: true, summary: "Verdict: IDENTICAL: all 5 frames are bit-identical to the reference." },
     { at: at(30), tool: "ae_get_comp_info", args: { comp: "Main" }, ms: 30, ok: true, summary: "{}" },
@@ -103,12 +106,31 @@ describe("feed", () => {
     expect(items[4].line).toBe("Channel 4 HD · Main");
   });
 
+  // this After Effects with the project as the newest entry left it
+  const here = { port: 8765, pid: 4242, project: "/work/Spot.aep", revision: 812 };
+
   it("offers Undo only on the newest entry, only if it changed the project and wasn't undone", () => {
-    expect(UI.feedItems(log).map((i: any) => i.undoable)).toEqual([true, false, false, false, false, false]);
-    expect(UI.feedItems(log.slice(1)).some((i: any) => i.undoable)).toBe(false); // newest is a failure
+    expect(UI.feedItems(log, { current: here }).map((i: any) => i.undoable)).toEqual([true, false, false, false, false, false]);
+    expect(UI.feedItems(log.slice(1), { current: here }).some((i: any) => i.undoable)).toBe(false); // newest is a failure
     const undone = { [UI.entryKey(log[0])]: true };
-    expect(UI.feedItems(log, { undone })[0].undoable).toBe(false);
+    expect(UI.feedItems(log, { undone, current: here })[0].undoable).toBe(false);
     expect(UI.feedItems(log, { limit: 3 })).toHaveLength(3);
+  });
+
+  it("offers Undo only when Edit > Undo would undo exactly that call: same After Effects, same project, nothing since, one step", () => {
+    const e = log[0];
+    expect(UI.canUndo(e, here)).toBe(true);
+    expect(UI.feedItems(log)[0].undoable).toBe(false); // current state not known
+    expect(UI.canUndo(e, { ...here, revision: 813 })).toBe(false); // something changed the project since
+    expect(UI.canUndo(e, { ...here, project: "/work/Other.aep" })).toBe(false); // another project is open
+    expect(UI.canUndo(e, { ...here, port: 8766 })).toBe(false); // another After Effects ran it
+    expect(UI.canUndo(e, { ...here, pid: 1 })).toBe(false); // After Effects was restarted
+    expect(UI.canUndo({ ...e, undoSteps: 3 }, here)).toBe(false); // a batch made several undo steps
+    expect(UI.canUndo({ ...e, undoSteps: undefined }, here)).toBe(false);
+    expect(UI.canUndo({ ...e, undoGroup: undefined }, here)).toBe(false);
+    expect(UI.canUndo({ ...e, revision: undefined }, here)).toBe(false);
+    expect(UI.canUndo({ ...e, instance: undefined }, here)).toBe(false); // older servers didn't record it
+    expect(UI.canUndo(e, null)).toBe(false);
   });
 
   it("uses the change report's lines when the log has them", () => {
@@ -131,9 +153,11 @@ describe("feed", () => {
 });
 
 describe("approval card", () => {
-  it("names the script's purpose and shows risk chips from the summary", () => {
+  it("titles the card with the tool, quotes the AI's comment, and shows risk chips", () => {
     const v = UI.approvalView({ tool: "Run script", client: "claude-ai", summary: "// rebuild the lower thirds\nvar c = app.project.activeItem;\nc.layer(1).remove();\nc.layers.addText('x');" });
-    expect(v.title).toBe("Run script: rebuild the lower thirds");
+    // the AI wrote that comment: it is quoted, not presented as what the script does
+    expect(v.title).toBe("Run script");
+    expect(v.says).toBe("rebuild the lower thirds");
     expect(v.client).toBe("Claude Desktop");
     expect(v.chips).toEqual([
       { text: "deletes", danger: true },
@@ -141,6 +165,9 @@ describe("approval card", () => {
     ]);
     expect(UI.approvalView({ tool: "Set property", summary: '{"layer":"Title"}' }, "Cursor")).toMatchObject({ title: "Set property", client: "Cursor" });
     expect(UI.riskChips("system.callSystem('rm -rf x')", "Run script")[0]).toEqual({ text: "runs a shell command", danger: true });
+    // the bridge's chips (from the whole text) win over what the shortened text shows
+    expect(UI.approvalView({ tool: "Run script", summary: "// just a tweak\nvar a = 1;", chips: [{ text: "runs a shell command", danger: true }] }).chips).toEqual([{ text: "runs a shell command", danger: true }]);
+    expect(UI.approvalView({ tool: "Set property", summary: "{}" }).says).toBeNull();
   });
   it("counts down to the 10-minute limit", () => {
     const now = Date.parse("2026-10-19T16:00:00Z");

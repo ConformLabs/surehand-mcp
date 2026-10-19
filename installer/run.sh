@@ -17,6 +17,43 @@ export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$HOME/.volta/bin:
 # Files from a downloaded zip are quarantined; clear it so the other launchers open normally.
 xattr -dr com.apple.quarantine "$ROOT" 2>/dev/null
 
+# Surehand MCP's own entries in ~/.surehand/ae and ~/.aemcp: the same list as OWN_FILES in
+# server/src/cli/uninstall.ts (a test keeps them equal). Everything else there is the user's.
+OWN_FILES="server config.json runtime.json extension-hash bridge-status.json instances update-check.json activity.jsonl tmp renders compat install.log MOVED.txt"
+
+# Another Surehand app (~/.surehand/<app>) is installed: the shared Node.js stays for it.
+other_apps() {
+  local d n
+  for d in "$SUREHAND"/*/; do
+    [ -d "$d" ] || continue
+    n="$(basename "$d")"
+    case "$n" in ae|node|ffmpeg) ;; *) return 0 ;; esac
+  done
+  return 1
+}
+
+# Removes only our own entries of a folder (never the user's data) and says what was kept.
+remove_own() {
+  local dir="$1" kept="" p name
+  [ -d "$dir" ] || return 0
+  for p in "$dir"/* "$dir"/.[!.]*; do
+    [ -e "$p" ] || [ -L "$p" ] || continue
+    name="$(basename "$p")"
+    if [ "$name" = "node" ]; then
+      # ~/.aemcp/node: 1.3's private Node.js, or the link the move left; the shared one is handled below
+      [ "$dir" = "$HOME/.aemcp" ] && rm -rf "$p"
+      continue
+    fi
+    case " $OWN_FILES " in
+      *" $name "*) rm -rf "$p" ;;
+      *) kept="$kept $name" ;;
+    esac
+  done
+  rmdir "$dir" 2>/dev/null
+  [ -n "$kept" ] && echo "Kept your files in $dir:$kept"
+  return 0
+}
+
 node_ok() { [ -x "$1" ] && [ "$("$1" -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)" -ge 18 ]; }
 
 NODE=""
@@ -29,9 +66,15 @@ done
 
 if [ -z "$NODE" ]; then
   if [ "${1:-}" = "uninstall" ]; then
-    rm -rf "$HOME/Library/Application Support/Adobe/CEP/extensions/com.aemcp" "$SUREHAND/ae" "$PRIVATE_NODE" "$HOME/.aemcp"
+    # without Node.js the server can't run its uninstaller: remove the extension and Surehand MCP's
+    # own files only; checkpoints, backups, history, proofs and anything else stay
+    rm -rf "$HOME/Library/Application Support/Adobe/CEP/extensions/com.aemcp"
+    remove_own "$SUREHAND/ae"
+    remove_own "$HOME/.aemcp"
+    rm -f "$SUREHAND/migration.log"
+    if other_apps; then echo "Kept $PRIVATE_NODE (another Surehand app uses it)."; else rm -rf "$PRIVATE_NODE"; fi
     rmdir "$SUREHAND" 2>/dev/null
-    echo "Removed the After Effects extension, ~/.surehand/ae and ~/.aemcp (Node.js not found, so AI app settings were left unchanged)."
+    echo "Removed the After Effects extension and Surehand MCP's own files (Node.js not found, so AI app settings were left unchanged)."
     exit 0
   fi
   echo "Node.js was not found. Downloading a private copy for Surehand MCP (one time, about 45 MB)..."
@@ -63,7 +106,10 @@ STATUS=$?
 # The private Node can only be deleted after it has finished running the uninstaller.
 if [ "${1:-}" = "uninstall" ]; then
   case "$NODE" in
-    "$PRIVATE_NODE/bin/node" | "$LEGACY_NODE/bin/node") rm -rf "$PRIVATE_NODE" "$LEGACY_NODE" ;;
+    "$PRIVATE_NODE/bin/node" | "$LEGACY_NODE/bin/node")
+      # ~/.aemcp/node: 1.3's own Node.js or a link; the shared one only when no other Surehand app needs it
+      rm -rf "$LEGACY_NODE"
+      other_apps || rm -rf "$PRIVATE_NODE" ;;
   esac
   rmdir "$SUREHAND" "$HOME/.aemcp" 2>/dev/null
 fi

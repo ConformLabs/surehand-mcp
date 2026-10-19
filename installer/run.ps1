@@ -16,6 +16,36 @@ $legacyNode = Join-Path $env:USERPROFILE ".aemcp\node"
 # Files extracted from a downloaded zip carry the "downloaded from the internet" mark; clear it.
 Get-ChildItem -Path $root -Recurse -File -ErrorAction SilentlyContinue | Unblock-File -ErrorAction SilentlyContinue
 
+# Surehand MCP's own entries in .surehand\ae and .aemcp: the same list as OWN_FILES in
+# server/src/cli/uninstall.ts (a test keeps them equal). Everything else there is the user's.
+$ownFiles = @("server", "config.json", "runtime.json", "extension-hash", "bridge-status.json", "instances", "update-check.json", "activity.jsonl", "tmp", "renders", "compat", "install.log", "MOVED.txt")
+$legacyDir = Join-Path $env:USERPROFILE ".aemcp"
+
+# Another Surehand app (.surehand\<app>) is installed: the shared Node.js stays for it.
+function Test-OtherApps {
+  if (-not (Test-Path $surehand)) { return $false }
+  return [bool](Get-ChildItem $surehand -Directory -Force -ErrorAction SilentlyContinue | Where-Object { @("ae", "node", "ffmpeg") -notcontains $_.Name -and -not $_.Name.StartsWith(".") })
+}
+
+# Removes only our own entries of a folder (never the user's data) and says what was kept.
+function Remove-Own($dir) {
+  if (-not (Test-Path $dir)) { return }
+  $kept = @()
+  foreach ($item in Get-ChildItem $dir -Force -ErrorAction SilentlyContinue) {
+    if ($item.Name -eq "node") {
+      # .aemcp\node: 1.3's private Node.js, or the junction the move left (remove the link itself)
+      if ($dir -eq $legacyDir) {
+        if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { $item.Delete() } else { Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $item.FullName }
+      }
+      continue
+    }
+    if ($ownFiles -contains $item.Name) { Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $item.FullName }
+    else { $kept += $item.Name }
+  }
+  if (-not (Get-ChildItem $dir -Force -ErrorAction SilentlyContinue)) { Remove-Item $dir -ErrorAction SilentlyContinue }
+  if ($kept.Count) { Write-Host "Kept your files in ${dir}: $($kept -join ', ')" }
+}
+
 function Test-Node($path) {
   if (-not $path -or -not (Test-Path $path)) { return $false }
   try { return [int](& $path -p "process.versions.node.split('.')[0]") -ge 18 } catch { return $false }
@@ -32,9 +62,15 @@ foreach ($c in $candidates) {
 
 if (-not $node) {
   if ($args.Count -gt 0 -and $args[0] -eq "uninstall") {
-    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue (Join-Path $env:APPDATA "Adobe\CEP\extensions\com.aemcp"), (Join-Path $surehand "ae"), $privateNode, (Join-Path $env:USERPROFILE ".aemcp")
+    # without Node.js the server can't run its uninstaller: remove the extension and Surehand MCP's
+    # own files only; checkpoints, backups, history, proofs and anything else stay
+    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue (Join-Path $env:APPDATA "Adobe\CEP\extensions\com.aemcp")
+    Remove-Own (Join-Path $surehand "ae")
+    Remove-Own $legacyDir
+    Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $surehand "migration.log")
+    if (Test-OtherApps) { Write-Host "Kept $privateNode (another Surehand app uses it)." } else { Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $privateNode }
     if ((Test-Path $surehand) -and -not (Get-ChildItem $surehand -Force)) { Remove-Item $surehand }
-    Write-Host "Removed the After Effects extension, .surehand\ae and .aemcp (Node.js not found, so AI app settings were left unchanged)."
+    Write-Host "Removed the After Effects extension and Surehand MCP's own files (Node.js not found, so AI app settings were left unchanged)."
     exit 0
   }
   Write-Host "Node.js was not found. Downloading a private copy for Surehand MCP (one time, about 30 MB)..."
@@ -89,7 +125,9 @@ if ($args.Count -gt 0 -and $args[0] -eq "uninstall") {
   if ($node -eq (Join-Path $privateNode "node.exe") -or $node -eq (Join-Path $legacyNode "node.exe")) {
     # .aemcp\node can be a junction to .surehand\node (after the move from 1.3): remove the link itself first
     if ((Test-Path $legacyNode) -and ((Get-Item $legacyNode -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) { (Get-Item $legacyNode -Force).Delete() }
-    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $privateNode, $legacyNode
+    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $legacyNode
+    # the shared Node.js only when no other Surehand app needs it
+    if (-not (Test-OtherApps)) { Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $privateNode }
   }
   foreach ($dir in @($surehand, (Join-Path $env:USERPROFILE ".aemcp"))) {
     if ((Test-Path $dir) -and -not (Get-ChildItem $dir -Force)) { Remove-Item $dir }

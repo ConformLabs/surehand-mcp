@@ -1,11 +1,13 @@
 // Moving a 1.3 installation (~/.aemcp) to ~/.surehand/ae, in temporary home folders.
 import { beforeEach, describe, expect, it } from "vitest";
 import { spawnSync } from "node:child_process";
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, statSync, utimesSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path, { join } from "node:path";
-import { mapLegacyPath, migrateLegacy } from "../src/migrate.js";
-import { appDir, configPath, installedServer, legacyDir, migrationPending, newAppDir, privateFfmpegDir, privateNodeDir, surehandRoot } from "../src/paths.js";
+import { lateMerge, mapLegacyPath, migrateLegacy, migrationBusy } from "../src/migrate.js";
+import { appDir, configPath, installedServer, legacyDir, migrationInProgress, migrationMarker, migrationPending, newAppDir, privateFfmpegDir, privateNodeDir, surehandRoot } from "../src/paths.js";
+import { ensureConfig } from "../src/cli/setup.js";
+import { movesLegacyBeforeRunning } from "../src/cli/commands.js";
 import { loadConfig } from "../src/config.js";
 import { instanceDirs, listInstances } from "../src/bridge.js";
 import { createServer } from "node:http";
@@ -222,7 +224,9 @@ describe("migrateLegacy", () => {
     expect(appDir()).toBe(L()); // not moved yet
     const r = migrateLegacy();
     expect(r.status).toBe("migrated");
-    expect(r.kept.join()).toMatch(/server \(.* already exists\)/);
+    expect(r.kept.join()).toMatch(/server\/ae-mcp\.mjs \(.* already exists\)/);
+    // the folder is merged: the old server's leftovers arrive under the new name
+    expect(readFileSync(join(A(), "server", "surehand-ae.mjs.previous"), "utf8")).toBe("server 1.3.3");
     expect(readFileSync(join(A(), "server", "surehand-ae.mjs"), "utf8")).toBe("server 1.4.0");
     expect(readFileSync(join(R(), "node", "bin", "node"), "utf8")).toBe("node 24");
     // the old server file forwards; the old Node.js is replaced by a link to the new one
@@ -277,5 +281,168 @@ describe("the 1.3 extension until After Effects restarts", () => {
 describe("folders", () => {
   it("legacyDir / newAppDir / surehandRoot", () => {
     expect([legacyDir(), newAppDir(), surehandRoot()]).toEqual([L(), A(), R()]);
+  });
+});
+
+describe("an interrupted move is finished, never forgotten (H1)", () => {
+  const steps = ["planned", "move activity.jsonl", "move server", "move node", "checkpoint indexes", "runtime.json", "config.json copy", "instances", "server forwarder", "node link", "AI app settings", "MOVED.txt", "marker"];
+  for (const at of steps) {
+    it(`killed at "${at}": the next run finishes it, and nothing is lost`, () => {
+      legacyInstall();
+      const before = tree(L());
+      const kill = Object.assign(new Error("killed"), { simulatedKill: true });
+      expect(() => migrateLegacy({ platform: "darwin", repoint: () => [], interrupt: (s) => { if (s === at) throw kill; } })).toThrow("killed");
+      // still pending (the marker), new data goes to the destination, and the lock is free again
+      expect(migrationInProgress()).toBe(true);
+      expect(migrationPending()).toBe(true);
+      expect(appDir()).toBe(A());
+      expect(migrationBusy()).toBe(false);
+      const repointed: string[] = [];
+      const r = migrateLegacy({ platform: "darwin", repoint: () => (repointed.push("x"), ["Cursor"]) });
+      expect(r.status).toBe("migrated");
+      expect(repointed).toEqual(["x"]); // the settings are pointed at the new place before the marker goes
+      expect(migrationInProgress()).toBe(false);
+      expect(migrationPending()).toBe(false);
+      expect(existsSync(join(L(), "MOVED.txt"))).toBe(true);
+      expect(readdirSync(L()).sort()).toEqual(["MOVED.txt", "config.json", "instances", "node", "runtime.json", "server"]);
+      expect(readFileSync(join(L(), "server", "ae-mcp.mjs"), "utf8")).toMatch(/await import/);
+      // every file arrived exactly once
+      const after = { ...tree(A()), ...Object.fromEntries(Object.entries(tree(join(R(), "node"))).map(([k, v]) => [`node/${k}`, v])), ...Object.fromEntries(Object.entries(tree(join(R(), "ffmpeg"))).map(([k, v]) => [`ffmpeg/${k}`, v])) };
+      for (const [rel, text] of Object.entries(before)) {
+        if ((rel.endsWith("index.json") && rel.startsWith("checkpoints")) || rel === "runtime.json") continue;
+        expect(after[rel.replace(/^server\/ae-mcp\.mjs/, "server/surehand-ae.mjs")], rel).toBe(text);
+      }
+      expect(Object.keys(after).some((k) => k.includes(".from-aemcp"))).toBe(false);
+    });
+  }
+
+  it("~/.aemcp emptied by a killed move (no MOVED.txt) still counts as pending", () => {
+    legacyInstall();
+    const kill = Object.assign(new Error("killed"), { simulatedKill: true });
+    expect(() => migrateLegacy({ interrupt: (s) => { if (s === "checkpoint indexes") throw kill; } })).toThrow();
+    expect(readdirSync(L())).toEqual([]); // everything renamed, nothing written yet
+    expect(migrationPending()).toBe(true);
+    expect(readFileSync(migrationMarker(), "utf8")).toMatch(/"phase": "finishing"/);
+    expect(migrateLegacy().status).toBe("migrated");
+  });
+
+  it("the server and Node.js move last: until then AI apps' old settings keep working", () => {
+    legacyInstall();
+    const kill = Object.assign(new Error("killed"), { simulatedKill: true });
+    expect(() => migrateLegacy({ interrupt: (s) => { if (s === "move server") throw kill; } })).toThrow();
+    expect(existsSync(join(L(), "server", "ae-mcp.mjs"))).toBe(true);
+    expect(existsSync(join(L(), "node", "bin", "node"))).toBe(true);
+    expect(existsSync(join(A(), "checkpoints"))).toBe(true);
+    expect(installedServer()).toBe(join(L(), "server", "ae-mcp.mjs"));
+    expect(privateNodeDir()).toBe(join(L(), "node"));
+  });
+});
+
+describe("locks and clashes (M2)", () => {
+  it("a lock is stale when its process is gone (not only by age), and held while it runs", () => {
+    legacyInstall();
+    mkdirSync(R(), { recursive: true });
+    writeFileSync(join(R(), ".migrate-ae.lock"), JSON.stringify({ pid: process.pid, startedAt: Date.now() }));
+    expect(migrationBusy()).toBe(true);
+    expect(migrateLegacy().status).toBe("busy");
+    // a process that has exited
+    const dead = spawnSync(process.execPath, ["-e", "process.stdout.write(String(process.pid))"], { encoding: "utf8" }).stdout;
+    writeFileSync(join(R(), ".migrate-ae.lock"), JSON.stringify({ pid: Number(dead), startedAt: Date.now() }));
+    expect(migrationBusy()).toBe(false);
+    expect(migrateLegacy().status).toBe("migrated");
+  });
+
+  it("never creates a config while another process is moving (it would get a new token)", () => {
+    legacyInstall();
+    mkdirSync(R(), { recursive: true });
+    writeFileSync(join(R(), ".migrate-ae.lock"), JSON.stringify({ pid: process.pid, startedAt: Date.now() }));
+    rmSync(join(L(), "config.json"));
+    expect(ensureConfig({ waitMs: 50 })).toBe(false);
+    expect(existsSync(join(A(), "config.json"))).toBe(false);
+    expect(existsSync(join(L(), "config.json"))).toBe(false);
+  });
+
+  it("merges into folders that already exist; a clashing file arrives as <name>.from-aemcp", () => {
+    legacyInstall();
+    put(join(A(), "checkpoints", "Other-99999999", "index.json"), "[]");
+    put(join(A(), "history", "Spot-1234abcd", "index.json"), '["newer"]');
+    put(join(A(), "notes.txt"), "written by 1.4");
+    const r = migrateLegacy();
+    expect(r.status).toBe("migrated");
+    expect(readdirSync(join(A(), "checkpoints")).sort()).toEqual(["Other-99999999", "Spot-1234abcd"]);
+    expect(readFileSync(join(A(), "history", "Spot-1234abcd", "index.json"), "utf8")).toBe('["newer"]');
+    expect(readFileSync(join(A(), "history", "Spot-1234abcd", "index.json.from-aemcp"), "utf8")).toBe("[]");
+    expect(readFileSync(join(A(), "notes.txt.from-aemcp"), "utf8")).toBe("the user's notes");
+    expect(r.renamed.sort()).toEqual(["history/Spot-1234abcd/index.json -> index.json.from-aemcp", "notes.txt -> notes.txt.from-aemcp"]);
+    // nothing of the user's stayed behind
+    expect(readdirSync(L()).sort()).toEqual(["MOVED.txt", "config.json", "instances", "node", "runtime.json", "server"]);
+  });
+});
+
+describe("after the move (M6)", () => {
+  it("MOVED.txt lists what stayed in ~/.aemcp and only then says nothing there holds data", () => {
+    legacyInstall();
+    // a Node.js in use (Windows) is copied: the original stays
+    migrateLegacy({ platform: "win32", rename: (from, to) => { if (path.basename(from) === "node") throw Object.assign(new Error("busy"), { code: "EPERM" }); renameSync(from, to); } });
+    const text = readFileSync(join(L(), "MOVED.txt"), "utf8");
+    expect(text).toMatch(/Also still here[\s\S]*node \(a copy/);
+    expect(text).not.toMatch(/Nothing here holds your data/);
+    // a clean move says it
+    newHome();
+    legacyInstall();
+    migrateLegacy({ platform: "darwin" });
+    expect(readFileSync(join(L(), "MOVED.txt"), "utf8")).toMatch(/Nothing here holds your data any more/);
+  });
+
+  it("merges what an older server still wrote into ~/.aemcp, and logs it", () => {
+    legacyInstall();
+    migrateLegacy({ platform: "darwin" });
+    // a 1.3 server still running writes a checkpoint and activity there
+    put(join(L(), "checkpoints", "Late-1", "v.aep"), "late aep");
+    put(join(L(), "activity.jsonl"), '{"tool":"late"}\n');
+    put(join(L(), "bridge-status.json"), "{}"); // status of the 1.3 bridge: stays
+    const r = lateMerge();
+    expect(r.merged.sort()).toEqual(["activity.jsonl", "checkpoints"]);
+    expect(readFileSync(join(A(), "checkpoints", "Late-1", "v.aep"), "utf8")).toBe("late aep");
+    expect(readFileSync(join(A(), "activity.jsonl.from-aemcp"), "utf8")).toBe('{"tool":"late"}\n');
+    expect(existsSync(join(L(), "checkpoints"))).toBe(false);
+    expect(existsSync(join(L(), "bridge-status.json"))).toBe(true);
+    expect(readFileSync(join(R(), "migration.log"), "utf8")).toMatch(/after the move: merged activity.jsonl, checkpoints/);
+    expect(lateMerge().merged).toEqual([]);
+  });
+
+  it("adopts permissions and a pause the 1.3 panel saved in ~/.aemcp/config.json (newer and different); never undoes a pause", () => {
+    legacyInstall();
+    migrateLegacy({ platform: "darwin" });
+    const cfg = JSON.parse(readFileSync(join(A(), "config.json"), "utf8"));
+    put(join(L(), "config.json"), JSON.stringify({ ...cfg, permissions: { mode: "read-only", allowShell: false } }));
+    const later = Date.now() / 1000 + 5;
+    utimesSync(join(L(), "config.json"), later, later);
+    expect(lateMerge().adopted).toEqual(["permissions"]);
+    expect(JSON.parse(readFileSync(join(A(), "config.json"), "utf8"))).toMatchObject({ token: cfg.token, permissions: { mode: "read-only", allowShell: false } });
+    // paused in 1.4 meanwhile; the 1.3 panel (no Pause) saves again: the pause stays
+    put(join(A(), "config.json"), JSON.stringify({ ...cfg, permissions: { mode: "read-only", allowShell: false }, paused: true }));
+    put(join(L(), "config.json"), JSON.stringify({ ...cfg, permissions: { mode: "read-only", allowShell: false } }));
+    utimesSync(join(L(), "config.json"), later + 10, later + 10);
+    expect(lateMerge().adopted).toEqual([]);
+    expect(JSON.parse(readFileSync(join(A(), "config.json"), "utf8")).paused).toBe(true);
+    expect(readFileSync(join(R(), "migration.log"), "utf8")).toMatch(/adopted permissions/);
+  });
+});
+
+describe("only commands that set things up move ~/.aemcp (L2)", () => {
+  it("the server's start and setup commands do; commands that only read never do", () => {
+    for (const c of [undefined, "--http", "--tools", "setup", "connect", "disconnect", "chatgpt"]) expect(movesLegacyBeforeRunning(c), String(c)).toBe(true);
+    for (const c of ["clients", "test", "selftest", "checkpoints", "checkpoint-diff", "diagnostics", "activity", "update", "install", "uninstall", "bogus"])
+      expect(movesLegacyBeforeRunning(c), c).toBe(false);
+  });
+
+  it("server and After Effects always use the same config.json, and none is created in ~/.aemcp", () => {
+    put(join(L(), "notes.txt"), "pending move, no config there");
+    expect(configPath()).toBe(join(A(), "config.json"));
+    put(join(L(), "config.json"), "{}");
+    expect(configPath()).toBe(join(L(), "config.json"));
+    put(join(A(), "config.json"), "{}");
+    expect(configPath()).toBe(join(A(), "config.json"));
   });
 });

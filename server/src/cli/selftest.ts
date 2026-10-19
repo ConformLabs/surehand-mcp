@@ -63,7 +63,8 @@ export async function quickChecks(print: boolean, beforeJob?: () => Promise<void
   }
 
   // --- installation ---
-  if (migrationPending()) note("folder", `Your files are still in ${legacyDir()}: moving them to ~/.surehand/ae didn't work yet (see ${migrationLog()}).`, "Quit your AI apps and After Effects, then run the installer again.");
+  // this test only reads: it reports a pending move, the server's next start (or the installer) does it
+  if (migrationPending()) note("folder", `Your files are still in ${legacyDir()}: they move to ~/.surehand/ae when the server next starts (if that already failed, see ${migrationLog()}).`, "If it stays like this, quit your AI apps and After Effects, then run the installer again.");
   if (existsSync(configPath()) && loadConfig().token) pass("config", `Config ${configPath()}`);
   else bad("config", `No config at ${configPath()}.`, REINSTALL);
 

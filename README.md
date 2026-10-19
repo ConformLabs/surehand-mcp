@@ -485,6 +485,16 @@ checkedAt, notes?}` (installs nothing). Errors come as `{error}`. The panel runs
   requests from web pages (with an `Origin` header) are rejected.
 - `ae_run_script` can do anything an After Effects script can, including reading/writing files and running shell
   commands via `system.callSystem`. Only connect AI apps you trust, and keep the ChatGPT tunnel running only while you use it.
+- Approvals ("Ask" mode), **Pause AI** and the panel's own actions are answered only inside After Effects: they need a
+  secret that the bridge keeps in memory and hands to the Surehand panel and the approval pop-up through After Effects'
+  extension events, never over the network or in a file. So an AI app, which has the token, can't approve its own
+  requests or get past a pause. A new request can't be answered in its first second on screen, and Enter never allows.
+- What the token protects against: other users of the computer, and programs that can't read your files. What it
+  doesn't: an AI app (or any program) that has full shell access as your own user account can read and change
+  everything Surehand can, including `config.json`; Surehand's permissions are guardrails against mistakes, not a
+  sandbox against such a program.
+- Settings files of AI apps are only changed when they can be read (a file with a mistake in it is left as it is and
+  reported), with a timestamped backup first (the newest five are kept) and an atomic write.
 
 ## Development
 

@@ -1,8 +1,9 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { homedir, platform } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { createInterface } from "node:readline";
+import { backupFile, readJsonFile, stripBom, writeFileAtomic } from "../fsutil.js";
 import { mapLegacyPath } from "../migrate.js";
 import { privateNodeDir, SERVER_NAME, surehandRoot } from "../paths.js";
 
@@ -52,26 +53,27 @@ export const warn = (m: string) => console.log(`  ${yellow("!")} ${m}`);
 export const fail = (m: string) => console.log(`  ${red("✖")} ${m}`);
 export const step = (m: string) => console.log(`\n${bold(m)}`);
 
+/** A JSON file's contents, or `fallback` when it is missing or unreadable (for display only: never write it back). */
 export function readJson<T = any>(file: string, fallback: T): T {
   try {
-    return JSON.parse(readFileSync(file, "utf8"));
+    return JSON.parse(stripBom(readFileSync(file, "utf8")));
   } catch {
     return fallback;
   }
 }
 
-/** Keep a one-time backup of a settings file before the first change (<file>.surehand.bak). 1.3 wrote
- *  <file>.aemcp.bak: an existing one already holds the original, so no second copy is made. */
-export function backupOnce(file: string) {
-  if (existsSync(file) && !existsSync(file + ".aemcp.bak") && !existsSync(file + ".surehand.bak")) copyFileSync(file, file + ".surehand.bak");
+/** A timestamped backup (the newest five are kept) before every change of a settings file. */
+export function backupBeforeWrite(file: string) {
+  backupFile(file);
 }
 
-/** Write JSON, keeping a one-time backup of the original file. */
-export function writeJsonWithBackup(file: string, data: unknown) {
-  mkdirSync(dirname(file), { recursive: true });
-  backupOnce(file);
-  writeFileSync(file, JSON.stringify(data, null, 2) + "\n");
+/** Write a text settings file: backup first, then an atomic replace that keeps the file's permissions. */
+export function writeTextWithBackup(file: string, text: string) {
+  backupFile(file);
+  writeFileAtomic(file, text);
 }
+
+export { readJsonFile };
 
 export function which(cmd: string): string | null {
   const r = spawnSync(isWin ? "where" : "which", [cmd], { encoding: "utf8" });
@@ -79,8 +81,32 @@ export function which(cmd: string): string | null {
   return null;
 }
 
+// cmd.exe metacharacters: escaped with ^ (as cross-spawn does)
+const CMD_META = /([()\][%!^"`<>&|;, *?])/g;
+function cmdArg(arg: string): string {
+  // Windows argv rules first (backslashes before a quote are doubled, the quote escaped), then cmd.exe's
+  let a = arg.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\*)$/, "$1$1");
+  a = `"${a}"`.replace(CMD_META, "^$1");
+  // a .cmd / .bat shim (npm's claude.cmd) passes its arguments through cmd.exe a second time
+  return a.replace(CMD_META, "^$1");
+}
+
+/**
+ * The command line for `cmd.exe /d /s /c` that runs a .cmd/.bat with exactly these arguments (no
+ * shell interpretation of &, |, %, quotes... in them).
+ */
+export function cmdExeLine(cmd: string, args: string[]): string {
+  return `"${[cmd.replace(CMD_META, "^$1"), ...args.map(cmdArg)].join(" ")}"`;
+}
+
 export function run(cmd: string, args: string[]) {
-  return execFileSync(cmd, args, { stdio: "pipe", encoding: "utf8", shell: isWin && /\.(cmd|bat)$/i.test(cmd) });
+  if (isWin && /\.(cmd|bat)$/i.test(cmd)) {
+    const r = spawnSync(process.env.ComSpec || "cmd.exe", ["/d", "/s", "/c", cmdExeLine(cmd, args)], { stdio: "pipe", encoding: "utf8", windowsVerbatimArguments: true });
+    if (r.error) throw r.error;
+    if (r.status !== 0) throw Object.assign(new Error(`${cmd} exited with ${r.status}: ${(r.stderr || r.stdout || "").trim()}`), { stderr: r.stderr, stdout: r.stdout, status: r.status });
+    return r.stdout;
+  }
+  return execFileSync(cmd, args, { stdio: "pipe", encoding: "utf8" });
 }
 
 /** The private Node.js the installers put in ~/.surehand/node, if it is there. */

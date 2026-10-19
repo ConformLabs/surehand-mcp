@@ -224,7 +224,7 @@ return { steps: __out, failed: __failed, rollback: args.atomic && __failed >= 0 
     // an atomic batch always compares before/after: that is what makes its rollback safe
     report: showReport || isAtomic ? (scope.length ? scope : reportScope({})) : undefined,
     rollback: isAtomic ? "requested" : undefined,
-    bridge: edits && perm.mode === "ask" ? { approval: { tool: `Batch (${steps.length} steps)`, summary: steps.map((s, i) => `${i + 1}. ${s.tool} ${approvalSummary(s.tool, s.args).slice(0, 300)}`).join("\n") } } : undefined,
+    bridge: edits && perm.mode === "ask" ? { approval: { tool: `Batch (${steps.length} steps)`, summary: steps.map((s, i) => `${i + 1}. ${s.tool} ${approvalSummary(s.tool, s.args)}`).join("\n") } } : undefined,
   });
   if (!r.ok) return formatResult(r);
   const res = r.result as { steps: { ok: boolean; result?: unknown; error?: string; line?: number }[]; failed: number };

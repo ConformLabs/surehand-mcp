@@ -161,8 +161,23 @@
   }
 
   /**
+   * May the panel offer Undo for this activity entry? Edit > Undo undoes whatever was done last in
+   * the After Effects it runs in, so only when that is certainly this call's one step: the entry
+   * names its undo step and the project's revision after it, it made exactly one undo step, it ran
+   * in this After Effects (bridge port and process) and in the project open now, and the project
+   * hasn't changed since (current revision === the entry's). `cur`: { port, pid, project, revision }.
+   */
+  function canUndo(e, cur) {
+    if (!e || !cur || !e.undoGroup || typeof e.revision !== "number" || e.undoSteps !== 1) return false;
+    if (!e.instance || e.instance.port !== cur.port || e.instance.pid !== cur.pid) return false;
+    if (typeof e.project !== "string" || e.project !== cur.project) return false;
+    return cur.revision === e.revision;
+  }
+
+  /**
    * Feed items, newest first: running renders on top, then up to `limit` log entries. The newest
-   * entry may get Undo (only it, and only if it changed the project and wasn't undone already).
+   * entry may get Undo (only it, only if it changed the project, wasn't undone already, and canUndo
+   * with opts.current).
    */
   function feedItems(activity, opts) {
     opts = opts || {};
@@ -175,7 +190,7 @@
       out.push(describeEntry(e));
     }
     out.forEach(function (it, k) {
-      it.undoable = it.undoable && k === 0 && it.entry === activity[0] && !undone[entryKey(it.entry)];
+      it.undoable = it.undoable && k === 0 && it.entry === activity[0] && !undone[entryKey(it.entry)] && canUndo(it.entry, opts.current);
     });
     return out;
   }
@@ -237,20 +252,25 @@
     [/\.add(Solid|Text|Shape|Null|Light|Camera|BoxText)\b|add_layer|add_shape/i, "adds layers", false],
     [/setValue|setValueAtTime|set_property|set_keyframes|expression/i, "changes properties", false],
   ];
-  /** Chips for an approval request, from its summary (script source or the call's arguments). */
+  /** Chips for an approval request, from its text (all of the script or the call's arguments). */
   function riskChips(summary, tool) {
     var text = String(tool || "") + "\n" + String(summary || ""), out = [];
     for (var i = 0; i < RISKS.length && out.length < 4; i++) if (RISKS[i][0].test(text)) out.push({ text: RISKS[i][1], danger: RISKS[i][2] });
     return out;
   }
-  /** { title, chips, client, code } for an approval card. */
+  /**
+   * { title, says, chips, client, code } for an approval card. The title is the tool (what will run);
+   * a script's first comment is the AI's own description, so it is only quoted ("The AI says: ..."),
+   * never presented as the title. Chips come from the bridge, which checked the whole text (the card
+   * may show only its start); older bridges: from the shown text.
+   */
   function approvalView(p, fallbackClient) {
     var summary = String(p.summary || "");
     var title = p.tool || "Change the project";
-    // "// rebuild the lower thirds" as the script's first line names what it does
-    var first = /^\s*\/\/\s*(.{3,80})/.exec(summary) || /^\s*\/\*+\s*(.{3,80}?)\s*(\*\/|$)/m.exec(summary);
-    if (/script/i.test(title) && first) title = title + ": " + first[1].replace(/\s*\*\/\s*$/, "");
-    return { title: title, chips: riskChips(summary, p.tool), client: clientName(p.client) || fallbackClient || "Your AI app", code: summary };
+    var first = /^\s*\/\/\s*(.{3,120})/.exec(summary) || /^\s*\/\*+\s*(.{3,120}?)\s*(\*\/|$)/m.exec(summary);
+    var says = /script/i.test(title) && first ? first[1].replace(/\s*\*\/\s*$/, "") : null;
+    var chips = Object.prototype.toString.call(p.chips) === "[object Array]" ? p.chips : riskChips(summary, p.tool);
+    return { title: title, says: says, chips: chips, client: clientName(p.client) || fallbackClient || "Your AI app", code: summary };
   }
   /** "0:42": time left to answer (requests give up after 10 minutes). */
   function countdown(deadline, now) {
@@ -301,7 +321,7 @@
 
   var api = {
     layoutFor: layoutFor, MODES: MODES, modeOf: modeOf, clientName: clientName, lastClient: lastClient, statusFor: statusFor,
-    toolName: toolName, describeEntry: describeEntry, entryDetails: entryDetails, feedItems: feedItems, entryKey: entryKey,
+    toolName: toolName, describeEntry: describeEntry, entryDetails: entryDetails, feedItems: feedItems, entryKey: entryKey, canUndo: canUndo,
     renderIdOf: renderIdOf, renderStartInfo: renderStartInfo, renderProgress: renderProgress, timeLeft: timeLeft,
     riskChips: riskChips, approvalView: approvalView, countdown: countdown,
     hhmm: hhmm, dayLabel: dayLabel, whenLabel: whenLabel, parseCliJson: parseCliJson, cmpVersions: cmpVersions, aeLabel: aeLabel,

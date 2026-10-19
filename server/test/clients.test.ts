@@ -2,7 +2,7 @@
 // 1.3's "after-effects" (only where it runs our server), and settings that named ~/.aemcp. Temporary home,
 // fake settings files; the Claude Code command line is never run.
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -152,5 +152,51 @@ describe("after the move from 1.3", () => {
     expect(r).toMatchObject({ status: "migrated", repointed: ["Cursor"] });
     expect(json(util.cursorConfig()).mcpServers).toEqual({ "surehand-ae": { command: "node", args: [server()] } });
     expect(clients.moveFromLegacy()).toMatchObject({ status: "not-needed", repointed: [] });
+  });
+});
+
+describe("AI app settings files are never lost (unreadable, BOM, comments)", () => {
+  it("refuses to write a settings file it can't read (half-written, hand-broken) and says which and why", () => {
+    const broken = '{\n  "globalShortcut": "x",\n  "mcpServers": { "mine": { "command": "/opt/x"';
+    put(util.claudeDesktopConfig(), broken);
+    const r = clients.connectClient("claude-desktop", ENTRY());
+    expect(r.ok).toBe(false);
+    expect(r.message).toContain(util.claudeDesktopConfig());
+    expect(r.message).toMatch(/isn't valid JSON.*left unchanged/);
+    expect(readFileSync(util.claudeDesktopConfig(), "utf8")).toBe(broken);
+    expect(clients.disconnectClient("claude-desktop").ok).toBe(false);
+    expect(readFileSync(util.claudeDesktopConfig(), "utf8")).toBe(broken);
+    expect(clients.clientInfo("claude-desktop").note).toMatch(/can't be read/);
+    // the move from 1.3 skips it too, and says so
+    const problems: string[] = [];
+    expect(clients.repointLegacyClients(problems)).toEqual([]);
+    expect(problems.join()).toMatch(/Claude Desktop: .* can't be read/);
+    expect(readFileSync(util.claudeDesktopConfig(), "utf8")).toBe(broken);
+  });
+
+  it("a BOM (Windows editors) is read and the rest of the file kept", () => {
+    put(util.claudeDesktopConfig(), "﻿" + JSON.stringify({ globalShortcut: "x", mcpServers: { other: FOREIGN } }));
+    expect(clients.connectClient("claude-desktop", ENTRY()).ok).toBe(true);
+    expect(json(util.claudeDesktopConfig())).toEqual({ globalShortcut: "x", mcpServers: { other: FOREIGN, "surehand-ae": ENTRY() } });
+  });
+
+  it("Cursor's mcp.json may have comments and trailing commas: read, and everything else in it kept", () => {
+    put(util.cursorConfig(), '{\n  // my servers\n  "mcpServers": {\n    "other": { "command": "/opt/other/ae-bridge", "args": ["--port", "9000"], },\n  },\n}\n');
+    expect(clients.connectClient("cursor", ENTRY()).ok).toBe(true);
+    expect(json(util.cursorConfig()).mcpServers).toEqual({ other: FOREIGN, "surehand-ae": ENTRY() });
+    expect(readFileSync(util.cursorConfig() + ".surehand.bak", "utf8")).toMatch(/\/\/ my servers/); // the original, comments and all
+  });
+
+  it("every change is backed up first (timestamped, the newest five kept) and written atomically", () => {
+    put(util.cursorConfig(), { mcpServers: { other: FOREIGN } });
+    for (let i = 0; i < 4; i++) {
+      clients.connectClient("cursor", ENTRY());
+      clients.disconnectClient("cursor");
+    }
+    const dir = dirname(util.cursorConfig());
+    const names = readdirSync(dir);
+    expect(names.filter((n) => /^mcp\.json\.surehand-\d{8}-\d{6}-\d{3}(-\d+)?\.bak$/.test(n))).toHaveLength(5);
+    expect(names.filter((n) => n.endsWith(".tmp"))).toEqual([]);
+    expect(json(util.cursorConfig()).mcpServers).toEqual({ other: FOREIGN });
   });
 });

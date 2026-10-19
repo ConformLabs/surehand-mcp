@@ -986,7 +986,11 @@ aemcp = (function () {
       if (opts.suppressDialogs !== false) { try { app.endSuppressDialogs(false); } catch (e) {} }
     }
     // the project's revision after the call (and any rollback): the panel's Undo checks nothing happened since
-    if (res && undo) { var revEnd = A.revision(); if (revEnd !== null) res.revision = revEnd; }
+    if (res && undo) {
+      var revEnd = A.revision(); if (revEnd !== null) res.revision = revEnd;
+      // and which project it was (the panel offers Undo only in the same project)
+      try { res.projectFile = app.project && app.project.file ? app.project.file.fsName : ""; } catch (e) {}
+    }
     return A.stringify(res);
   };
 

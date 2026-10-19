@@ -105,7 +105,7 @@ export function applyProfile(server: McpServer, profile: ToolProfile): Map<strin
           ok: !!result && !result.isError,
           summary: text.split("\n")[0].slice(0, 300) || (result ? undefined : "no result (exception)"),
           changes: changesAt >= 0 ? text.slice(changesAt).split("\n").filter((l) => /^[+~-] /.test(l)).length : undefined,
-          ...activityDetails(name, text, ctx.last),
+          ...activityDetails(name, text, ctx.last, ctx),
         });
       }
     };

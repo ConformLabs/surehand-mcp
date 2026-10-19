@@ -80,6 +80,8 @@ export interface RunResult {
   result?: unknown;
   /** app.project.revision after a call with an undo group (AE versions that have it) */
   revision?: number;
+  /** the project's file after a call with an undo group ("" when unsaved) */
+  projectFile?: string;
   changes?: Changes;
   rollback?: Rollback;
   logs: string[];
@@ -192,7 +194,12 @@ export async function runJsx(body: string, args: unknown = {}, opts: RunOptions 
   const res = parseResult(raw);
   // for the activity log: the undo step this call made and the revision after it (the panel's Undo)
   if (ctx && opts.undoGroup !== false && opts.undoGroup !== "") {
-    ctx.last = { undoGroup: typeof opts.undoGroup === "string" && opts.undoGroup ? opts.undoGroup : "Surehand MCP", ...(typeof res.revision === "number" ? { revision: res.revision } : {}) };
+    ctx.last = {
+      undoGroup: typeof opts.undoGroup === "string" && opts.undoGroup ? opts.undoGroup : "Surehand MCP",
+      ...(typeof res.revision === "number" ? { revision: res.revision } : {}),
+      ...(typeof res.projectFile === "string" ? { project: res.projectFile } : {}),
+    };
+    ctx.undoSteps = (ctx.undoSteps ?? 0) + 1;
   }
   return res;
 }

@@ -24,6 +24,11 @@ export interface ActivityEntry {
   revision?: number;
   /** the undo step the call made in After Effects */
   undoGroup?: string;
+  /** how many undo steps the call made (the panel's Undo is offered only for exactly one) */
+  undoSteps?: number;
+  /** the project the call changed ("" when unsaved), and the After Effects (bridge port and process) that ran it */
+  project?: string;
+  instance?: { port: number; pid?: number };
   /** ae_preflight / ae_prove_identical: the verdict and its line */
   result?: { verdict: string; summary: string };
 }
@@ -31,7 +36,12 @@ export interface ActivityEntry {
 const MAX_CHANGE_LINES = 20;
 
 /** The optional fields the panel reads, from a tool's text result and its call context. */
-export function activityDetails(tool: string, text: string, last?: { revision?: number; undoGroup?: string }): Partial<ActivityEntry> {
+export function activityDetails(
+  tool: string,
+  text: string,
+  last?: { revision?: number; undoGroup?: string; project?: string },
+  call?: { undoSteps?: number; instance?: { port: number; pid?: number } },
+): Partial<ActivityEntry> {
   const out: Partial<ActivityEntry> = {};
   const at = text.indexOf("\nChanges");
   if (at >= 0) {
@@ -40,6 +50,9 @@ export function activityDetails(tool: string, text: string, last?: { revision?: 
   }
   if (typeof last?.revision === "number") out.revision = last.revision;
   if (last?.undoGroup) out.undoGroup = last.undoGroup;
+  if (typeof last?.project === "string") out.project = last.project;
+  if (call?.undoSteps) out.undoSteps = call.undoSteps;
+  if (call?.instance) out.instance = call.instance;
   const first = text.split("\n")[0] ?? "";
   if (tool === "ae_preflight") {
     const m = /^(PASS|FAIL|WARNINGS|INCOMPLETE)\b/.exec(first);

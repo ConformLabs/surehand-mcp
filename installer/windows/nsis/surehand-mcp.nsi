@@ -223,10 +223,32 @@ Section "Uninstall"
     RMDir "${SERVER_DIR}"
   ${EndIf}
 
-  ; the private Node.js (an AI app still running the server can keep node.exe in use)
-  RMDir /r "${NODE_DIR}"
-  ${If} ${FileExists} "${NODE_DIR}\*.*"
-    DetailPrint "Some of ${NODE_DIR} is in use; quit your AI apps and delete it by hand."
+  ; the private Node.js is shared by the Surehand apps: removed only when no other one (.surehand\<app>)
+  ; is installed (an AI app still running the server can keep node.exe in use)
+  StrCpy $1 0
+  FindFirst $2 $3 "${SUREHAND}\*.*"
+  ${DoWhile} $3 != ""
+    ${If} ${FileExists} "${SUREHAND}\$3\*.*"
+    ${AndIf} $3 != "."
+    ${AndIf} $3 != ".."
+    ${AndIf} $3 != "ae"
+    ${AndIf} $3 != "node"
+    ${AndIf} $3 != "ffmpeg"
+      StrCpy $4 $3 1
+      ${If} $4 != "."
+        StrCpy $1 1
+      ${EndIf}
+    ${EndIf}
+    FindNext $2 $3
+  ${Loop}
+  FindClose $2
+  ${If} $1 == 1
+    DetailPrint "Kept ${NODE_DIR}: another Surehand app uses it."
+  ${Else}
+    RMDir /r "${NODE_DIR}"
+    ${If} ${FileExists} "${NODE_DIR}\*.*"
+      DetailPrint "Some of ${NODE_DIR} is in use; quit your AI apps and delete it by hand."
+    ${EndIf}
   ${EndIf}
   RMDir "${APPDIR}" ; only if empty (config.json and checkpoints are kept)
   RMDir "${SUREHAND}"

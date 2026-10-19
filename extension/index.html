@@ -28,9 +28,11 @@
   </aside>
 
   <main class="right">
+    <div id="askGone" class="withdrawn" role="status" aria-live="polite" hidden>That request was withdrawn.</div>
     <section id="ask" class="ask" aria-label="Approval request" hidden>
       <div class="ask-top"><span id="askWho"></span><span id="askTime" class="num" title="Time left to answer"></span></div>
       <div id="askTitle" class="ask-title"></div>
+      <div id="askSays" class="says" hidden></div>
       <div id="askChips" class="chips"></div>
       <button id="askShow" class="link under" type="button" aria-expanded="false" aria-controls="askCode">Show the script</button>
       <pre id="askCode" class="code" hidden></pre>
@@ -68,6 +70,7 @@
 <script src="js/paths.js"></script>
 <script src="js/panel-model.js"></script>
 <script src="js/bridge-core.js"></script>
+<script src="js/control.js"></script>
 <script src="js/panel.js"></script>
 </body>
 </html>

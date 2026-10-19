@@ -12,8 +12,18 @@
  *   through /approve, which accepts the first answer and refuses any later one;
  * - the panel and the pop-up poll /pending?ui=panel|popup, which doubles as a heartbeat: when a
  *   request waits and neither is showing, the bridge opens the pop-up (com.aemcp.approval);
- * - while the config says "paused": true, every call from the AI is refused at once (nothing
- *   runs); the panel's own calls (marked fromPanel) still run. */
+ * - while paused, every call from the AI is refused at once (nothing runs); the panel's own calls
+ *   (marked fromPanel) still run.
+ *
+ * Who may do what. The token in config.json lets a program talk to the bridge (the MCP server, i.e.
+ * the AI app, has it). Answering approvals, pausing / resuming and running the panel's own jobs
+ * (fromPanel) also need the panel secret: random, made at start, kept only in this bridge's memory and
+ * handed out only through a CEP event (com.surehand.ae.hello -> com.surehand.ae.welcome), which only
+ * code running inside this After Effects' extensions can send or receive. So an AI app can't approve
+ * its own requests or get past a pause, even though it has the token.
+ *
+ * config.json is written atomically (temporary file + rename) and never regenerated when it is there
+ * but can't be read: the last good copy is used meanwhile, and without one nothing is accepted. */
 (function (global) {
   "use strict";
   var nodeRequire = typeof require !== "undefined" ? require : global.cep_node && global.cep_node.require;
@@ -34,25 +44,87 @@
   // a pop-up that was asked to open gets this long to load and report in
   var POPUP_GRACE_MS = 6000;
   var PAUSED_MESSAGE = "Paused in the Surehand panel: nothing was run. Ask the user to resume.";
+  // how much of an approval's text the panel and the pop-up show (the rest is counted, and checked for risks)
+  var SUMMARY_MAX = 5000;
+  // an answer is accepted only for the oldest request, once a person could have seen it for this long
+  var MIN_SHOWN_MS = 1000;
+  var HELLO_EVENT = "com.surehand.ae.hello";
+  var WELCOME_EVENT = "com.surehand.ae.welcome";
 
   function paths() { return global.SurehandPaths.current(nodeRequire); }
 
+  // ---------- config.json ----------
+  /** Writes a file atomically (temporary file next to it, then rename), readable only by the user. */
+  function writeFileAtomic(file, text) {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    var tmp = path.join(path.dirname(file), "." + path.basename(file) + "." + process.pid + "." + Date.now().toString(36) + ".tmp");
+    fs.writeFileSync(tmp, text, { mode: 384 }); // 0600: the token is a secret
+    try { fs.renameSync(tmp, file); } catch (e) { try { fs.unlinkSync(tmp); } catch (x) {} throw e; }
+    if (process.platform !== "win32") { try { fs.chmodSync(file, 384); } catch (e) {} }
+  }
+  /** { cfg } | { missing } | { error } (a BOM is ignored). */
+  function readConfigFile(file) {
+    var raw;
+    try { raw = fs.readFileSync(file, "utf8"); } catch (e) { return e.code === "ENOENT" ? { missing: true } : { error: e.code || e.message }; }
+    if (raw.charCodeAt(0) === 0xfeff) raw = raw.slice(1);
+    try {
+      var cfg = JSON.parse(raw);
+      return cfg && typeof cfg === "object" && !(cfg instanceof Array) ? { cfg: cfg } : { error: "not a JSON object" };
+    } catch (e) { return { error: raw.trim() ? "not valid JSON" : "empty" }; }
+  }
+  var lastGood = {}; // per file: the last config that parsed
+  var configProblem = null;
+
+  /**
+   * The config, read on every call. A missing file is created (token, ports). One that is there but
+   * can't be read (another process writing it right now, a half-saved edit) is never replaced: it is
+   * read again a few times, then the last good copy is used; without one, the result has no token
+   * (so nothing is accepted) and `unreadable` says why.
+   */
   function loadConfig() {
-    var file = paths().config;
-    var cfg = {};
-    try { cfg = JSON.parse(fs.readFileSync(file, "utf8")); } catch (e) {}
-    var changed = false;
-    if (!cfg.token) { cfg.token = crypto.randomBytes(24).toString("hex"); changed = true; }
-    if (!cfg.bridgePort) { cfg.bridgePort = 8765; changed = true; }
-    if (!cfg.httpPort) { cfg.httpPort = 8766; changed = true; }
-    if (changed) {
-      try { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, JSON.stringify(cfg, null, 2)); } catch (e) {}
+    var file = paths().config, r = null;
+    for (var i = 0; i < 3; i++) {
+      r = readConfigFile(file);
+      if (r.cfg || r.missing) break;
     }
-    return cfg;
+    if (r.cfg) {
+      configProblem = null;
+      var cfg = r.cfg, changed = false;
+      if (!cfg.token) { cfg.token = crypto.randomBytes(24).toString("hex"); changed = true; }
+      if (!cfg.bridgePort) { cfg.bridgePort = 8765; changed = true; }
+      if (!cfg.httpPort) { cfg.httpPort = 8766; changed = true; }
+      if (changed) { try { writeFileAtomic(file, JSON.stringify(cfg, null, 2) + "\n"); } catch (e) {} }
+      lastGood[file] = cfg;
+      return cfg;
+    }
+    if (r.missing && !lastGood[file]) {
+      configProblem = null;
+      var fresh = { token: crypto.randomBytes(24).toString("hex"), bridgePort: 8765, httpPort: 8766 };
+      try { writeFileAtomic(file, JSON.stringify(fresh, null, 2) + "\n"); } catch (e) {}
+      lastGood[file] = fresh;
+      return fresh;
+    }
+    configProblem = r.missing ? "it was removed" : r.error;
+    if (lastGood[file]) return lastGood[file];
+    return { unreadable: file + ": " + configProblem, bridgePort: 8765, httpPort: 8766 };
+  }
+  /**
+   * Changes the config (read again just before, written atomically). Refuses (returns false) while
+   * the file can't be read: writing would replace what is in it.
+   */
+  function updateConfig(change) {
+    var file = paths().config, r = readConfigFile(file);
+    if (r.error) { r = readConfigFile(file); }
+    if (r.error) return false;
+    var cfg = r.cfg || {};
+    change(cfg);
+    try { writeFileAtomic(file, JSON.stringify(cfg, null, 2) + "\n"); lastGood[file] = cfg; return true; } catch (e) { return false; }
   }
 
   function permissionMode() {
-    var p = loadConfig().permissions;
+    var cfg = loadConfig();
+    if (cfg.unreadable) return "unreadable";
+    var p = cfg.permissions;
     return (p && p.mode) || "full";
   }
 
@@ -72,19 +144,26 @@
     current: null, // { startedAt, label } of the script being evaluated
     pending: [], // edits waiting for approval in "ask" mode
     lastActivated: null,
-    pause: null, // { key, refused } while the config says paused
+    pause: null, // { key, since, refused } while paused
+    // the pause set in this After Effects' panel (kept here, so editing config.json can't undo it)
+    heldPause: null,
+    panelSecret: null, // see the top of this file
     // heartbeats of the panel / pop-up, when the bridge asked for the pop-up, which requests were shown
     ui: { panel: null, popup: null, requestedAt: 0, fellBackFor: 0, presented: {} },
   };
 
   // ---------- pause ----------
-  /** Is the AI paused (config "paused": true)? Counts refusals per pause (pausedAt). */
+  /**
+   * Is the AI paused? Paused by this After Effects' panel (held in memory until resumed there), or by
+   * "paused": true in the config (another After Effects' panel, or a pause from before a restart),
+   * which is then held here as well. Counts refusals per pause.
+   */
   function isPaused() {
-    var cfg = {};
-    try { cfg = JSON.parse(fs.readFileSync(paths().config, "utf8")); } catch (e) {}
-    if (!cfg.paused) { state.pause = null; return false; }
-    var key = String(cfg.pausedAt || "on");
-    if (!state.pause || state.pause.key !== key) state.pause = { key: key, since: cfg.pausedAt || null, refused: 0 };
+    var cfg = loadConfig();
+    if (cfg.paused && !state.heldPause) state.heldPause = { since: cfg.pausedAt || new Date().toISOString() };
+    if (!state.heldPause) { state.pause = null; return false; }
+    var key = String(state.heldPause.since);
+    if (!state.pause || state.pause.key !== key) state.pause = { key: key, since: state.heldPause.since, refused: 0 };
     return true;
   }
   function pauseInfo() { return isPaused() ? { since: state.pause.since, refused: state.pause.refused } : null; }
@@ -92,6 +171,16 @@
     if (state.pause) state.pause.refused++;
     addLog({ at: new Date().toISOString(), ms: 0, ok: false, paused: true, label: label || null, preview: "refused: paused in the Surehand panel" });
     return { ok: false, paused: true, error: PAUSED_MESSAGE };
+  }
+  /** Pause / resume from the panel; also saved in the config (other After Effects windows, restarts). */
+  function setPaused(on) {
+    var at = new Date().toISOString();
+    state.heldPause = on ? { since: at } : null;
+    var saved = updateConfig(function (cfg) {
+      if (on) { cfg.paused = true; cfg.pausedAt = at; }
+      else { delete cfg.paused; delete cfg.pausedAt; }
+    });
+    return { ok: true, paused: pauseInfo(), saved: saved };
   }
 
   // ---------- approval pop-up ----------
@@ -144,6 +233,19 @@
     if (state.listening) {
       try { fs.mkdirSync(p.instances, { recursive: true }); fs.writeFileSync(instanceFile(), JSON.stringify(info, null, 2)); } catch (e) {}
     }
+  }
+
+  /** Answers a hello: the panel secret and where this bridge listens, as a CEP event (stays inside After Effects). */
+  function welcome() {
+    if (!state.listening) return;
+    var host = {};
+    try { host = JSON.parse(global.__adobe_cep__.getHostEnvironment()); } catch (e) {}
+    try {
+      global.__adobe_cep__.dispatchEvent({
+        type: WELCOME_EVENT, scope: "APPLICATION", appId: host.appId || "AEFT", extensionId: "",
+        data: JSON.stringify({ port: state.port, secret: state.panelSecret, pid: process.pid, version: VERSION }),
+      });
+    } catch (e) {}
   }
 
   function unregister() {
@@ -210,11 +312,18 @@
     res.end(JSON.stringify(obj));
   }
 
-  function authorized(req, token) {
-    var h = String(req.headers.authorization || "").replace(/^Bearer\s+/i, "");
-    if (!h || h.length !== token.length) return false;
-    try { return crypto.timingSafeEqual(Buffer.from(h), Buffer.from(token)); } catch (e) { return false; }
+  function same(a, b) {
+    if (!a || !b || a.length !== b.length) return false;
+    try { return crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b)); } catch (e) { return false; }
   }
+  function authorized(req, token) {
+    return same(String(req.headers.authorization || "").replace(/^Bearer\s+/i, ""), String(token || ""));
+  }
+  /** The request comes from the panel or the pop-up of this After Effects (it knows the panel secret). */
+  function fromUI(req) {
+    return same(String(req.headers["x-surehand-panel"] || ""), state.panelSecret);
+  }
+  var UI_ONLY = "Only the Surehand panel or pop-up in After Effects can do this.";
 
   function readBody(req, cb) {
     var chunks = [];
@@ -236,13 +345,15 @@
       // AE has not accepted the no-op sent before the current job: a dialog is open, or AE is busy/starting
       waitingForAE: !!(cur && cur.waiting), waitingForMs: cur && cur.waiting ? Date.now() - cur.startedAt : 0,
       queue: state.queue.length, pendingApprovals: state.pending.length, permissionMode: permissionMode(),
-      paused: pauseInfo(),
+      paused: pauseInfo(), configProblem: configProblem,
       startedAt: state.startedAt, lastActivated: state.lastActivated, authorized: authorized(req, token),
     };
   }
 
   function handleEval(req, res, body) {
     if (!body || typeof body.script !== "string") return send(res, 400, { ok: false, error: "missing script" });
+    // the panel's own jobs run also while paused: only the panel (or a command it started) may say so
+    if (body.fromPanel && !fromUI(req)) return send(res, 403, { ok: false, error: UI_ONLY });
     // paused in the panel: refuse at once, so the AI stops instead of waiting (the panel's own calls still run)
     if (!body.fromPanel && isPaused()) return send(res, 200, refusePaused(body.label || (body.approval && body.approval.tool)));
     var finished = false;
@@ -262,7 +373,8 @@
       script: body.script,
       label: body.label || null,
       fromPanel: !!body.fromPanel,
-      done: function (result) { finish(200, { ok: true, result: result }); },
+      // which After Effects ran it (the panel offers Undo only there)
+      done: function (result) { finish(200, { ok: true, result: result, instance: { port: state.port, pid: process.pid } }); },
       fail: function (status, obj) { finish(status, obj); },
     };
     var timeoutMs = Math.max(1000, Math.min(Number(body.timeoutMs) || 120000, 24 * 3600 * 1000));
@@ -303,13 +415,22 @@
     // client went away (or the AI app cancelled the request) before we answered: don't run it if still queued
     res.on("close", function () { if (!finished) { finished = true; job.cancelled = true; clearTimeout(timer); clearInterval(watch); dropPending(job); } });
 
-    if (body.approval && permissionMode() === "ask") {
+    var mode = permissionMode();
+    if (body.approval && mode === "unreadable") {
+      // fail closed: without readable settings, edits that would need an OK don't run
+      return send(res, 200, { ok: false, denied: true, error: "Surehand's settings file can't be read (" + configProblem + "), so changes aren't run. Ask the user to check it." });
+    }
+    if (body.approval && mode === "ask") {
       // hold the edit until the user allows or denies it in the Surehand MCP panel
       var now = Date.now();
+      var tool = String(body.approval.tool || "edit").slice(0, 120);
+      var text = String(body.approval.summary || "");
       var p = {
         id: crypto.randomBytes(6).toString("hex"), at: new Date(now).toISOString(), deadline: new Date(now + APPROVAL_TIMEOUT_MS).toISOString(),
-        tool: body.approval.tool || "edit", summary: String(body.approval.summary || "").slice(0, 4000),
-        client: body.approval.client ? String(body.approval.client).slice(0, 80) : undefined, job: job, answered: false,
+        tool: tool, summary: shorten(text),
+        // risks are found in all of it (the whole script / file), not only the part that is shown
+        chips: risks(String(body.approval.full || text), tool),
+        client: body.approval.client ? String(body.approval.client).slice(0, 80) : undefined, job: job, answered: false, shownAt: 0,
       };
       // the one place an approval is answered: the first answer wins, any later one is refused (returns false)
       p.resolve = function (allow, by) {
@@ -339,6 +460,27 @@
     enqueue();
   }
 
+  /** At most SUMMARY_MAX characters, saying how many more there are. */
+  function shorten(text) {
+    return text.length > SUMMARY_MAX ? text.slice(0, SUMMARY_MAX) + "\n\u2026 " + (text.length - SUMMARY_MAX) + " more characters not shown" : text;
+  }
+  function risks(text, tool) {
+    try { return global.SurehandUI ? global.SurehandUI.riskChips(text, tool) : []; } catch (e) { return []; }
+  }
+
+  /**
+   * An answer from the panel or the pop-up: accepted only for the request it names, only if that is
+   * the oldest one waiting (the one shown), and only once a person could have seen it for a moment.
+   */
+  function answerApproval(b) {
+    var p = state.pending.filter(function (x) { return x.id === b.id; })[0];
+    if (!p) return { status: 404, body: { ok: false, answered: true, error: "no such request (already answered or cancelled)" } };
+    if (state.pending[0] !== p) return { status: 409, body: { ok: false, error: "not the request being shown (an older one waits)" } };
+    if (!p.shownAt || Date.now() - p.shownAt < MIN_SHOWN_MS) return { status: 409, body: { ok: false, tooSoon: true, error: "answered before it could be read" } };
+    if (!p.resolve(!!b.allow, b.by)) return { status: 404, body: { ok: false, answered: true, error: "no such request (already answered or cancelled)" } };
+    return { status: 200, body: { ok: true } };
+  }
+
   function dropPending(job) {
     state.pending = state.pending.filter(function (x) { return x.job !== job; });
   }
@@ -346,33 +488,45 @@
   function start() {
     if (state.started) return state;
     state.started = true;
+    state.panelSecret = crypto.randomBytes(32).toString("hex");
     var cfg = loadConfig();
     var base = cfg.bridgePort;
     var server = http.createServer(function (req, res) {
       // Reject browser-originated requests (DNS-rebinding / CSRF protection)
       if (req.headers.origin) return send(res, 403, { ok: false, error: "forbidden" });
-      var token = loadConfig().token;
+      var cfgNow = loadConfig(), token = cfgNow.token;
       var q = String(req.url || "").indexOf("?");
       var route = q < 0 ? req.url : req.url.slice(0, q), u = { query: q < 0 ? {} : querystring.parse(req.url.slice(q + 1)) };
       if (req.method === "GET" && route === "/health") return send(res, 200, health(req, token));
+      if (!cfgNow.token) return send(res, 503, { ok: false, error: "Surehand's settings file can't be read (" + (configProblem || "unknown") + "): nothing is accepted until it is fixed." });
       if (!authorized(req, token)) return send(res, 401, { ok: false, error: "unauthorized" });
       if (req.method === "GET" && route === "/log") return send(res, 200, { ok: true, log: state.log });
       if (req.method === "GET" && route === "/pending") {
         // the panel and the pop-up poll this: it is also their heartbeat
-        var who = u.query.ui;
+        var who = u.query.ui, ui = fromUI(req);
         if (who === "panel" || who === "popup") state.ui[who] = { at: Date.now(), visible: u.query.visible !== "0" };
+        // the request the panel / pop-up shows right now: from then on it may be answered (after MIN_SHOWN_MS)
+        if (ui && u.query.showing) state.pending.forEach(function (p) { if (p.id === u.query.showing && !p.shownAt) p.shownAt = Date.now(); });
         if (who) checkPopup();
         return send(res, 200, {
-          ok: true, paused: pauseInfo(),
-          pending: state.pending.map(function (p) { return { id: p.id, at: p.at, deadline: p.deadline, tool: p.tool, summary: p.summary, client: p.client }; }),
+          ok: true, paused: pauseInfo(), configProblem: configProblem,
+          pending: state.pending.map(function (p) { return { id: p.id, at: p.at, deadline: p.deadline, tool: p.tool, summary: p.summary, chips: p.chips, client: p.client }; }),
         });
       }
       if (req.method === "POST" && route === "/approve") {
+        // the AI app has the token: it must not be able to answer its own requests
+        if (!fromUI(req)) return send(res, 403, { ok: false, error: UI_ONLY });
         return readBody(req, function (err, b) {
           if (err) return send(res, 400, { ok: false, error: "invalid JSON" });
-          var p = state.pending.filter(function (x) { return x.id === b.id; })[0];
-          if (!p || !p.resolve(!!b.allow, b.by)) return send(res, 404, { ok: false, answered: true, error: "no such request (already answered or cancelled)" });
-          send(res, 200, { ok: true });
+          var a = answerApproval(b || {});
+          send(res, a.status, a.body);
+        });
+      }
+      if (req.method === "POST" && route === "/pause") {
+        if (!fromUI(req)) return send(res, 403, { ok: false, error: UI_ONLY });
+        return readBody(req, function (err, b) {
+          if (err) return send(res, 400, { ok: false, error: "invalid JSON" });
+          send(res, 200, setPaused(!!(b && b.paused)));
         });
       }
       if (req.method === "POST" && route === "/eval") {
@@ -416,6 +570,8 @@
         writeStatus();
       });
     } catch (e) {}
+    // the panel secret, for the panel and the pop-up of this After Effects only (see the top)
+    try { global.__adobe_cep__.addEventListener(HELLO_EVENT, function () { welcome(); }); } catch (e) {}
     setInterval(writeStatus, 60 * 1000); // heartbeat
     // a panel closed while a request waits: show the pop-up
     setInterval(function () { if (state.pending.length) checkPopup(); }, 1000);
@@ -426,8 +582,9 @@
 
   var api = {
     start: start, state: state, loadConfig: loadConfig, hostInfo: hostInfo, permissionMode: permissionMode, paths: paths,
-    popupDecision: popupDecision, checkPopup: checkPopup, isPaused: isPaused,
-    VERSION: VERSION, PAUSED_MESSAGE: PAUSED_MESSAGE, PANEL_ID: PANEL_ID, POPUP_ID: POPUP_ID,
+    popupDecision: popupDecision, checkPopup: checkPopup, isPaused: isPaused, setPaused: setPaused, updateConfig: updateConfig, welcome: welcome,
+    VERSION: VERSION, PAUSED_MESSAGE: PAUSED_MESSAGE, PANEL_ID: PANEL_ID, POPUP_ID: POPUP_ID, SUMMARY_MAX: SUMMARY_MAX, MIN_SHOWN_MS: MIN_SHOWN_MS,
+    HELLO_EVENT: HELLO_EVENT, WELCOME_EVENT: WELCOME_EVENT,
   };
   // where the files are right now (an update may migrate ~/.aemcp to ~/.surehand/ae while AE runs)
   Object.defineProperty(api, "CONFIG_FILE", { enumerable: true, get: function () { return paths().config; } });

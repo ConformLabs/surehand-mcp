@@ -6,6 +6,7 @@ import { CLIENT_IDS, disconnectClient } from "./clients.js";
 import { bold, extensionDir, ok, warn } from "./util.js";
 
 // Files and folders in ~/.surehand/ae (and, from 1.3, ~/.aemcp) that Surehand MCP creates. Everything else there is the user's.
+// installer/run.sh and installer/run.ps1 (uninstall without Node.js) carry the same list: a test keeps them equal.
 export const OWN_FILES = [
   "server", "config.json", "runtime.json", "extension-hash", "bridge-status.json", "instances", "update-check.json",
   "activity.jsonl", "tmp", "renders", "compat", "install.log", MOVED_NOTE,
@@ -47,8 +48,9 @@ export function uninstall(argv: string[]) {
   const dir = appDir();
   const kept = clean(dir, keepConfig, all);
   // after the move from 1.3, ~/.aemcp only holds compatibility files (and whatever of the user's was left there);
-  // before it (it failed), ~/.surehand/ae may hold a server an installer put there
-  const otherKept = clean(dir === legacyDir() ? newAppDir() : legacyDir(), keepConfig, all);
+  // before it (it failed), ~/.surehand/ae may hold a server an installer put there. --keep-config keeps
+  // the config in use only: a second copy of the token (the one left in ~/.aemcp for the 1.3 extension) goes
+  const otherKept = clean(dir === legacyDir() ? newAppDir() : legacyDir(), false, all);
   rmSync(migrationLog(), { force: true });
   if (all) rmSync(join(surehandRoot(), "ffmpeg"), { recursive: true, force: true });
   // the private Node.js is shared by the Surehand apps: removed here only when no other one is installed and it

@@ -18,7 +18,9 @@ import { updateCommand } from "./cli/update-cmd.js";
 import { recordRuntime } from "./cli/setup.js";
 import { uninstall } from "./cli/uninstall.js";
 import { createMcpServer } from "./server.js";
-import { env, SERVER_NAME } from "./paths.js";
+import { env, migrationPending, SERVER_NAME } from "./paths.js";
+import { migrationLog } from "./migrate.js";
+import { movesLegacyBeforeRunning } from "./cli/commands.js";
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(name);
@@ -133,13 +135,19 @@ function autoSetup() {
   }
 }
 
-/** A 1.3 installation (~/.aemcp) moves to ~/.surehand/ae: a cheap check once done. Never fails a start. */
+/**
+ * A 1.3 installation (~/.aemcp) moves to ~/.surehand/ae: a cheap check once done. Never fails a start.
+ * Only where Surehand is about to work (the server's start, setup, connect / disconnect, chatgpt):
+ * commands that only read (clients, test, checkpoints, diagnostics, activity...) move nothing and
+ * change no settings; they work from wherever the files are and can say the move is pending.
+ */
 function moveOnStart(quiet: boolean) {
   try {
     const r = moveFromLegacy();
     if (quiet) return;
     if (r.status === "migrated") console.error(`[${SERVER_NAME}] moved ~/.aemcp to ~/.surehand/ae${r.repointed.length ? ` and updated ${r.repointed.join(", ")}` : ""} (log: ${r.log})`);
     else if (r.status === "failed") console.error(`[${SERVER_NAME}] could not move ~/.aemcp to ~/.surehand/ae (${r.error}); working from ~/.aemcp. Log: ${r.log}`);
+    else if (r.late?.merged.length || r.late?.adopted.length) console.error(`[${SERVER_NAME}] merged what an older version still wrote into ~/.aemcp (log: ${migrationLog()})`);
   } catch (e) {
     if (!quiet) console.error(`[${SERVER_NAME}] moving ~/.aemcp failed:`, e);
   }
@@ -151,13 +159,17 @@ async function main() {
   if (process.argv.includes("--version")) return void console.log(VERSION);
   if (process.argv.includes("--help") || cmd === "help") return void console.log(HELP);
   const json = rest.includes("--json");
-  // install and update move (and report) it themselves; --json output stays clean
-  if (cmd !== "install" && cmd !== "update" && cmd !== "uninstall") moveOnStart(json);
+  // the server itself (no command, or only options) and the commands that set things up; install and
+  // update move (and report) it themselves; --json output stays clean
+  if (movesLegacyBeforeRunning(cmd)) moveOnStart(json);
   const print = (o: unknown, text: string) => console.log(json ? JSON.stringify(o) : text);
   switch (cmd) {
     case "clients": {
       const list = listClients();
-      return print(clientsJson(), list.map((c) => `${c.name.padEnd(24)} ${c.id === "chatgpt-web" ? "see `surehand-ae chatgpt`" : !c.installed ? "not installed" : c.configured ? "connected" : "not connected"}${c.note ? ` (${c.note})` : ""}`).join("\n"));
+      // read-only: a pending move is only reported (the server's next start, or install, does it)
+      const pending = migrationPending();
+      if (pending && !json) console.log(`(Your files are still in ~/.aemcp: the move to ~/.surehand/ae happens at the server's next start. Log: ${migrationLog()})`);
+      return print({ ...clientsJson(), ...(pending ? { migrationPending: true } : {}) }, list.map((c) => `${c.name.padEnd(24)} ${c.id === "chatgpt-web" ? "see `surehand-ae chatgpt`" : !c.installed ? "not installed" : c.configured ? "connected" : "not connected"}${c.note ? ` (${c.note})` : ""}`).join("\n"));
     }
     case "connect":
     case "disconnect": {

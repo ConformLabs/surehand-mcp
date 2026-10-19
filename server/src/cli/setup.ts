@@ -5,7 +5,9 @@
 // Claude Desktop extension (.mcpb) is enough.
 import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { readJsonFile, sleepSync, writeFileAtomic } from "../fsutil.js";
+import { migrationBusy } from "../migrate.js";
 import { dirname, join, relative, sep } from "node:path";
 import { checkSignature, SIGNATURE_FILE, type SignatureCheck } from "./signature.js";
 import { VERSION } from "../config.js";
@@ -31,15 +33,42 @@ export interface SetupResult {
 /** Outcome of the automatic setup at server start, reported by ae_status / connection errors. */
 export let lastSetup: SetupResult | null = null;
 
-export function ensureConfig(): boolean {
+/**
+ * Creates config.json (token and ports) or fills in what it lacks. Never replaces a config that is
+ * there but can't be read (a new token would disconnect After Effects and drop the user's settings):
+ * that throws. While another process is moving ~/.aemcp, waits for it (a few seconds) rather than
+ * creating a second config next to the one about to arrive. Written atomically, readable only by the
+ * user (0600).
+ */
+export function ensureConfig(o: { waitMs?: number } = {}): boolean {
+  const until = Date.now() + (o.waitMs ?? 5000);
+  while (migrationBusy() && Date.now() < until) sleepSync(100);
+  if (migrationBusy()) return false; // still moving: the next start does it
   const file = configPath();
-  const cfg = readJson<Record<string, unknown>>(file, {});
-  if (cfg.token && cfg.bridgePort && cfg.httpPort) return false;
+  let r = readJsonFile<Record<string, unknown>>(file);
+  for (let i = 0; i < 3 && !r.ok && !r.missing; i++) {
+    sleepSync(50); // a torn read while someone writes it?
+    r = readJsonFile<Record<string, unknown>>(file);
+  }
+  if (!r.ok && !r.missing) throw new Error(`${file} can't be read (${r.error}). It was left as it is; fix or remove it, then run setup again.`);
+  const cfg: Record<string, unknown> = r.ok && r.data && typeof r.data === "object" ? r.data : {};
+  if (cfg.token && cfg.bridgePort && cfg.httpPort) {
+    if (process.platform !== "win32") {
+      try {
+        if ((statSync(file).mode & 0o077) !== 0) chmodSync(file, 0o600); // the token is a secret
+      } catch {}
+    }
+    return false;
+  }
   cfg.token ||= randomBytes(24).toString("hex");
   cfg.bridgePort ||= 8765;
   cfg.httpPort ||= 8766;
-  mkdirSync(dirname(file), { recursive: true });
-  writeFileSync(file, JSON.stringify(cfg, null, 2) + "\n", { mode: 0o600 });
+  writeFileAtomic(file, JSON.stringify(cfg, null, 2) + "\n", { mode: 0o600 });
+  if (process.platform !== "win32") {
+    try {
+      chmodSync(file, 0o600);
+    } catch {}
+  }
   return true;
 }
 
@@ -171,6 +200,6 @@ export function recordRuntime() {
     if (fileURLToPath(import.meta.url) !== server) return;
     const info = { node: stableNodePath(), server, version: VERSION };
     if (JSON.stringify(readJson(runtimeFile(), null)) === JSON.stringify(info)) return;
-    writeFileSync(runtimeFile(), JSON.stringify(info, null, 2));
+    writeFileAtomic(runtimeFile(), JSON.stringify(info, null, 2));
   } catch {}
 }

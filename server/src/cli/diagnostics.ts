@@ -44,7 +44,7 @@ export async function diagnostics(): Promise<string> {
   const cfg = readJson<any>(configPath(), null);
   if (cfg) L.push(`config: ${JSON.stringify({ ...cfg, token: cfg.token ? `<set, ${cfg.token.length} chars>` : "MISSING" })}`);
   else L.push(`config: MISSING (${configPath()})`);
-  L.push(`folder: ${appDir()}${migrationPending() ? ` (the move from ${legacyDir()} hasn't happened: see ${migrationLog()})` : existsSync(join(legacyDir(), MOVED_NOTE)) ? ` (moved from ${legacyDir()})` : ""}`);
+  L.push(`folder: ${appDir()}${migrationPending() ? ` (the move from ${legacyDir()} is pending: the server's next start does it; see ${migrationLog()})` : existsSync(join(legacyDir(), MOVED_NOTE)) ? ` (moved from ${legacyDir()})` : ""}`);
   L.push(`installed server: ${existsSync(installedServer()) ? installedServer() : "not installed (fine when using the .mcpb)"}`);
   L.push(`extension: ${extensionDir()} · ${existsSync(join(extensionDir(), "CSXS", "manifest.xml")) ? `hash ${installedExtensionHash()} (bundled ${__AEMCP_CEP_HASH__})` : "MISSING"}`);
   const sig = installedExtensionSignature();

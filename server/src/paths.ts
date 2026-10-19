@@ -32,10 +32,20 @@ export const newAppDir = () => join(surehandRoot(), APP);
 export const legacyDir = () => join(homedir(), ".aemcp");
 
 /**
- * True while ~/.aemcp holds data that hasn't moved to ~/.surehand/ae yet: before the migration ran,
- * or after it failed (it then leaves ~/.aemcp as it was, and everything keeps working from there).
+ * Written before the move from ~/.aemcp renames anything, removed after its last step: while it is
+ * there, a move has started and not finished (perhaps the process was killed), and the next run
+ * finishes it. It holds the plan (JSON).
+ */
+export const migrationMarker = () => join(surehandRoot(), ".migrate-ae.inprogress");
+export const migrationInProgress = () => existsSync(migrationMarker());
+
+/**
+ * True while the move from ~/.aemcp isn't complete: a move started and not finished (the marker), or
+ * ~/.aemcp holds data and no MOVED.txt (before the move ran, or after it failed: it then leaves
+ * ~/.aemcp as it was, and everything keeps working from there).
  */
 export function migrationPending(): boolean {
+  if (migrationInProgress()) return true;
   const l = legacyDir();
   if (!existsSync(l) || existsSync(join(l, MOVED_NOTE))) return false;
   try {
@@ -45,12 +55,19 @@ export function migrationPending(): boolean {
   }
 }
 
-/** The folder this app reads and writes: ~/.surehand/ae, or ~/.aemcp while its data hasn't moved. */
-export const appDir = () => (migrationPending() ? legacyDir() : newAppDir());
+/**
+ * The folder this app reads and writes: ~/.surehand/ae, or ~/.aemcp while its data hasn't started
+ * moving. Once a move has started (even if it was interrupted), new data goes to ~/.surehand/ae.
+ */
+export const appDir = () => (migrationPending() && !migrationInProgress() ? legacyDir() : newAppDir());
 
 /** The installed standalone server (what AI apps run). */
-export const installedServer = () =>
-  appDir() === legacyDir() ? join(legacyDir(), "server", LEGACY_SERVER_FILE) : join(newAppDir(), "server", SERVER_FILE);
+export const installedServer = () => {
+  if (appDir() === legacyDir()) return join(legacyDir(), "server", LEGACY_SERVER_FILE);
+  // an interrupted move moves the server last: until then it is still in ~/.aemcp
+  const moved = join(newAppDir(), "server", SERVER_FILE), old = join(legacyDir(), "server", LEGACY_SERVER_FILE);
+  return migrationInProgress() && !existsSync(moved) && existsSync(old) ? old : moved;
+};
 
 /** Shared between the Surehand apps: the private Node.js and Preflight's ffmpeg. */
 export const privateNodeDir = () => (migrationPending() && existsSync(join(legacyDir(), "node")) ? join(legacyDir(), "node") : join(surehandRoot(), "node"));
@@ -67,7 +84,17 @@ export function env(name: string): string | undefined {
   return process.env[`SUREHAND_AE_${name}`] || process.env[`AEMCP_${name}`] || undefined;
 }
 
-/** The config file: SUREHAND_AE_CONFIG / AEMCP_CONFIG, else config.json in the app folder. */
-export const configPath = () => env("CONFIG") || appFile("config.json");
+/**
+ * The config file: SUREHAND_AE_CONFIG / AEMCP_CONFIG, else ~/.surehand/ae/config.json, or
+ * ~/.aemcp/config.json while only that one exists: the same rule as the extension's paths.js, so
+ * the server and After Effects always use the same file (also during an interrupted move), and a new
+ * config is never created in ~/.aemcp.
+ */
+export const configPath = () => {
+  const override = env("CONFIG");
+  if (override) return override;
+  const fresh = join(newAppDir(), "config.json"), old = join(legacyDir(), "config.json");
+  return !existsSync(fresh) && existsSync(old) ? old : fresh;
+};
 /** True when the config path is the default one (not moved with SUREHAND_AE_CONFIG / AEMCP_CONFIG). */
 export const defaultConfigPath = () => !env("CONFIG");

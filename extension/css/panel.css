@@ -82,6 +82,10 @@ input:focus { border-color: var(--green) !important; }
 .chip.danger { background: var(--red-bg); color: var(--red-soft); }
 .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 .ask-hint { color: #8FB5A1; }
+/* what the AI wrote about its own script: quoted, never the title */
+.says { color: #C9C6BF; font-size: 12px; font-style: italic; line-height: 1.35; word-break: break-word; }
+.says::before { content: "The AI says: "; font-style: normal; color: #8E8B85; }
+.withdrawn { color: #C9C6BF; font-size: 12px; padding: 6px 0; }
 pre.code { margin: 0; max-height: 180px; overflow: auto; background: var(--green-deep); color: #D7EDE1; padding: 8px; border-radius: 6px; white-space: pre-wrap; word-break: break-word; font: 10.5px ui-monospace, Menlo, Consolas, monospace; }
 
 /* ---------- not connected ---------- */
