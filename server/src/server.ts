@@ -12,6 +12,7 @@ import { registerOnDemandTools } from "./tools/ondemand.js";
 import { registerJsxTools } from "./tools/registry.js";
 import { ALL_JSX_TOOLS } from "./tools/all.js";
 import { applyProfile, resolveProfile, type ToolProfile } from "./tools/profile.js";
+import { SERVER_NAME } from "./paths.js";
 
 export function createMcpServer(profile: ToolProfile = resolveProfile()): McpServer {
   const instructions =
@@ -21,7 +22,7 @@ export function createMcpServer(profile: ToolProfile = resolveProfile()): McpSer
       : "\n- This chat has the core tools loaded. Many more (3D, audio, text styling, footage, render settings, masks, Essential Graphics, " +
         "project management...) are available on demand: ae_tools lists them, ae_tools {describe: [...]} gives parameters, ae_call runs them. " +
         "ae_run_script can do anything else.");
-  const server = new McpServer({ name: "after-effects", title: "Surehand MCP for Adobe After Effects", version: VERSION }, { instructions });
+  const server = new McpServer({ name: SERVER_NAME, title: "Surehand MCP for Adobe After Effects", version: VERSION }, { instructions });
   const catalog = applyProfile(server, profile);
   registerCoreTools(server);
   registerJsxTools(server, ALL_JSX_TOOLS);

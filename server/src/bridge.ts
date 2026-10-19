@@ -3,12 +3,17 @@ import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { setupHint } from "./cli/setup.js";
 import { configPath, loadConfig } from "./config.js";
+import { defaultConfigPath, env, legacyDir } from "./paths.js";
+import { callContext } from "./context.js";
 
 export class BridgeError extends Error {
-  constructor(message: string, readonly code: "NOT_RUNNING" | "STARTING" | "BLOCKED" | "AUTH" | "TIMEOUT" | "BRIDGE" | "DENIED" | "CANCELLED") {
+  constructor(message: string, readonly code: "NOT_RUNNING" | "STARTING" | "BLOCKED" | "AUTH" | "TIMEOUT" | "BRIDGE" | "DENIED" | "CANCELLED" | "PAUSED") {
     super(message);
   }
 }
+
+/** What the AI is told while the user has paused it in the Surehand panel (the bridge sends the same text). */
+export const PAUSED_MESSAGE = "Paused in the Surehand panel: nothing was run. Ask the user to resume.";
 
 const NOT_RUNNING_HELP =
   "Cannot reach After Effects. Make sure After Effects is running and the Surehand MCP bridge is loaded " +
@@ -31,6 +36,8 @@ export interface Health {
   queue?: number;
   pendingApprovals?: number;
   permissionMode?: string;
+  /** "Pause AI" in the panel: AI calls are refused (bridge 1.4+) */
+  paused?: { since?: string | null; refused?: number } | null;
   startedAt?: string;
   lastActivated?: string;
   authorized?: boolean;
@@ -49,8 +56,24 @@ export interface Instance {
 
 // ---------- instance discovery ----------
 
-// next to the config file (normally ~/.aemcp/instances), so a custom AEMCP_CONFIG is self-contained
-const INSTANCES_DIR = () => join(dirname(configPath()), "instances");
+// next to the config file (normally ~/.surehand/ae/instances), so a custom SUREHAND_AE_CONFIG is self-contained.
+// Moving from 1.3: an After Effects that hasn't been restarted since still runs the 1.3 extension, which
+// registers in ~/.aemcp/instances, so that folder is read too (it is empty once AE has restarted).
+export function instanceDirs(): string[] {
+  const dirs = [join(dirname(configPath()), "instances")];
+  const legacy = join(legacyDir(), "instances");
+  if (defaultConfigPath() && !dirs.includes(legacy)) dirs.push(legacy);
+  return dirs;
+}
+
+function readInstanceFile(port: number): any {
+  for (const dir of instanceDirs()) {
+    try {
+      return JSON.parse(readFileSync(join(dir, `${port}.json`), "utf8"));
+    } catch {}
+  }
+  return {};
+}
 let selectedPort: number | null = null;
 let cache: { at: number; list: Instance[] } | null = null;
 
@@ -66,7 +89,7 @@ async function probe(port: number, timeoutMs = 800): Promise<Health | null> {
       signal: AbortSignal.timeout(timeoutMs),
     });
     const h = (await res.json()) as Health;
-    return h?.name === "aemcp-bridge" ? h : null;
+    return h?.name === "aemcp-bridge" || h?.name === "surehand-ae-bridge" ? h : null;
   } catch {
     return null;
   }
@@ -76,20 +99,19 @@ async function probe(port: number, timeoutMs = 800): Promise<Health | null> {
 export async function listInstances(force = false): Promise<Instance[]> {
   if (!force && cache && Date.now() - cache.at < 5000) return cache.list;
   const ports = new Set<number>([loadConfig().bridgePort]);
-  try {
-    for (const f of readdirSync(INSTANCES_DIR())) {
-      const port = parseInt(f, 10);
-      if (port) ports.add(port);
-    }
-  } catch {}
+  for (const dir of instanceDirs()) {
+    try {
+      for (const f of readdirSync(dir)) {
+        const port = parseInt(f, 10);
+        if (port) ports.add(port);
+      }
+    } catch {}
+  }
   const found = await Promise.all(
     [...ports].map(async (port) => {
       const h = await probe(port);
       if (!h) return null;
-      let file: any = {};
-      try {
-        file = JSON.parse(readFileSync(join(INSTANCES_DIR(), `${port}.json`), "utf8"));
-      } catch {}
+      const file = readInstanceFile(port);
       const appVersion = h.host?.appVersion || file.host?.appVersion || "";
       return {
         port,
@@ -121,11 +143,11 @@ export function selectInstance(port: number | null) {
 
 /** Which bridge to talk to: the instance chosen in this session, a configured preference, the only one, or the most recently used AE window. */
 export async function resolvePort(): Promise<number> {
-  if (process.env.AEMCP_BRIDGE_PORT) return Number(process.env.AEMCP_BRIDGE_PORT); // explicit: no discovery
+  if (env("BRIDGE_PORT")) return Number(env("BRIDGE_PORT")); // explicit: no discovery
   const list = await listInstances();
   if (selectedPort && list.some((i) => i.port === selectedPort)) return selectedPort;
   if (!list.length) return loadConfig().bridgePort; // nothing reachable: requests will explain
-  const pref = process.env.AEMCP_INSTANCE || loadConfig().instance;
+  const pref = env("INSTANCE") || loadConfig().instance;
   const m = pref ? matchInstance(list, pref) : undefined;
   if (m) return m.port;
   if (list.length === 1) return list[0].port;
@@ -145,12 +167,12 @@ function seconds(env: string | undefined, file: number | undefined, def: number)
  * started (a long render...) still gets the tool's full timeout.
  */
 export function blockedAfterMs(): number {
-  return seconds(process.env.AEMCP_BLOCKED_AFTER_SECONDS, loadConfig().blockedAfterSeconds, 3000);
+  return seconds(env("BLOCKED_AFTER_SECONDS"), loadConfig().blockedAfterSeconds, 3000);
 }
 
 /** How long ae_status waits for an After Effects that is still starting before giving up. */
 export function startupWaitMs(): number {
-  return seconds(process.env.AEMCP_STARTUP_WAIT_SECONDS, loadConfig().startupWaitSeconds, 15_000);
+  return seconds(env("STARTUP_WAIT_SECONDS"), loadConfig().startupWaitSeconds, 15_000);
 }
 
 // ---------- requests ----------
@@ -195,8 +217,10 @@ async function request(path: string, init: RequestOptions = {}): Promise<any> {
     init.cancel?.removeEventListener("abort", onCancel);
   }
   const body = await res.json().catch(() => ({}));
-  if (res.status === 401) throw new BridgeError("Bridge rejected the token. Re-run the installer so server and AE share ~/.aemcp/config.json, then restart AE.", "AUTH");
+  if (res.status === 401) throw new BridgeError("Bridge rejected the token. Re-run the installer so server and AE share ~/.surehand/ae/config.json, then restart AE.", "AUTH");
   if (body.blocked) throw new BridgeError(explainBlocked(body), "BLOCKED");
+  // paused in the panel: nothing ran; a clean message, not a bridge error
+  if (body.paused) throw new BridgeError(PAUSED_MESSAGE, "PAUSED");
   if (body.denied) throw new BridgeError(body.error || "The change was denied in After Effects.", "DENIED");
   if (!res.ok || body.ok === false) throw new BridgeError(body.error || `Bridge error HTTP ${res.status}`, "BRIDGE");
   return body;
@@ -244,11 +268,23 @@ export async function health(port?: number): Promise<Health> {
   return request("/health", { method: "GET", timeoutMs: 3000, port });
 }
 
+/**
+ * Commands the Surehand panel runs for the user (Compare with now, Test the connection) get the
+ * panel's secret for this After Effects session in SUREHAND_AE_PANEL_SECRET: their jobs then run
+ * as the panel's own (also while the AI is paused). An AI app never has it.
+ */
+const panelSecret = () => env("PANEL_SECRET");
+const panelJob = () => (panelSecret() ? { fromPanel: true } : {});
+const panelHeaders = (): Record<string, string> => {
+  const s = panelSecret();
+  return s ? { "x-surehand-panel": s } : {};
+};
+
 export interface EvalOptions {
   /** shown in the Surehand MCP panel / bridge log */
   label?: string;
   /** in "ask" permission mode the bridge holds the call until the user approves it */
-  approval?: { tool: string; summary: string };
+  approval?: { tool: string; summary: string; client?: string; /** the whole text, when summary shows only part of it: checked for risks */ full?: string };
   cancel?: AbortSignal;
 }
 
@@ -259,10 +295,14 @@ export async function evalRaw(script: string, timeoutMs = 120_000, opts: EvalOpt
   const body = await request("/eval", {
     method: "POST",
     // startTimeoutMs: the bridge answers early (blocked) if After Effects doesn't take the script that soon
-    body: JSON.stringify({ script, timeoutMs, startTimeoutMs: blockedAfterMs() || undefined, label: opts.label, approval: opts.approval }),
+    body: JSON.stringify({ script, timeoutMs, startTimeoutMs: blockedAfterMs() || undefined, label: opts.label, approval: opts.approval, ...panelJob() }),
     timeoutMs: timeoutMs + 5000 + extra,
     cancel: opts.cancel,
+    headers: panelHeaders(),
   });
+  // which After Effects ran it (bridge 1.4+): the panel offers Undo only there
+  const ctx = callContext.getStore();
+  if (ctx && body.instance && typeof body.instance.port === "number") ctx.instance = { port: body.instance.port, pid: typeof body.instance.pid === "number" ? body.instance.pid : undefined };
   return String(body.result ?? "");
 }
 

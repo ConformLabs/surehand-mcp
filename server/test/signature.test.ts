@@ -21,6 +21,7 @@ describe("extension signature", () => {
     expect(manifest.match(/<Extension Id="[^"]+" Version="([^"]+)"/g)).toEqual([
       `<Extension Id="com.aemcp.bridge" Version="${version}"`,
       `<Extension Id="com.aemcp.panel" Version="${version}"`,
+      `<Extension Id="com.aemcp.approval" Version="${version}"`,
     ]);
   });
 

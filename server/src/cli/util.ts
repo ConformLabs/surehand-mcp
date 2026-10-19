@@ -1,48 +1,49 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { homedir, platform } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { createInterface } from "node:readline";
+import { backupFile, readJsonFile, stripBom, writeFileAtomic } from "../fsutil.js";
+import { mapLegacyPath } from "../migrate.js";
+import { privateNodeDir, SERVER_NAME, surehandRoot } from "../paths.js";
 
 export const isMac = platform() === "darwin";
 export const isWin = platform() === "win32";
-export const HOME = homedir();
-export const AEMCP_DIR = join(HOME, ".aemcp");
-export const CONFIG_FILE = join(AEMCP_DIR, "config.json");
-export const INSTALLED_SERVER = join(AEMCP_DIR, "server", "ae-mcp.mjs");
-export const SERVER_NAME = "after-effects";
+/** Read when used (tests and the uninstaller run with other home folders). */
+const HOME_ = () => homedir();
+export { SERVER_NAME, LEGACY_SERVER_NAME, appDir, configPath, installedServer } from "../paths.js";
 export const EXTENSION_ID = "com.aemcp";
 export const CSXS_VERSIONS = [9, 10, 11, 12, 13, 14];
 
-const APPDATA = process.env.APPDATA || join(HOME, "AppData", "Roaming");
-const LOCALAPPDATA = process.env.LOCALAPPDATA || join(HOME, "AppData", "Local");
+const APPDATA_ = () => process.env.APPDATA || join(HOME_(), "AppData", "Roaming");
+const LOCALAPPDATA_ = () => process.env.LOCALAPPDATA || join(HOME_(), "AppData", "Local");
 
 export const cepExtensionsDir = () =>
-  isWin ? join(APPDATA, "Adobe", "CEP", "extensions") : join(HOME, "Library", "Application Support", "Adobe", "CEP", "extensions");
+  isWin ? join(APPDATA_(), "Adobe", "CEP", "extensions") : join(HOME_(), "Library", "Application Support", "Adobe", "CEP", "extensions");
 export const extensionDir = () => join(cepExtensionsDir(), EXTENSION_ID);
-export const claudeDesktopDir = () => (isWin ? join(APPDATA, "Claude") : join(HOME, "Library", "Application Support", "Claude"));
+export const claudeDesktopDir = () => (isWin ? join(APPDATA_(), "Claude") : join(HOME_(), "Library", "Application Support", "Claude"));
 export const claudeDesktopConfig = () => join(claudeDesktopDir(), "claude_desktop_config.json");
-export const claudeCodeConfig = () => join(HOME, ".claude.json");
-export const cursorConfig = () => join(HOME, ".cursor", "mcp.json");
+export const claudeCodeConfig = () => join(HOME_(), ".claude.json");
+export const cursorConfig = () => join(HOME_(), ".cursor", "mcp.json");
 /** ChatGPT desktop and Codex share this file (CODEX_HOME overrides ~/.codex). */
-export const codexConfig = () => join(process.env.CODEX_HOME || join(HOME, ".codex"), "config.toml");
+export const codexConfig = () => join(process.env.CODEX_HOME || join(HOME_(), ".codex"), "config.toml");
 
 /** True if the ChatGPT desktop app or Codex is installed, even if it hasn't created ~/.codex yet. */
 export function chatgptDesktopInstalled(): boolean {
   if (which("codex")) return true;
   if (isMac)
-    return ["/Applications/ChatGPT.app", "/Applications/Codex.app", join(HOME, "Applications", "ChatGPT.app")].some((p) => existsSync(p));
+    return ["/Applications/ChatGPT.app", "/Applications/Codex.app", join(HOME_(), "Applications", "ChatGPT.app")].some((p) => existsSync(p));
   if (isWin) {
-    if ([join(LOCALAPPDATA, "Programs", "ChatGPT"), join(LOCALAPPDATA, "Microsoft", "WindowsApps", "ChatGPT.exe")].some((p) => existsSync(p))) return true;
+    if ([join(LOCALAPPDATA_(), "Programs", "ChatGPT"), join(LOCALAPPDATA_(), "Microsoft", "WindowsApps", "ChatGPT.exe")].some((p) => existsSync(p))) return true;
     try {
-      return readdirSync(join(LOCALAPPDATA, "Packages")).some((n) => /^OpenAI\.(ChatGPT|Codex)/i.test(n));
+      return readdirSync(join(LOCALAPPDATA_(), "Packages")).some((n) => /^OpenAI\.(ChatGPT|Codex)/i.test(n));
     } catch {
       return false;
     }
   }
   return false;
 }
-export const claudeDesktopExe = () => join(LOCALAPPDATA, "AnthropicClaude", "claude.exe");
+export const claudeDesktopExe = () => join(LOCALAPPDATA_(), "AnthropicClaude", "claude.exe");
 
 const useColor = process.stdout.isTTY || isWin;
 const color = (c: number) => (s: string) => (useColor ? `\x1b[${c}m${s}\x1b[0m` : s);
@@ -52,20 +53,27 @@ export const warn = (m: string) => console.log(`  ${yellow("!")} ${m}`);
 export const fail = (m: string) => console.log(`  ${red("✖")} ${m}`);
 export const step = (m: string) => console.log(`\n${bold(m)}`);
 
+/** A JSON file's contents, or `fallback` when it is missing or unreadable (for display only: never write it back). */
 export function readJson<T = any>(file: string, fallback: T): T {
   try {
-    return JSON.parse(readFileSync(file, "utf8"));
+    return JSON.parse(stripBom(readFileSync(file, "utf8")));
   } catch {
     return fallback;
   }
 }
 
-/** Write JSON, keeping a one-time .aemcp.bak of the original file. */
-export function writeJsonWithBackup(file: string, data: unknown) {
-  mkdirSync(dirname(file), { recursive: true });
-  if (existsSync(file) && !existsSync(file + ".aemcp.bak")) copyFileSync(file, file + ".aemcp.bak");
-  writeFileSync(file, JSON.stringify(data, null, 2) + "\n");
+/** A timestamped backup (the newest five are kept) before every change of a settings file. */
+export function backupBeforeWrite(file: string) {
+  backupFile(file);
 }
+
+/** Write a text settings file: backup first, then an atomic replace that keeps the file's permissions. */
+export function writeTextWithBackup(file: string, text: string) {
+  backupFile(file);
+  writeFileAtomic(file, text);
+}
+
+export { readJsonFile };
 
 export function which(cmd: string): string | null {
   const r = spawnSync(isWin ? "where" : "which", [cmd], { encoding: "utf8" });
@@ -73,24 +81,57 @@ export function which(cmd: string): string | null {
   return null;
 }
 
+// cmd.exe metacharacters: escaped with ^ (as cross-spawn does)
+const CMD_META = /([()\][%!^"`<>&|;, *?])/g;
+function cmdArg(arg: string): string {
+  // Windows argv rules first (backslashes before a quote are doubled, the quote escaped), then cmd.exe's
+  let a = arg.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\*)$/, "$1$1");
+  a = `"${a}"`.replace(CMD_META, "^$1");
+  // a .cmd / .bat shim (npm's claude.cmd) passes its arguments through cmd.exe a second time
+  return a.replace(CMD_META, "^$1");
+}
+
+/**
+ * The command line for `cmd.exe /d /s /c` that runs a .cmd/.bat with exactly these arguments (no
+ * shell interpretation of &, |, %, quotes... in them).
+ */
+export function cmdExeLine(cmd: string, args: string[]): string {
+  return `"${[cmd.replace(CMD_META, "^$1"), ...args.map(cmdArg)].join(" ")}"`;
+}
+
 export function run(cmd: string, args: string[]) {
-  return execFileSync(cmd, args, { stdio: "pipe", encoding: "utf8", shell: isWin && /\.(cmd|bat)$/i.test(cmd) });
+  if (isWin && /\.(cmd|bat)$/i.test(cmd)) {
+    const r = spawnSync(process.env.ComSpec || "cmd.exe", ["/d", "/s", "/c", cmdExeLine(cmd, args)], { stdio: "pipe", encoding: "utf8", windowsVerbatimArguments: true });
+    if (r.error) throw r.error;
+    if (r.status !== 0) throw Object.assign(new Error(`${cmd} exited with ${r.status}: ${(r.stderr || r.stdout || "").trim()}`), { stderr: r.stderr, stdout: r.stdout, status: r.status });
+    return r.stdout;
+  }
+  return execFileSync(cmd, args, { stdio: "pipe", encoding: "utf8" });
+}
+
+/** The private Node.js the installers put in ~/.surehand/node, if it is there. */
+export function privateNode(): string | null {
+  const p = join(privateNodeDir(), ...(isWin ? ["node.exe"] : ["bin", "node"]));
+  return existsSync(p) ? p : null;
 }
 
 /** Prefer the node on PATH (often a stable symlink that survives upgrades) over the resolved binary. */
-export function stableNodePath(): string {
-  // a Node the wrapper downloaded into ~/.aemcp/node is already stable
-  if (process.execPath.startsWith(join(AEMCP_DIR, "node"))) return process.execPath;
+export function stableNodePath(execPath = process.execPath): string {
+  // a private Node (installers, or the launcher's download) is already stable; one still in the
+  // 1.3 folder (~/.aemcp/node) is used from where it moved to
+  const mapped = mapLegacyPath(execPath);
+  if (mapped !== execPath && existsSync(mapped)) return mapped;
+  if (execPath.startsWith(privateNodeDir()) || execPath.startsWith(join(surehandRoot(), "node"))) return execPath;
   const onPath = which("node");
-  return onPath && existsSync(onPath) ? onPath : process.execPath;
+  return onPath && existsSync(onPath) ? onPath : execPath;
 }
 
 export function findClaudeCli(): string | null {
   const found = which("claude");
   if (found) return found;
   const candidates = isWin
-    ? [join(APPDATA, "npm", "claude.cmd"), join(HOME, ".local", "bin", "claude.exe")]
-    : [join(HOME, ".local", "bin", "claude"), join(HOME, ".claude", "local", "claude"), "/opt/homebrew/bin/claude", "/usr/local/bin/claude"];
+    ? [join(APPDATA_(), "npm", "claude.cmd"), join(HOME_(), ".local", "bin", "claude.exe")]
+    : [join(HOME_(), ".local", "bin", "claude"), join(HOME_(), ".claude", "local", "claude"), "/opt/homebrew/bin/claude", "/usr/local/bin/claude"];
   return candidates.find((c) => existsSync(c)) || null;
 }
 
@@ -105,12 +146,14 @@ export async function ask(question: string, def = true): Promise<boolean> {
 
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-// --- Codex (TOML): only add/remove our own marked block ---
-const CODEX_START = "# >>> ae-mcp >>>";
-const CODEX_END = "# <<< ae-mcp <<<";
+// --- Codex (TOML): only add/remove our own marked block (1.3 marked it "ae-mcp") ---
+const CODEX_START = `# >>> ${SERVER_NAME} >>>`;
+const CODEX_END = `# <<< ${SERVER_NAME} <<<`;
 export function removeCodexBlock(text: string) {
-  return text.replace(new RegExp(`\\n?${CODEX_START}[\\s\\S]*?${CODEX_END}\\n?`, "g"), "\n");
+  return text.replace(/\n?# >>> (?:ae-mcp|surehand-ae) >>>[\s\S]*?# <<< (?:ae-mcp|surehand-ae) <<<\n?/g, "\n");
 }
+/** True if the text has our block (either name). */
+export const hasCodexBlock = (text: string) => /# >>> (?:ae-mcp|surehand-ae) >>>/.test(text);
 export function codexBlock(nodePath: string, serverFile: string) {
   const q = (s: string) => JSON.stringify(s);
   return `${CODEX_START}\n[mcp_servers.${SERVER_NAME}]\ncommand = ${q(nodePath)}\nargs = [${q(serverFile)}]\nstartup_timeout_sec = 20\ntool_timeout_sec = 600\n${CODEX_END}\n`;

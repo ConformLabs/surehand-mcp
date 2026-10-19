@@ -46,7 +46,7 @@ if (sign && spawnSync(process.execPath, [signScript, "--check"], { stdio: "inher
 
 // --- server bundle ---
 run(process.execPath, ["build.mjs"], { cwd: SERVER });
-const serverMjs = join(SERVER, "dist", "ae-mcp.mjs");
+const serverMjs = join(SERVER, "dist", "surehand-ae.mjs");
 
 // --- Node.js (pinned, verified) ---
 mkdirSync(CACHE, { recursive: true });

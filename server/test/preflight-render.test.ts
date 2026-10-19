@@ -146,7 +146,7 @@ describe.skipIf(!ff)("rendered-file checks with ffmpeg", () => {
     expect(red.findings.filter((f) => f.severity === "fail").map((f) => f.message)).toEqual([expect.stringMatching(/saturated red flashes/)]);
   });
 
-  it("thumbnails at the failing times, in ~/.aemcp/tmp", async () => {
+  it("thumbnails at the failing times, in ~/.surehand/ae/tmp", async () => {
     const home = mkdtempSync(join(tmpdir(), "aemcp-home-"));
     const saved = { HOME: process.env.HOME, USERPROFILE: process.env.USERPROFILE };
     process.env.HOME = process.env.USERPROFILE = home;
@@ -156,7 +156,7 @@ describe.skipIf(!ff)("rendered-file checks with ffmpeg", () => {
       // frozen before black (priority), then by time
       expect(r.thumbnails!.map((t) => t.label)).toEqual([expect.stringMatching(/^frozen/), expect.stringMatching(/^black/), expect.stringMatching(/^black/)]);
       for (const t of r.thumbnails!) {
-        expect(t.path.startsWith(join(home, ".aemcp", "tmp"))).toBe(true);
+        expect(t.path.startsWith(join(home, ".surehand", "ae", "tmp"))).toBe(true);
         expect([...readFileSync(t.path).subarray(0, 3)]).toEqual([0xff, 0xd8, 0xff]); // JPEG
       }
     } finally {
@@ -210,12 +210,12 @@ describe.skipIf(!ff)("rendered-file checks with ffmpeg", () => {
     expect(r.ran).toEqual(["video properties", "black"]);
   });
 
-  it("old thumbnails left in ~/.aemcp/tmp are swept", async () => {
+  it("old thumbnails left in ~/.surehand/ae/tmp are swept", async () => {
     const home = mkdtempSync(join(tmpdir(), "aemcp-home-"));
     const saved = { HOME: process.env.HOME, USERPROFILE: process.env.USERPROFILE };
     process.env.HOME = process.env.USERPROFILE = home;
     try {
-      const tmp = join(home, ".aemcp", "tmp");
+      const tmp = join(home, ".surehand", "ae", "tmp");
       mkdirSync(tmp, { recursive: true });
       const old = join(tmp, "preflight-old-1.jpg"), fresh = join(tmp, "preflight-new-1.jpg"), other = join(tmp, "other.jpg");
       for (const p of [old, fresh, other]) writeFileSync(p, "x");
@@ -240,7 +240,7 @@ describe.skipIf(!ff)("rendered-file checks with ffmpeg", () => {
     spawnSync("chmod", ["755", wrapper]);
     try {
       const ac = new AbortController();
-      const tmp = join(home, ".aemcp", "tmp");
+      const tmp = join(home, ".surehand", "ae", "tmp");
       const run = checkFile(file("blackfrozen.mkv"), loadSpec({ black: { maxSeconds: 0.5 } }), { ffmpeg: { ...ff!, ffmpeg: wrapper }, thumbnails: true, signal: ac.signal });
       for (let i = 0; i < 200 && !(existsSync(tmp) && readdirSync(tmp).length); i++) await new Promise((r) => setTimeout(r, 25));
       expect(readdirSync(tmp)).toHaveLength(1);

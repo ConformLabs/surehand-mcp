@@ -4,7 +4,8 @@
   "description": "Surehand MCP for Adobe After Effects: run ExtendScript and control AE from Claude, ChatGPT and other MCP clients",
   "type": "module",
   "bin": {
-    "ae-mcp": "dist/ae-mcp.mjs"
+    "surehand-ae": "dist/surehand-ae.mjs",
+    "ae-mcp": "dist/surehand-ae.mjs"
   },
   "files": [
     "dist"
@@ -13,7 +14,7 @@
     "build": "node build.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "start": "node dist/ae-mcp.mjs",
+    "start": "node dist/surehand-ae.mjs",
     "package": "node scripts/package.mjs",
     "package:mac-pkg": "node scripts/package-mac-pkg.mjs",
     "package:win-installer": "node scripts/package-win-installer.mjs",

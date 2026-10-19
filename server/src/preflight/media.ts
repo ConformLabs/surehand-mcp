@@ -3,17 +3,17 @@
 // runs only when its section is in the user's spec.
 import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, statSync, unlinkSync } from "node:fs";
-import { homedir } from "node:os";
 import { extname, join, resolve } from "node:path";
 import { ensureFfmpeg, type FfmpegBuild, FfmpegMissingError, type FfmpegPaths, runTool } from "./ffmpeg.js";
 import { FlashDetector, type FlashRun } from "./flash.js";
 import type { Finding, NotRun, Spec } from "./spec.js";
+import { appFile } from "../paths.js";
 
 export interface FileCheck {
   findings: Finding[];
   /** what ffprobe reported (codec, size, rate, duration, audio...) in a compact form */
   probe: Record<string, unknown>;
-  /** JPEG frames at notable times (absolute paths, in ~/.aemcp/tmp), for the report */
+  /** JPEG frames at notable times (absolute paths, in ~/.surehand/ae/tmp), for the report */
   thumbnails?: { at: number; path: string; label: string }[];
   /** requested checks that did not run (or ran on incomplete data), and why: the verdict can't be PASS */
   notRun?: NotRun[];
@@ -28,7 +28,7 @@ export interface FileCheck {
 export interface CheckFileOptions {
   thumbnails?: boolean;
   signal?: AbortSignal;
-  /** download the pinned FFmpeg build into ~/.aemcp/ffmpeg when none is found (ask the user first) */
+  /** download the pinned FFmpeg build into ~/.surehand/ffmpeg when none is found (ask the user first) */
   allowDownload?: boolean;
   /** asked right before the download starts (the approval in After Effects in "ask" mode); throw to refuse */
   confirmDownload?: (build: FfmpegBuild) => Promise<void>;
@@ -896,7 +896,7 @@ export function planAnalysis(info: ProbeInfo, spec: Spec, findings: Finding[], n
   return plan;
 }
 
-/** Removes Preflight thumbnails left in ~/.aemcp/tmp for more than a day (a call that crashed). */
+/** Removes Preflight thumbnails left in ~/.surehand/ae/tmp for more than a day (a call that crashed). */
 function sweepThumbnails(dir: string) {
   try {
     for (const n of readdirSync(dir))
@@ -944,7 +944,7 @@ export function coverage(a: Analysis, info: ProbeInfo, videoChecks: string[]): {
 
 export async function checkFile(path: string, spec: Spec, opts: CheckFileOptions = {}): Promise<FileCheck> {
   const t0 = Date.now();
-  const tmpDir = join(homedir(), ".aemcp", "tmp");
+  const tmpDir = appFile("tmp");
   sweepThumbnails(tmpDir);
   const allNotRun = (reason: string): NotRun[] => requestedChecks(spec).map((check) => ({ check, reason }));
   if (!existsSync(path) || !statSync(path).isFile())

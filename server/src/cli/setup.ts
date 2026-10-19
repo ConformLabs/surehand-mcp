@@ -5,16 +5,19 @@
 // Claude Desktop extension (.mcpb) is enough.
 import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { readJsonFile, sleepSync, writeFileAtomic } from "../fsutil.js";
+import { migrationBusy } from "../migrate.js";
 import { dirname, join, relative, sep } from "node:path";
 import { checkSignature, SIGNATURE_FILE, type SignatureCheck } from "./signature.js";
 import { VERSION } from "../config.js";
 import { compareVersions } from "../update.js";
 import { fileURLToPath } from "node:url";
-import { AEMCP_DIR, CONFIG_FILE, CSXS_VERSIONS, INSTALLED_SERVER, extensionDir, isMac, isWin, readJson, stableNodePath } from "./util.js";
+import { appDir, appFile, configPath, installedServer } from "../paths.js";
+import { CSXS_VERSIONS, extensionDir, isMac, isWin, readJson, stableNodePath } from "./util.js";
 
 // Kept outside the extension folder: an extra file inside it would break the signature.
-const HASH_FILE = join(AEMCP_DIR, "extension-hash");
+const HASH_FILE = () => appFile("extension-hash");
 
 /** True when this build ships a signed extension (always, for release builds). */
 export const bundledExtensionSigned = SIGNATURE_FILE in __AEMCP_CEP_FILES__;
@@ -30,21 +33,49 @@ export interface SetupResult {
 /** Outcome of the automatic setup at server start, reported by ae_status / connection errors. */
 export let lastSetup: SetupResult | null = null;
 
-export function ensureConfig(): boolean {
-  const cfg = readJson<Record<string, unknown>>(CONFIG_FILE, {});
-  if (cfg.token && cfg.bridgePort && cfg.httpPort) return false;
+/**
+ * Creates config.json (token and ports) or fills in what it lacks. Never replaces a config that is
+ * there but can't be read (a new token would disconnect After Effects and drop the user's settings):
+ * that throws. While another process is moving ~/.aemcp, waits for it (a few seconds) rather than
+ * creating a second config next to the one about to arrive. Written atomically, readable only by the
+ * user (0600).
+ */
+export function ensureConfig(o: { waitMs?: number } = {}): boolean {
+  const until = Date.now() + (o.waitMs ?? 5000);
+  while (migrationBusy() && Date.now() < until) sleepSync(100);
+  if (migrationBusy()) return false; // still moving: the next start does it
+  const file = configPath();
+  let r = readJsonFile<Record<string, unknown>>(file);
+  for (let i = 0; i < 3 && !r.ok && !r.missing; i++) {
+    sleepSync(50); // a torn read while someone writes it?
+    r = readJsonFile<Record<string, unknown>>(file);
+  }
+  if (!r.ok && !r.missing) throw new Error(`${file} can't be read (${r.error}). It was left as it is; fix or remove it, then run setup again.`);
+  const cfg: Record<string, unknown> = r.ok && r.data && typeof r.data === "object" ? r.data : {};
+  if (cfg.token && cfg.bridgePort && cfg.httpPort) {
+    if (process.platform !== "win32") {
+      try {
+        if ((statSync(file).mode & 0o077) !== 0) chmodSync(file, 0o600); // the token is a secret
+      } catch {}
+    }
+    return false;
+  }
   cfg.token ||= randomBytes(24).toString("hex");
   cfg.bridgePort ||= 8765;
   cfg.httpPort ||= 8766;
-  mkdirSync(AEMCP_DIR, { recursive: true });
-  writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2) + "\n", { mode: 0o600 });
+  writeFileAtomic(file, JSON.stringify(cfg, null, 2) + "\n", { mode: 0o600 });
+  if (process.platform !== "win32") {
+    try {
+      chmodSync(file, 0o600);
+    } catch {}
+  }
   return true;
 }
 
 // "<hash> <version>" of the installed extension. Older releases wrote only the hash.
 function readMarker(): string[] {
   try {
-    return readFileSync(HASH_FILE, "utf8").trim().split(/\s+/);
+    return readFileSync(HASH_FILE(), "utf8").trim().split(/\s+/);
   } catch {
     return [];
   }
@@ -74,8 +105,8 @@ export function ensureExtension(force = false): { installed: boolean; updated: b
     mkdirSync(dirname(p), { recursive: true });
     writeFileSync(p, content);
   }
-  mkdirSync(AEMCP_DIR, { recursive: true });
-  writeFileSync(HASH_FILE, `${__AEMCP_CEP_HASH__} ${VERSION}`);
+  mkdirSync(appDir(), { recursive: true });
+  writeFileSync(HASH_FILE(), `${__AEMCP_CEP_HASH__} ${VERSION}`);
   return { installed: true, updated };
 }
 
@@ -159,15 +190,16 @@ export function setupHint(): string {
   return "";
 }
 
-/** Where the standalone install runs from, for the Surehand MCP panel's Update button. Only the
- *  standalone server (~/.aemcp/server) records itself: the Claude Desktop extension is updated
- *  by installing a new .mcpb. */
-export const RUNTIME_FILE = join(AEMCP_DIR, "runtime.json");
+/** Where the standalone install runs from, for the Surehand MCP panel (Update button, Connect and
+ *  Checkpoints screens: it runs `node <server> <command>`). Only the standalone server
+ *  (~/.surehand/ae/server) records itself: the Claude Desktop extension is updated by installing a new .mcpb. */
+export const runtimeFile = () => appFile("runtime.json");
 export function recordRuntime() {
   try {
-    if (fileURLToPath(import.meta.url) !== INSTALLED_SERVER) return;
-    const info = { node: stableNodePath(), server: INSTALLED_SERVER, version: VERSION };
-    if (JSON.stringify(readJson(RUNTIME_FILE, null)) === JSON.stringify(info)) return;
-    writeFileSync(RUNTIME_FILE, JSON.stringify(info, null, 2));
+    const server = installedServer();
+    if (fileURLToPath(import.meta.url) !== server) return;
+    const info = { node: stableNodePath(), server, version: VERSION };
+    if (JSON.stringify(readJson(runtimeFile(), null)) === JSON.stringify(info)) return;
+    writeFileAtomic(runtimeFile(), JSON.stringify(info, null, 2));
   } catch {}
 }

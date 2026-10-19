@@ -624,7 +624,7 @@ describe("ae_preflight", () => {
     await callTool({ spec: { black: { maxSeconds: 1 } }, target: "file", file, allowFfmpegDownload: true });
     expect(fake.opts.allowDownload).toBe(true);
     await fake.opts.confirmDownload(build);
-    expect(fake.approvals).toEqual([{ tool: "Download FFmpeg", summary: expect.stringMatching(/^Download FFmpeg 9\.0\.2 once into ~\/\.aemcp\/ffmpeg[\s\S]*https:\/\/x\/ffmpeg\.zip/) }]);
+    expect(fake.approvals).toEqual([{ tool: "Download FFmpeg", summary: expect.stringMatching(/^Download FFmpeg 9\.0\.2 once into ~\/\.surehand\/ffmpeg[\s\S]*https:\/\/x\/ffmpeg\.zip/) }]);
     fake.deny = true;
     await expect(fake.opts.confirmDownload(build)).rejects.toThrow(/not approved in After Effects .*nothing was downloaded/);
 

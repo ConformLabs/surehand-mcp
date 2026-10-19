@@ -13,26 +13,33 @@ import { approvalSummary, permissions, READ_ONLY_REFUSAL, SHELL_REFUSAL, usesShe
 import { reservedGlobalsHint, transpileUserCode } from "../transpile.js";
 import { ALL_JSX_TOOLS } from "./all.js";
 import { applyFormat, errorResult, formatResult, reportScope } from "./registry.js";
+import { appFile } from "../paths.js";
+import { mapLegacyPath } from "../migrate.js";
 
 // ---------- checkpoints ----------
 
-const CHECKPOINTS = join(homedir(), ".aemcp", "checkpoints");
+const CHECKPOINTS = () => appFile("checkpoints");
 const MAX_CHECKPOINTS = 50;
 
 interface Checkpoint { id: string; at: string; label?: string; file: string; project: string }
 
 function projectDir(projectPath: string) {
   const name = basename(projectPath, extname(projectPath)).replace(/[^\w.-]+/g, "_").slice(0, 60);
-  return join(CHECKPOINTS, `${name}-${createHash("sha1").update(projectPath).digest("hex").slice(0, 8)}`);
+  return join(CHECKPOINTS(), `${name}-${createHash("sha1").update(projectPath).digest("hex").slice(0, 8)}`);
 }
 
 function readIndex(dir: string): Checkpoint[] {
   try {
-    return JSON.parse(readFileSync(join(dir, "index.json"), "utf8"));
+    const list: Checkpoint[] = JSON.parse(readFileSync(join(dir, "index.json"), "utf8"));
+    // an index written before the move from ~/.aemcp names the old folder
+    return list.map((c) => (c.file && !existsSync(c.file) && existsSync(mapLegacyPath(c.file)) ? { ...c, file: mapLegacyPath(c.file) } : c));
   } catch {
     return [];
   }
 }
+
+/** The checkpoints of a project (oldest first). */
+export const checkpointIndex = (projectPath: string) => readIndex(projectDir(projectPath));
 
 const stamp = () => new Date().toISOString().replace(/[:T]/g, "-").replace(/\..+$/, "");
 
@@ -217,7 +224,7 @@ return { steps: __out, failed: __failed, rollback: args.atomic && __failed >= 0 
     // an atomic batch always compares before/after: that is what makes its rollback safe
     report: showReport || isAtomic ? (scope.length ? scope : reportScope({})) : undefined,
     rollback: isAtomic ? "requested" : undefined,
-    bridge: edits && perm.mode === "ask" ? { approval: { tool: `Batch (${steps.length} steps)`, summary: steps.map((s, i) => `${i + 1}. ${s.tool} ${approvalSummary(s.tool, s.args).slice(0, 300)}`).join("\n") } } : undefined,
+    bridge: edits && perm.mode === "ask" ? { approval: { tool: `Batch (${steps.length} steps)`, summary: steps.map((s, i) => `${i + 1}. ${s.tool} ${approvalSummary(s.tool, s.args)}`).join("\n") } } : undefined,
   });
   if (!r.ok) return formatResult(r);
   const res = r.result as { steps: { ok: boolean; result?: unknown; error?: string; line?: number }[]; failed: number };
@@ -328,7 +335,7 @@ export function registerWorkflowTools(server: McpServer) {
       title: "List scripts",
       description:
         "List the user's own After Effects scripts: AE's Scripts folder (and ScriptUI Panels) plus folders configured as \"scriptFolders\" " +
-        "in ~/.aemcp/config.json, with each script's description from its header comment. Run one with ae_run_script_file.",
+        "in ~/.surehand/ae/config.json, with each script's description from its header comment. Run one with ae_run_script_file.",
       inputSchema: { nameContains: z.string().optional() },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
@@ -350,7 +357,7 @@ export function registerWorkflowTools(server: McpServer) {
             {
               type: "text",
               text: JSON.stringify({ folders: folders.map(([d, o]) => ({ folder: d, origin: o, exists: existsSync(d) })), scripts: list }) +
-                (folders.length < 2 ? '\n\nTip: add your own folders with "scriptFolders": ["/path/to/scripts"] in ~/.aemcp/config.json.' : ""),
+                (folders.length < 2 ? '\n\nTip: add your own folders with "scriptFolders": ["/path/to/scripts"] in ~/.surehand/ae/config.json.' : ""),
             },
           ],
         };

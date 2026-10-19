@@ -78,6 +78,10 @@ export interface Rollback {
 export interface RunResult {
   ok: boolean;
   result?: unknown;
+  /** app.project.revision after a call with an undo group (AE versions that have it) */
+  revision?: number;
+  /** the project's file after a call with an undo group ("" when unsaved) */
+  projectFile?: string;
   changes?: Changes;
   rollback?: Rollback;
   logs: string[];
@@ -175,6 +179,8 @@ export async function runJsx(body: string, args: unknown = {}, opts: RunOptions 
   // defaults from the tool call: label for the AE panel log, and the AI app's cancel signal
   const ctx = callContext.getStore();
   opts = { ...opts, bridge: { label: ctx?.tool, cancel: ctx?.signal, ...opts.bridge } };
+  // the approval prompt in After Effects names the AI app that asks
+  if (opts.bridge?.approval && ctx?.client && !opts.bridge.approval.client) opts.bridge = { ...opts.bridge, approval: { ...opts.bridge.approval, client: ctx.client } };
   if (opts.bridge?.approval) {
     // make sure the helpers are loaded first, so the user is asked to approve only once
     const probe = await evalRaw(`(typeof aemcp !== 'undefined' && aemcp.version === ${toJsLiteral(HELPER_VERSION)}) ? 'ok' : 'no'`, 10_000, { cancel: opts.bridge.cancel });
@@ -185,7 +191,17 @@ export async function runJsx(body: string, args: unknown = {}, opts: RunOptions 
     await ensureHelpers();
     raw = await evalRaw(script, opts.timeoutMs, opts.bridge);
   }
-  return parseResult(raw);
+  const res = parseResult(raw);
+  // for the activity log: the undo step this call made and the revision after it (the panel's Undo)
+  if (ctx && opts.undoGroup !== false && opts.undoGroup !== "") {
+    ctx.last = {
+      undoGroup: typeof opts.undoGroup === "string" && opts.undoGroup ? opts.undoGroup : "Surehand MCP",
+      ...(typeof res.revision === "number" ? { revision: res.revision } : {}),
+      ...(typeof res.projectFile === "string" ? { project: res.projectFile } : {}),
+    };
+    ctx.undoSteps = (ctx.undoSteps ?? 0) + 1;
+  }
+  return res;
 }
 
 /** The change report as short, readable lines. */

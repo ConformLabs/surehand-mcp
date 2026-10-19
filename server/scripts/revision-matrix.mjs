@@ -26,8 +26,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let token, targets = [], tunnel = null;
 if (sshHost) {
   const ps = (cmd) => spawnSync("ssh", [...SSH, sshHost, `powershell -NoProfile -Command "${cmd}"`], { encoding: "utf8" }).stdout || "";
-  token = JSON.parse(ps("Get-Content $env:USERPROFILE\\.aemcp\\config.json -Raw")).token;
-  const ports = ps("Get-ChildItem $env:USERPROFILE\\.aemcp\\instances\\*.json -ErrorAction SilentlyContinue | ForEach-Object { (Get-Content $_ -Raw | ConvertFrom-Json).port }")
+  token = JSON.parse(ps("Get-Content $env:USERPROFILE\\.surehand\\ae\\config.json -Raw")).token;
+  const ports = ps("Get-ChildItem $env:USERPROFILE\\.surehand\\ae\\instances\\*.json -ErrorAction SilentlyContinue | ForEach-Object { (Get-Content $_ -Raw | ConvertFrom-Json).port }")
     .split(/\r?\n/).map((s) => s.trim()).filter((s) => /^\d+$/.test(s));
   const fwd = ports.flatMap((p, i) => ["-L", `${28700 + i}:127.0.0.1:${p}`]);
   if (ports.length) {
@@ -36,10 +36,10 @@ if (sshHost) {
   }
   targets = ports.map((p, i) => ({ port: 28700 + i, where: `${sshHost}:${p}` }));
 } else {
-  token = JSON.parse(readFileSync(join(homedir(), ".aemcp", "config.json"), "utf8")).token;
+  token = JSON.parse(readFileSync(join(homedir(), ".surehand", "ae", "config.json"), "utf8")).token;
   try {
-    targets = readdirSync(join(homedir(), ".aemcp", "instances")).filter((f) => f.endsWith(".json"))
-      .map((f) => JSON.parse(readFileSync(join(homedir(), ".aemcp", "instances", f), "utf8")).port).map((port) => ({ port, where: `port ${port}` }));
+    targets = readdirSync(join(homedir(), ".surehand", "ae", "instances")).filter((f) => f.endsWith(".json"))
+      .map((f) => JSON.parse(readFileSync(join(homedir(), ".surehand", "ae", "instances", f), "utf8")).port).map((port) => ({ port, where: `port ${port}` }));
   } catch {}
 }
 

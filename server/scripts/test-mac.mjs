@@ -10,12 +10,12 @@
 //
 // The installed server, the extension and the open After Effects are shared by every checkout
 // on this Mac, so one run at a time: a run waits (up to --wait-minutes, default 30) while another
-// holds ~/.aemcp/test-mac.lock, and fails if the installed server stops being its own build.
+// holds ~/.surehand/test-mac.lock, and fails if the installed server stops being its own build.
 //
 // "~" is the user's real home folder even when $HOME points elsewhere (agent runners set it to a
 // temp folder): that is where the installed server, the extension and After Effects are.
 import { spawnSync } from "node:child_process";
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { acquireLock, buildInfo, describeBuild, interruptedBy, realHome, sha256File } from "./test-guard.mjs";
@@ -27,14 +27,18 @@ if (process.platform !== "darwin") {
 const allowNoAe = process.argv.includes("--allow-no-ae");
 const waitArg = process.argv.indexOf("--wait-minutes");
 const waitMinutes = waitArg > 0 && Number.isFinite(Number(process.argv[waitArg + 1])) ? Number(process.argv[waitArg + 1]) : 30;
-const bundle = fileURLToPath(new URL("../dist/ae-mcp.mjs", import.meta.url));
+const bundle = fileURLToPath(new URL("../dist/surehand-ae.mjs", import.meta.url));
 const buildVersion = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
 const home = realHome();
-const installed = join(home, ".aemcp", "server", "ae-mcp.mjs");
+// ~/.surehand/ae/server/surehand-ae.mjs; ~/.aemcp/server/ae-mcp.mjs only while a 1.3 installation could not be moved
+const newInstalled = join(home, ".surehand", "ae", "server", "surehand-ae.mjs");
+const legacyInstalled = join(home, ".aemcp", "server", "ae-mcp.mjs");
+const legacyPending = () => existsSync(join(home, ".aemcp")) && !existsSync(join(home, ".aemcp", "MOVED.txt")) && readdirSync(join(home, ".aemcp")).length > 0;
+let installed = newInstalled;
 const plain = (s) => s.replace(/\x1b\[[0-9;]*m/g, "");
 const build = describeBuild(buildInfo(dirname(bundle)));
 const bundleSha = sha256File(bundle);
-const tested = `${build}, dist/ae-mcp.mjs sha256 ${bundleSha}`;
+const tested = `${build}, dist/surehand-ae.mjs sha256 ${bundleSha}`;
 const node = (args, env = {}) => {
   const r = spawnSync(process.execPath, args, { encoding: "utf8", env: { ...process.env, HOME: home, ...env }, maxBuffer: 32 * 1024 * 1024 });
   const sig = interruptedBy(r);
@@ -50,7 +54,7 @@ console.log(`Home folder: ${home}${process.env.HOME && process.env.HOME !== home
 
 for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"]) process.on(sig, () => process.exit(130)); // while waiting for the lock; the exit hook releases it
 try {
-  await acquireLock(join(home, ".aemcp", "test-mac.lock"), { owner: { build, bundleSha, cwd: process.cwd() }, waitMs: waitMinutes * 60_000 });
+  await acquireLock(join(home, ".surehand", "test-mac.lock"), { owner: { build, bundleSha, cwd: process.cwd() }, waitMs: waitMinutes * 60_000 });
 } catch (e) {
   console.error(`\n${e.message}. Run again later (or pass --wait-minutes N).`);
   process.exit(1);
@@ -73,6 +77,10 @@ if (inst.status !== 0 || !/Extension:/.test(inst.out)) {
   console.error("install failed:\n" + inst.out);
   process.exit(1);
 }
+if (legacyPending()) {
+  installed = legacyInstalled;
+  console.log(`  ! ~/.aemcp could not be moved to ~/.surehand/ae (see ~/.surehand/migration.log): testing ${installed}`);
+}
 checkInstalled("after install");
 
 const alive = (pid) => {
@@ -82,14 +90,19 @@ const alive = (pid) => {
     return e.code === "EPERM";
   }
 };
-const dir = join(home, ".aemcp", "instances");
+// this version's extension registers in ~/.surehand/ae/instances; a 1.3 extension (an After Effects not restarted
+// since the update) in ~/.aemcp/instances
 let instances = [];
-try {
-  instances = readdirSync(dir)
-    .filter((f) => f.endsWith(".json"))
-    .map((f) => JSON.parse(readFileSync(join(dir, f), "utf8")))
-    .filter((i) => i.port && alive(i.pid)); // skip files left behind by an After Effects that crashed
-} catch {}
+for (const dir of [join(home, ".surehand", "ae", "instances"), join(home, ".aemcp", "instances")]) {
+  try {
+    instances.push(
+      ...readdirSync(dir)
+        .filter((f) => f.endsWith(".json"))
+        .map((f) => JSON.parse(readFileSync(join(dir, f), "utf8")))
+        .filter((i) => i.port && alive(i.pid) && !instances.some((j) => j.port === i.port)), // skip files left behind by an After Effects that crashed
+    );
+  } catch {}
+}
 
 let failed = 0;
 if (!instances.length) {
@@ -103,7 +116,7 @@ if (!instances.length) {
 } else {
   for (const i of instances) {
     console.log(`\n== After Effects ${i.host?.appVersion ?? "?"} (bridge port ${i.port})`);
-    const r = node([installed, "selftest", "--full"], { AEMCP_BRIDGE_PORT: String(i.port) });
+    const r = node([installed, "selftest", "--full"], { SUREHAND_AE_BRIDGE_PORT: String(i.port), AEMCP_BRIDGE_PORT: String(i.port) });
     console.log(r.out.split("\n").filter((l) => /✖|signature|Bridge running|steps passed|step\(s\) failed|All checks|problem/i.test(l)).join("\n"));
     const bridge = /bridge v(\S+?)\)/.exec(r.out)?.[1];
     if (bridge && bridge !== buildVersion)

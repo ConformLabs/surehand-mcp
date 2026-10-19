@@ -1,7 +1,6 @@
-// `ae-mcp selftest --full`: exercises every major tool against the connected After Effects in
+// `surehand-ae selftest --full`: exercises every major tool against the connected After Effects in
 // temporary comps (removed afterwards) and saves a compatibility report for this AE version.
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { CAPABILITIES_JSX, FEATURE_NOTES } from "../capabilities.js";
 import { VERSION } from "../config.js";
@@ -15,6 +14,7 @@ import { regressionSteps } from "./fulltest-regression.js";
 import { revisionSteps } from "./fulltest-revision.js";
 import { rollbackSteps } from "./fulltest-rollback.js";
 import { bold, fail, green, ok, red, warn } from "./util.js";
+import { appFile } from "../paths.js";
 
 const ALL = ALL_JSX_TOOLS;
 const C = "__aemcp_fulltest";
@@ -177,7 +177,7 @@ export async function fullSelftest(before?: ProjectState): Promise<number> {
 
   const start = await runJsx("var m = 0; for (var i = 1; i <= app.project.numItems; i++) m = Math.max(m, app.project.item(i).id); return { maxId: m, rq: app.project.renderQueue.numItems };", {}, { undoGroup: false });
   const { maxId, rq } = start.result as { maxId: number; rq: number };
-  const tmpDir = join(homedir(), ".aemcp", "tmp");
+  const tmpDir = appFile("tmp");
   mkdirSync(tmpDir, { recursive: true });
   const frame = join(tmpDir, `fulltest_${Date.now()}.png`);
 
@@ -278,7 +278,7 @@ return p.numItems;`,
   } catch {}
 
   const failed = results.filter((r) => !r.ok);
-  const dir = join(homedir(), ".aemcp", "compat");
+  const dir = appFile("compat");
   mkdirSync(dir, { recursive: true });
   const file = join(dir, `after-effects-${appVersion.replace(/[^\w.]+/g, "_")}.json`);
   writeFileSync(file, JSON.stringify({ at: new Date().toISOString(), server: VERSION, appVersion, os, platform: process.platform, features, results }, null, 2));

@@ -76,7 +76,7 @@ export function targetSkips(spec: Spec, target: "project" | "file" | "both"): st
 /** In "ask" mode: the same Allow / Deny request in After Effects as for other tools, before anything is downloaded. */
 async function approveDownload(build: FfmpegBuild): Promise<void> {
   const summary =
-    `Download FFmpeg ${build.version} once into ~/.aemcp/ffmpeg for the Preflight file checks ` +
+    `Download FFmpeg ${build.version} once into ~/.surehand/ffmpeg for the Preflight file checks ` +
     `(${build.publisher}; ${build.licence}; checked against a pinned SHA-256):\n${build.archives.map((a) => a.url).join("\n")}`;
   try {
     // a script that does nothing: it only carries the approval request
@@ -145,7 +145,7 @@ async function runPreflight(args: Record<string, any>): Promise<CallToolResult> 
         if (wantDownload && mode === "read-only")
           notes.push("ffmpeg isn't installed, and Surehand MCP is in read-only mode, which doesn't download programs, so allowFfmpegDownload was not used. The user can install ffmpeg themselves (brew install ffmpeg / winget install ffmpeg) or change the permission mode in Window > Extensions > Surehand MCP.");
         else if (!wantDownload)
-          notes.push("ffmpeg isn't installed, so the file checks didn't run. Ask the user whether to download it once (a pinned, checksum-verified build into ~/.aemcp/ffmpeg), then call again with allowFfmpegDownload: true; or they can install it themselves (brew install ffmpeg / winget install ffmpeg).");
+          notes.push("ffmpeg isn't installed, so the file checks didn't run. Ask the user whether to download it once (a pinned, checksum-verified build into ~/.surehand/ffmpeg), then call again with allowFfmpegDownload: true; or they can install it themselves (brew install ffmpeg / winget install ffmpeg).");
       }
       if (!timeBase) {
         // the file's own frame rate (probe.video.frameRate); the spec's only when the file has no video
@@ -181,7 +181,7 @@ async function runPreflight(args: Record<string, any>): Promise<CallToolResult> 
         }
       }
     } finally {
-      // the thumbnails are temporary files in ~/.aemcp/tmp: remove all of them, shown or not
+      // the thumbnails are temporary files in ~/.surehand/ae/tmp: remove all of them, shown or not
       for (const t of fc.thumbnails ?? [])
         try {
           unlinkSync(t.path);
@@ -214,7 +214,7 @@ export function registerPreflightTools(server: McpServer) {
         allowFfmpegDownload: z
           .boolean()
           .optional()
-          .describe("Only after the user agreed: if ffmpeg isn't installed, download it once (a pinned, checksum-verified build, about 60-80 MB) into ~/.aemcp/ffmpeg for the file checks."),
+          .describe("Only after the user agreed: if ffmpeg isn't installed, download it once (a pinned, checksum-verified build, about 60-80 MB) into ~/.surehand/ffmpeg for the file checks."),
         timeBudgetSeconds: z.number().min(5).max(1800).optional().describe("Stop the frame-by-frame project checks after this long and report what was checked (default 120)."),
       },
       // never changes the project; can download ffmpeg (with the user's consent) and writes temporary thumbnails

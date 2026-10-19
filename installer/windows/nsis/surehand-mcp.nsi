@@ -3,15 +3,16 @@
 ; package-win-installer.mjs) downloads and verifies Node.js, builds the server and passes these defines:
 ;   VERSION        package version, e.g. 1.4.0           VERSION4    the same as a.b.c.d
 ;   NODE_EXE       verified official node.exe (win-x64)   NODE_VERSION e.g. 24.22.0
-;   SERVER_MJS     the single-file server (server/dist/ae-mcp.mjs)
+;   SERVER_MJS     the single-file server (server/dist/surehand-ae.mjs)
 ;   LOG_FILTER     log-filter.cjs (next to this file)     ICON        the .ico
 ;   OUTFILE        the Setup .exe to write                ESTIMATED_KB installed size for Add/Remove Programs
 ;   SIGN_CMD       optional: a command that Authenticode-signs the file given as its last argument in place
 ;
-; What it installs (the same places as installer/run.ps1 and `ae-mcp install`):
-;   %USERPROFILE%\.aemcp\node\node.exe          a private Node.js (replaces an older private copy)
-;   %USERPROFILE%\.aemcp\server\ae-mcp.mjs       the server; then `node ae-mcp.mjs install` installs the
-;                                                After Effects extension, writes the config and connects AI apps
+; What it installs (the same places as installer/run.ps1 and `surehand-ae install`):
+;   %USERPROFILE%\.surehand\node\node.exe                a private Node.js, shared by the Surehand apps (replaces an older private copy)
+;   %USERPROFILE%\.surehand\ae\server\surehand-ae.mjs    the server; then `node surehand-ae.mjs install` moves a 1.3
+;                                                      installation (%USERPROFILE%\.aemcp), installs the After Effects
+;                                                      extension, writes the config and connects AI apps
 ;   %LOCALAPPDATA%\Programs\Surehand MCP\        the uninstaller and the icon (Add/Remove Programs entry)
 
 Unicode true
@@ -29,10 +30,12 @@ SetCompressor /SOLID lzma
 !define HOMEPAGE "https://github.com/ConformLabs/surehand-mcp"
 !define UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\SurehandMCP"
 !define UNINST_EXE "Uninstall Surehand MCP.exe"
-!define AEMCP "$PROFILE\.aemcp"
-!define NODE_DIR "$PROFILE\.aemcp\node"
-!define SERVER_DIR "$PROFILE\.aemcp\server"
-!define SERVER "$PROFILE\.aemcp\server\ae-mcp.mjs"
+!define SUREHAND "$PROFILE\.surehand"
+!define APPDIR "$PROFILE\.surehand\ae"
+!define LEGACY "$PROFILE\.aemcp"
+!define NODE_DIR "$PROFILE\.surehand\node"
+!define SERVER_DIR "$PROFILE\.surehand\ae\server"
+!define SERVER "$PROFILE\.surehand\ae\server\surehand-ae.mjs"
 !define CEP_EXT "$APPDATA\Adobe\CEP\extensions\com.aemcp"
 
 !ifdef SIGN_CMD
@@ -69,7 +72,7 @@ VIAddVersionKey /LANG=1033 "Comments" "${HOMEPAGE}"
 !define MUI_FINISHPAGE_LINK "Documentation and help: github.com/ConformLabs/surehand-mcp"
 !define MUI_FINISHPAGE_LINK_LOCATION "${HOMEPAGE}"
 !define MUI_FINISHPAGE_NOREBOOTSUPPORT
-!define MUI_UNCONFIRMPAGE_TEXT_TOP "${PRODUCT} will be removed: the server, the After Effects extension, its AI app connections and its private Node.js. Your settings (.aemcp\config.json) and project checkpoints (.aemcp\checkpoints) and your other files there are kept."
+!define MUI_UNCONFIRMPAGE_TEXT_TOP "${PRODUCT} will be removed: the server, the After Effects extension, its AI app connections and its private Node.js. Your settings (.surehand\ae\config.json) and project checkpoints (.surehand\ae\checkpoints) and your other files there are kept."
 
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_INSTFILES
@@ -118,7 +121,7 @@ Section "Install"
   ${EndIf}
 
   ; A Claude Desktop that is open rewrites its settings from memory and can drop a new connection.
-  ; `ae-mcp install` would offer to restart it, but only in an interactive console (it skips that here).
+  ; `surehand-ae install` would offer to restart it, but only in an interactive console (it skips that here).
   !insertmacro IsRunning "claude.exe"
   ${If} $0 == 1
     MessageBox MB_OKCANCEL|MB_ICONINFORMATION "Claude Desktop is open.$\r$\n$\r$\nIf ${PRODUCT} is not connected to Claude Desktop yet, quit Claude Desktop now (tray icon > Quit), then click OK. Otherwise just click OK." /SD IDOK IDOK claude_ok
@@ -151,17 +154,17 @@ Section "Install"
   ; --- the server, then its own installer (extension, config, AI apps) ---
   DetailPrint "Installing the server to ${SERVER_DIR}"
   SetOutPath "${SERVER_DIR}"
-  File "/oname=ae-mcp.mjs" "${SERVER_MJS}"
+  File "/oname=surehand-ae.mjs" "${SERVER_MJS}"
   InitPluginsDir
   SetOutPath "$PLUGINSDIR"
   File "/oname=log-filter.cjs" "${LOG_FILTER}"
-  DetailPrint "Running: node ae-mcp.mjs install"
+  DetailPrint "Running: node surehand-ae.mjs install"
   ; log-filter.cjs runs it without a console (no prompts) and makes its output readable here
   nsExec::ExecToLog '"${NODE_DIR}\node.exe" "$PLUGINSDIR\log-filter.cjs" "${SERVER}" install'
   Pop $0
   SetOutPath "$TEMP"
   ${If} $0 != 0
-    DetailPrint "ae-mcp install failed (exit code $0)."
+    DetailPrint "surehand-ae install failed (exit code $0)."
     MessageBox MB_ICONSTOP "${PRODUCT} could not finish installing (exit code $0). Click Show details for the reason." /SD IDOK
     SetErrorLevel 2
     Abort "Installation failed."
@@ -189,9 +192,10 @@ Section "Install"
   ${EndIf}
 SectionEnd
 
-; Uninstall keeps the user's data: ~/.aemcp/config.json (settings, token) and ~/.aemcp/checkpoints
+; Uninstall keeps the user's data: ~/.surehand/ae/config.json (settings, token) and ~/.surehand/ae/checkpoints
 ; (project safety copies). It removes the server, the After Effects extension, the AI app entries
-; (all done by `ae-mcp uninstall --keep-config`, which also leaves any other files in .aemcp alone), the private Node.js and the uninstaller.
+; (all done by `surehand-ae uninstall --keep-config`, which also leaves any other files in .surehand\ae alone and
+; removes what 1.3's .aemcp kept for the move), the private Node.js and the uninstaller.
 Section "Uninstall"
   SetShellVarContext current
   SetDetailsPrint both
@@ -204,12 +208,12 @@ Section "Uninstall"
     InitPluginsDir
     SetOutPath "$PLUGINSDIR"
     File "/oname=log-filter.cjs" "${LOG_FILTER}"
-    ; keeps config.json, the checkpoints and any files in .aemcp that aren't ours
+    ; keeps config.json, the checkpoints and any files in .surehand\ae that aren't ours
     nsExec::ExecToLog '"${NODE_DIR}\node.exe" "$PLUGINSDIR\log-filter.cjs" "${SERVER}" uninstall --keep-config'
     Pop $0
     SetOutPath "$TEMP"
     ${If} $0 != 0
-      DetailPrint "ae-mcp uninstall reported a problem (exit code $0)."
+      DetailPrint "surehand-ae uninstall reported a problem (exit code $0)."
     ${EndIf}
   ${Else}
     ; no Node or server left (e.g. removed by hand): remove the extension; AI app settings are left as they are
@@ -219,12 +223,36 @@ Section "Uninstall"
     RMDir "${SERVER_DIR}"
   ${EndIf}
 
-  ; the private Node.js (an AI app still running the server can keep node.exe in use)
-  RMDir /r "${NODE_DIR}"
-  ${If} ${FileExists} "${NODE_DIR}\*.*"
-    DetailPrint "Some of ${NODE_DIR} is in use; quit your AI apps and delete it by hand."
+  ; the private Node.js is shared by the Surehand apps: removed only when no other one (.surehand\<app>)
+  ; is installed (an AI app still running the server can keep node.exe in use)
+  StrCpy $1 0
+  FindFirst $2 $3 "${SUREHAND}\*.*"
+  ${DoWhile} $3 != ""
+    ${If} ${FileExists} "${SUREHAND}\$3\*.*"
+    ${AndIf} $3 != "."
+    ${AndIf} $3 != ".."
+    ${AndIf} $3 != "ae"
+    ${AndIf} $3 != "node"
+    ${AndIf} $3 != "ffmpeg"
+      StrCpy $4 $3 1
+      ${If} $4 != "."
+        StrCpy $1 1
+      ${EndIf}
+    ${EndIf}
+    FindNext $2 $3
+  ${Loop}
+  FindClose $2
+  ${If} $1 == 1
+    DetailPrint "Kept ${NODE_DIR}: another Surehand app uses it."
+  ${Else}
+    RMDir /r "${NODE_DIR}"
+    ${If} ${FileExists} "${NODE_DIR}\*.*"
+      DetailPrint "Some of ${NODE_DIR} is in use; quit your AI apps and delete it by hand."
+    ${EndIf}
   ${EndIf}
-  RMDir "${AEMCP}" ; only if empty (config.json and checkpoints are kept)
+  RMDir "${APPDIR}" ; only if empty (config.json and checkpoints are kept)
+  RMDir "${SUREHAND}"
+  RMDir "${LEGACY}"
 
   DeleteRegKey HKCU "${UNINST_KEY}"
   Delete "$INSTDIR\surehand-mcp.ico"

@@ -15,7 +15,7 @@ const touch = (p: string) => {
 };
 
 describe("finding ffmpeg", () => {
-  it("config override first, then ~/.aemcp/ffmpeg, then PATH", () => {
+  it("config override first, then ~/.surehand/ffmpeg, then PATH", () => {
     const root = tmp();
     const cfgFf = touch(join(root, "cfg", "ffmpeg"));
     touch(join(root, "cfg", "ffprobe"));
@@ -38,7 +38,7 @@ describe("finding ffmpeg", () => {
     expect(r.notes[0]).toMatch(/config\.json sets ffmpegPath "\/nowhere\/ffmpeg", but ffmpeg is not there/);
     const msg = ffmpegNotFoundMessage(r.notes, "darwin-arm64");
     expect(msg).toMatch(/ffmpeg \/ ffprobe were not found/);
-    expect(msg).toMatch(/download FFmpeg 9\.0\.2 once into ~\/\.aemcp\/ffmpeg/);
+    expect(msg).toMatch(/download FFmpeg 9\.0\.2 once into ~\/\.surehand\/ffmpeg/);
     expect(msg).toMatch(/brew install ffmpeg/);
   });
 

@@ -2,13 +2,13 @@
 // usable while a separate render process works, with progress, status and cancel.
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { spawn, type ChildProcess } from "node:child_process";
-import { createWriteStream, existsSync, mkdirSync } from "node:fs";
-import { homedir } from "node:os";
+import { createWriteStream, existsSync, mkdirSync, readdirSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { z } from "zod";
 import { runJsx } from "../jsx.js";
 import { permissions, READ_ONLY_REFUSAL } from "../permissions.js";
 import { errorResult, formatResult } from "./registry.js";
+import { appFile } from "../paths.js";
 
 interface Job {
   id: string;
@@ -27,7 +27,45 @@ interface Job {
 }
 
 const jobs = new Map<string, Job>();
-const LOG_DIR = join(homedir(), ".aemcp", "renders");
+const LOG_DIR = () => appFile("renders");
+
+/** How many background renders keep their files (renders/<id>.log and .json). */
+export const RENDERS_KEPT = 50;
+
+/**
+ * Removes the files of all but the newest `keep` renders in `dir` (by the newest of each job's
+ * files); `active` jobs (still running) are never removed.
+ */
+export function pruneRenders(dir: string, keep = RENDERS_KEPT, active: Set<string> = new Set()) {
+  let names: string[];
+  try {
+    names = readdirSync(dir);
+  } catch {
+    return;
+  }
+  const jobs = new Map<string, { files: string[]; at: number }>();
+  for (const n of names) {
+    const m = /^(r[0-9a-z]+)\.(log|json)$/.exec(n);
+    if (!m) continue;
+    let at = 0;
+    try {
+      at = statSync(join(dir, n)).mtimeMs;
+    } catch {}
+    const j = jobs.get(m[1]) ?? { files: [], at: 0 };
+    j.files.push(n);
+    j.at = Math.max(j.at, at);
+    jobs.set(m[1], j);
+  }
+  const old = [...jobs.entries()].sort((a, b) => b[1].at - a[1].at).slice(keep);
+  for (const [id, j] of old) {
+    if (active.has(id)) continue;
+    for (const f of j.files) {
+      try {
+        unlinkSync(join(dir, f));
+      } catch {}
+    }
+  }
+}
 
 /** aerender lives next to the After Effects app (macOS) or AfterFX.exe (Windows). */
 function aerenderPath(appPackage: string): string | null {
@@ -36,6 +74,18 @@ function aerenderPath(appPackage: string): string | null {
       ? [join(appPackage, "aerender.exe"), join(dirname(appPackage), "aerender.exe"), join(appPackage, "Support Files", "aerender.exe")]
       : [join(dirname(appPackage), "aerender"), join(appPackage, "..", "aerender")];
   return candidates.find((p) => existsSync(p)) ?? null;
+}
+
+/**
+ * renders/<id>.json for the Surehand MCP panel, kept up to date while the job runs:
+ * {id, comp, frames, done, status, output, startedAt, endedAt?} (done = frames rendered so far).
+ */
+export function writeJobFile(j: Pick<Job, "id" | "comp" | "frames" | "frameRendered" | "status" | "output" | "startedAt" | "endedAt">) {
+  try {
+    mkdirSync(LOG_DIR(), { recursive: true });
+    const o = { id: j.id, comp: j.comp, frames: j.frames, done: j.status === "done" ? j.frames || j.frameRendered : j.frameRendered, status: j.status, output: j.output, startedAt: j.startedAt, ...(j.endedAt ? { endedAt: j.endedAt } : {}) };
+    writeFileSync(join(LOG_DIR(), `${j.id}.json`), JSON.stringify(o));
+  } catch {} // never fails a render
 }
 
 function view(j: Job) {
@@ -120,9 +170,11 @@ return { project: p.file.fsName, comp: name, frames: frames, app: Folder.appPack
         if (args.endFrame !== undefined) cli.push("-e", String(args.endFrame));
         if (args.output) mkdirSync(dirname(args.output), { recursive: true });
 
-        mkdirSync(LOG_DIR, { recursive: true });
+        mkdirSync(LOG_DIR(), { recursive: true });
+        // keep the folder from growing forever: the newest renders only (never one still running)
+        pruneRenders(LOG_DIR(), RENDERS_KEPT - 1, new Set([...jobs.values()].filter((j) => j.status === "running").map((j) => j.id)));
         const id = `r${Date.now().toString(36)}`;
-        const logPath = join(LOG_DIR, `${id}.log`);
+        const logPath = join(LOG_DIR(), `${id}.log`);
         const logStream = createWriteStream(logPath);
         const job: Job = {
           id, comp: info.comp, output: args.output || "(render queue item output)", project: info.project, status: "running",
@@ -130,6 +182,8 @@ return { project: p.file.fsName, comp: name, frames: frames, app: Folder.appPack
         };
         const proc = spawn(bin, cli, { stdio: ["ignore", "pipe", "pipe"] });
         job.proc = proc;
+        writeJobFile(job);
+        let written = 0;
         const onData = (d: Buffer) => {
           const text = d.toString();
           logStream.write(text);
@@ -141,6 +195,11 @@ return { project: p.file.fsName, comp: name, frames: frames, app: Folder.appPack
             job.tail.push(line.trim());
             if (job.tail.length > 50) job.tail.shift();
           }
+          // progress for the panel, at most twice a second
+          if (Date.now() - written > 500) {
+            written = Date.now();
+            writeJobFile(job);
+          }
         };
         proc.stdout.on("data", onData);
         proc.stderr.on("data", onData);
@@ -148,6 +207,7 @@ return { project: p.file.fsName, comp: name, frames: frames, app: Folder.appPack
           job.status = "failed";
           job.tail.push(String(e));
           job.endedAt = new Date().toISOString();
+          writeJobFile(job);
         });
         proc.on("exit", (code) => {
           logStream.end();
@@ -155,6 +215,7 @@ return { project: p.file.fsName, comp: name, frames: frames, app: Folder.appPack
           job.endedAt = new Date().toISOString();
           if (job.status === "running") job.status = code === 0 && !job.tail.some((l) => /aerender ERROR|^ERROR/i.test(l)) ? "done" : "failed";
           job.proc = undefined;
+          writeJobFile(job);
         });
         jobs.set(id, job);
         return {
@@ -191,6 +252,7 @@ return { project: p.file.fsName, comp: name, frames: frames, app: Folder.appPack
         if (j.status === "running" && j.proc) {
           j.status = "cancelled";
           j.proc.kill();
+          writeJobFile(j);
         }
         return { content: [{ type: "text", text: JSON.stringify(view(j)) }] };
       }

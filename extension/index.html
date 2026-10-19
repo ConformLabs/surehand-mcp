@@ -1,61 +1,76 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <title>Surehand MCP</title>
   <link rel="stylesheet" href="css/panel.css">
 </head>
-<body>
-  <header>
-    <svg class="mark" viewBox="0 0 200 200" aria-hidden="true"><mask id="sh-cut"><rect x="-10" y="-10" width="220" height="220" fill="#fff"/><rect x="91" y="91" width="18" height="18" fill="#000"/></mask><path d="M150 62 C128 18 50.5 50.5 78.8 78.8 L121.2 121.2 C149.5 149.5 72 182 50 138" fill="none" stroke="#F2EFE8" stroke-width="20" stroke-linecap="round" mask="url(#sh-cut)"/><line x1="57.6" y1="57.6" x2="142.4" y2="142.4" stroke="#3DD68C" stroke-width="8" stroke-linecap="round" mask="url(#sh-cut)"/><circle cx="57.6" cy="57.6" r="13" fill="#3DD68C"/><circle cx="142.4" cy="142.4" r="13" fill="#3DD68C"/><rect x="88" y="88" width="24" height="24" fill="none" stroke="#3DD68C" stroke-width="8"/></svg>
-    <div>
-      <div id="title">Surehand MCP</div>
-      <div id="sub" class="muted">checking…</div>
+<body class="layout-default">
+<div id="app">
+  <aside class="left">
+    <header class="head">
+      <svg id="tile" class="tile green" width="26" height="26" viewBox="0 0 200 200" aria-hidden="true"><rect width="200" height="200" rx="46"></rect><g transform="translate(24 24) scale(0.76)"><path d="M150 62 C128 18 50.5 50.5 78.8 78.8 L121.2 121.2 C149.5 149.5 72 182 50 138" fill="none" stroke="#14161A" stroke-width="24" stroke-linecap="round"></path><circle cx="57.6" cy="57.6" r="15" fill="#14161A"></circle><circle cx="142.4" cy="142.4" r="15" fill="#14161A"></circle></g></svg>
+      <div class="who">
+        <div class="name">Surehand</div>
+        <div id="status" class="status idle" role="status" aria-live="polite"><span class="dot" aria-hidden="true"></span><span id="statusText">Starting…</span></div>
+      </div>
+      <button id="pause" class="icon-btn" type="button" aria-label="Pause AI" title="Pause AI"><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><rect x="1.5" y="1" width="2.4" height="8" rx="0.6" fill="#F2EFE8"></rect><rect x="6.1" y="1" width="2.4" height="8" rx="0.6" fill="#F2EFE8"></rect></svg></button>
+      <button id="resume" class="primary pill" type="button" hidden>Resume</button>
+    </header>
+
+    <div id="pausedNote" class="note-amber" hidden></div>
+
+    <div class="modes">
+      <span id="mode-label" class="eyebrow">What the AI may do</span>
+      <div id="modes" class="seg" role="radiogroup" aria-labelledby="mode-label"></div>
+      <div id="modeDesc" class="desc"></div>
     </div>
-    <span id="dot" class="dot" title="Connection status"></span>
-  </header>
-  <div id="update" class="banner" hidden>
-    <span id="updateText"></span>
-    <button id="updateBtn">Update</button>
+  </aside>
+
+  <main class="right">
+    <div id="askGone" class="withdrawn" role="status" aria-live="polite" hidden>That request was withdrawn.</div>
+    <section id="ask" class="ask" aria-label="Approval request" hidden>
+      <div class="ask-top"><span id="askWho"></span><span id="askTime" class="num" title="Time left to answer"></span></div>
+      <div id="askTitle" class="ask-title"></div>
+      <div id="askSays" class="says" hidden></div>
+      <div id="askChips" class="chips"></div>
+      <button id="askShow" class="link under" type="button" aria-expanded="false" aria-controls="askCode">Show the script</button>
+      <pre id="askCode" class="code" hidden></pre>
+      <div class="two">
+        <button id="allow" class="primary big" type="button">Allow</button>
+        <button id="deny" class="secondary big" type="button">Deny</button>
+      </div>
+      <div id="askHint" class="ask-hint"></div>
+    </section>
+
+    <section id="setup" class="setup" aria-label="Set up an AI app" hidden>
+      <span id="setupText" class="ink"></span>
+      <button id="setupBtn" class="primary pill" type="button">Set it up</button>
+      <span id="setupHint" class="muted2"></span>
+    </section>
+
+    <div id="feed" class="feed" role="list" aria-label="What the AI did"></div>
+  </main>
+
+  <footer class="foot"><span id="hostLabel"></span><button id="ver" class="link" type="button" title="Updates"></button></footer>
+</div>
+
+<div id="screen" class="screen" role="dialog" aria-modal="true" aria-labelledby="screenTitle" hidden>
+  <div class="screen-head">
+    <button id="back" class="icon-btn small" type="button" aria-label="Back"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="#F2EFE8" stroke-width="1.6" aria-hidden="true"><path d="M6.5 1.5 3 5l3.5 3.5"></path></svg></button>
+    <span id="screenTitle" class="screen-title"></span>
+    <span id="screenAction"></span>
+    <svg class="tile green mini" width="20" height="20" viewBox="0 0 200 200" aria-hidden="true"><rect width="200" height="200" rx="46"></rect><g transform="translate(22 22) scale(0.78)"><path d="M150 62 C128 18 50.5 50.5 78.8 78.8 L121.2 121.2 C149.5 149.5 72 182 50 138" fill="none" stroke="#14161A" stroke-width="28" stroke-linecap="round"></path><circle cx="57.6" cy="57.6" r="17" fill="#14161A"></circle><circle cx="142.4" cy="142.4" r="17" fill="#14161A"></circle></g></svg>
   </div>
+  <div id="screenBody" class="screen-body"></div>
+</div>
 
-  <section id="approvals" hidden>
-    <div class="label">Waiting for your approval</div>
-    <div id="approvalList"></div>
-  </section>
+<div id="toast" class="toast" role="status" aria-live="polite" hidden><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#14874F" stroke-width="2" aria-hidden="true"><path d="m3 7.4 2.6 2.6L11 4.4"></path></svg><span id="toastText"></span></div>
 
-  <section class="row">
-    <button id="test">Test</button>
-    <button id="diag" title="Copies a report to paste into a bug report or a chat">Copy diagnostics</button>
-    <button id="openLog" title="Show the full activity log file">Open log</button>
-  </section>
-
-  <section class="grid">
-    <label for="perm">Permissions</label>
-    <select id="perm">
-      <option value="full">Full access</option>
-      <option value="ask">Ask before every change</option>
-      <option value="read-only">Read-only</option>
-    </select>
-    <label for="shell">Shell commands</label>
-    <select id="shell">
-      <option value="on">Allowed</option>
-      <option value="off">Blocked</option>
-    </select>
-    <label for="profile">AI tools</label>
-    <select id="profile">
-      <option value="core">Core (faster, recommended)</option>
-      <option value="full">Full (all tools)</option>
-    </select>
-  </section>
-  <div id="note" class="muted small" hidden></div>
-
-  <section>
-    <div class="label">Activity <span class="muted" id="activityHint">(click an entry for details)</span></div>
-    <ul id="log"><li class="muted">No calls yet</li></ul>
-  </section>
-  <footer class="muted" id="foot"></footer>
-  <script src="js/bridge-core.js"></script>
-  <script src="js/panel.js"></script>
+<script src="js/paths.js"></script>
+<script src="js/panel-model.js"></script>
+<script src="js/bridge-core.js"></script>
+<script src="js/control.js"></script>
+<script src="js/panel.js"></script>
 </body>
 </html>

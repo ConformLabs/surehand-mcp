@@ -1,14 +1,14 @@
 // Checks GitHub (at most once a day) for a newer release. The result is cached in
-// ~/.aemcp/update-check.json, which the After Effects panel also reads to show a banner.
-// Disable with "updateCheck": false in ~/.aemcp/config.json or AEMCP_NO_UPDATE_CHECK=1.
+// ~/.surehand/ae/update-check.json, which the After Effects panel also reads to show a banner.
+// Disable with "updateCheck": false in ~/.surehand/ae/config.json or SUREHAND_AE_NO_UPDATE_CHECK=1 (or AEMCP_NO_UPDATE_CHECK=1).
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { loadConfig, VERSION } from "./config.js";
+import { appFile, env } from "./paths.js";
 
 export const REPO = "ConformLabs/surehand-mcp";
 export const RELEASES_URL = `https://github.com/${REPO}/releases/latest`;
-const CACHE = join(homedir(), ".aemcp", "update-check.json");
+const CACHE = () => appFile("update-check.json");
 const DAY = 24 * 3600 * 1000;
 
 export interface UpdateInfo {
@@ -42,12 +42,12 @@ export function compareVersions(a: string, b: string): number {
 }
 
 export function updateCheckEnabled(): boolean {
-  return !process.env.AEMCP_NO_UPDATE_CHECK && loadConfig().updateCheck !== false;
+  return !env("NO_UPDATE_CHECK") && loadConfig().updateCheck !== false;
 }
 
 function readCache(): UpdateInfo | null {
   try {
-    return JSON.parse(readFileSync(CACHE, "utf8"));
+    return JSON.parse(readFileSync(CACHE(), "utf8"));
   } catch {
     return null;
   }
@@ -68,7 +68,7 @@ export async function checkForUpdate(force = false): Promise<UpdateInfo | null> 
   if (!force && cached && Date.now() - Date.parse(cached.checkedAt) < DAY) return (current = knownUpdate());
   try {
     const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
-      headers: { "user-agent": `ae-mcp/${VERSION}`, accept: "application/vnd.github+json" },
+      headers: { "user-agent": `surehand-ae/${VERSION}`, accept: "application/vnd.github+json" },
       signal: AbortSignal.timeout(4000),
     });
     if (!res.ok) return knownUpdate();
@@ -76,8 +76,8 @@ export async function checkForUpdate(force = false): Promise<UpdateInfo | null> 
     if (!rel.tag_name) return knownUpdate();
     const latest = rel.tag_name.replace(/^v/, "");
     current = { checkedAt: new Date().toISOString(), current: VERSION, latest, url: rel.html_url || RELEASES_URL, updateAvailable: compareVersions(latest, VERSION) > 0 };
-    mkdirSync(dirname(CACHE), { recursive: true });
-    writeFileSync(CACHE, JSON.stringify(current, null, 2));
+    mkdirSync(dirname(CACHE()), { recursive: true });
+    writeFileSync(CACHE(), JSON.stringify(current, null, 2));
     return current;
   } catch {
     return knownUpdate(); // offline: never an error

@@ -14,7 +14,7 @@ const pkg = JSON.parse(readFileSync(join(SERVER, "package.json"), "utf8"));
 const OUT_BASE = join(ROOT, "dist-zip");
 const OUT = join(OUT_BASE, "Surehand-MCP");
 const STAGE = join(OUT_BASE, ".mcpb-stage");
-const bundle = join(SERVER, "dist", "ae-mcp.mjs");
+const bundle = join(SERVER, "dist", "surehand-ae.mjs");
 const run = (cmd, args, cwd = SERVER) => execFileSync(cmd, args, { cwd, stdio: "inherit" });
 
 run(process.execPath, ["build.mjs"]);
@@ -22,7 +22,7 @@ run(process.execPath, ["build.mjs"]);
 // tool list for the .mcpb manifest, straight from the server
 const client = new Client({ name: "package", version: "1" });
 // list every tool (the extension's "Enable all tools" setting exposes them all)
-await client.connect(new StdioClientTransport({ command: process.execPath, args: [bundle, "--tools", "full"], env: { ...process.env, AEMCP_NO_AUTOSETUP: "1", AEMCP_NO_ACTIVITY_LOG: "1" } }));
+await client.connect(new StdioClientTransport({ command: process.execPath, args: [bundle, "--tools", "full"], env: { ...process.env, SUREHAND_AE_NO_AUTOSETUP: "1", SUREHAND_AE_NO_ACTIVITY_LOG: "1" } }));
 const { tools } = await client.listTools();
 await client.close();
 // every tool carries all four hints (the expected values are in test/annotations.test.ts)
@@ -34,11 +34,11 @@ rmSync(OUT_BASE, { recursive: true, force: true });
 
 // --- Claude Desktop extension (.mcpb) ---
 mkdirSync(join(STAGE, "server"), { recursive: true });
-copyFileSync(bundle, join(STAGE, "server", "ae-mcp.mjs"));
+copyFileSync(bundle, join(STAGE, "server", "surehand-ae.mjs"));
 copyFileSync(join(SERVER, "assets", "icon.png"), join(STAGE, "icon.png"));
 const manifest = {
   manifest_version: "0.3",
-  name: "after-effects",
+  name: "surehand-ae",
   display_name: "Surehand MCP",
   version: pkg.version,
   description: "Surehand MCP for Adobe® After Effects®: run ExtendScript, build comps, animate, apply effects and preview frames.",
@@ -54,8 +54,8 @@ const manifest = {
   icon: "icon.png",
   server: {
     type: "node",
-    entry_point: "server/ae-mcp.mjs",
-    mcp_config: { command: "node", args: ["${__dirname}/server/ae-mcp.mjs"], env: { AEMCP_TOOLS: "${user_config.full_toolset}" } },
+    entry_point: "server/surehand-ae.mjs",
+    mcp_config: { command: "node", args: ["${__dirname}/server/surehand-ae.mjs"], env: { SUREHAND_AE_TOOLS: "${user_config.full_toolset}" } },
   },
   user_config: {
     full_toolset: {
@@ -107,7 +107,7 @@ for (const [name, cmd, desc] of LAUNCHERS) {
 copyFileSync(join(ROOT, "installer", "run.sh"), join(DIRS.support, "run.sh"));
 chmodSync(join(DIRS.support, "run.sh"), 0o755);
 copyFileSync(join(ROOT, "installer", "run.ps1"), join(DIRS.support, "run.ps1"));
-copyFileSync(bundle, join(DIRS.support, "ae-mcp.mjs"));
+copyFileSync(bundle, join(DIRS.support, "surehand-ae.mjs"));
 copyFileSync(join(ROOT, "README.md"), join(DIRS.support, "README (technical).md"));
 copyFileSync(join(ROOT, "installer", "START HERE.txt"), join(OUT, "START HERE.txt"));
 

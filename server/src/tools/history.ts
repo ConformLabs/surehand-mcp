@@ -1,9 +1,8 @@
-// Project history: snapshots of the open project (stored under ~/.aemcp/history/<project>/) and
+// Project history: snapshots of the open project (stored under ~/.surehand/ae/history/<project>/) and
 // "what changed between v11 and v12?" diffs between snapshots, checkpoints and the current project.
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { basename, extname, join } from "node:path";
 import { gunzipSync, gzipSync } from "node:zlib";
 import { z } from "zod";
@@ -11,6 +10,7 @@ import { diffSnapshots, formatDiff, parseSnapshotLines, type Snapshot } from "..
 import { runJsx } from "../jsx.js";
 import { capText, errorResult } from "./registry.js";
 import { onCheckpointSaved } from "./workflow.js";
+import { appFile } from "../paths.js";
 
 const MAX_SNAPSHOTS = 100;
 const DEFAULT_BUDGET_S = 90;
@@ -206,9 +206,9 @@ return out.join("\\n");`;
 
 // ---------- storage ----------
 
-const HISTORY = () => join(homedir(), ".aemcp", "history");
+const HISTORY = () => appFile("history");
 
-/** Same folder name as the project's checkpoints (~/.aemcp/checkpoints/<name>-<hash>). */
+/** Same folder name as the project's checkpoints (~/.surehand/ae/checkpoints/<name>-<hash>). */
 export function historyDir(projectPath: string) {
   const name = basename(projectPath, extname(projectPath)).replace(/[^\w.-]+/g, "_").slice(0, 60);
   return join(HISTORY(), `${name}-${createHash("sha1").update(projectPath).digest("hex").slice(0, 8)}`);
@@ -225,7 +225,7 @@ function readJson<T>(file: string, fallback: T): T {
 }
 const readIndex = (dir: string) => readJson<SnapshotEntry[]>(join(dir, "index.json"), []);
 const checkpointsOf = (project: string) =>
-  readJson<{ id: string; at: string; label?: string; file: string }[]>(join(homedir(), ".aemcp", "checkpoints", basename(historyDir(project)), "index.json"), []);
+  readJson<{ id: string; at: string; label?: string; file: string }[]>(appFile("checkpoints", basename(historyDir(project)), "index.json"), []);
 
 export function loadSnapshot(project: string, id: string): Snapshot {
   return JSON.parse(gunzipSync(readFileSync(join(historyDir(project), `${id}.json.gz`))).toString("utf8"));
@@ -327,6 +327,36 @@ export function resolveRef(ref: string, index: SnapshotEntry[], checkpoints: { i
   return `No snapshot or checkpoint "${r}"${prefix.length > 1 ? ` (${prefix.length} snapshots start with it; give more of the id)` : ""}. Use action "list".`;
 }
 
+export class HistoryRefError extends Error {}
+
+/**
+ * The diff between two snapshots / checkpoints / "current" of a project (the open one in After Effects
+ * when either side is "current"). Throws HistoryRefError when a reference can't be resolved.
+ */
+export async function historyDiff(
+  project: string,
+  a: { from?: string; to?: string; timeBudgetSeconds?: number; detail?: number | string; limit?: number },
+): Promise<string> {
+  const index = readIndex(historyDir(project)), cps = checkpointsOf(project);
+  const from = resolveRef(a.from ?? "latest", index, cps), to = resolveRef(a.to ?? "current", index, cps);
+  if (typeof from === "string") throw new HistoryRefError(`from: ${from}`);
+  if (typeof to === "string") throw new HistoryRefError(`to: ${to}`);
+  const sa = from.current ? undefined : loadSnapshot(project, from.entry.id), sb = to.current ? undefined : loadSnapshot(project, to.entry.id);
+  // the current project is read for the comps the stored side covers
+  const scope = (sa ?? sb)?.scope;
+  const live = from.current || to.current ? await captureSnapshot({ comps: scope, timeBudgetSeconds: a.timeBudgetSeconds, lenient: true }, { id: "current" }) : undefined;
+  const A = sa ?? live!, B = sb ?? live!;
+  const moving =
+    live && live.revision != null && live.stats.revisionAfter != null && live.revision !== live.stats.revisionAfter
+      ? `\nNote: the project changed while the current project was being read (revision ${live.revision} -> ${live.stats.revisionAfter}), so parts of it may be from before and parts from after that change; run the diff again for a consistent result.`
+      : "";
+  const text = `From: ${title(A, !sa)}\nTo:   ${title(B, !sb)}\n` + formatDiff(diffSnapshots(A, B), { detail: a.detail, limit: a.limit }) + moving;
+  return capText(text);
+}
+
+/** The project's snapshots (oldest first). */
+export const snapshotIndex = (project: string) => readIndex(historyDir(project));
+
 const title = (s: Snapshot, current: boolean) =>
   current
     ? `the current project (revision ${s.revision ?? "n/a"}, not stored)`
@@ -342,7 +372,7 @@ export function registerHistoryTools(server: McpServer) {
         "layers, every non-default or animated property with keyframes and easing, expressions, effects, masks, text, markers, render queue). " +
         "list: snapshots and checkpoints of this project (ae_checkpoint save also stores a snapshot). diff: what changed between two of them or the " +
         'current project ("What changed between v11 and v12?"): comps, layers, values, keyframes, expressions (line diff), effects, render queue. ' +
-        "Doesn't change the project; snapshots are kept under ~/.aemcp/history (last 100 per project).",
+        "Doesn't change the project; snapshots are kept under ~/.surehand/ae/history (last 100 per project).",
       inputSchema: {
         action: z.enum(["snapshot", "list", "diff"]),
         label: z.string().max(80).optional().describe('snapshot: a short label, e.g. "v12" (diff can refer to it).'),
@@ -354,7 +384,7 @@ export function registerHistoryTools(server: McpServer) {
         detail: z.union([z.number().int(), z.string()]).optional().describe("diff: show every change in this one comp (id or name)."),
         limit: z.number().int().min(10).max(5000).optional().describe("diff: max change lines (default 150)."),
       },
-      // writes snapshot files under ~/.aemcp only; the project is never changed
+      // writes snapshot files under ~/.surehand/ae only; the project is never changed
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
     async (a) => {
@@ -375,20 +405,7 @@ export function registerHistoryTools(server: McpServer) {
           if (!rows.length) return { content: [{ type: "text", text: `No snapshots or checkpoints yet for ${project}. Take one with ae_project_history {action: "snapshot", label: "..."}.` }] };
           return { content: [{ type: "text", text: `History of ${project} (newest first):\n${rows.map((r) => r.line).join("\n")}` }] };
         }
-        const from = resolveRef(a.from ?? "latest", index, cps), to = resolveRef(a.to ?? "current", index, cps);
-        if (typeof from === "string") return errorResult(`from: ${from}`);
-        if (typeof to === "string") return errorResult(`to: ${to}`);
-        const sa = from.current ? undefined : loadSnapshot(project, from.entry.id), sb = to.current ? undefined : loadSnapshot(project, to.entry.id);
-        // the current project is read for the comps the stored side covers
-        const scope = (sa ?? sb)?.scope;
-        const live = from.current || to.current ? await captureSnapshot({ comps: scope, timeBudgetSeconds: a.timeBudgetSeconds, lenient: true }, { id: "current" }) : undefined;
-        const A = sa ?? live!, B = sb ?? live!;
-        const moving =
-          live && live.revision != null && live.stats.revisionAfter != null && live.revision !== live.stats.revisionAfter
-            ? `\nNote: the project changed while the current project was being read (revision ${live.revision} -> ${live.stats.revisionAfter}), so parts of it may be from before and parts from after that change; run the diff again for a consistent result.`
-            : "";
-        const text = `From: ${title(A, !sa)}\nTo:   ${title(B, !sb)}\n` + formatDiff(diffSnapshots(A, B), { detail: a.detail, limit: a.limit }) + moving;
-        return { content: [{ type: "text", text: capText(text) }] };
+        return { content: [{ type: "text", text: await historyDiff(project, a) }] };
       } catch (e) {
         return errorResult(e);
       }

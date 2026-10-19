@@ -1,4 +1,4 @@
-// `ae-mcp chatgpt`: HTTP server + public HTTPS tunnel so ChatGPT can connect.
+// `surehand-ae chatgpt`: HTTP server + public HTTPS tunnel so ChatGPT can connect.
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -62,6 +62,6 @@ Keep this window open while you use it. Press Ctrl+C to stop.
     warn("ChatGPT needs a public HTTPS address, which needs a free tunnel tool. Install one, then run this again:");
     console.log(`  - cloudflared (no account): ${isWin ? "winget install --id Cloudflare.cloudflared" : "brew install cloudflared"}`);
     console.log("  - or ngrok: https://ngrok.com/download");
-    console.log(`\nThe server is running locally at http://127.0.0.1:${port}/mcp (token in ~/.aemcp/config.json).`);
+    console.log(`\nThe server is running locally at http://127.0.0.1:${port}/mcp (token in ~/.surehand/ae/config.json).`);
   }
 }

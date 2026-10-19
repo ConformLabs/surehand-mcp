@@ -142,7 +142,7 @@ const EXPECTED: Record<string, Hints> = {
   ae_batch: SCRIPT, // steps can be ae_run_script
   ae_checkpoint: D, // save overwrites the .aep; restore closes the open project
   ae_prove_identical: SCRIPT, // run executes ae_batch steps (can be ae_run_script); capture/compare only render
-  ae_project_history: E, // never changes the project, but writes (and prunes) its snapshot files under ~/.aemcp/history
+  ae_project_history: E, // never changes the project, but writes (and prunes) its snapshot files under ~/.surehand/ae/history
   ae_list_scripts: R,
   // checks
   ae_preflight: [false, false, true, true], // never changes the project; may download ffmpeg (with consent) and writes temporary thumbnails

@@ -3,8 +3,9 @@
 // can still be done with ae_run_script.
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { loadConfig } from "../config.js";
-import { logActivity } from "../activity.js";
-import { callContext } from "../context.js";
+import { activityDetails, logActivity } from "../activity.js";
+import { callContext, type CallContext } from "../context.js";
+import { env as envVar } from "../paths.js";
 
 export const CORE_TOOLS = new Set([
   // connection, scripting, seeing
@@ -49,7 +50,7 @@ export interface ToolProfile {
 }
 
 /**
- * Resolution order: --tools <v>, AEMCP_TOOLS, config.toolProfile, default "core".
+ * Resolution order: --tools <v>, SUREHAND_AE_TOOLS / AEMCP_TOOLS, config.toolProfile, default "core".
  * Values: "core", "full" ("true"/"false" from the .mcpb checkbox map to full/core), or
  * "core,ae_import_files,..." to add individual tools to the core set.
  */
@@ -57,7 +58,8 @@ export function resolveProfile(argv = process.argv): ToolProfile {
   const i = argv.indexOf("--tools");
   // The .mcpb checkbox always sends "true"/"false"; "false" means "not chosen here", so the
   // panel / config.json setting still applies.
-  const env = process.env.AEMCP_TOOLS && process.env.AEMCP_TOOLS.toLowerCase() !== "false" ? process.env.AEMCP_TOOLS : undefined;
+  const tools = envVar("TOOLS");
+  const env = tools && tools.toLowerCase() !== "false" ? tools : undefined;
   const raw = (i >= 0 ? argv[i + 1] : undefined) ?? env ?? loadConfig().toolProfile ?? "core";
   const v = String(raw).trim().toLowerCase();
   if (v === "full" || v === "all" || v === "true") return { name: "full", allows: () => true };
@@ -86,8 +88,10 @@ export function applyProfile(server: McpServer, profile: ToolProfile): Map<strin
     const wrapped = async (args: any, extra: any) => {
       const t0 = Date.now();
       let result: any;
+      const client: string | undefined = (server.server as any).getClientVersion?.()?.name;
+      const ctx: CallContext = { tool: name, signal: extra?.signal, client };
       try {
-        result = await callContext.run({ tool: name, signal: extra?.signal }, () => cb(args, extra));
+        result = await callContext.run(ctx, () => cb(args, extra));
         return result;
       } finally {
         const text: string = result?.content?.find((c: any) => c.type === "text")?.text ?? "";
@@ -101,6 +105,7 @@ export function applyProfile(server: McpServer, profile: ToolProfile): Map<strin
           ok: !!result && !result.isError,
           summary: text.split("\n")[0].slice(0, 300) || (result ? undefined : "no result (exception)"),
           changes: changesAt >= 0 ? text.slice(changesAt).split("\n").filter((l) => /^[+~-] /.test(l)).length : undefined,
+          ...activityDetails(name, text, ctx.last, ctx),
         });
       }
     };

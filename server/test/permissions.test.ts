@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-describe("permissions come from ~/.aemcp/config.json", () => {
+describe("permissions come from ~/.surehand/ae/config.json", () => {
   it("reads mode and allowShell (regression: loadConfig dropped them)", async () => {
     const dir = mkdtempSync(join(tmpdir(), "aemcp-perm-"));
     const file = join(dir, "config.json");
