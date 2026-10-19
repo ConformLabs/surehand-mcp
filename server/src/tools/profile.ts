@@ -1,5 +1,5 @@
 // Tool profiles. Every tool definition is sent to the AI in every chat, so the full set
-// (~60 tools, ~14k tokens) is costly. The "core" profile keeps the essentials; anything else
+// (98 tools, ~27k tokens) is costly. The "core" profile keeps the essentials; anything else
 // can still be done with ae_run_script.
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { loadConfig } from "../config.js";
