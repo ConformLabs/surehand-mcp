@@ -24,6 +24,9 @@ let home = "";
 // the bridge's panel secret: handed to the panel only through the (simulated) CEP welcome event
 const SECRET = "s".repeat(64);
 let revision = 812;
+// a test can answer server commands itself (undefined: the defaults below) and slow them down
+let cliAnswer: ((cmd: string) => unknown) | null = null;
+let cliDelay = 20;
 
 const waitFor = async (cond: () => boolean, ms = 4000) => {
   const t0 = Date.now();
@@ -110,13 +113,15 @@ beforeAll(async () => {
       cliEnv.push(opts.env);
       const cmd = args.slice(1).join(" ");
       let out: unknown = { ok: true };
-      if (cmd === "update --check --json") out = { ok: true, current: "test", latest: "99.0.0", updateAvailable: true, notes: ["Faster history"], checkedAt: new Date().toISOString() };
+      const own = cliAnswer?.(cmd);
+      if (own !== undefined) out = own;
+      else if (cmd === "update --check --json") out = { ok: true, current: "test", latest: "99.0.0", updateAvailable: true, notes: ["Faster history"], checkedAt: new Date().toISOString() };
       else if (cmd === "update --json") out = { ok: true, updated: true, to: "99.0.0", message: "Updated" };
       else if (cmd === "clients --json")
         out = { ok: true, clients: [{ id: "claude-desktop", name: "Claude Desktop", installed: true, configured: true }, { id: "cursor", name: "Cursor", installed: true, configured: false }] };
       else if (cmd.startsWith("connect ")) out = { ok: true, message: "Cursor is set up. Restart Cursor." };
       else if (cmd === "test --json") out = { checks: [{ ok: true, name: "Bridge running" }] };
-      setTimeout(() => cb(null, "progress\n" + JSON.stringify(out), ""), 20);
+      setTimeout(() => cb(null, "progress\n" + JSON.stringify(out), ""), cliDelay);
       return undefined;
     },
   };
@@ -125,6 +130,7 @@ beforeAll(async () => {
   w.Buffer = Buffer;
   w.SUREHAND_ARM_MS = 150;
   w.SUREHAND_GONE_MS = 250;
+  w.SUREHAND_CHAT_POLL_MS = 60;
   // CEP events: the bridge answers a hello with the panel secret
   const listeners: Record<string, ((e: any) => void)[]> = {};
   w.__adobe_cep__ = {
@@ -418,5 +424,189 @@ describe("Surehand panel: ☰ menu", () => {
     search.dispatchEvent(new (dom.window as any).Event("input"));
     expect(rows()).toEqual(["Set keyframes"]);
     $("back").click();
+  });
+});
+
+describe("Surehand panel: ☰ screens (live findings)", () => {
+  const panel = () => (dom.window as any).SurehandPanel;
+  const buttons = (text: string) => [...doc().querySelectorAll("#screenBody button, #screenAction button")].filter((b: any) => b.textContent === text) as any[];
+  const after = (n: number) => cli.slice(n).map((c) => c.slice(2).join(" "));
+
+  it("the panel's scripts stay ES5 (After Effects' older CEF)", async () => {
+    const { parse } = await import("acorn");
+    for (const f of ["js/panel.js", "js/panel-model.js", "js/control.js", "js/paths.js", "js/approval.js", "js/bridge-core.js"])
+      expect(() => parse(readFileSync(new URL(f, ROOT), "utf8"), { ecmaVersion: 5 }), f).not.toThrow();
+  });
+
+  it("Connect: a set-up app says Connected (not \"Set up\" next to Remove); ChatGPT (web) has a short status and Start", async () => {
+    cliAnswer = (cmd) =>
+      cmd === "clients --json"
+        ? {
+            clients: [
+              { id: "claude-desktop", name: "Claude Desktop", installed: true, configured: true, inUse: true },
+              { id: "cursor", name: "Cursor", installed: true, configured: true, note: "connected under the old name (after-effects); Connect updates it" },
+              { id: "codex", name: "ChatGPT desktop / Codex", installed: true, configured: false },
+              { id: "chatgpt-web", name: "ChatGPT (web)", installed: true, configured: false, note: "Not running", action: "start", howTo: "a long explanation ".repeat(10) },
+            ],
+          }
+        : undefined;
+    panel().menu("connect");
+    await waitFor(() => doc().querySelectorAll("#screenBody .client").length === 4);
+    const rows = [...doc().querySelectorAll("#screenBody .client")].map((r: any) => ({ state: r.querySelector(".cstate").textContent, btn: r.querySelector("button")?.textContent }));
+    expect(rows).toEqual([
+      { state: "Connected \u00b7 in use now", btn: "Remove" },
+      { state: "Connected \u00b7 connected under the old name", btn: "Remove" },
+      { state: "Not connected", btn: "Set up" },
+      { state: "Not running", btn: "Start" },
+    ]);
+    expect($("screenBody").textContent).not.toMatch(/Set up ·|long explanation/);
+    // Start opens the ChatGPT screen (no "connect chatgpt-web", which only explained)
+    const n = cli.length;
+    cliAnswer = (cmd) => (cmd === "chatgpt --status --json" ? { ok: true, state: "stopped" } : undefined);
+    buttons("Start")[0].click();
+    expect($("screenTitle").textContent).toBe("ChatGPT on the web");
+    await waitFor(() => buttons("Start").length === 1);
+    expect(after(n)).not.toContain("connect chatgpt-web --json");
+    // Back goes back to Connect
+    $("back").click();
+    expect($("screenTitle").textContent).toBe("Connect an AI app");
+    $("back").click();
+    expect($("screen").hidden).toBe(true);
+    cliAnswer = null;
+  });
+
+  it("ChatGPT on the web: Start, starting (polls), running with the address, Copy, Stop", async () => {
+    let state: any = { ok: true, state: "stopped" }, polls = 0;
+    const URL_ = "https://fake-1.trycloudflare.com/mcp/" + "k".repeat(32);
+    cliAnswer = (cmd) => {
+      if (cmd === "chatgpt --background --json") return (state = { ok: true, state: "starting", pid: 7 });
+      if (cmd === "chatgpt --status --json") {
+        if (state.state === "starting" && ++polls >= 3) state = { ok: true, state: "running", url: URL_, tunnel: "cloudflared", pid: 7 };
+        return state;
+      }
+      if (cmd === "chatgpt --stop --json") return (state = { ok: true, state: "stopped", stopped: true });
+      return undefined;
+    };
+    panel().openScreen("chatgpt");
+    await waitFor(() => buttons("Start").length === 1);
+    expect($("screenBody").textContent).toMatch(/can\u2019t start programs on this computer/);
+    buttons("Start")[0].click();
+    await waitFor(() => /Starting the secure link/.test($("screenBody").textContent));
+    await waitFor(() => !!doc().querySelector("#screenBody .urlbox"), 5000);
+    expect(polls).toBeGreaterThanOrEqual(3);
+    expect(doc().querySelector("#screenBody .urlbox .mono")!.textContent).toBe(URL_);
+    const steps = [...doc().querySelectorAll("#screenBody .steps li")].map((l: any) => l.textContent);
+    expect(steps).toEqual([
+      "In ChatGPT: Settings \u203a Apps & Connectors \u203a Advanced settings \u203a Developer mode on.",
+      "Create a connector and paste this address. Authentication: No authentication.",
+      "Keep this computer awake while you use it.",
+    ]);
+    let copied = "";
+    const w = dom.window as any;
+    const exec = w.document.execCommand;
+    w.document.execCommand = () => ((copied = (doc().querySelector("textarea") as any)?.value ?? ""), true);
+    buttons("Copy")[0].click();
+    w.document.execCommand = exec;
+    expect(copied).toBe(URL_);
+    await waitFor(() => $("toastText").textContent === "Copied \u2014 keep it private: it contains your access key");
+    // the address never lands in the feed
+    expect($("feed")?.textContent ?? "").not.toContain(URL_);
+    buttons("Stop")[0].click();
+    await waitFor(() => buttons("Start").length === 1);
+    expect(cli.map((c) => c.slice(2).join(" "))).toContain("chatgpt --stop --json");
+    $("back").click();
+    $("back").click();
+    cliAnswer = null;
+  });
+
+  it("ChatGPT on the web: needs cloudflared (install command + Try again), and an error with Try again", async () => {
+    let answer: any = { ok: false, state: "needs-tunnel", installCommand: "brew install cloudflared" };
+    cliAnswer = (cmd) => (cmd.startsWith("chatgpt ") ? answer : undefined);
+    panel().openScreen("chatgpt");
+    await waitFor(() => /needs a free tunnel tool, cloudflared/.test($("screenBody").textContent));
+    expect(doc().querySelector("#screenBody .urlbox .mono")!.textContent).toBe("brew install cloudflared");
+    expect(buttons("Copy")).toHaveLength(1);
+    answer = { ok: false, state: "error", error: "cloudflared stopped before giving an address (failed to dial)." };
+    const n = cli.length;
+    buttons("Try again")[0].click();
+    await waitFor(() => /didn\u2019t start/.test($("screenBody").textContent));
+    expect(after(n)).toContain("chatgpt --background --json");
+    expect($("screenBody").textContent).toMatch(/failed to dial/);
+    expect(buttons("Try again")).toHaveLength(1);
+    panel().closeScreen();
+    cliAnswer = null;
+  });
+
+  it("Connection test: shows each check's message (its name as a small label), a red row with Fix that connects the app", async () => {
+    cliAnswer = (cmd) =>
+      cmd === "test --json"
+        ? {
+            checks: [
+              { ok: true, name: "update", message: "Surehand MCP 1.4.0 is the latest version." },
+              { ok: false, name: "claude-desktop", message: "Claude Desktop: its settings name a server that no longer exists.", fix: { connect: "claude-desktop", label: "Reconnect Claude Desktop" } },
+            ],
+          }
+        : cmd.startsWith("connect ")
+          ? { ok: true, message: "Claude Desktop is connected to Surehand MCP." }
+          : undefined;
+    panel().menu("test");
+    await waitFor(() => /1 of 2 checks passed/.test($("screenBody").textContent));
+    const rows = [...doc().querySelectorAll("#screenBody .check")] as any[];
+    expect(rows.map((r) => r.querySelector(".cmain").textContent)).toEqual(["Surehand MCP 1.4.0 is the latest version.", "Claude Desktop: its settings name a server that no longer exists."]);
+    expect(rows.map((r) => r.querySelector(".clabel").textContent)).toEqual(["update", "claude-desktop"]);
+    expect(rows[1].className).toBe("check bad");
+    const fix = rows[1].querySelector("button");
+    expect(fix.textContent).toBe("Fix");
+    fix.click();
+    await waitFor(() => cli.some((c) => c.slice(2).join(" ") === "connect claude-desktop --json"));
+    await waitFor(() => /Claude Desktop is connected/.test($("toastText").textContent));
+    panel().closeScreen();
+    cliAnswer = null;
+  });
+
+  it("an answer that comes back late never draws its screen over another one (seen live: Connect over Checkpoints)", async () => {
+    cliDelay = 300;
+    panel().menu("connect");
+    await waitFor(() => buttons("Set up").length > 0, 3000);
+    buttons("Set up")[0].click();
+    panel().menu("history"); // the user moves on before the connect answer arrives
+    await new Promise((r) => setTimeout(r, 1000));
+    expect($("screenTitle").textContent).toBe("Activity history");
+    expect(doc().querySelector("#screenBody .client")).toBeNull();
+    cliDelay = 20;
+    panel().closeScreen();
+  });
+
+  it("Checkpoints: Save one now goes through the server (with its history snapshot) as the panel; Compare shows the summary first", async () => {
+    const cps = [{ id: "2026-10-19-17-00-00", at: "2026-10-19T17:00:00.000Z", label: "old", file: "/cp/b.aep" }, { id: "2026-10-19-18-01-21", at: "2026-10-19T18:01:21.000Z", label: "v2", file: "/cp/a.aep", history: "h1" }];
+    const DIFF = 'From: snapshot 2026-10-19-18-01-21 "v2" (checkpoint 2026-10-19-18-01-21), revision 5774\nTo:   the current project (revision 5910, not stored)\nSummary: 1 layer changed\n\n~ layer #1 "Title": Opacity 100 -> 50';
+    cliAnswer = (cmd) => {
+      if (cmd.startsWith("checkpoints --json")) return { checkpoints: cps };
+      if (cmd.startsWith("checkpoint-save --json")) return { ok: true, checkpoint: { id: "2026-10-20-01-00-00", label: "saved in the panel", file: "/cp/c.aep", history: "h2" } };
+      if (cmd.startsWith("checkpoint-diff ")) return { text: DIFF };
+      return undefined;
+    };
+    panel().menu("checkpoints");
+    await waitFor(() => doc().querySelectorAll("#screenBody .cp").length === 2);
+    // newest first (the server lists oldest first)
+    expect(doc().querySelectorAll("#screenBody .cp")[0].textContent).toMatch(/v2/);
+    expect(doc().querySelectorAll("#screenBody .cp")[1].textContent).toMatch(/no history snapshot/);
+    expect($("screenBody").textContent).not.toMatch(/saved before history existed/);
+    const n = cli.length;
+    buttons("Save one now")[0].click();
+    await waitFor(() => $("toastText").textContent === "Checkpoint saved.");
+    const i = cli.findIndex((c, k) => k >= n && c[2] === "checkpoint-save");
+    expect(cli[i].slice(2)).toEqual(["checkpoint-save", "--json", "--label", "saved in the panel", "--project", expect.any(String)]);
+    expect(cliEnv[i].SUREHAND_AE_PANEL_SECRET).toBe(SECRET); // works while the AI is paused
+    await waitFor(() => doc().querySelectorAll("#screenBody .cp").length === 2 && buttons("Compare with now").length === 1);
+    buttons("Compare with now")[0].click();
+    await waitFor(() => !!doc().querySelector("#screenBody .diff-sum"));
+    const out = doc().querySelector("#screenBody .diffout") as any;
+    expect([...out.children].map((c: any) => c.className)).toEqual(["diff-sum", "details", "diff-meta"]);
+    expect(out.children[0].textContent).toBe("1 layer changed");
+    expect(out.children[1].textContent).toBe('~ layer #1 "Title": Opacity 100 -> 50');
+    expect(out.children[2].textContent).toMatch(/^From: snapshot .*\nTo: the current project/);
+    panel().closeScreen();
+    cliAnswer = null;
   });
 });

@@ -9,7 +9,7 @@ import { checkForUpdate } from "./update.js";
 // dependencies (zod) too late for the MCP SDK, crashing the bundle at startup.
 import { activityFile, readActivity } from "./activity.js";
 import { chatgpt } from "./cli/chatgpt.js";
-import { checkpointDiffCommand, checkpointsCommand } from "./cli/checkpoints.js";
+import { checkpointDiffCommand, checkpointSaveCommand, checkpointsCommand } from "./cli/checkpoints.js";
 import { clientsJson, connectClient, disconnectClient, listClients, moveFromLegacy } from "./cli/clients.js";
 import { diagnostics } from "./cli/diagnostics.js";
 import { install } from "./cli/install.js";
@@ -107,7 +107,9 @@ Usage:
   surehand-ae diagnostics     print a report to paste into a bug report (no secrets)
   surehand-ae activity [n]    the last n tool calls (default 30); full log in ~/.surehand/ae/activity.jsonl
   surehand-ae chatgpt [--local]
-                         HTTP server + public tunnel for ChatGPT
+                         HTTP server + public tunnel for ChatGPT (in this window; Ctrl+C stops it)
+  surehand-ae chatgpt --background|--status|--stop [--json]
+                         the same in the background (the panel's ChatGPT screen): start, its state and address, stop
   surehand-ae update [--json]  install the latest release over this installation (and the AE extension)
   surehand-ae update --check [--json]   only report: {latest, current, updateAvailable, url, checkedAt, notes}
   surehand-ae clients [--json]          the AI apps on this computer and whether they are connected
@@ -115,6 +117,7 @@ Usage:
   surehand-ae disconnect <app> [--json]
   surehand-ae checkpoints [--json] [--project <path.aep>]      a project's checkpoints (default: the open one)
   surehand-ae checkpoint-diff <id> [--json] [--project <path>]  what changed since a checkpoint (needs After Effects)
+  surehand-ae checkpoint-save [--label <text>] [--project <path>] [--json]   save the open project and checkpoint it
   surehand-ae setup           only install/update the After Effects extension and config
 
 Files: ~/.surehand/ae (config.json, checkpoints, history...); shared: ~/.surehand/node, ~/.surehand/ffmpeg.
@@ -161,7 +164,7 @@ async function main() {
   const json = rest.includes("--json");
   // the server itself (no command, or only options) and the commands that set things up; install and
   // update move (and report) it themselves; --json output stays clean
-  if (movesLegacyBeforeRunning(cmd)) moveOnStart(json);
+  if (movesLegacyBeforeRunning(cmd, rest)) moveOnStart(json);
   const print = (o: unknown, text: string) => console.log(json ? JSON.stringify(o) : text);
   switch (cmd) {
     case "clients": {
@@ -185,6 +188,9 @@ async function main() {
       return;
     case "checkpoint-diff":
       process.exitCode = await checkpointDiffCommand(rest);
+      return;
+    case "checkpoint-save":
+      process.exitCode = await checkpointSaveCommand(rest);
       return;
     case "install":
       return install(rest);

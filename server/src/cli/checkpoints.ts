@@ -2,12 +2,15 @@
 //   checkpoints --json [--project <path>]   {checkpoints: [{id, at, label, file, history?}]} (history: the id of the
 //                                           project history snapshot stored with it; only those can be diffed)
 //   checkpoint-diff <id> [--project <path>] [--json]   what changed since a checkpoint: plain text ({text} with --json)
+//   checkpoint-save [--label <l>] [--project <path>] [--json]   as ae_checkpoint save (with its history snapshot):
+//                                           {ok, checkpoint: {id, at, label, file, history?}, note?}; the panel runs it
+//                                           as its own job (works while the AI is paused)
 // Errors: a message on stderr, or with --json {error} (checkpoints: {checkpoints: [], error}); exit code 1.
 // Without --project, the project open in After Effects. The diff always needs After Effects (it reads
 // the open project), and only compares with the project that is open there.
 import { runJsx } from "../jsx.js";
 import { HistoryRefError, historyDiff, snapshotIndex } from "../tools/history.js";
-import { checkpointIndex } from "../tools/workflow.js";
+import { checkpointIndex, saveCheckpoint } from "../tools/workflow.js";
 
 const opt = (args: string[], name: string) => (args.indexOf(name) >= 0 ? args[args.indexOf(name) + 1] : undefined);
 
@@ -77,6 +80,37 @@ export async function checkpointDiffCommand(args: string[]): Promise<number> {
   } catch (e: any) {
     return out(json, e instanceof HistoryRefError ? e.message.replace(/^from: /, "") : e?.message || String(e));
   }
+}
+
+export async function checkpointSaveCommand(args: string[]): Promise<number> {
+  const json = args.includes("--json");
+  const label = opt(args, "--label");
+  const want = opt(args, "--project");
+  const fail = (error: string) => {
+    if (json) console.log(JSON.stringify({ ok: false, error }));
+    else console.error(error);
+    return 1;
+  };
+  if (want) {
+    // it saves the project open in After Effects: only when that is the one meant
+    let open: string | null;
+    try {
+      open = await openProject();
+    } catch (e) {
+      return fail(`${NO_AE(e).split(" Open")[0]}.`);
+    }
+    if (open !== want) return fail(`The project open in After Effects (${open ?? "an unsaved project"}) isn't ${want}. Open that project first.`);
+  }
+  let cp: Awaited<ReturnType<typeof saveCheckpoint>>;
+  try {
+    cp = await saveCheckpoint(label || undefined);
+  } catch (e: any) {
+    return fail(e?.message || String(e));
+  }
+  const row = listCheckpoints(cp.project).find((r) => r.id === cp.id) ?? { id: cp.id, at: cp.at, label: cp.label ?? null, file: cp.file };
+  if (json) console.log(JSON.stringify({ ok: true, checkpoint: row, ...(cp.note ? { note: cp.note } : {}) }));
+  else console.log(`Checkpoint ${row.id} saved: ${row.file}${cp.note ? `\n${cp.note}` : ""}`);
+  return 0;
 }
 
 function out(json: boolean, error: string, extra: Record<string, unknown> = {}): number {

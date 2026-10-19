@@ -597,6 +597,26 @@ describe("checkpoints / checkpoint-diff commands (the panel's Checkpoints screen
     expect(JSON.parse(c.lines[1]).error).toMatch(/compares with the project open in After Effects \(.*Cli\.aep\), not .*Other\.aep/);
   });
 
+  it("checkpoint-save (the panel's Save one now) saves with a history snapshot, so it can be compared", async () => {
+    const root = mkdtempSync(join(tmpdir(), "surehand-proj-"));
+    const file = join(root, "Saved.aep");
+    writeFileSync(file, "aep");
+    fakeApp = fakeProject([fakeLayer(7, 1, "Title")]);
+    fakeApp.__projectFile = file;
+    fakeApp.project.file = { fsName: file };
+    const { checkpointSaveCommand } = await import("../src/cli/checkpoints.js");
+    const { historyDir } = await import("../src/tools/history.js");
+    const c = capture();
+    expect(await checkpointSaveCommand(["--json", "--label", "saved in the panel", "--project", file])).toBe(0);
+    expect(await checkpointSaveCommand(["--json", "--project", join(root, "Other.aep")])).toBe(1);
+    c.done();
+    const out = JSON.parse(c.lines[0]);
+    const snapId = JSON.parse(readFileSync(join(historyDir(file), "index.json"), "utf8"))[0].id;
+    expect(out).toMatchObject({ ok: true, checkpoint: { id: expect.any(String), label: "saved in the panel", file: expect.stringContaining("saved_in_the_panel"), history: snapId } });
+    expect(out.note).toMatch(/History snapshot/);
+    expect(JSON.parse(c.lines[1])).toEqual({ ok: false, error: expect.stringMatching(/Saved\.aep\) isn't .*Other\.aep/) });
+  });
+
   it("says so when After Effects can't be reached (the diff needs it; the list works with --project)", async () => {
     fakeApp = { project: { file: null } }; // the stand-in fails like an unreachable bridge
     const { checkpointsCommand, checkpointDiffCommand } = await import("../src/cli/checkpoints.js");

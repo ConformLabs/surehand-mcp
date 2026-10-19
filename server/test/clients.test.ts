@@ -62,10 +62,24 @@ describe("clients --json", () => {
     put(util.cursorConfig(), { mcpServers: {} });
     const out = clients.clientsJson();
     expect(out.clients.map((c) => c.id)).toEqual(["claude-desktop", "claude-code", "codex", "cursor", "chatgpt-web"]);
-    for (const c of out.clients) expect(Object.keys(c).every((k) => ["id", "name", "installed", "configured", "inUse", "note", "action"].includes(k))).toBe(true);
+    for (const c of out.clients) expect(Object.keys(c).every((k) => ["id", "name", "installed", "configured", "inUse", "note", "action", "howTo"].includes(k))).toBe(true);
     expect(out.clients[3]).toEqual({ id: "cursor", name: "Cursor", installed: true, configured: false });
-    expect(out.clients[4]).toMatchObject({ id: "chatgpt-web", configured: false, action: "start" });
+    expect(out.clients[4]).toMatchObject({ id: "chatgpt-web", configured: false, action: "start", howTo: expect.stringMatching(/Developer mode/) });
+    // a short status for the row; the long how-to stays out of the note
+    expect(["Not running", "Needs cloudflared"]).toContain(out.clients[4].note);
     expect(JSON.parse(out.snippet!)).toEqual({ mcpServers: { "surehand-ae": { command: expect.any(String), args: [server()] } } });
+  });
+
+  it("ChatGPT (web) is connected while its background server runs, from the status file", () => {
+    const file = join(home, ".surehand", "ae", "chatgpt.json");
+    // a live supervisor is checked by its process: this test process isn't one, so a "running" file says stopped
+    put(file, { state: "running", pid: process.pid, url: "https://x.trycloudflare.com/mcp/t" });
+    expect(clients.clientsJson().clients[4]).toMatchObject({ configured: false });
+    put(file, { state: "needs-tunnel" });
+    const n = clients.clientsJson().clients[4].note;
+    expect(n === "Needs cloudflared" || n === "Not running").toBe(true); // "Not running" when this computer has a tunnel tool
+    put(file, { state: "error", error: "cloudflared stopped" });
+    expect(clients.clientsJson().clients[4]).toMatchObject({ configured: false, note: "Didn\u2019t start" });
   });
 
   it("notes an entry whose Node.js is gone", () => {
