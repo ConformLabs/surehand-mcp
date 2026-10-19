@@ -66690,6 +66690,7 @@ aemcp = (function () {
     for (var id in b.items) {
       if (!b.items.hasOwnProperty(id)) continue;
       var xb = b.items[id], xa = a.items[id], fb = xb.split(SEP);
+      if (isSentinel(raw(fb[2])) || (xa !== undefined && isSentinel(raw(xa.split(SEP)[2])))) continue; // the rollback's own marker
       if (xa === undefined) {
         var extra = undefined; // reset explicitly: ES3 'var' keeps the previous iteration's value
         if (fb[1] === "comp") {
@@ -66708,7 +66709,7 @@ aemcp = (function () {
       for (var f = 2; f < fb.length; f++) if (fa[f] !== fb[f]) d.push(labels[f - 2] + " " + show(fa[f]) + " -> " + show(fb[f]));
       if (d.length) add(ch.items, ["~", fb[0], raw(fb[2]), d.join("; ")]);
     }
-    for (var id2 in a.items) if (a.items.hasOwnProperty(id2) && b.items[id2] === undefined) { var fr = a.items[id2].split(SEP); add(ch.items, ["-", fr[0], raw(fr[2])]); }
+    for (var id2 in a.items) if (a.items.hasOwnProperty(id2) && b.items[id2] === undefined) { var fr = a.items[id2].split(SEP); if (!isSentinel(raw(fr[2]))) add(ch.items, ["-", fr[0], raw(fr[2])]); }
     for (var cid in b.comps) {
       if (!b.comps.hasOwnProperty(cid)) continue;
       var cb = b.comps[cid], ca = a.comps[cid];
@@ -66773,25 +66774,65 @@ aemcp = (function () {
 
   // ---------- runner ----------
   function listed(ch) { return !!(ch && (ch.items.length || ch.layers.length || ch.props.length || ch.unlisted)); }
-  // Undo what this call changed (opts.rollback). It runs in the same script as the call, right after its
-  // undo group closed, so nothing else can land on the undo stack in between. Only when the call changed
-  // something: an empty undo group is not an undo step, and Edit > Undo would revert the user's previous
-  // action instead. Undo moves app.project.revision forward (it doesn't restore it), so the check
-  // afterwards compares a new snapshot with the one from before the call. Never undoes a second time.
-  function rollback(before, rev0, rev1, ch) {
-    var moved = rev0 !== null && rev1 !== null && rev1 !== rev0;
-    if (!moved) {
-      if (!before || !ch || ch.error) return { undone: false, verified: false, problem: "unknown" }; // can't tell: leave it
-      if (!listed(ch)) return { undone: false, verified: true }; // nothing changed: the undo stack is left alone
+  function allComps(scope) { for (var i = 0; scope && i < scope.length; i++) if (scope[i] === "*") return true; return false; }
+  // Guarded rollback (opts.rollback): undo what this call changed, in the same script as the call, so
+  // nothing else can land on the undo stack in between. Never undoes a second time.
+  // Whether to undo: null = undo; otherwise the rollback result without undoing.
+  function rollbackPlan(before, rev0, rev1, ch, scope, requested) {
+    if (rev0 !== null && rev1 !== null && rev1 !== rev0) return null; // the project changed (maybe only a value written unchanged)
+    if (!before || !ch || ch.error) return { undone: false, verified: false, problem: "unknown" }; // can't tell: leave it
+    if (listed(ch)) return null;
+    // Nothing listed. Without project.revision that proves nothing when part of the project wasn't
+    // compared (a comp out of scope, properties over the budget, a truncated list).
+    if (rev0 === null && (ch.partial || ch.truncated || !allComps(scope))) {
+      // atomic batch: undo anyway, the sentinel makes it safe; read-only check: say it couldn't be told
+      return requested ? null : { undone: false, verified: false, problem: "unknown" };
     }
-    app.executeCommand(16); // Edit > Undo: this call's undo group
-    var out = { undone: true, verified: true };
-    if (moved && A.revision() === rev1) { out.verified = false; out.problem = "undo did nothing"; return out; }
-    if (!before) { out.verified = false; out.problem = "not checked"; return out; }
+    return { undone: false, verified: true }; // nothing changed: the undo stack is left alone
+  }
+  // The sentinel: a real edit made inside the call's still-open undo group, just before it closes, and
+  // only when the call is about to be undone. An undo group becomes an undo step only if something
+  // changed in it, and a value written unchanged moves app.project.revision without changing anything:
+  // without the sentinel, Edit > Undo could revert the user's previous step instead of this call. With
+  // it, the group is never empty, so Edit > Undo reverts this call together with the sentinel. It is two
+  // edits (add a folder, rename it): inside the group they are one undo step; if the call closed its
+  // group itself, they are two, the undo only reverts the rename, and the folder left behind shows it.
+  var SENTINEL = "__aemcp_rollback_";
+  function isSentinel(name) { return String(name).indexOf(SENTINEL) === 0; }
+  function addSentinel() {
+    var id = SENTINEL + new Date().getTime() + "_" + Math.floor(Math.random() * 1000000000);
+    var f = app.project.items.addFolder(id + "_new");
+    try { f.name = id; } catch (e) {}
+    return id;
+  }
+  function findSentinel(id) {
+    var p = app.project;
+    for (var i = 1; i <= p.numItems; i++) { var it = p.item(i); if (it instanceof FolderItem && String(it.name).indexOf(id) === 0) return it; }
+    return null;
+  }
+  // Edit > Undo once, then check: the sentinel must be gone (the undo reverted this call's group), and
+  // the project must be as before the call. Undo moves app.project.revision forward (it doesn't restore
+  // it), so the check compares a new snapshot with the one from before the call.
+  function rollback(before, revS, id) {
+    try { app.executeCommand(16); } // Edit > Undo: this call's undo group, sentinel included
+    catch (e) {
+      var still = findSentinel(id);
+      var fail = { undone: !still, verified: false, problem: "failed: " + (e.message || e) }; // the sentinel tells whether it undid
+      if (still) { try { still.remove(); } catch (e2) { fail.leftover = String(still.name); } }
+      return fail;
+    }
+    var out = { undone: true, verified: true }, left = findSentinel(id);
+    if (left) {
+      // the undo didn't revert this call's group: never undo again, remove the sentinel by hand
+      out.verified = false;
+      out.problem = revS !== null && A.revision() === revS ? "undo did nothing" : "not this call";
+      try { left.remove(); } catch (e) { out.leftover = String(left.name); }
+    }
+    if (!before) { if (out.verified) { out.verified = false; out.problem = "not checked"; } return out; }
     try {
       var d = A.diff(before, snapshotAgain(before));
-      if (listed(d)) { out.verified = false; out.problem = "not back"; out.remaining = d; }
-    } catch (e) { out.verified = false; out.problem = "not checked: " + (e.message || e); }
+      if (listed(d)) { if (out.verified) { out.verified = false; out.problem = "not back"; } out.remaining = d; }
+    } catch (e) { if (out.verified) { out.verified = false; out.problem = "not checked: " + (e.message || e); } }
     return out;
   }
   A.run = function (fn, args, opts) {
@@ -66805,7 +66846,7 @@ aemcp = (function () {
     var undo = opts.undoGroup !== false && opts.undoGroup !== "";
     // rollback: "changes" = undo whatever the call changed (read-only mode);
     // "requested" = only when the call returns { rollback: true } (atomic batch)
-    var res, before = null, rev0 = null, rev1 = null, back = false;
+    var res, before = null, rev0 = null, rev1 = null, back = false, plan = null, sentinel = null, revS = null;
     try {
       if (opts.suppressDialogs !== false) { try { app.beginSuppressDialogs(); } catch (e) {} }
       try {
@@ -66825,12 +66866,21 @@ aemcp = (function () {
           if (before) { try { res.changes = changesSince(before, rev0, opts.report); } catch (e2) {} }
         }
         rev1 = rev0 === null ? null : A.revision();
+        // to be undone: the sentinel goes in while this call's undo group is still open
+        if (back && undo) {
+          try { plan = rollbackPlan(before, rev0, rev1, res.changes, opts.report, opts.rollback === "requested"); } catch (e) { plan = { undone: false, verified: false, problem: "failed: " + (e.message || e) }; }
+          if (!plan) {
+            try { sentinel = addSentinel(); revS = A.revision(); }
+            catch (e) { plan = { undone: false, verified: false, problem: "failed: couldn't prepare the undo (" + (e.message || e) + ")" }; }
+          }
+        }
       } finally {
         if (undo) { try { app.endUndoGroup(); } catch (e) {} }
       }
       if (back) {
         if (!undo) res.rollback = { undone: false, verified: false, problem: "no undo group" };
-        else { try { res.rollback = rollback(before, rev0, rev1, res.changes); } catch (e) { res.rollback = { undone: false, verified: false, problem: "failed: " + (e.message || e) }; } }
+        else if (plan) res.rollback = plan;
+        else { try { res.rollback = rollback(before, revS, sentinel); } catch (e) { res.rollback = { undone: true, verified: false, problem: "failed: " + (e.message || e) }; } }
       }
     } finally {
       if (opts.suppressDialogs !== false) { try { app.endSuppressDialogs(false); } catch (e) {} }
@@ -66966,12 +67016,19 @@ ${lines.join("\n")}`;
 function rollbackProblem(rb, what) {
   if (rb.verified) return "";
   const check2 = "Check the project before going on (Edit > Undo and Edit > Redo still work step by step).";
+  const leftover = rb.leftover ? `
+A temporary folder "${rb.leftover}" (AE MCP's undo marker) couldn't be removed; it can be deleted.` : "";
   if (!rb.undone)
-    return `It couldn't be checked whether ${what} changed the project${rb.problem && rb.problem !== "unknown" ? ` (${rb.problem})` : ""}, so nothing was undone. ${check2}`;
-  const why = rb.problem === "not back" ? `the project still isn't how it was before ${what}:
-${(formatChanges(rb.remaining) ?? "").replace(/^Changes[^\n]*:\n/, "")}` : rb.problem === "undo did nothing" ? "After Effects didn't undo anything." : `the result couldn't be checked (${rb.problem}).`;
+    return `It couldn't be checked whether ${what} changed the project${rb.problem && rb.problem !== "unknown" ? ` (${rb.problem})` : ""}, so nothing was undone. ${check2}${leftover}`;
+  const remaining = rb.remaining ? (formatChanges(rb.remaining) ?? "").replace(/^Changes[^\n]*:\n/, "") : "";
+  const notBack = `the project still isn't how it was before ${what}:
+${remaining}`;
+  if (rb.problem === "not this call")
+    return `Edit > Undo was run once for ${what}, but it didn't revert the undo step of ${what} (${what} may have ended its undo group itself), ${remaining ? `and ${notBack}` : "so some of its changes may still be in the project."}
+It was not undone again (that Undo only reverted AE MCP's temporary undo marker), so nothing else in the undo history was reverted. ${check2}${leftover}`;
+  const why = rb.problem === "not back" ? notBack : rb.problem === "undo did nothing" ? "After Effects didn't undo anything." : `the result couldn't be checked (${rb.problem}).`;
   return `The undo step of ${what} was undone once, but ${why}
-It was not undone again, so nothing else in the undo history was reverted. ${check2}`;
+It was not undone again, so nothing else in the undo history was reverted. ${check2}${leftover}`;
 }
 
 // src/tools/profile.ts
@@ -69874,32 +69931,64 @@ async function renderPng(body, args) {
   }
   return { info, data };
 }
-var UNDO_STACK_CALLS = /\b(?:begin|end)UndoGroup\b|\bexecuteCommand\b|\bpurge\b/g;
-function undoStackCalls(code) {
-  return [...new Set(withoutComments(code).match(UNDO_STACK_CALLS) ?? [])];
+var READ_ONLY_BLOCKED = [
+  { name: "beginUndoGroup", re: /\bbeginUndoGroup\b/, undoHistory: true },
+  { name: "endUndoGroup", re: /\bendUndoGroup\b/, undoHistory: true },
+  { name: "executeCommand", re: /\bexecuteCommand\b/, undoHistory: true },
+  { name: "purge", re: /\bpurge\b/, undoHistory: true },
+  { name: "scheduleTask", re: /\bscheduleTask\b/ },
+  { name: "newProject", re: /\bnewProject\b/ },
+  { name: "app.open", re: /\bapp\s*\.\s*open\s*\(/ },
+  { name: "project.close", re: /\bproject\s*\.\s*close\s*\(/ },
+  { name: "save", re: /\.\s*save\s*\(/ },
+  { name: "saveWithDialog", re: /\bsaveWithDialog\b/ }
+];
+function decodeEscapes(code) {
+  return code.replace(/\\u\{([0-9a-fA-F]{1,6})\}|\\u([0-9a-fA-F]{4})/g, (m, a, b) => {
+    const cp = parseInt(a ?? b, 16);
+    return cp <= 1114111 ? String.fromCodePoint(cp) : m;
+  });
 }
-function undoStackRefusal(code) {
-  const calls = undoStackCalls(code);
-  if (!calls.length) return null;
-  return `Nothing ran. AE MCP is in read-only mode, and this script calls ${calls.join(", ")}. executeCommand, beginUndoGroup, endUndoGroup and purge change the undo history outside AE MCP's control, so read-only mode couldn't reliably put the project back afterwards; scripts that call them are refused. To run it on purpose, the user can switch to edit mode (Full access, or Ask before every change) in After Effects: Window > Extensions > AE MCP > Permissions.`;
+function readOnlyBlockedCalls(code, transpiled) {
+  const texts = [decodeEscapes(withoutComments(code))];
+  if (transpiled !== void 0) texts.push(decodeEscapes(transpiled));
+  return READ_ONLY_BLOCKED.filter((b) => texts.some((t) => b.re.test(t))).map((b) => b.name);
 }
-function readOnlyRunOptions(code) {
-  return { undoGroup: "AE MCP Script (read-only check)", report: ["*"], checkOnly: !undoStackCalls(code).length, rollback: "changes" };
+function readOnlyScriptRefusal(code, transpiled) {
+  const names = readOnlyBlockedCalls(code, transpiled);
+  if (!names.length) return null;
+  const blocked = READ_ONLY_BLOCKED.filter((b) => names.includes(b.name));
+  const why = [];
+  if (blocked.some((b) => b.undoHistory))
+    why.push(
+      "executeCommand, beginUndoGroup, endUndoGroup and purge change the undo history outside AE MCP's control, so read-only mode couldn't reliably put the project back afterwards."
+    );
+  if (blocked.some((b) => !b.undoHistory))
+    why.push(
+      "app.open, newProject, project.close, save, saveWithDialog and scheduleTask open, close or save projects or run code later, which read-only mode can't undo."
+    );
+  return `Nothing ran. AE MCP is in read-only mode, and this script mentions ${names.join(", ")}. ${why.join(" ")} Scripts that mention these names are refused (the check reads the code, so a name in a string counts too). To run it on purpose, the user can switch to edit mode (Full access, or Ask before every change) in After Effects: Window > Extensions > AE MCP > Permissions.`;
 }
+var READ_ONLY_RUN_OPTIONS = { undoGroup: "AE MCP Script (read-only check)", report: ["*"], checkOnly: true, rollback: "changes" };
 function readOnlyRefusal(r) {
   const rb = r.rollback;
   if (!rb || !rb.undone && rb.verified) return null;
   if (!rb.verified) return `${READ_ONLY_REFUSAL}
 ${rollbackProblem(rb, "the script")}`;
-  const changes = r.changes && !r.changes.unlisted ? formatChanges(r.changes) : null;
+  const ch = r.changes;
+  if (ch && !ch.unlisted && (ch.items.length || ch.layers.length || ch.props.length))
+    return `${READ_ONLY_REFUSAL}
+This script changed the project, so its changes were undone:
+${formatChanges(ch)}`;
   return `${READ_ONLY_REFUSAL}
-This script changed the project, so its changes were undone${changes ? `:
-${changes}` : "."}`;
+This script wrote to the project (perhaps only values that were already set), so its changes were undone.`;
 }
+var READ_ONLY_STILL_RUNNING = "Read-only mode: a script can't be interrupted, and when it ends, the read-only rollback still runs inside After Effects in the same run (whatever the script changed is undone, once, as usual), but this reply can't show its result. Check the project (ae_status, ae_get_project_info) before going on.";
 async function runReadOnly(code, timeoutMs = 12e4) {
-  const refused = undoStackRefusal(code);
+  const t = transpileUserCode(code);
+  const refused = readOnlyScriptRefusal(code, t.source);
   if (refused) return { refusal: refused };
-  const r = await runJsx(evalBody(transpileUserCode(code).source), {}, { ...readOnlyRunOptions(code), timeoutMs });
+  const r = await runJsx(evalBody(t.source), {}, { ...READ_ONLY_RUN_OPTIONS, timeoutMs });
   return { refusal: readOnlyRefusal(r), r };
 }
 function registerCoreTools(server) {
@@ -69921,15 +70010,16 @@ function registerCoreTools(server) {
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true }
     },
     async ({ code, args, undoGroup, depth, timeoutSeconds, transpile, report }) => {
+      let readOnly2 = false;
       try {
         const perm = permissions();
         if (!perm.allowShell && usesShell(code)) return errorResult(SHELL_REFUSAL);
-        const readOnly2 = perm.mode === "read-only";
-        const undoStack = readOnly2 ? undoStackRefusal(code) : null;
-        if (undoStack) return errorResult(undoStack);
+        readOnly2 = perm.mode === "read-only";
         const t = transpileUserCode(code, transpile !== false);
+        const refused = readOnly2 ? readOnlyScriptRefusal(code, t.source) : null;
+        if (refused) return errorResult(refused);
         const r = await runJsx(evalBody(t.source), args ?? {}, {
-          ...readOnly2 ? readOnlyRunOptions(code) : { undoGroup: undoGroup === "" ? false : undoGroup || "AE MCP Script", report: report === false ? void 0 : reportScope(args) },
+          ...readOnly2 ? READ_ONLY_RUN_OPTIONS : { undoGroup: undoGroup === "" ? false : undoGroup || "AE MCP Script", report: report === false ? void 0 : reportScope(args) },
           depth,
           timeoutMs: (timeoutSeconds ?? 120) * 1e3,
           bridge: perm.mode === "ask" ? { approval: { tool: "Run script", summary: approvalSummary("ae_run_script", { code }) } } : void 0
@@ -69953,7 +70043,9 @@ function registerCoreTools(server) {
         }
         return formatResult(r, { quietNoChanges: true });
       } catch (e) {
-        return errorResult(e);
+        const out = errorResult(e);
+        if (readOnly2 && e instanceof BridgeError && (e.code === "TIMEOUT" || e.code === "CANCELLED")) out.content.push({ type: "text", text: READ_ONLY_STILL_RUNNING });
+        return out;
       }
     }
   );
@@ -79390,13 +79482,22 @@ init_define_AEMCP_CEP_FILES();
 var P2 = "__aemcp_fulltest_rev";
 var COMPS = 30;
 var LAYERS = 12;
-var READ_ONLY = { undoGroup: "AE MCP Script (read-only check)", report: ["*"], checkOnly: true, timeoutMs: 3e5 };
+var READ_ONLY = { ...READ_ONLY_RUN_OPTIONS, rollback: void 0, timeoutMs: 3e5 };
 var user = (code) => evalBody(`(function(args, log){${code}
 })`);
 var findComp = `var c = null; for (var i = 1; i <= app.project.numItems; i++) if (app.project.item(i).name === "${P2}") c = app.project.item(i);`;
 var U = `${P2}_undo`;
 var UNDO = 16;
 var REDO = 2035;
+async function sentinelsLeft() {
+  const r = await runJsx(
+    `var n = []; for (var i = 1; i <= app.project.numItems; i++) if (String(app.project.item(i).name).indexOf("__aemcp_rollback_") === 0) n.push(app.project.item(i).name); return n.join(", ");`,
+    {},
+    { undoGroup: false }
+  );
+  if (!r.ok) throw new Error(`couldn't list the project items: ${r.error?.message}`);
+  return String(r.result ?? "");
+}
 async function revisionSteps(features, say) {
   const fast = !!features.revision;
   const out = [];
@@ -79476,6 +79577,8 @@ return app.project.numItems;`,
 ${script2}
 return L ? L.name : null;`, 3e5);
     const after = await state2();
+    const left = await sentinelsLeft();
+    if (left) return `the rollback's temporary folder was left in the project: ${left}`;
     if (opts.refused) {
       if (r) return `not refused: the script ran (layer name ${r.result}); ${refusal ? `then: ${refusal}` : "no refusal"}; before: ${before}; after: ${after}`;
       if (!/^Nothing ran\./.test(refusal ?? "")) return `unexpected reply: ${refusal}`;
@@ -79489,12 +79592,17 @@ return L ? L.name : null;`, 3e5);
       if (after !== before.replace(/^user rename 1/, "solid")) return `the project isn't back and more than the script's own Undo changed it: before ${before}; after ${after}`;
       return refusal && /not undone again|nothing was undone/.test(refusal) ? null : `the project isn't back and the reply doesn't say so: ${refusal}`;
     }
-    if (after !== before) return `before the script: ${before}; after the ${refusal ? "refusal and Undo" : "script (not refused)"}: ${after}`;
+    if (after !== before) return `before the script: ${before}; after the ${refusal ? "refusal and Undo" : "script (not refused)"}: ${after} (the user's rename must survive)`;
+    if (opts.unchanged) {
+      note = `revision moved: ${!!r.rollback?.undone}; rollback: ${JSON.stringify(r.rollback)}; reply: ${refusal ?? "(none)"}`;
+      say(true, `  ${name}: ${note}`);
+      if (r.rollback && !r.rollback.verified) return `the rollback wasn't verified: ${refusal}`;
+    }
     return null;
   });
   await undoSafe("script calls Edit > Undo", `app.executeCommand(${UNDO});`, { refused: true });
   await undoSafe("script calls Edit > Redo", `app.executeCommand(${REDO});`, { userUndoes: true, refused: true });
-  await undoSafe("script sets a property to its current value", "L.opacity.setValue(L.opacity.value);");
+  await undoSafe("script sets a property to its current value", "L.opacity.setValue(L.opacity.value);", { unchanged: true });
   await undoSafe("script ends the undo group early, then edits", "app.endUndoGroup(); L.opacity.setValue(33);", { refused: true });
   await undoSafe("script edits, ends the undo group, edits again", "L.opacity.setValue(33); app.endUndoGroup(); L.rotation.setValue(10);", { refused: true });
   await undoSafe("script only ends the undo group early", "app.endUndoGroup();", { refused: true });
@@ -79556,6 +79664,7 @@ async function rollbackSteps(say) {
     out.push({ step: name, ok: !problem, ms, error: problem ?? void 0 });
     say(!problem, problem ? `${name}: ${problem}` : `${name} (${ms} ms)`);
   };
+  const clean = async (problem) => problem ?? (await sentinelsLeft() ? `the rollback's temporary folder was left: ${await sentinelsLeft()}` : null);
   await step2("rollback: set up", async () => {
     const r = await runJsx(`var c = app.project.items.addComp("${P3}", 640, 360, 1, 4, 25); c.layers.addSolid([0.2, 0.4, 0.6], "${P3} solid", 64, 64, 1); return 1;`, {}, { undoGroup: "AE MCP self-test" });
     return r.ok ? null : `couldn't create the test comp: ${r.error?.message}`;
@@ -79575,14 +79684,30 @@ async function rollbackSteps(say) {
     const r = await runBatch({ steps: [script(`${OP} op.setValue(5);`), script('throw new Error("fails after an edit")')], name: "AE MCP self-test batch" }, FULL);
     const after = await state();
     if (!/was rolled back \(nothing changed\)/.test(text(r))) return `unexpected reply: ${text(r)}`;
-    return after.opacity === 41 ? null : `Opacity is ${after.opacity}, expected 41 (5 = not rolled back, 100/37 = undone twice)`;
+    return clean(after.opacity === 41 ? null : `Opacity is ${after.opacity}, expected 41 (5 = not rolled back, 100/37 = undone twice)`);
+  });
+  await step2("rollback: read-only script that writes Opacity's current value: the manual edit survives", async () => {
+    await manualEdit(39);
+    const refusal = await readOnly(`${OP} op.setValue(op.value); return 1;`);
+    const after = await state();
+    if (after.opacity !== 39) return `the manual edit was reverted: Opacity is ${after.opacity}, expected 39`;
+    if (refusal && !/its changes were undone/.test(refusal)) return `unexpected reply: ${refusal}`;
+    return clean(null);
+  });
+  await step2("rollback: atomic batch that writes Opacity's current value, then fails: the manual edit survives", async () => {
+    await manualEdit(40);
+    const r = await runBatch({ steps: [script(`${OP} op.setValue(op.value);`), script('throw new Error("fails after a no-op write")')] }, FULL);
+    const after = await state();
+    if (after.opacity !== 40) return `the manual edit was reverted: Opacity is ${after.opacity}, expected 40`;
+    if (!/was rolled back \(nothing changed\)|nothing to undo/.test(text(r))) return `unexpected reply: ${text(r)}`;
+    return clean(null);
   });
   await step2("rollback: read-only script that edits is reverted exactly once", async () => {
     await manualEdit(43);
     const refusal = await readOnly(`${OP} op.setValue(80); return 1;`);
     const after = await state();
     if (!refusal || !/its changes were undone/.test(refusal)) return `unexpected reply: ${refusal}`;
-    return after.opacity === 43 ? null : `Opacity is ${after.opacity}, expected 43 (80 = not reverted, 41 = undone twice)`;
+    return clean(after.opacity === 43 ? null : `Opacity is ${after.opacity}, expected 43 (80 = not reverted, 41 = undone twice)`);
   });
   await step2("rollback: read-only script that only reads leaves the undo stack alone", async () => {
     await manualEdit(47);
@@ -79604,8 +79729,8 @@ async function rollbackSteps(say) {
     await manualEdit(59);
     const refusal = await readOnly(`${OP} op.setValue(80); app["end" + "UndoGroup"](); op.setValue(90); return 1;`);
     const after = await state();
-    if (!refusal || !/not undone again/.test(refusal)) return `unexpected reply: ${refusal}`;
-    return after.opacity === 80 ? null : `Opacity is ${after.opacity}, expected 80 (one undo)`;
+    if (!refusal || !/didn't revert the undo step of the script/.test(refusal) || !/not undone again/.test(refusal)) return `unexpected reply: ${refusal}`;
+    return clean(after.opacity === 90 ? null : `Opacity is ${after.opacity}, expected 90 (only the sentinel's rename undone)`);
   });
   return out;
 }
