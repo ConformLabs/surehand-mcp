@@ -3,6 +3,7 @@
 // plus a timing of a read-only query on a project with many comps, fast path vs the full snapshot.
 // Everything it creates is named __aemcp_fulltest_rev* and removed by the full self-test's cleanup.
 import { evalRaw } from "../bridge.js";
+import { warn } from "./util.js";
 import { evalBody, formatChanges, runJsx, type RunOptions, type RunResult } from "../jsx.js";
 import { READ_ONLY_RUN_OPTIONS, runReadOnly } from "../tools/core.js";
 
@@ -160,14 +161,23 @@ return app.project.numItems;`,
       return null;
     });
 
+  // Cases that really run Edit > Undo/Redo or unbalance undo groups inside After Effects can make AE show
+  // "Undo group mismatch" and crash it (seen in AE 26.5 on the 1.3.4 test day). Read-only mode refuses such
+  // scripts anyway, so these stress cases only run when asked for: AEMCP_SELFTEST_UNDO_STRESS=1.
+  const stress = process.env.AEMCP_SELFTEST_UNDO_STRESS === "1";
+  const stressSkip = (name: string) => warn(`read-only undo keeps the user's last edit: ${name}: skipped (undo-stress case; can crash After Effects; run with AEMCP_SELFTEST_UNDO_STRESS=1)`);
+
   await undoSafe("script calls Edit > Undo", `app.executeCommand(${UNDO});`, { refused: true });
-  await undoSafe("script calls Edit > Redo", `app.executeCommand(${REDO});`, { userUndoes: true, refused: true });
+  if (stress) await undoSafe("script calls Edit > Redo", `app.executeCommand(${REDO});`, { userUndoes: true, refused: true });
+  else stressSkip("script calls Edit > Redo");
   await undoSafe("script sets a property to its current value", "L.opacity.setValue(L.opacity.value);", { unchanged: true });
   await undoSafe("script ends the undo group early, then edits", "app.endUndoGroup(); L.opacity.setValue(33);", { refused: true });
   await undoSafe("script edits, ends the undo group, edits again", "L.opacity.setValue(33); app.endUndoGroup(); L.rotation.setValue(10);", { refused: true });
   await undoSafe("script only ends the undo group early", "app.endUndoGroup();", { refused: true });
-  await undoSafe("script calls Edit > Undo by an assembled name", `app["execute" + "Command"](${UNDO});`, { assembled: true });
-  await undoSafe("script edits, then opens an undo group by an assembled name and never closes it", `L.opacity.setValue(33); app["begin" + "UndoGroup"]("x");`, { unclosed: true });
+  if (stress) await undoSafe("script calls Edit > Undo by an assembled name", `app["execute" + "Command"](${UNDO});`, { assembled: true });
+  else stressSkip("script calls Edit > Undo by an assembled name");
+  if (stress) await undoSafe("script edits, then opens an undo group by an assembled name and never closes it", `L.opacity.setValue(33); app["begin" + "UndoGroup"]("x");`, { unclosed: true });
+  else stressSkip("script edits, then opens an undo group by an assembled name and never closes it");
 
   // a read-only query on a project with many comps, the way ae_run_script runs it (median of 3)
   const bench: Record<string, number> = {};

@@ -79786,14 +79786,19 @@ return L ? L.name : null;`, 3e5);
     }
     return null;
   });
+  const stress = process.env.AEMCP_SELFTEST_UNDO_STRESS === "1";
+  const stressSkip = (name) => warn(`read-only undo keeps the user's last edit: ${name}: skipped (undo-stress case; can crash After Effects; run with AEMCP_SELFTEST_UNDO_STRESS=1)`);
   await undoSafe("script calls Edit > Undo", `app.executeCommand(${UNDO});`, { refused: true });
-  await undoSafe("script calls Edit > Redo", `app.executeCommand(${REDO});`, { userUndoes: true, refused: true });
+  if (stress) await undoSafe("script calls Edit > Redo", `app.executeCommand(${REDO});`, { userUndoes: true, refused: true });
+  else stressSkip("script calls Edit > Redo");
   await undoSafe("script sets a property to its current value", "L.opacity.setValue(L.opacity.value);", { unchanged: true });
   await undoSafe("script ends the undo group early, then edits", "app.endUndoGroup(); L.opacity.setValue(33);", { refused: true });
   await undoSafe("script edits, ends the undo group, edits again", "L.opacity.setValue(33); app.endUndoGroup(); L.rotation.setValue(10);", { refused: true });
   await undoSafe("script only ends the undo group early", "app.endUndoGroup();", { refused: true });
-  await undoSafe("script calls Edit > Undo by an assembled name", `app["execute" + "Command"](${UNDO});`, { assembled: true });
-  await undoSafe("script edits, then opens an undo group by an assembled name and never closes it", `L.opacity.setValue(33); app["begin" + "UndoGroup"]("x");`, { unclosed: true });
+  if (stress) await undoSafe("script calls Edit > Undo by an assembled name", `app["execute" + "Command"](${UNDO});`, { assembled: true });
+  else stressSkip("script calls Edit > Undo by an assembled name");
+  if (stress) await undoSafe("script edits, then opens an undo group by an assembled name and never closes it", `L.opacity.setValue(33); app["begin" + "UndoGroup"]("x");`, { unclosed: true });
+  else stressSkip("script edits, then opens an undo group by an assembled name and never closes it");
   const bench = {};
   await step2(
     `read-only query on ${COMPS + 1}+ comps: fast path vs full snapshot`,
@@ -79851,6 +79856,7 @@ async function rollbackSteps(say) {
     out.push({ step: name, ok: !problem, ms, error: problem ?? void 0 });
     say(!problem, problem ? `${name}: ${problem}` : `${name} (${ms} ms)`);
   };
+  const skipStress = async (name, _fn) => warn(`${name}: skipped (undo-stress case; can crash After Effects; run with AEMCP_SELFTEST_UNDO_STRESS=1)`);
   const clean = async (problem) => problem ?? (await sentinelsLeft() ? `the rollback's temporary folder was left: ${await sentinelsLeft()}` : null);
   await step2("rollback: set up", async () => {
     const r = await runJsx(`var c = app.project.items.addComp("${P3}", 640, 360, 1, 4, 25); c.layers.addSolid([0.2, 0.4, 0.6], "${P3} solid", 64, 64, 1); return 1;`, {}, { undoGroup: "AE MCP self-test" });
@@ -79912,14 +79918,14 @@ async function rollbackSteps(say) {
     if (!refusal || !/^Nothing ran\./.test(refusal)) return `unexpected reply: ${refusal}`;
     return after.opacity === 53 ? null : `Opacity is ${after.opacity}, expected 53 (nothing ran)`;
   });
-  await step2("rollback: read-only script that closes its own undo group by an assembled name: reported, not undone again", async () => {
+  await (process.env.AEMCP_SELFTEST_UNDO_STRESS === "1" ? step2 : skipStress)("rollback: read-only script that closes its own undo group by an assembled name: reported, not undone again", async () => {
     await manualEdit(59);
     const refusal = await readOnly(`${OP} op.setValue(80); app["end" + "UndoGroup"](); op.setValue(90); return 1;`);
     const after = await state();
     if (!refusal || !/did not revert the script's changes as a whole/.test(refusal) || !/The Undo was not repeated/.test(refusal)) return `unexpected reply: ${refusal}`;
     return clean(after.opacity === 90 ? null : `Opacity is ${after.opacity}, expected 90 (only the sentinel's rename undone)`);
   });
-  await step2("rollback: read-only script that splits its undo group (assembled end + begin): reported honestly, never claims values were compared", async () => {
+  await (process.env.AEMCP_SELFTEST_UNDO_STRESS === "1" ? step2 : skipStress)("rollback: read-only script that splits its undo group (assembled end + begin): reported honestly, never claims values were compared", async () => {
     await manualEdit(61);
     const { refusal, r } = await runReadOnly(`${OP} op.setValue(80); app["end" + "UndoGroup"](); app["begin" + "UndoGroup"]("x"); return 1;`);
     const after = await state();

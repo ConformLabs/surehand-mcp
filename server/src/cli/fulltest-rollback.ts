@@ -6,6 +6,7 @@ import { runJsx } from "../jsx.js";
 import { runReadOnly } from "../tools/core.js";
 import { runBatch } from "../tools/workflow.js";
 import { sentinelsLeft } from "./fulltest-revision.js";
+import { warn } from "./util.js";
 
 export interface RollbackStep { step: string; ok: boolean; ms: number; error?: string }
 
@@ -44,6 +45,8 @@ export async function rollbackSteps(say: (ok: boolean, line: string) => void): P
     out.push({ step: name, ok: !problem, ms, error: problem ?? undefined });
     say(!problem, problem ? `${name}: ${problem}` : `${name} (${ms} ms)`);
   };
+  // undo-stress cases (see fulltest-revision.ts): only with AEMCP_SELFTEST_UNDO_STRESS=1
+  const skipStress = async (name: string, _fn: () => Promise<string | null>) => warn(`${name}: skipped (undo-stress case; can crash After Effects; run with AEMCP_SELFTEST_UNDO_STRESS=1)`);
   // every case: the rollback's temporary folder (sentinel) never stays in the project
   const clean = async (problem: string | null) => problem ?? ((await sentinelsLeft()) ? `the rollback's temporary folder was left: ${await sentinelsLeft()}` : null);
 
@@ -119,7 +122,7 @@ export async function rollbackSteps(say: (ok: boolean, line: string) => void): P
 
   // the same script with the call assembled at runtime, which the text check can't see: the rollback
   // is the backstop
-  await step("rollback: read-only script that closes its own undo group by an assembled name: reported, not undone again", async () => {
+  await (process.env.AEMCP_SELFTEST_UNDO_STRESS === "1" ? step : skipStress)("rollback: read-only script that closes its own undo group by an assembled name: reported, not undone again", async () => {
     await manualEdit(59);
     const refusal = await readOnly(`${OP} op.setValue(80); app["end" + "UndoGroup"](); op.setValue(90); return 1;`);
     const after = await state();
@@ -132,7 +135,7 @@ export async function rollbackSteps(say: (ok: boolean, line: string) => void): P
   // a script that ends its group and opens a new one (assembled names, past the text check): its first edit
   // stays in a closed undo step, the marker lands in the new group, and the one Undo reverts only that.
   // The light (read-only) snapshot can't compare values, so the reply must never claim they were compared.
-  await step("rollback: read-only script that splits its undo group (assembled end + begin): reported honestly, never claims values were compared", async () => {
+  await (process.env.AEMCP_SELFTEST_UNDO_STRESS === "1" ? step : skipStress)("rollback: read-only script that splits its undo group (assembled end + begin): reported honestly, never claims values were compared", async () => {
     await manualEdit(61);
     const { refusal, r } = await runReadOnly(`${OP} op.setValue(80); app["end" + "UndoGroup"](); app["begin" + "UndoGroup"]("x"); return 1;`);
     const after = await state();
