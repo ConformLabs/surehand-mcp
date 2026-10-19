@@ -16,6 +16,7 @@
   var UI = window.SurehandUI;
   var $ = function (id) { return document.getElementById(id); };
   var REPO_URL = "https://github.com/ConformLabs/surehand-mcp";
+  var WIKI_URL = REPO_URL + "/wiki";
   var POLL_MS = 1500;
   // a new request can't be answered for this long (no answer meant for the previous card lands on it)
   // (a little more than the bridge's 1 s, which counts from when the panel reports the card shown)
@@ -249,6 +250,8 @@
 
   // ---------- header: status, pause ----------
   function status() {
+    if (S.connecting) return { kind: "idle", tile: "gray", text: "Connecting to After Effects\u2026", short: "Connecting", connecting: true };
+    if (!isPausedNow() && !S.pending.length && UI.workingView(S.health, S.busySince ? Date.now() - S.busySince : null)) return { kind: "ready", tile: "green", text: "Working\u2026", short: "Working" };
     return UI.statusFor({
       bridgeError: S.bridgeError, paused: isPausedNow(), pendingCount: S.pending.length,
       client: UI.lastClient(S.activity), everConnected: S.activity.length > 0,
@@ -292,6 +295,7 @@
     });
   }
   $("pause").onclick = function () { setPaused(true); };
+  $("menuBtn").onclick = function () { openScreen("menu"); };
   $("resume").onclick = function () { setPaused(false); };
 
   // ---------- mode switch (config permissions.mode) ----------
@@ -309,7 +313,7 @@
     box.innerHTML = "";
     UI.MODES.forEach(function (m) {
       var on = m.id === mode;
-      var label = S.layout === "narrow" ? m.short : m.label;
+      var label = S.layout === "default" ? m.label : m.short;
       var b = el("button", { type: "button", role: "radio", "aria-checked": on ? "true" : "false", "aria-label": m.label, tabindex: on ? "0" : "-1", "data-mode": m.id });
       b.innerHTML = MODE_ICONS[m.id](on ? "#14161A" : "#C9C6BF") + "<span></span>";
       b.lastChild.textContent = label;
@@ -458,8 +462,16 @@
   function renderSetup() {
     var st = status();
     var box = $("setup");
-    box.hidden = st.kind !== "idle";
+    box.hidden = !(st.kind === "idle" && !st.connecting) && st.kind !== "problem";
     if (box.hidden) return;
+    if (st.kind === "problem") {
+      $("setupText").textContent = st.text + ".";
+      $("setupBtn").hidden = false;
+      $("setupBtn").textContent = "Test the connection";
+      $("setupBtn").onclick = function () { openScreen("test"); };
+      $("setupHint").textContent = "It finds what\u2019s wrong and how to fix it.";
+      return;
+    }
     // ChatGPT on the web has its own screen (a secure link, not a setting): not offered here
     var list = (S.clients && S.clients.list || []).filter(function (c) { return c.action !== "start"; });
     var configured = list.filter(function (c) { return c.configured; });
@@ -571,17 +583,33 @@
   var ICONS = {
     change: '<svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M5 1 9 5 5 9 1 5z" fill="#3DD68C"></path></svg>',
     problem: '<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="#FF8A80" stroke-width="1.6" aria-hidden="true"><path d="M5 1.8v4M5 7.8v.4"></path></svg>',
+    blocked: '<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="#F2C97A" stroke-width="1.5" aria-hidden="true"><circle cx="5" cy="5" r="3.6"></circle><path d="M2.5 7.5l5-5"></path></svg>',
     proof: '<svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="#3DD68C" stroke-width="1.7" aria-hidden="true"><path d="m2 5.8 2.2 2.2L9 3"></path></svg>',
     read: '<svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="#8E8B85" stroke-width="1.2" aria-hidden="true"><path d="M1 5.5S3 2 5.5 2 10 5.5 10 5.5 8 9 5.5 9 1 5.5 1 5.5z"></path><circle cx="5.5" cy="5.5" r="1.4"></circle></svg>',
     render: '<svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2.5 1.5v7L8.5 5z" fill="#14161A"></path></svg>',
   };
+  var shownWorking = "";
+  function renderWorking() {
+    var w = UI.workingView(S.health, S.busySince ? Date.now() - S.busySince : null), box = $("working");
+    var key = w ? w.text + "|" + w.time + "|" + w.line + "|" + w.waiting : "";
+    if (key === shownWorking) return;
+    shownWorking = key;
+    box.hidden = !w;
+    box.innerHTML = "";
+    if (!w) return;
+    box.className = "working" + (w.waiting ? " waiting" : "");
+    box.appendChild(el("div", { cls: "row1" }, [el("span", { cls: "wtitle" }, [el("span", { cls: "spin", "aria-hidden": "true" }), el("span", { text: w.text })]),
+      el("span", { cls: "time num", text: w.time })]));
+    if (w.line) box.appendChild(el("div", { cls: "line", text: w.line }));
+  }
+  $("allActivity").onclick = function () { openScreen("history"); };
   var shownFeed = "";
   function renderFeed(force) {
     var limit = S.layout === "wide" ? 5 : S.layout === "narrow" ? 6 : 7;
     var running = {};
     S.renders.forEach(function (r) { running[r.id] = true; });
     var items = UI.feedItems(S.activity, { limit: Math.max(1, limit - S.renders.length), undone: S.undone, runningRenders: running, current: S.current });
-    var key = JSON.stringify([S.layout, S.renders, items.map(function (i) { return [i.at, i.title, i.line, i.undoable, !!S.open[UI.entryKey(i.entry)]]; })]);
+    var key = JSON.stringify([S.layout, S.renders, S.activity.length, items.map(function (i) { return [i.at, i.title, i.line, i.undoable, !!S.open[UI.entryKey(i.entry)]]; })]);
     if (!force && key === shownFeed) return;
     shownFeed = key;
     var feed = $("feed");
@@ -589,6 +617,8 @@
     S.renders.forEach(function (r) { feed.appendChild(renderItem(r)); });
     items.forEach(function (it, k) { feed.appendChild(feedItem(it, k === 0)); });
     if (!items.length && !S.renders.length) feed.appendChild(el("div", { cls: "empty", text: "What the AI does in After Effects shows up here." }));
+    var shownEntries = items.reduce(function (n, i) { return n + (i.count || 1); }, 0);
+    $("allActivity").hidden = S.layout === "narrow" || S.activity.length <= shownEntries;
   }
   function renderItem(r) {
     var pct = r.pct === null || r.pct === undefined ? null : r.pct;
@@ -611,8 +641,8 @@
     var inline = el("span", { cls: "inline", text: (it.line ? " \u00b7 " + it.line : "") + " \u00b7 " + time });
     var row1 = el("div", { cls: "row1" }, [el("span", { style: "min-width:0;overflow:hidden;text-overflow:ellipsis" }, [title, inline]), el("span", { cls: "time", text: time })]);
     var body = el("div", { cls: "body" }, [row1]);
-    var details = it.kind === "read" && !it.line ? null : function () { toggleDetails(k); };
-    if (it.kind !== "read") body.appendChild(el("div", { cls: "line", text: it.line }));
+    var details = it.kind === "read" && !it.group ? null : function () { toggleDetails(k); };
+    body.appendChild(el("div", { cls: "line", text: it.line }));
     var acts = el("div", { cls: "acts" });
     var side = el("div", { cls: "side-act" });
     if (it.undoable) {
@@ -620,14 +650,18 @@
       side.appendChild(button("link green", "Undo", function () { undo(it); }, { "aria-label": "Undo " + it.title }));
     }
     if (it.kind === "change" || it.kind === "problem") {
-      acts.appendChild(button("link", open ? "Hide details" : "Details", details, { "aria-expanded": open ? "true" : "false" }));
+      if (first) acts.appendChild(button("link", open ? "Hide details" : "Details", details, { "aria-expanded": open ? "true" : "false" }));
       // the two-column layout has room for "Show" on problems (the boards show it there only)
       if (!it.undoable && it.kind === "problem") side.appendChild(button("link wide-only", open ? "Hide" : "Show", details, { "aria-expanded": open ? "true" : "false", "aria-label": "Show " + it.title }));
     }
-    if (acts.children.length && first) body.appendChild(acts);
-    var node = el("div", { cls: cls, role: "listitem" }, [el("span", { cls: "ico " + it.kind, html: ICONS[it.kind] }), body, side]);
+    if (acts.children.length) body.appendChild(acts);
+    var node = el("div", { cls: cls + (details ? " clickable" : ""), role: "listitem" }, [el("span", { cls: "ico " + it.kind, html: ICONS[it.kind] }), body, side]);
+    if (details) {
+      node.title = open ? "Click to hide what happened" : "Click for what happened";
+      node.onclick = function (ev) { if (ev.target.tagName !== "BUTTON" && !(window.getSelection && String(window.getSelection()))) details(); };
+    }
     if (open) {
-      var pre = el("pre", { cls: "details", text: UI.entryDetails(it.entry) });
+      var pre = el("pre", { cls: "details", text: UI.entryDetails(it.entry, it.group) });
       if (S.layout === "wide") node.appendChild(pre);
       else body.appendChild(pre);
     }
@@ -776,6 +810,7 @@
 
   // ---------- ☰ screens ----------
   var SCREENS = {
+    menu: { title: "Surehand", render: screenMenu },
     connect: { title: "Connect an AI app", render: screenConnect },
     checkpoints: { title: "Checkpoints", render: screenCheckpoints },
     history: { title: "Activity history", render: screenHistory },
@@ -785,8 +820,12 @@
     about: { title: "About & help", render: screenAbout },
   };
   var lastFocus = null, screenToken = 0;
-  function openScreen(id) {
+  function openScreen(id, from) {
     if (!S.screen) lastFocus = document.activeElement;
+    // Back from a screen opened in the menu goes to the menu; sub-screens keep their parent
+    if (from !== undefined) S.from = from;
+    else if (id === "menu" || !S.screen) S.from = null;
+    else if (S.screen === "menu") S.from = "menu";
     S.screen = id;
     screenToken++;
     $("screenTitle").textContent = SCREENS[id].title;
@@ -798,6 +837,7 @@
   }
   function closeScreen() {
     S.screen = null;
+    S.from = null;
     screenToken++;
     $("screen").hidden = true;
     if (lastFocus && lastFocus.focus) try { lastFocus.focus(); } catch (e) {}
@@ -810,11 +850,12 @@
    */
   function redrawLater() {
     var token = screenToken, id = S.screen;
-    return function () { if (id && token === screenToken && S.screen === id) openScreen(id); };
+    var from = S.from;
+    return function () { if (id && token === screenToken && S.screen === id) openScreen(id, from); };
   }
   /** Back (and Esc): a sub-screen goes back to the screen it came from. */
   function goBack() {
-    var parent = S.screen && SCREENS[S.screen] && SCREENS[S.screen].parent;
+    var parent = S.screen && SCREENS[S.screen] && SCREENS[S.screen].parent || (S.screen !== "menu" && S.from);
     if (parent) openScreen(parent);
     else closeScreen();
   }
@@ -1091,6 +1132,9 @@
     var all = S.activity.map(function (e) { return { item: UI.describeEntry(e), e: e }; });
     var filter = "all", query = "";
     var problems = all.filter(function (x) { return x.item.kind === "problem"; }).length;
+    var apps = {};
+    all.forEach(function (x) { if (x.e.client) apps[UI.clientName(x.e.client)] = true; });
+    var manyApps = Object.keys(apps).length > 1;
     var search = el("input", { id: "hsearch", placeholder: "Search layers, comps, tools\u2026", type: "search", autocomplete: "off" });
     var filters = el("div", { cls: "filters", role: "group", "aria-label": "Show" });
     [["all", "All"], ["change", "Changes"], ["problem", "Problems" + (problems ? " " + problems : "")]].forEach(function (f) {
@@ -1116,8 +1160,8 @@
         var d = UI.dayLabel(x.e.at, Date.now());
         if (d !== day) { day = d; list.appendChild(el("div", { cls: "day", text: d })); }
         var k = UI.entryKey(x.e);
-        var sub = [x.item.line, UI.clientName(x.e.client)].filter(Boolean).join(" \u00b7 ");
-        var row = el("button", { type: "button", cls: "hrow" + (x.item.kind === "problem" ? " bad" : ""), "aria-expanded": open[k] ? "true" : "false" }, [
+        var sub = [x.item.line, manyApps ? UI.clientName(x.e.client) : null].filter(Boolean).join(" \u00b7 ");
+        var row = el("button", { type: "button", cls: "hrow" + (x.item.kind === "problem" ? " bad" : x.item.kind === "blocked" ? " blocked" : ""), "aria-expanded": open[k] ? "true" : "false" }, [
           el("span", { cls: "htime", text: UI.hhmm(x.e.at) }),
           el("span", { cls: "hmain" }, [el("span", { cls: "htitle", text: x.item.title }), sub ? el("span", { cls: "hline", text: sub }) : null]),
         ]);
@@ -1165,6 +1209,9 @@
       });
     });
   }
+  var CHECK_NAMES = { update: "Updates", config: "Settings file", extension: "After Effects extension", signature: "Extension signature",
+    bridge: "Bridge", extendscript: "Scripting", node: "Node.js", server: "Server", ffmpeg: "ffmpeg", migration: "Move from 1.3" };
+  function tilde(t) { var h = os.homedir(); return h ? String(t).split(h).join("~") : String(t); }
   function showChecks(body, checks, again, note) {
     again.disabled = false;
     body.innerHTML = "";
@@ -1180,7 +1227,8 @@
     checks.forEach(function (c) {
       // the server's message says what was checked and what was found; its name ("update", "config"...) is a small label
       var name = c.name || c.label || c.title || c.id;
-      var text = c.message || name;
+      var text = tilde(c.message || name);
+      name = CHECK_NAMES[name] || (c.message ? null : name);
       var fixId = c.fix && (c.fix.connect || c.fix.client);
       var fix = fixId ? button("primary pill sm", "Fix", function () { connectClient({ id: fixId, name: c.fix.name || name }); },
         { title: c.fix.label || null, "aria-label": c.fix.label || "Fix: " + text }) : null;
@@ -1228,9 +1276,16 @@
       card.appendChild(el("div", { cls: "upd-head" }, [el("span", { cls: "v", text: checking ? "Checking\u2026" : "You\u2019re up to date" }), el("span", { cls: "have", text: "version " + current })]));
     }
     body.appendChild(card);
-    var auto = S.cfg.updateCheck === false ? "off" : "once a day";
+    var autoOn = S.cfg.updateCheck !== false;
+    var autoBtn = button("link green", autoOn ? "once a day" : "off", function () {
+      if (!writeConfig(function (cfg) { if (autoOn) cfg.updateCheck = false; else delete cfg.updateCheck; })) return;
+      S.cfg = readConfig();
+      toast(autoOn ? "Surehand won\u2019t look for updates by itself." : "Surehand looks for updates once a day.");
+      drawUpdate(body, u, checking, note);
+    }, { title: "Click to turn " + (autoOn ? "off" : "on"), "aria-label": "Check automatically: " + (autoOn ? "once a day" : "off") + ". Click to turn " + (autoOn ? "off" : "on") });
+    if (!autoOn) autoBtn.style.color = "#A9A69F";
     body.appendChild(el("div", { cls: "kv" }, [
-      el("div", {}, [el("span", { text: "Check automatically" }), el("span", { style: "color:#7FE3B2", text: auto })]),
+      el("div", {}, [el("span", { text: "Check automatically" }), autoBtn]),
       el("div", {}, [el("span", { text: "Last checked" }), el("span", { style: "color:#A9A69F", text: u && u.checkedAt ? UI.whenLabel(u.checkedAt, Date.now()) : "not yet" })]),
       button("link green", "See all release notes", function () { openUrl(REPO_URL + "/releases"); }),
     ]));
@@ -1250,13 +1305,53 @@
     }, { timeout: 180000 });
   }
 
+  // The panel's own menu (the same as After Effects' ☰ flyout, which many people never open)
+  function screenMenu(body) {
+    var upd = S.update && S.update.latest && UI.cmpVersions(S.update.latest, AEMCPBridge.VERSION) > 0;
+    function row(id, label, sub, opts) {
+      opts = opts || {};
+      var b = button("mrow" + (opts.accent ? " accent" : ""), "", function () { if (id === "diag") copyDiagnostics(); else openScreen(id, "menu"); });
+      b.appendChild(el("span", { cls: "mtext" }, [el("span", { cls: "mlabel", text: label }), sub ? el("span", { cls: "msub", text: sub }) : null]));
+      b.appendChild(el("span", { cls: "chev", text: id === "diag" ? "" : "\u203a", "aria-hidden": "true" }));
+      return b;
+    }
+    function group(title, kids) { return el("div", { cls: "mgroup" }, [el("div", { cls: "eyebrow", text: title })].concat(kids)); }
+    function choice(label, sub, options, current, onPick) {
+      var seg = el("div", { cls: "mini-seg", role: "radiogroup", "aria-label": label });
+      options.forEach(function (o) {
+        var on = o[0] === current;
+        seg.appendChild(button(on ? "on" : "", o[1], function () { if (!on) onPick(o[0]); }, { role: "radio", "aria-checked": on ? "true" : "false" }));
+      });
+      return el("div", { cls: "mset" }, [el("div", { cls: "mtext" }, [el("span", { cls: "mlabel", text: label }), el("span", { cls: "msub", text: sub })]), seg]);
+    }
+    var shell = !(S.cfg.permissions && S.cfg.permissions.allowShell === false);
+    var all = S.cfg.toolProfile === "full";
+    body.appendChild(group("Work", [
+      row("connect", "Connect an AI app", "Claude, ChatGPT, Cursor and others"),
+      row("checkpoints", "Checkpoints", "Safety copies of this project"),
+      row("history", "Activity history", "Everything the AI did, searchable"),
+    ]));
+    body.appendChild(group("Settings", [
+      choice("Tools the AI sees", all ? "All tools: more to choose from, a bigger prompt" : "Core: faster; the rest stay one call away", [["core", "Core"], ["all", "All"]], all ? "all" : "core",
+        function (v) { onMenu(v === "all" ? "toolsAll" : "toolsCore"); openScreen("menu"); }),
+      choice("Shell commands in scripts", shell ? "Scripts may run programs on this computer" : "Scripts can\u2019t run programs", [["yes", "Allowed"], ["no", "Off"]], shell ? "yes" : "no",
+        function (v) { onMenu(v === "yes" ? "shellYes" : "shellNo"); openScreen("menu"); }),
+    ]));
+    body.appendChild(group("Help", [
+      row("test", "Test the connection", "Finds what\u2019s wrong and how to fix it"),
+      row("diag", "Copy diagnostics", "For a bug report or a chat"),
+      row("update", "Updates", "Version " + AEMCPBridge.VERSION + (upd ? " \u00b7 " + S.update.latest + " is ready" : ""), { accent: upd }),
+      row("about", "About & help", null),
+    ]));
+  }
+
   // About & help
   function screenAbout(body) {
     var logo = '<svg width="64" height="64" viewBox="0 0 200 200" role="img" aria-label="Surehand MCP"><rect width="200" height="200" rx="46" fill="#3DD68C"></rect><g transform="translate(28 28) scale(0.72)"><path d="M150 62 C128 18 50.5 50.5 78.8 78.8 L121.2 121.2 C149.5 149.5 72 182 50 138" fill="none" stroke="#14161A" stroke-width="20" stroke-linecap="round"></path><line x1="57.6" y1="57.6" x2="142.4" y2="142.4" stroke="#14161A" stroke-width="8" stroke-linecap="round"></line><circle cx="57.6" cy="57.6" r="12" fill="#14161A"></circle><circle cx="142.4" cy="142.4" r="12" fill="#14161A"></circle><rect x="87" y="87" width="26" height="26" fill="#3DD68C" stroke="#14161A" stroke-width="8"></rect></g></svg>';
     body.appendChild(el("div", { cls: "about" }, [el("span", { html: logo }),
       el("div", {}, [el("div", { cls: "t", text: "Surehand MCP" }), el("div", { cls: "s", text: "for Adobe\u00ae After Effects\u00ae \u00b7 version " + AEMCPBridge.VERSION })])]));
     var links = el("div", { cls: "links" });
-    [["Getting started", REPO_URL + "#readme"], ["Troubleshooting", REPO_URL + "#troubleshooting"], ["Report a problem", REPO_URL + "/issues"]].forEach(function (l) {
+    [["Getting started", WIKI_URL], ["The Surehand panel", WIKI_URL + "/The-Surehand-panel"], ["Troubleshooting", WIKI_URL + "/Troubleshooting"], ["Report a problem", REPO_URL + "/issues"]].forEach(function (l) {
       var b = button("", "", function () { openUrl(l[1]); });
       b.appendChild(el("span", { text: l[0] }));
       b.appendChild(el("span", { text: "\u203a", "aria-hidden": "true" }));
@@ -1277,8 +1372,17 @@
     renderModes();
     call("GET", "/health", null, function (err, h) {
       if (err) {
-        // the bridge extension starts with After Effects: give it ~8 s before starting the panel's own
+        S.health = null;
         healthFailures++;
+        // It answered before, so it runs: the bridge lives inside After Effects and can't answer while After
+        // Effects runs something long (a script, a dialog). Never start a second bridge then.
+        if (S.lastHealthyAt) {
+          S.busySince = S.busySince || S.lastHealthyAt;
+          renderWorking();
+          renderHeader();
+          return;
+        }
+        // the bridge extension starts with After Effects: give it ~8 s before starting the panel's own
         if (!triedStart && healthFailures >= START_AFTER_FAILURES) {
           triedStart = true;
           AEMCPBridge.start();
@@ -1286,11 +1390,16 @@
           return;
         }
         if (!triedStart) findMyPort(function () {}); // the real bridge may have registered meanwhile
-        S.bridgeError = AEMCPBridge.state.error ? "Bridge problem: " + AEMCPBridge.state.error : "Bridge not running";
+        S.bridgeError = AEMCPBridge.state.error ? "Bridge problem: " + AEMCPBridge.state.error
+          : healthFailures < START_AFTER_FAILURES && !triedStart ? null : "Not connected to After Effects";
+        S.connecting = !S.bridgeError && !S.health;
         renderHeader();
         return;
       }
       healthFailures = 0;
+      S.connecting = false;
+      S.lastHealthyAt = Date.now();
+      S.busySince = null;
       if (++yieldTick % 5 === 0) yieldOwnBridge();
       S.health = h;
       S.bridgeError = h.configProblem && h.authorized === false ? "Settings file can\u2019t be read: " + h.configProblem
@@ -1300,6 +1409,7 @@
       if (!secret()) Control.hello();
       if (!S.bridgeError) pollPending(); // cheap local request; also the panel's heartbeat for the bridge
       updateCurrent();
+      renderWorking();
     });
     readActivity();
     S.renders = readRenders();
