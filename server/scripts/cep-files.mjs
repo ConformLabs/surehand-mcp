@@ -16,7 +16,11 @@ export function readCepFiles(version) {
       const p = join(dir, name);
       if (name.startsWith(".")) continue;
       if (statSync(p).isDirectory()) walk(p);
-      else files[relative(CEP_ROOT, p).split(sep).join("/")] = readFileSync(p, "utf8").replaceAll("__AEMCP_VERSION__", version);
+      else {
+        const rel = relative(CEP_ROOT, p).split(sep).join("/");
+        // CEP manifest versions are numeric (x.y.z): a pre-release such as 1.4.0-beta.1 is 1.4.0 there
+        files[rel] = readFileSync(p, "utf8").replaceAll("__AEMCP_VERSION__", rel === "CSXS/manifest.xml" ? version.replace(/[-+].*$/, "") : version);
+      }
     }
   })(CEP_ROOT);
   return files;

@@ -1,12 +1,16 @@
 // Cuts a release in one go:
 //   version bump -> sign the AE extension -> check (types, tests, build) -> Mac + Windows tests ->
-//   package -> release pull request -> wait for its CI -> merge -> GitHub release with the zip, .mcpb
+//   package -> signed installers (Windows .exe, notarized Mac .pkg) -> release pull request -> wait for its CI -> merge -> GitHub release with the zip, .mcpb
 //   and server file, on the merged commit.
 //
 //   npm run release -- 1.3.2 --notes notes.md
 //   options: --skip-mac       don't run the Mac test (scripts/test-mac.mjs: needs After Effects open here)
 //            --skip-windows   don't run the Windows test (scripts/test-windows.mjs)
 //            --draft          create the GitHub release as a draft
+//            --skip-installers  don't build the installers (no SimplySign / Apple notarization needed)
+//   A pre-release version (1.4.0-beta.1) becomes a GitHub pre-release: `ae-mcp update` ignores those.
+//   The installers need SimplySign Desktop logged in (Windows signing) and the "aemcp-notary" keychain
+//   profile (Apple notarization, which can take a while); both are checked before anything changes.
 //
 // main only accepts changes through a pull request with green CI (a GitHub ruleset), so the release
 // commit goes on a release/X.Y.Z branch with its own PR. Stops at the first failure: nothing is pushed
@@ -23,7 +27,9 @@ const ROOT = join(SERVER, "..");
 const args = process.argv.slice(2);
 const flag = (n) => args.includes(n);
 const opt = (n) => (args.indexOf(n) >= 0 ? args[args.indexOf(n) + 1] : undefined);
-const version = args.find((a) => /^\d+\.\d+\.\d+$/.test(a));
+const version = args.find((a) => /^\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$/.test(a));
+const prerelease = version?.includes("-");
+const installers = !flag("--skip-installers");
 const notes = opt("--notes") && resolve(process.cwd(), opt("--notes"));
 const tag = `v${version}`;
 
@@ -37,15 +43,30 @@ const run = (cmd, a, cwd = SERVER) => {
   const r = spawnSync(cmd, a, { cwd, stdio: "inherit" });
   if (r.status !== 0) die(`${cmd} ${a.join(" ")} failed`);
 };
+// same order as compareVersions in src/update.ts: 1.4.0-beta.1 < 1.4.0-beta.2 < 1.4.0
 const newer = (a, b) => {
-  const [x, y] = [a, b].map((v) => v.split(".").map(Number));
-  for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] > y[i];
+  const parse = (v) => {
+    const [core, pre] = v.split(/-(.*)/s);
+    return { n: core.split(".").map(Number), pre: pre ? pre.split(".") : null };
+  };
+  const x = parse(a), y = parse(b);
+  for (let i = 0; i < 3; i++) if (x.n[i] !== y.n[i]) return x.n[i] > y.n[i];
+  if (!x.pre || !y.pre) return !x.pre && !!y.pre;
+  for (let i = 0; i < Math.max(x.pre.length, y.pre.length); i++) {
+    const p = x.pre[i], q = y.pre[i];
+    if (p === undefined || q === undefined) return q === undefined;
+    if (p === q) continue;
+    const np = /^\d+$/.test(p), nq = /^\d+$/.test(q);
+    if (np && nq) return Number(p) > Number(q);
+    if (np !== nq) return nq;
+    return p > q;
+  }
   return false;
 };
 
 // --- preflight: everything that can be checked before changing anything ---
 step("checks before starting");
-if (!version || !notes) die("usage: npm run release -- <x.y.z> --notes <notes.md> [--skip-mac] [--skip-windows] [--draft]");
+if (!version || !notes) die("usage: npm run release -- <x.y.z[-beta.n]> --notes <notes.md> [--skip-mac] [--skip-windows] [--skip-installers] [--draft]");
 if (!existsSync(notes)) die(`notes file not found: ${notes}`);
 const pkg = JSON.parse(readFileSync(join(SERVER, "package.json"), "utf8"));
 if (!newer(version, pkg.version)) die(`${version} is not newer than the current ${pkg.version}`);
@@ -60,7 +81,13 @@ const branch = `release/${version}`;
 if (sh("git", ["ls-remote", "--heads", "origin", branch])) die(`branch ${branch} already exists on GitHub: delete it or finish that release first`);
 const repo = sh("gh", ["repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"]);
 if (spawnSync("gh", ["auth", "status"], { stdio: "ignore" }).status !== 0) die("gh is not logged in");
-console.log(`releasing ${pkg.version} -> ${version}`);
+if (installers) {
+  if (spawnSync(process.execPath, [join(SERVER, "scripts", "sign-win.mjs"), "--check"], { stdio: "inherit" }).status !== 0)
+    die("Windows signing isn't available: log in to SimplySign Desktop (or pass --skip-installers)");
+  if (spawnSync("xcrun", ["notarytool", "history", "--keychain-profile", "aemcp-notary"], { stdio: "ignore" }).status !== 0)
+    die('Apple notarization isn\'t set up: the keychain profile "aemcp-notary" is missing (or pass --skip-installers)');
+}
+console.log(`releasing ${pkg.version} -> ${version}${prerelease ? " (pre-release)" : ""}`);
 
 step("version");
 run("npm", ["version", version, "--no-git-tag-version"]);
@@ -95,7 +122,15 @@ const digest = await new Promise((ok, bad) => {
   createReadStream(serverFile).on("data", (d) => h.update(d)).on("end", () => ok(h.digest("hex"))).on("error", bad);
 });
 writeFileSync(`${serverFile}.sha256`, `${digest}  ae-mcp.mjs\n`);
-for (const f of [zip, mcpb, serverFile]) if (!existsSync(f)) die(`missing ${f}`);
+const assets = [zip, mcpb, serverFile, `${serverFile}.sha256`];
+if (installers) {
+  step("Windows installer (signed)");
+  run("npm", ["run", "package:win-installer", "--", "--sign"]);
+  step("Mac installer (signed, notarized)");
+  run("npm", ["run", "package:mac-pkg", "--", "--notary-timeout", "2h"]);
+  assets.push(join(dist, `Surehand-MCP-Setup-${version}.exe`), join(dist, `Surehand-MCP-${version}.pkg`));
+}
+for (const f of assets) if (!existsSync(f)) die(`missing ${f}`);
 
 step(`release pull request (${branch})`);
 sh("git", ["checkout", "-q", "-b", branch]);
@@ -133,5 +168,5 @@ sh("git", ["branch", "-q", "-D", branch]);
 console.log(`main is at ${sha.slice(0, 7)}`);
 
 step("GitHub release");
-run("gh", ["release", "create", tag, zip, mcpb, serverFile, `${serverFile}.sha256`, "--target", sha, "--title", tag, "--notes-file", notes, ...(flag("--draft") ? ["--draft"] : [])], ROOT);
+run("gh", ["release", "create", tag, ...assets, "--target", sha, "--title", tag, "--notes-file", notes, ...(prerelease ? ["--prerelease"] : []), ...(flag("--draft") ? ["--draft"] : [])], ROOT);
 console.log(`\n✔ released ${tag}: ${sh("gh", ["release", "view", tag, "--json", "url", "--jq", ".url"])}`);

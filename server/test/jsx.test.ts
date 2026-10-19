@@ -107,6 +107,12 @@ describe("update check", () => {
     expect(compareVersions("1.1.0", "1.0.9")).toBe(1);
     expect(compareVersions("v1.0.0", "1.0.0")).toBe(0);
     expect(compareVersions("1.0.0", "1.10.0")).toBe(-1);
+    expect(compareVersions("1.4.0-beta.1", "1.4.0")).toBe(-1);
+    expect(compareVersions("1.4.0", "1.4.0-beta.2")).toBe(1);
+    expect(compareVersions("1.4.0-beta.2", "1.4.0-beta.10")).toBe(-1);
+    expect(compareVersions("1.4.0-beta.1", "1.3.4")).toBe(1);
+    expect(compareVersions("v1.4.0-rc.1", "1.4.0-beta.9")).toBe(1);
+    expect(compareVersions("1.4.0-beta.1", "1.4.0-beta.1")).toBe(0);
   });
 });
 

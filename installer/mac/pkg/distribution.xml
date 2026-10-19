@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Template for npm run package:mac-pkg: server/scripts/package-mac-pkg.mjs fills in the version and component package name. -->
+<installer-gui-script minSpecVersion="2">
+    <title>Surehand MCP</title>
+    <welcome file="welcome.html" mime-type="text/html"/>
+    <conclusion file="conclusion.html" mime-type="text/html"/>
+    <options customize="never" require-scripts="false" hostArchitectures="arm64,x86_64"/>
+    <!-- Per-user install into the home folder only: no administrator password, nothing outside ~ is touched. -->
+    <domains enable_anywhere="false" enable_currentUserHome="true" enable_localSystem="false"/>
+    <installation-check script="checkOS()"/>
+    <script><![CDATA[
+function checkOS() {
+    // the bundled Node.js 24 needs macOS 13.5 or later
+    if (system.compareVersions(system.version.ProductVersion, '13.5') < 0) {
+        my.result.type = 'Fatal';
+        my.result.title = 'macOS 13.5 or later is required';
+        my.result.message = 'Surehand MCP needs macOS Ventura 13.5 or later.';
+        return false;
+    }
+    return true;
+}
+    ]]></script>
+    <choices-outline>
+        <line choice="default"/>
+    </choices-outline>
+    <choice id="default" title="Surehand MCP">
+        <pkg-ref id="com.conformlabs.surehand-mcp"/>
+    </choice>
+    <pkg-ref id="com.conformlabs.surehand-mcp" version="@VERSION@" onConclusion="none">@COMPONENT_PKG@</pkg-ref>
+</installer-gui-script>

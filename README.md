@@ -312,11 +312,14 @@ server/              MCP server (TypeScript) -> bundled into server/dist/ae-mcp.
   src/cli/             install / uninstall / selftest / chatgpt / setup commands (ae-mcp <command>)
   scripts/smoke.mjs    end-to-end test against a running After Effects
   scripts/package.mjs  builds the shareable release folder, zip and .mcpb
-  scripts/release.mjs  cuts a release: version, sign, check, Mac + Windows tests, package, release PR, CI, merge, GitHub release
+  scripts/release.mjs  cuts a release: version, sign, check, Mac + Windows tests, package, installers, release PR, CI, merge, GitHub release
   scripts/test-mac.mjs      installs the build on this Mac and runs the full self-test on each open After Effects
   scripts/test-windows.mjs  the same on a Windows PC over SSH
   scripts/test-guard.mjs    lock and build checks so parallel test:mac runs don't test each other's build
   scripts/sign-extension.mjs  signs the After Effects extension
+  scripts/package-mac-pkg.mjs        the signed, notarized Mac installer (.pkg)
+  scripts/package-win-installer.mjs  the Windows installer (.exe, NSIS, built on the Mac)
+  scripts/sign-win.mjs               signs Windows files with the Certum certificate (SimplySign)
   scripts/ci-check.mjs assertions for the CI install / uninstall dry runs
 extension/           After Effects extension (signed): invisible bridge (auto-starts) + status panel
 installer/           run.sh / run.ps1: find or download Node.js, then run an ae-mcp command
@@ -338,7 +341,10 @@ npm run sign             # re-sign the After Effects extension after changing ex
 npm run test:mac         # install this build here and run the full self-test on each open After Effects
                          # (one run per Mac at a time: waits for ~/.aemcp/test-mac.lock; reports the commit tested)
 npm run test:windows     # the same on the Windows PC over SSH
+npm run package:mac-pkg       # -> ../dist-zip/Surehand-MCP-<version>.pkg, signed and notarized (--no-notarize: faster)
+npm run package:win-installer # -> ../dist-zip/Surehand-MCP-Setup-<version>.exe (--sign: needs SimplySign logged in)
 npm run release -- 1.4.0 --notes notes.md   # everything above, then a release PR, its CI, merge and the GitHub release
+                                            # (1.4.0-beta.1 makes a GitHub pre-release; --skip-installers skips both installers)
 ```
 
 The After Effects extension in `extension/` is embedded in the server bundle at build time, and the server installs

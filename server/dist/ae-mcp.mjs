@@ -65461,9 +65461,22 @@ var RELEASES_URL = `https://github.com/${REPO}/releases/latest`;
 var CACHE = join2(homedir2(), ".aemcp", "update-check.json");
 var DAY = 24 * 3600 * 1e3;
 function compareVersions(a, b) {
-  const pa = a.replace(/^v/, "").split(/[.-]/).map((x) => parseInt(x, 10) || 0);
-  const pb = b.replace(/^v/, "").split(/[.-]/).map((x) => parseInt(x, 10) || 0);
-  for (let i = 0; i < 3; i++) if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) > (pb[i] ?? 0) ? 1 : -1;
+  const parse3 = (v) => {
+    const [core, pre] = v.replace(/^v/, "").split(/-(.*)/s);
+    return { n: core.split(".").map((x) => parseInt(x, 10) || 0), pre: pre ? pre.split(".") : null };
+  };
+  const pa = parse3(a), pb = parse3(b);
+  for (let i = 0; i < 3; i++) if ((pa.n[i] ?? 0) !== (pb.n[i] ?? 0)) return (pa.n[i] ?? 0) > (pb.n[i] ?? 0) ? 1 : -1;
+  if (!pa.pre || !pb.pre) return pa.pre ? -1 : pb.pre ? 1 : 0;
+  for (let i = 0; i < Math.max(pa.pre.length, pb.pre.length); i++) {
+    const x = pa.pre[i], y = pb.pre[i];
+    if (x === void 0 || y === void 0) return x === void 0 ? -1 : 1;
+    if (x === y) continue;
+    const nx = /^\d+$/.test(x), ny = /^\d+$/.test(y);
+    if (nx && ny) return Number(x) > Number(y) ? 1 : -1;
+    if (nx !== ny) return nx ? -1 : 1;
+    return x > y ? 1 : -1;
+  }
   return 0;
 }
 function updateCheckEnabled() {
@@ -80383,18 +80396,39 @@ Surehand MCP update`));
 init_define_AEMCP_CEP_FILES();
 import { existsSync as existsSync12, readdirSync as readdirSync6, readFileSync as readFileSync14, rmSync as rmSync4, writeFileSync as writeFileSync9 } from "node:fs";
 import { join as join14 } from "node:path";
+var OWN_FILES = [
+  "server",
+  "config.json",
+  "runtime.json",
+  "extension-hash",
+  "bridge-status.json",
+  "instances",
+  "update-check.json",
+  "activity.jsonl",
+  "tmp",
+  "renders",
+  "compat",
+  "install.log"
+];
 function uninstall(argv) {
   console.log(bold("\nSurehand MCP uninstaller\n"));
   const keepConfig = argv.includes("--keep-config");
+  const all = argv.includes("--all");
   if (existsSync12(extensionDir())) {
     rmSync4(extensionDir(), { recursive: true, force: true });
     ok(`Removed the After Effects extension`);
   }
+  const kept = [];
   if (existsSync12(AEMCP_DIR)) {
-    for (const name of readdirSync6(AEMCP_DIR))
-      if (name !== "node" && !(keepConfig && name === "config.json")) rmSync4(join14(AEMCP_DIR, name), { recursive: true, force: true });
+    for (const name of readdirSync6(AEMCP_DIR)) {
+      if (name === "node" || keepConfig && name === "config.json") continue;
+      if (all || OWN_FILES.includes(name)) rmSync4(join14(AEMCP_DIR, name), { recursive: true, force: true });
+      else kept.push(name);
+    }
+    if (!readdirSync6(AEMCP_DIR).length) rmSync4(AEMCP_DIR, { recursive: true, force: true });
   }
-  ok(keepConfig ? "Removed the server (kept ~/.aemcp/config.json)" : `Removed ${AEMCP_DIR}`);
+  ok(keepConfig ? "Removed the server (kept ~/.aemcp/config.json)" : "Removed the server");
+  if (kept.length) warn(`Kept your files in ${AEMCP_DIR}: ${kept.join(", ")} (delete them yourself, or uninstall with --all)`);
   for (const [label, file2] of [["Claude Desktop", claudeDesktopConfig()], ["Cursor", cursorConfig()], ["Claude Code", claudeCodeConfig()]]) {
     const data = readJson(file2, null);
     if (data?.mcpServers?.[SERVER_NAME]) {
@@ -80907,7 +80941,7 @@ Usage:
                          run over Streamable HTTP at /mcp (ChatGPT via a tunnel)
   ae-mcp install [--skip-clients] [--no-claude-desktop|--no-claude-code|--no-cursor|--no-codex]
                          install the server + After Effects extension and connect AI apps
-  ae-mcp uninstall [--keep-config]
+  ae-mcp uninstall [--keep-config] [--all]   (keeps checkpoints and files that are not ours unless --all)
   ae-mcp selftest [--full]  check the installation and the connection to After Effects;
                          --full also runs every major tool and saves a compatibility report
   ae-mcp diagnostics     print a report to paste into a bug report (no secrets)

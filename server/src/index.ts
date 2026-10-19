@@ -95,7 +95,7 @@ Usage:
                          run over Streamable HTTP at /mcp (ChatGPT via a tunnel)
   ae-mcp install [--skip-clients] [--no-claude-desktop|--no-claude-code|--no-cursor|--no-codex]
                          install the server + After Effects extension and connect AI apps
-  ae-mcp uninstall [--keep-config]
+  ae-mcp uninstall [--keep-config] [--all]   (keeps checkpoints and files that are not ours unless --all)
   ae-mcp selftest [--full]  check the installation and the connection to After Effects;
                          --full also runs every major tool and saves a compatibility report
   ae-mcp diagnostics     print a report to paste into a bug report (no secrets)

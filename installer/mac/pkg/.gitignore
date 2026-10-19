@@ -1,0 +1,3 @@
+# downloads (Node.js) and intermediate build output of npm run package:mac-pkg
+.cache/
+build/
