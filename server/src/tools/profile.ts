@@ -88,7 +88,8 @@ export function applyProfile(server: McpServer, profile: ToolProfile): Map<strin
     const wrapped = async (args: any, extra: any) => {
       const t0 = Date.now();
       let result: any;
-      const ctx: CallContext = { tool: name, signal: extra?.signal };
+      const client: string | undefined = (server.server as any).getClientVersion?.()?.name;
+      const ctx: CallContext = { tool: name, signal: extra?.signal, client };
       try {
         result = await callContext.run(ctx, () => cb(args, extra));
         return result;

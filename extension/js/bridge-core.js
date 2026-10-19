@@ -1,10 +1,19 @@
 /* Surehand MCP bridge: a tiny HTTP server inside After Effects (CEP + Node) that evaluates
- * ExtendScript sent by the ae-mcp server. Binds to 127.0.0.1 only and requires the
- * shared token from ~/.aemcp/config.json.
+ * ExtendScript sent by the MCP server. Binds to 127.0.0.1 only and requires the shared token
+ * from the config file (~/.surehand/ae/config.json, or ~/.aemcp/config.json on a 1.3 install
+ * that has not been migrated: see paths.js, which must be loaded first).
  *
  * Several After Effects instances (e.g. 2025 and 2026) can run at once: each bridge takes the
- * first free port from bridgePort upwards and registers itself in ~/.aemcp/instances/, so the
- * server can list them and pick one. */
+ * first free port from bridgePort upwards and registers itself in the instances folder next to
+ * the config, so the server can list them and pick one.
+ *
+ * The bridge is the single source of truth for approvals ("ask" mode) and for "Pause AI":
+ * - pending approvals live here; the panel and the approval pop-up only show them and answer
+ *   through /approve, which accepts the first answer and refuses any later one;
+ * - the panel and the pop-up poll /pending?ui=panel|popup, which doubles as a heartbeat: when a
+ *   request waits and neither is showing, the bridge opens the pop-up (com.aemcp.approval);
+ * - while the config says "paused": true, every call from the AI is refused at once (nothing
+ *   runs); the panel's own calls (marked fromPanel) still run. */
 (function (global) {
   "use strict";
   var nodeRequire = typeof require !== "undefined" ? require : global.cep_node && global.cep_node.require;
@@ -13,24 +22,31 @@
   var os = nodeRequire("os");
   var path = nodeRequire("path");
   var crypto = nodeRequire("crypto");
+  var querystring = nodeRequire("querystring");
 
   var VERSION = "__AEMCP_VERSION__"; // replaced with the release version at build time
-  var CONFIG_DIR = path.join(os.homedir(), ".aemcp");
-  var CONFIG_FILE = path.join(CONFIG_DIR, "config.json");
-  var STATUS_FILE = path.join(CONFIG_DIR, "bridge-status.json");
-  var INSTANCES_DIR = path.join(CONFIG_DIR, "instances");
   var PANEL_ID = "com.aemcp.panel";
+  var POPUP_ID = "com.aemcp.approval";
   var PORT_RANGE = 10;
+  var APPROVAL_TIMEOUT_MS = 10 * 60 * 1000;
+  // the panel / pop-up poll every 1.5s: without a poll for this long it is closed (or frozen)
+  var UI_STALE_MS = 4000;
+  // a pop-up that was asked to open gets this long to load and report in
+  var POPUP_GRACE_MS = 6000;
+  var PAUSED_MESSAGE = "Paused in the Surehand panel: nothing was run. Ask the user to resume.";
+
+  function paths() { return global.SurehandPaths.current(nodeRequire); }
 
   function loadConfig() {
+    var file = paths().config;
     var cfg = {};
-    try { cfg = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf8")); } catch (e) {}
+    try { cfg = JSON.parse(fs.readFileSync(file, "utf8")); } catch (e) {}
     var changed = false;
     if (!cfg.token) { cfg.token = crypto.randomBytes(24).toString("hex"); changed = true; }
     if (!cfg.bridgePort) { cfg.bridgePort = 8765; changed = true; }
     if (!cfg.httpPort) { cfg.httpPort = 8766; changed = true; }
     if (changed) {
-      try { fs.mkdirSync(CONFIG_DIR, { recursive: true }); fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2)); } catch (e) {}
+      try { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, JSON.stringify(cfg, null, 2)); } catch (e) {}
     }
     return cfg;
   }
@@ -56,23 +72,77 @@
     current: null, // { startedAt, label } of the script being evaluated
     pending: [], // edits waiting for approval in "ask" mode
     lastActivated: null,
+    pause: null, // { key, refused } while the config says paused
+    // heartbeats of the panel / pop-up, when the bridge asked for the pop-up, which requests were shown
+    ui: { panel: null, popup: null, requestedAt: 0, fellBackFor: 0, presented: {} },
   };
+
+  // ---------- pause ----------
+  /** Is the AI paused (config "paused": true)? Counts refusals per pause (pausedAt). */
+  function isPaused() {
+    var cfg = {};
+    try { cfg = JSON.parse(fs.readFileSync(paths().config, "utf8")); } catch (e) {}
+    if (!cfg.paused) { state.pause = null; return false; }
+    var key = String(cfg.pausedAt || "on");
+    if (!state.pause || state.pause.key !== key) state.pause = { key: key, since: cfg.pausedAt || null, refused: 0 };
+    return true;
+  }
+  function pauseInfo() { return isPaused() ? { since: state.pause.since, refused: state.pause.refused } : null; }
+  function refusePaused(label) {
+    if (state.pause) state.pause.refused++;
+    addLog({ at: new Date().toISOString(), ms: 0, ok: false, paused: true, label: label || null, preview: "refused: paused in the Surehand panel" });
+    return { ok: false, paused: true, error: PAUSED_MESSAGE };
+  }
+
+  // ---------- approval pop-up ----------
+  /**
+   * Pure decision: should the bridge open the approval pop-up now? `s`: { now, pending: [ids],
+   * presented: {id: true}, panel / popup: { at, visible } (last poll), requestedAt (last open request),
+   * fellBackFor (the requestedAt for which the panel was opened instead) }.
+   * Returns { open, openPanel, present } (present: mark the pending ids as shown to the user).
+   */
+  function popupDecision(s) {
+    var none = { open: false, openPanel: false, present: false };
+    var ids = s.pending || [];
+    if (!ids.length) return none;
+    var panelShowing = !!(s.panel && s.now - s.panel.at < UI_STALE_MS && s.panel.visible !== false);
+    var popupShowing = !!(s.popup && s.now - s.popup.at < UI_STALE_MS);
+    if (panelShowing || popupShowing) return { open: false, openPanel: false, present: true };
+    if (s.requestedAt && s.now - s.requestedAt < POPUP_GRACE_MS) return none; // still opening
+    // asked for the pop-up, but it never reported in (not supported here?): open the panel instead, once
+    if (s.requestedAt && s.fellBackFor !== s.requestedAt && (!s.popup || s.popup.at < s.requestedAt)) return { open: false, openPanel: true, present: true };
+    var fresh = ids.filter(function (id) { return !(s.presented && s.presented[id]); }).length;
+    return { open: fresh > 0, openPanel: false, present: fresh > 0 };
+  }
+
+  function checkPopup() {
+    var ui = state.ui, now = Date.now();
+    var ids = state.pending.map(function (p) { return p.id; });
+    var d = popupDecision({ now: now, pending: ids, presented: ui.presented, panel: ui.panel, popup: ui.popup, requestedAt: ui.requestedAt, fellBackFor: ui.fellBackFor });
+    if (d.present) ids.forEach(function (id) { ui.presented[id] = true; });
+    if (d.openPanel) { ui.fellBackFor = ui.requestedAt; openExtension(PANEL_ID); }
+    if (d.open) { ui.requestedAt = now; openExtension(POPUP_ID); }
+    // forget answered requests
+    Object.keys(ui.presented).forEach(function (id) { if (ids.indexOf(id) < 0) delete ui.presented[id]; });
+    return d;
+  }
 
   function addLog(entry) {
     state.log.unshift(entry);
     if (state.log.length > 50) state.log.length = 50;
   }
 
-  function instanceFile() { return path.join(INSTANCES_DIR, String(state.port) + ".json"); }
+  function instanceFile() { return path.join(paths().instances, String(state.port) + ".json"); }
 
   function writeStatus() {
     var info = {
       listening: state.listening, port: state.port, error: state.error, pid: process.pid, host: hostInfo(), version: VERSION,
       startedAt: state.startedAt, lastActivated: state.lastActivated, at: new Date().toISOString(),
     };
-    try { fs.writeFileSync(STATUS_FILE, JSON.stringify(info, null, 2)); } catch (e) {}
+    var p = paths();
+    try { fs.mkdirSync(p.dir, { recursive: true }); fs.writeFileSync(p.bridgeStatus, JSON.stringify(info, null, 2)); } catch (e) {}
     if (state.listening) {
-      try { fs.mkdirSync(INSTANCES_DIR, { recursive: true }); fs.writeFileSync(instanceFile(), JSON.stringify(info, null, 2)); } catch (e) {}
+      try { fs.mkdirSync(p.instances, { recursive: true }); fs.writeFileSync(instanceFile(), JSON.stringify(info, null, 2)); } catch (e) {}
     }
   }
 
@@ -98,6 +168,8 @@
     if (state.busy || !state.queue.length) return;
     var job = state.queue.shift();
     if (dead(job)) { skip(job); return pump(); }
+    // paused while it waited in the queue: it hasn't started, so it never will
+    if (!job.fromPanel && isPaused()) { job.fail(200, refusePaused(job.label)); return pump(); }
     state.busy = true;
     // waiting: the no-op has not come back yet, so After Effects isn't taking scripts right now
     state.current = { startedAt: Date.now(), label: job.label, waiting: true };
@@ -106,6 +178,12 @@
         state.busy = false;
         state.current = null;
         skip(job);
+        return pump();
+      }
+      if (!job.fromPanel && isPaused()) {
+        state.busy = false;
+        state.current = null;
+        job.fail(200, refusePaused(job.label));
         return pump();
       }
       state.current.waiting = false;
@@ -146,8 +224,8 @@
     });
   }
 
-  function openPanel() {
-    try { global.__adobe_cep__.requestOpenExtension(PANEL_ID, ""); } catch (e) {}
+  function openExtension(id) {
+    try { global.__adobe_cep__.requestOpenExtension(id, ""); } catch (e) {}
   }
 
   function health(req, token) {
@@ -158,12 +236,15 @@
       // AE has not accepted the no-op sent before the current job: a dialog is open, or AE is busy/starting
       waitingForAE: !!(cur && cur.waiting), waitingForMs: cur && cur.waiting ? Date.now() - cur.startedAt : 0,
       queue: state.queue.length, pendingApprovals: state.pending.length, permissionMode: permissionMode(),
+      paused: pauseInfo(),
       startedAt: state.startedAt, lastActivated: state.lastActivated, authorized: authorized(req, token),
     };
   }
 
   function handleEval(req, res, body) {
     if (!body || typeof body.script !== "string") return send(res, 400, { ok: false, error: "missing script" });
+    // paused in the panel: refuse at once, so the AI stops instead of waiting (the panel's own calls still run)
+    if (!body.fromPanel && isPaused()) return send(res, 200, refusePaused(body.label || (body.approval && body.approval.tool)));
     var finished = false;
     var timer = null;
     var watch = null;
@@ -180,7 +261,9 @@
     var job = {
       script: body.script,
       label: body.label || null,
+      fromPanel: !!body.fromPanel,
       done: function (result) { finish(200, { ok: true, result: result }); },
+      fail: function (status, obj) { finish(status, obj); },
     };
     var timeoutMs = Math.max(1000, Math.min(Number(body.timeoutMs) || 120000, 24 * 3600 * 1000));
     // optional (sent by newer servers): give up early if After Effects hasn't accepted any script for
@@ -222,23 +305,35 @@
 
     if (body.approval && permissionMode() === "ask") {
       // hold the edit until the user allows or denies it in the Surehand MCP panel
+      var now = Date.now();
       var p = {
-        id: crypto.randomBytes(6).toString("hex"), at: new Date().toISOString(), tool: body.approval.tool || "edit",
-        summary: String(body.approval.summary || "").slice(0, 4000), job: job,
+        id: crypto.randomBytes(6).toString("hex"), at: new Date(now).toISOString(), deadline: new Date(now + APPROVAL_TIMEOUT_MS).toISOString(),
+        tool: body.approval.tool || "edit", summary: String(body.approval.summary || "").slice(0, 4000),
+        client: body.approval.client ? String(body.approval.client).slice(0, 80) : undefined, job: job, answered: false,
       };
-      p.resolve = function (allow) {
+      // the one place an approval is answered: the first answer wins, any later one is refused (returns false)
+      p.resolve = function (allow, by) {
+        if (p.answered) return false;
+        p.answered = true;
         state.pending = state.pending.filter(function (x) { return x !== p; });
-        if (finished) return;
+        if (finished) return true;
         if (!allow) {
-          addLog({ at: new Date().toISOString(), ms: 0, ok: false, label: p.tool, preview: "denied in the Surehand MCP panel" });
-          return finish(200, { ok: false, denied: true, error: "The user denied this change in After Effects (Surehand MCP panel)." });
+          addLog({ at: new Date().toISOString(), ms: 0, ok: false, label: p.tool, preview: "denied in the Surehand panel" + (by === "popup" ? " (pop-up)" : "") });
+          return finish(200, { ok: false, denied: true, error: "The user denied this change in After Effects (Surehand MCP panel)." }), true;
         }
+        if (isPaused()) return finish(200, refusePaused(p.tool)), true;
         enqueue();
+        return true;
       };
       state.pending.push(p);
-      openPanel();
+      checkPopup();
       // waiting for a person: allow up to 10 minutes before giving up
-      setTimeout(function () { if (!finished && state.pending.indexOf(p) >= 0) { state.pending = state.pending.filter(function (x) { return x !== p; }); finish(200, { ok: false, denied: true, error: "No one approved this change in the Surehand MCP panel within 10 minutes." }); } }, 10 * 60 * 1000);
+      setTimeout(function () {
+        if (finished || p.answered) return;
+        p.answered = true;
+        state.pending = state.pending.filter(function (x) { return x !== p; });
+        finish(200, { ok: false, denied: true, error: "No one approved this change in the Surehand MCP panel within 10 minutes." });
+      }, APPROVAL_TIMEOUT_MS);
       return;
     }
     enqueue();
@@ -257,22 +352,30 @@
       // Reject browser-originated requests (DNS-rebinding / CSRF protection)
       if (req.headers.origin) return send(res, 403, { ok: false, error: "forbidden" });
       var token = loadConfig().token;
-      if (req.method === "GET" && req.url === "/health") return send(res, 200, health(req, token));
+      var q = String(req.url || "").indexOf("?");
+      var route = q < 0 ? req.url : req.url.slice(0, q), u = { query: q < 0 ? {} : querystring.parse(req.url.slice(q + 1)) };
+      if (req.method === "GET" && route === "/health") return send(res, 200, health(req, token));
       if (!authorized(req, token)) return send(res, 401, { ok: false, error: "unauthorized" });
-      if (req.method === "GET" && req.url === "/log") return send(res, 200, { ok: true, log: state.log });
-      if (req.method === "GET" && req.url === "/pending") {
-        return send(res, 200, { ok: true, pending: state.pending.map(function (p) { return { id: p.id, at: p.at, tool: p.tool, summary: p.summary }; }) });
+      if (req.method === "GET" && route === "/log") return send(res, 200, { ok: true, log: state.log });
+      if (req.method === "GET" && route === "/pending") {
+        // the panel and the pop-up poll this: it is also their heartbeat
+        var who = u.query.ui;
+        if (who === "panel" || who === "popup") state.ui[who] = { at: Date.now(), visible: u.query.visible !== "0" };
+        if (who) checkPopup();
+        return send(res, 200, {
+          ok: true, paused: pauseInfo(),
+          pending: state.pending.map(function (p) { return { id: p.id, at: p.at, deadline: p.deadline, tool: p.tool, summary: p.summary, client: p.client }; }),
+        });
       }
-      if (req.method === "POST" && req.url === "/approve") {
+      if (req.method === "POST" && route === "/approve") {
         return readBody(req, function (err, b) {
           if (err) return send(res, 400, { ok: false, error: "invalid JSON" });
           var p = state.pending.filter(function (x) { return x.id === b.id; })[0];
-          if (!p) return send(res, 404, { ok: false, error: "no such request (already answered or cancelled)" });
-          p.resolve(!!b.allow);
+          if (!p || !p.resolve(!!b.allow, b.by)) return send(res, 404, { ok: false, answered: true, error: "no such request (already answered or cancelled)" });
           send(res, 200, { ok: true });
         });
       }
-      if (req.method === "POST" && req.url === "/eval") {
+      if (req.method === "POST" && route === "/eval") {
         return readBody(req, function (err, b) {
           if (err) return send(res, 400, { ok: false, error: "invalid JSON" });
           handleEval(req, res, b);
@@ -314,13 +417,20 @@
       });
     } catch (e) {}
     setInterval(writeStatus, 60 * 1000); // heartbeat
+    // a panel closed while a request waits: show the pop-up
+    setInterval(function () { if (state.pending.length) checkPopup(); }, 1000);
     try { global.addEventListener("unload", unregister); } catch (e) {}
     try { process.on("exit", unregister); } catch (e) {}
     return state;
   }
 
-  global.AEMCPBridge = {
-    start: start, state: state, loadConfig: loadConfig, hostInfo: hostInfo, permissionMode: permissionMode,
-    VERSION: VERSION, CONFIG_FILE: CONFIG_FILE, CONFIG_DIR: CONFIG_DIR,
+  var api = {
+    start: start, state: state, loadConfig: loadConfig, hostInfo: hostInfo, permissionMode: permissionMode, paths: paths,
+    popupDecision: popupDecision, checkPopup: checkPopup, isPaused: isPaused,
+    VERSION: VERSION, PAUSED_MESSAGE: PAUSED_MESSAGE, PANEL_ID: PANEL_ID, POPUP_ID: POPUP_ID,
   };
+  // where the files are right now (an update may migrate ~/.aemcp to ~/.surehand/ae while AE runs)
+  Object.defineProperty(api, "CONFIG_FILE", { enumerable: true, get: function () { return paths().config; } });
+  Object.defineProperty(api, "CONFIG_DIR", { enumerable: true, get: function () { return paths().dir; } });
+  global.AEMCPBridge = api;
 })(window);

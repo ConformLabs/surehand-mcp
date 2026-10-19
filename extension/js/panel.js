@@ -1,23 +1,50 @@
-/* Status panel: connection, approvals ("ask" mode), permissions, activity log, diagnostics.
- * If the background bridge extension isn't running (some hosts don't honour StartOn for
- * invisible extensions), the panel starts the bridge itself. */
+/* The Surehand panel: status, "What the AI may do", Pause AI, approval cards ("ask" mode), and a
+ * short feed of what the AI did. Settings and tools live in After Effects' own panel menu (☰),
+ * whose screens slide over the feed. If the background bridge extension isn't running (some
+ * hosts don't honour StartOn for invisible extensions), the panel starts the bridge itself.
+ * Needs paths.js, panel-model.js and bridge-core.js. ES5 only. */
 (function () {
   "use strict";
   var http = require("http");
   var fs = require("fs");
   var os = require("os");
   var path = require("path");
+  var crypto = require("crypto");
   var childProcess = require("child_process");
+  var UI = window.SurehandUI;
   var $ = function (id) { return document.getElementById(id); };
-  var AEMCP_DIR = path.join(os.homedir(), ".aemcp");
-  var ACTIVITY_FILE = path.join(AEMCP_DIR, "activity.jsonl");
+  var REPO_URL = "https://github.com/ConformLabs/surehand-mcp";
+  var POLL_MS = 1500;
   var myPort = null; // the bridge of THIS After Effects instance
 
+  function P() { return window.SurehandPaths.current(require); }
   function readJson(file) {
     try { return JSON.parse(fs.readFileSync(file, "utf8")); } catch (e) { return null; }
   }
+  function el(tag, attrs, kids) {
+    var n = document.createElement(tag);
+    if (attrs) Object.keys(attrs).forEach(function (k) {
+      var v = attrs[k];
+      if (v === undefined || v === null || v === false) return;
+      if (k === "text") n.textContent = v;
+      else if (k === "html") n.innerHTML = v;
+      else if (k === "onclick") n.onclick = v;
+      else if (k === "cls") n.className = v;
+      else n.setAttribute(k, v === true ? "" : v);
+    });
+    (kids || []).forEach(function (c) { if (c) n.appendChild(typeof c === "string" ? document.createTextNode(c) : c); });
+    return n;
+  }
+  function button(cls, text, onclick, attrs) {
+    var b = el("button", attrs || {}, [text]);
+    b.type = "button";
+    b.className = cls;
+    b.onclick = onclick;
+    return b;
+  }
 
-  function call(method, p, body, cb) {
+  // ---------- bridge requests ----------
+  function call(method, p, body, cb, timeoutMs) {
     var cfg = AEMCPBridge.loadConfig();
     var data = body ? JSON.stringify(body) : null;
     var port = myPort || AEMCPBridge.state.port || cfg.bridgePort;
@@ -25,19 +52,31 @@
       headers: { authorization: "Bearer " + cfg.token, "content-type": "application/json" } }, function (res) {
       var chunks = [];
       res.on("data", function (c) { chunks.push(c); });
-      res.on("end", function () { try { cb(null, JSON.parse(Buffer.concat(chunks).toString("utf8"))); } catch (e) { cb(e); } });
+      res.on("end", function () {
+        var r = null;
+        try { r = JSON.parse(Buffer.concat(chunks).toString("utf8")); } catch (e) { return cb(e); }
+        if (r && typeof r === "object") r.httpStatus = res.statusCode;
+        cb(null, r);
+      });
     });
     req.on("error", function (e) { cb(e); });
-    req.setTimeout(p === "/eval" ? 30000 : 3000, function () { req.destroy(new Error("timeout")); });
+    req.setTimeout(timeoutMs || (p === "/eval" ? 30000 : 3000), function () { req.destroy(new Error("timeout")); });
     if (data) req.write(data);
     req.end();
   }
+  /** Run ExtendScript for the panel itself (allowed while the AI is paused). */
+  function evalAE(script, label, cb, timeoutMs) {
+    call("POST", "/eval", { script: script, timeoutMs: timeoutMs || 10000, label: label, fromPanel: true }, function (err, r) {
+      if (err) return cb(err);
+      if (!r.ok) return cb(new Error(r.error || "After Effects did not run it"));
+      cb(null, r.result);
+    }, (timeoutMs || 10000) + 5000);
+  }
 
-  // The bridge of this instance: the bridge extension writes bridge-status.json with its pid and port;
-  // with several AE instances, match on this AE's version.
+  // The bridge of this instance: with several AE instances, match on this AE's version.
   function findMyPort(cb) {
     var host = AEMCPBridge.hostInfo();
-    var dir = path.join(AEMCP_DIR, "instances"), best = null;
+    var dir = P().instances, best = null;
     try {
       fs.readdirSync(dir).forEach(function (f) {
         var info = readJson(path.join(dir, f));
@@ -48,155 +87,443 @@
     cb();
   }
 
-  function setStatus(kind, text) {
-    $("dot").className = "dot " + kind;
-    $("sub").textContent = text;
-  }
-
-  function note(text) {
-    $("note").textContent = text;
-    $("note").hidden = false;
-  }
-
-  // ---------- config (permissions, tool profile) ----------
-  function readConfig() { return readJson(AEMCPBridge.CONFIG_FILE) || AEMCPBridge.loadConfig(); }
-  function writeConfig(cfg) {
-    try { fs.writeFileSync(AEMCPBridge.CONFIG_FILE, JSON.stringify(cfg, null, 2) + "\n"); return true; }
-    catch (e) { alert("Could not save settings: " + e.message); return false; }
-  }
-  function loadSettings() {
-    var cfg = readConfig(), p = cfg.permissions || {};
-    $("perm").value = p.mode === "ask" || p.mode === "read-only" ? p.mode : "full";
-    $("shell").value = p.allowShell === false ? "off" : "on";
-    $("profile").value = cfg.toolProfile === "full" ? "full" : "core";
-  }
-  $("perm").onchange = $("shell").onchange = function () {
-    var cfg = readConfig();
-    cfg.permissions = { mode: $("perm").value, allowShell: $("shell").value === "on" };
-    if (writeConfig(cfg)) note("Permissions saved. They apply to the next request (no restart needed).");
-  };
-  $("profile").onchange = function () {
-    var cfg = readConfig();
-    cfg.toolProfile = $("profile").value;
-    if (writeConfig(cfg)) note("Saved. Restart your AI app to apply the tool set.");
-  };
-
-  // ---------- approvals ----------
-  var shownPending = null; // ids currently on screen (null = nothing rendered yet)
-  function renderPending(list) {
-    var key = list.map(function (p) { return p.id; }).join(",");
-    if (key === shownPending) return;
-    shownPending = key;
-    var box = $("approvalList");
-    box.innerHTML = "";
-    $("approvals").hidden = !list.length;
-    list.forEach(function (p) {
-      var d = document.createElement("div");
-      d.className = "approval";
-      d.innerHTML = '<div class="what"></div><pre></pre><div class="row"><button class="allow">Allow</button><button class="deny">Deny</button></div>';
-      d.querySelector(".what").textContent = p.tool + " · " + new Date(p.at).toLocaleTimeString();
-      d.querySelector("pre").textContent = p.summary;
-      d.querySelector(".allow").onclick = function () { answer(p.id, true, d); };
-      d.querySelector(".deny").onclick = function () { answer(p.id, false, d); };
-      box.appendChild(d);
-    });
-  }
-  function answer(id, allow, card) {
-    // remove the card right away; the next poll redraws from the bridge's list either way
-    if (card && card.parentNode) card.parentNode.removeChild(card);
-    if (!$("approvalList").children.length) $("approvals").hidden = true;
-    call("POST", "/approve", { id: id, allow: allow }, function () { shownPending = null; pollPending(); });
-  }
-  function pollPending() {
-    call("GET", "/pending", null, function (err, r) { if (!err && r && r.pending) renderPending(r.pending); });
-  }
-
-  // ---------- activity ----------
-  function readActivity(limit) {
-    try {
-      var lines = fs.readFileSync(ACTIVITY_FILE, "utf8").trim().split("\n");
-      return lines.slice(-limit).map(function (l) { try { return JSON.parse(l); } catch (e) { return null; } }).filter(Boolean).reverse();
-    } catch (e) { return []; }
-  }
-  var shownActivity = "", openEntry = null;
-  function renderActivity() {
-    var list = readActivity(30);
-    var key = list.length ? list[0].at + list.length : "";
-    if (key === shownActivity) return;
-    shownActivity = key;
-    var ul = $("log");
-    ul.innerHTML = "";
-    if (!list.length) { ul.innerHTML = '<li class="muted">No calls yet</li>'; return; }
-    list.forEach(function (e) {
-      var li = document.createElement("li");
-      li.className = e.ok ? "ok" : "err";
-      li.innerHTML = '<span class="t"></span><span class="s"></span> <span class="p"></span> <span class="c"></span>';
-      li.querySelector(".t").textContent = new Date(e.at).toLocaleTimeString() + " · " + e.ms + "ms";
-      li.querySelector(".s").textContent = e.tool;
-      li.querySelector(".p").textContent = (e.summary || "").slice(0, 120);
-      li.querySelector(".c").textContent = (e.client ? " · " + e.client : "") + (e.changes ? " · " + e.changes + " changes" : "");
-      li.onclick = function () {
-        var pre = li.querySelector("pre");
-        if (pre) { li.removeChild(pre); openEntry = null; return; }
-        pre = document.createElement("pre");
-        pre.textContent = e.args && typeof e.args.code === "string" ? e.args.code : JSON.stringify(e.args, null, 2);
-        li.appendChild(pre);
-        openEntry = e.at;
-      };
-      ul.appendChild(li);
-      if (openEntry === e.at) li.onclick();
-    });
-  }
-  $("openLog").onclick = function () {
-    var cmd = process.platform === "win32" ? 'explorer /select,"' + ACTIVITY_FILE + '"' : 'open -R "' + ACTIVITY_FILE + '"';
-    if (!fs.existsSync(ACTIVITY_FILE)) return alert("No activity yet.");
-    childProcess.exec(cmd);
-  };
-
-  // ---------- update banner (the MCP server checks GitHub at most daily and caches the result) ----------
-  function cmpVersions(a, b) {
-    var pa = String(a).replace(/^v/, "").split("."), pb = String(b).replace(/^v/, "").split(".");
-    for (var i = 0; i < 3; i++) { var x = parseInt(pa[i], 10) || 0, y = parseInt(pb[i], 10) || 0; if (x !== y) return x > y ? 1 : -1; }
-    return 0;
-  }
-  // The standalone install records how to run itself (~/.aemcp/runtime.json); then the panel can
-  // update in place with `ae-mcp update`. Otherwise (Claude Desktop .mcpb) it links to the release.
-  function updater() {
-    var rt = readJson(path.join(AEMCP_DIR, "runtime.json"));
+  // ---------- the server's command line (menu screens) ----------
+  function runtime() {
+    var rt = readJson(P().runtime);
     return rt && rt.node && rt.server && fs.existsSync(rt.node) && fs.existsSync(rt.server) ? rt : null;
   }
-  var updating = false, updatedTo = null;
-  function showUpdate() {
-    if (updating) return;
-    if (updatedTo) {
-      $("updateText").textContent = "Updated to v" + updatedTo + ". Restart After Effects and your AI apps.";
-      $("updateBtn").hidden = true;
-      $("update").hidden = false;
+  var NO_RUNTIME = "This needs the Surehand MCP app installed with its installer. With only the Claude Desktop extension it isn't available here.";
+  var TOO_OLD = "This needs a newer Surehand MCP server. Update it from \u2630 \u203a Check for updates.";
+  /**
+   * `<node> <server> args...` -> cb(err, json, text). err.friendly says what to show. Commands added in
+   * 1.4 aren't run on an older server (it would start an MCP server instead of answering).
+   */
+  function runCli(args, cb, opts) {
+    opts = opts || {};
+    var rt = runtime();
+    if (!rt) return cb({ friendly: NO_RUNTIME });
+    if (opts.since && rt.version && UI.cmpVersions(rt.version, opts.since) < 0) return cb({ friendly: TOO_OLD });
+    var env = {};
+    Object.keys(process.env).forEach(function (k) { env[k] = process.env[k]; });
+    env.AEMCP_NO_AUTOSETUP = "1";
+    var child;
+    try {
+      child = childProcess.execFile(rt.node, [rt.server].concat(args), { timeout: opts.timeout || 30000, windowsHide: true, maxBuffer: 8 * 1024 * 1024, env: env }, function (err, stdout, stderr) {
+        var text = String(stdout || "");
+        var json = UI.parseCliJson(text);
+        if (opts.text) return cb(err && !text ? { friendly: "It did not finish: " + (err.message || err) } : null, json, text);
+        if (!json) return cb({ friendly: /unknown|usage/i.test(text + stderr) || !text ? TOO_OLD : "Unexpected answer: " + text.slice(0, 200) }, null, text);
+        cb(null, json, text);
+      });
+    } catch (e) { return cb({ friendly: "Could not start the Surehand MCP server: " + e.message }); }
+    // never leave a server waiting for input
+    try { if (child && child.stdin) child.stdin.end(); } catch (e) {}
+  }
+
+  // ---------- toast (no alert() pop-ups) ----------
+  var toastTimer = null;
+  function toast(text, bad) {
+    $("toastText").textContent = text;
+    $("toast").className = "toast" + (bad ? " bad" : "");
+    $("toast").hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { $("toast").hidden = true; }, bad ? 6000 : 3500);
+  }
+
+  // ---------- config ----------
+  function readConfig() { return readJson(P().config) || AEMCPBridge.loadConfig(); }
+  function writeConfig(change) {
+    var cfg = readConfig();
+    change(cfg);
+    try {
+      fs.mkdirSync(path.dirname(P().config), { recursive: true });
+      fs.writeFileSync(P().config, JSON.stringify(cfg, null, 2) + "\n");
+      return true;
+    } catch (e) { toast("Could not save the setting: " + e.message, true); return false; }
+  }
+
+  // ---------- state ----------
+  var S = {
+    layout: "default", cfg: {}, health: null, bridgeError: null, authorized: true, pending: [], paused: null,
+    activity: [], renders: [], undone: {}, open: {}, clients: null, update: null, screen: null, answering: {},
+  };
+
+  // ---------- layout ----------
+  function applyLayout() {
+    var l = UI.layoutFor(window.innerWidth || 320, window.innerHeight || 560);
+    if (l === S.layout) return;
+    S.layout = l;
+    document.body.className = document.body.className.replace(/\blayout-\w+\b/, "") + " layout-" + l;
+    renderModes();
+    renderFeed(true);
+  }
+
+  // ---------- header: status, pause ----------
+  function status() {
+    return UI.statusFor({
+      bridgeError: S.bridgeError, paused: !!S.cfg.paused, pendingCount: S.pending.length,
+      client: UI.lastClient(S.activity), everConnected: S.activity.length > 0,
+    });
+  }
+  function renderHeader() {
+    var st = status();
+    $("status").className = "status " + st.kind;
+    $("statusText").textContent = S.layout === "narrow" ? st.short : st.text;
+    $("status").title = st.text;
+    $("tile").setAttribute("class", "tile " + st.tile);
+    var paused = !!S.cfg.paused;
+    $("pause").hidden = paused;
+    $("resume").hidden = !paused;
+    var note = $("pausedNote");
+    note.hidden = !paused;
+    if (paused) {
+      var n = S.paused && S.paused.refused || 0;
+      note.textContent = "Nothing runs in After Effects. AI calls are refused at once, so the AI stops instead of waiting." +
+        (n ? " " + n + " refused so far." : "");
+    }
+    var host = AEMCPBridge.hostInfo();
+    $("hostLabel").textContent = UI.aeLabel(host.appVersion);
+    var upd = S.update && S.update.latest && UI.cmpVersions(S.update.latest, AEMCPBridge.VERSION) > 0;
+    $("ver").textContent = AEMCPBridge.VERSION + (upd ? " \u00b7 update ready" : "");
+    $("ver").className = "link" + (upd ? " update" : "");
+  }
+  function setPaused(on) {
+    if (!writeConfig(function (cfg) {
+      if (on) { cfg.paused = true; cfg.pausedAt = new Date().toISOString(); }
+      else { delete cfg.paused; delete cfg.pausedAt; }
+    })) return;
+    S.cfg = readConfig();
+    S.paused = on ? { refused: 0 } : null;
+    renderHeader();
+    renderSetup();
+    toast(on ? "AI paused: its calls are refused until you resume." : "Resumed: the AI can work again.");
+    (on ? $("resume") : $("pause")).focus();
+  }
+  $("pause").onclick = function () { setPaused(true); };
+  $("resume").onclick = function () { setPaused(false); };
+
+  // ---------- mode switch (config permissions.mode) ----------
+  var MODE_ICONS = {
+    full: function (ink) { return '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M6.8 1 2.5 6.8h3L5 11l4.5-6H6.4z" fill="' + ink + '"></path></svg>'; },
+    ask: function (ink) { return '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="' + ink + '" stroke-width="1.4" aria-hidden="true"><path d="M3.5 6.5V3.2a.9.9 0 0 1 1.8 0v2.6M5.3 5.4V2.4a.9.9 0 0 1 1.8 0v3M7.1 5.4V3a.9.9 0 0 1 1.8 0v3.8c0 2-1.4 3.7-3.3 3.7-1.4 0-2.2-.7-2.9-1.9L1.9 7a.9.9 0 0 1 1.6-.9"></path></svg>'; },
+    "read-only": function (ink) { return '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="' + ink + '" stroke-width="1.4" aria-hidden="true"><path d="M1 6s2-3.6 5-3.6S11 6 11 6 9 9.6 6 9.6 1 6 1 6z"></path><circle cx="6" cy="6" r="1.5"></circle></svg>'; },
+  };
+  var shownModes = "";
+  function renderModes() {
+    var mode = UI.modeOf(S.cfg), key = mode + S.layout;
+    if (key === shownModes) return;
+    shownModes = key;
+    var box = $("modes");
+    box.innerHTML = "";
+    UI.MODES.forEach(function (m) {
+      var on = m.id === mode;
+      var label = S.layout === "narrow" ? m.short : m.label;
+      var b = el("button", { type: "button", role: "radio", "aria-checked": on ? "true" : "false", "aria-label": m.label, tabindex: on ? "0" : "-1", "data-mode": m.id });
+      b.innerHTML = MODE_ICONS[m.id](on ? "#14161A" : "#C9C6BF") + "<span></span>";
+      b.lastChild.textContent = label;
+      b.onclick = function () { setMode(m.id); };
+      b.onkeydown = function (e) {
+        var i = UI.MODES.indexOf(m), d = e.keyCode === 39 || e.keyCode === 40 ? 1 : e.keyCode === 37 || e.keyCode === 38 ? -1 : 0;
+        if (!d) return;
+        e.preventDefault();
+        var next = UI.MODES[(i + d + UI.MODES.length) % UI.MODES.length];
+        setMode(next.id);
+        var nb = box.querySelector('[data-mode="' + next.id + '"]');
+        if (nb) nb.focus();
+      };
+      box.appendChild(b);
+    });
+    var def = UI.MODES.filter(function (m) { return m.id === mode; })[0];
+    $("modeDesc").textContent = S.layout === "narrow" ? def.narrow : def.desc;
+  }
+  function setMode(id) {
+    if (UI.modeOf(S.cfg) === id) return;
+    if (!writeConfig(function (cfg) {
+      var p = cfg.permissions || {};
+      cfg.permissions = { mode: id, allowShell: p.allowShell !== false };
+    })) return;
+    S.cfg = readConfig();
+    renderModes();
+  }
+
+  // ---------- approvals ----------
+  var shownAsk = null, askOpen = false;
+  function currentAsk() {
+    for (var i = 0; i < S.pending.length; i++) if (!S.answering[S.pending[i].id]) return S.pending[i];
+    return null;
+  }
+  function renderAsk() {
+    var p = currentAsk();
+    $("ask").hidden = !p;
+    if (!p) { shownAsk = null; return; }
+    var waiting = S.pending.filter(function (x) { return !S.answering[x.id]; }).length;
+    $("askTime").textContent = UI.countdown(p.deadline || new Date(Date.parse(p.at) + 600000).toISOString(), Date.now());
+    $("askHint").textContent = "Enter allows \u00b7 Esc denies" + (waiting > 1 ? " \u00b7 " + (waiting - 1) + " more after this" : "");
+    if (shownAsk === p.id) return;
+    shownAsk = p.id;
+    askOpen = false;
+    var v = UI.approvalView(p, UI.lastClient(S.activity));
+    $("askWho").textContent = v.client + " asks";
+    $("askTitle").textContent = v.title;
+    var chips = $("askChips");
+    chips.innerHTML = "";
+    v.chips.forEach(function (c) { chips.appendChild(el("span", { cls: "chip" + (c.danger ? " danger" : ""), text: c.text })); });
+    $("askShow").textContent = /script/i.test(p.tool) ? "Show the script" : "Show the details";
+    $("askShow").setAttribute("aria-expanded", "false");
+    $("askCode").textContent = v.code;
+    $("askCode").hidden = true;
+  }
+  $("askShow").onclick = function () {
+    askOpen = !askOpen;
+    $("askCode").hidden = !askOpen;
+    $("askShow").setAttribute("aria-expanded", askOpen ? "true" : "false");
+    $("askShow").textContent = (askOpen ? "Hide" : "Show") + (/script/.test($("askShow").textContent) ? " the script" : " the details");
+  };
+  function answer(allow) {
+    var p = currentAsk();
+    if (!p) return;
+    S.answering[p.id] = true; // hide it at once; the bridge's list is the truth on the next poll
+    renderAsk();
+    renderHeader();
+    call("POST", "/approve", { id: p.id, allow: allow, by: "panel" }, function (err, r) {
+      if (err) { delete S.answering[p.id]; toast("Could not answer: " + err.message, true); }
+      else if (r && r.httpStatus === 404) toast("Already answered (or the AI app cancelled it).");
+      pollPending();
+    });
+  }
+  $("allow").onclick = function () { answer(true); };
+  $("deny").onclick = function () { answer(false); };
+  function pollPending() {
+    var visible = document.visibilityState ? document.visibilityState !== "hidden" : true;
+    call("GET", "/pending?ui=panel&visible=" + (visible ? "1" : "0"), null, function (err, r) {
+      if (err || !r || !r.pending) return;
+      S.pending = r.pending;
+      S.paused = r.paused || null;
+      Object.keys(S.answering).forEach(function (id) {
+        if (!r.pending.some(function (x) { return x.id === id; })) delete S.answering[id];
+      });
+      renderAsk();
+      renderHeader();
+    });
+  }
+
+  // ---------- keyboard: Enter allows, Esc denies (or closes a screen) ----------
+  document.addEventListener("keydown", function (e) {
+    if (e.keyCode === 9) document.body.classList.add("kbd");
+    var tag = e.target && e.target.tagName;
+    if (S.screen) {
+      if (e.keyCode === 27) { e.preventDefault(); closeScreen(); }
       return;
     }
-    var u = readJson(path.join(AEMCP_DIR, "update-check.json"));
-    if (!(u && u.latest && cmpVersions(u.latest, AEMCPBridge.VERSION) > 0)) { $("update").hidden = true; return; }
-    var rt = updater();
-    $("updateText").textContent = "Update available: v" + u.latest;
-    $("updateBtn").hidden = false;
-    $("updateBtn").disabled = false;
-    $("updateBtn").textContent = rt ? "Update" : "Download";
-    $("updateBtn").onclick = rt ? function () { runUpdate(rt, u.latest); } : function () {
-      try { window.cep.util.openURLInDefaultBrowser(u.url); } catch (e) { alert(u.url); }
-    };
-    $("update").hidden = false;
+    if ($("ask").hidden || tag === "INPUT" || tag === "TEXTAREA") return;
+    if (e.keyCode === 13) {
+      // a focused control keeps its own Enter (Deny, Pause...); otherwise Enter allows
+      if ((tag === "BUTTON" || tag === "A") && e.target.id !== "allow") return;
+      e.preventDefault();
+      answer(true);
+    } else if (e.keyCode === 27) {
+      e.preventDefault();
+      answer(false);
+    }
+  });
+  document.addEventListener("mousedown", function () { document.body.classList.remove("kbd"); });
+
+  // ---------- not connected: set up an AI app ----------
+  function renderSetup() {
+    var st = status();
+    var box = $("setup");
+    box.hidden = st.kind !== "idle";
+    if (box.hidden) return;
+    var list = S.clients && S.clients.list || [];
+    var configured = list.filter(function (c) { return c.configured; });
+    var todo = list.filter(function (c) { return c.installed !== false && !c.configured && c.connectable !== false; });
+    var pick = todo.filter(function (c) { return /claude.?desktop/i.test(c.id + " " + c.name); })[0] || todo[0];
+    if (configured.length) {
+      $("setupText").textContent = configured[0].name + " is set up. Restart it to connect.";
+      $("setupBtn").hidden = true;
+      $("setupHint").textContent = "Other apps: \u2630 \u203a Connect an AI app.";
+    } else if (pick) {
+      $("setupText").textContent = pick.name + " isn\u2019t set up yet.";
+      $("setupBtn").hidden = false;
+      $("setupBtn").textContent = "Set it up";
+      $("setupBtn").onclick = function () { connectClient(pick, true); };
+      $("setupHint").textContent = "Then restart " + pick.name + ". Other apps: \u2630 \u203a Connect an AI app.";
+    } else {
+      $("setupText").textContent = "No AI app has used Surehand yet.";
+      $("setupBtn").hidden = false;
+      $("setupBtn").textContent = "Connect an AI app";
+      $("setupBtn").onclick = function () { openScreen("connect"); };
+      $("setupHint").textContent = "Set one up, then restart that app.";
+    }
   }
-  function runUpdate(rt, latest) {
-    updating = true;
-    $("updateText").textContent = "Updating to v" + latest + "…";
-    $("updateBtn").disabled = true;
-    childProcess.execFile(rt.node, [rt.server, "update", "--json"], { timeout: 180000, windowsHide: true }, function (err, stdout) {
-      updating = false;
-      var r = null;
-      try { r = JSON.parse(String(stdout).trim().split(/\r?\n/).pop()); } catch (e) {}
-      if (r && r.ok && r.updated) updatedTo = r.to;
-      else alert((r && r.message) || ("The update did not finish: " + (err ? err.message : "no result")));
-      showUpdate();
+  function loadClients(cb) {
+    runCli(["clients", "--json"], function (err, json) {
+      if (err) { S.clients = { error: err.friendly, list: [] }; }
+      else {
+        var raw = Array.isArray(json) ? json : json.clients || [];
+        S.clients = { list: raw.map(function (c) {
+          return {
+            id: c.id, name: c.name || c.label || c.id, installed: c.installed, configured: !!(c.configured || c.setUp || c.connected),
+            inUse: c.inUse, note: c.note || c.detail || c.status, connectable: c.connectable, action: c.action,
+          };
+        }), snippet: json.snippet || json.settings || null };
+      }
+      renderSetup();
+      if (cb) cb();
+    }, { since: "1.4.0" });
+  }
+  function connectClient(c, fromSetup) {
+    runCli(["connect", c.id, "--json"], function (err, r) {
+      if (err) return toast(err.friendly, true);
+      toast(r.message || (r.ok === false ? "Could not set up " + c.name + "." : c.name + " is set up. Restart it to use Surehand."), r.ok === false);
+      loadClients(function () { if (S.screen === "connect") openScreen("connect"); });
+    }, { since: "1.4.0", timeout: 60000 });
+    if (fromSetup) $("setupBtn").disabled = true;
+    setTimeout(function () { $("setupBtn").disabled = false; }, 3000);
+  }
+
+  // ---------- activity log and renders ----------
+  /** The last part of a (possibly large) log file: only the tail is read. */
+  function readTail(file, bytes) {
+    var fd = null;
+    try {
+      var st = fs.statSync(file);
+      var len = Math.min(st.size, bytes), buf = Buffer.alloc(len);
+      fd = fs.openSync(file, "r");
+      fs.readSync(fd, buf, 0, len, st.size - len);
+      var text = buf.toString("utf8");
+      if (len < st.size) text = text.slice(text.indexOf("\n") + 1); // drop the partial first line
+      return text;
+    } catch (e) { return ""; } finally { if (fd !== null) try { fs.closeSync(fd); } catch (e) {} }
+  }
+  var activityStamp = "";
+  /** Newest first. Re-read only when the file changed. */
+  function readActivity(bytes, force) {
+    var file = P().activity, stamp = "";
+    try { var st = fs.statSync(file); stamp = file + st.size + ":" + st.mtime.getTime(); } catch (e) { stamp = "none"; }
+    if (!force && stamp === activityStamp) return false;
+    activityStamp = stamp;
+    S.activity = parseActivity(readTail(file, bytes || 512 * 1024));
+    return true;
+  }
+  function parseActivity(text) {
+    return text.split("\n").map(function (l) { try { return l.trim() ? JSON.parse(l) : null; } catch (e) { return null; } })
+      .filter(Boolean).reverse();
+  }
+  /** Background renders still running: renders/<id>.log written recently and not finished. */
+  function readRenders() {
+    var dir = P().renders, out = [];
+    var starts = {};
+    S.activity.forEach(function (e) {
+      if (e.tool !== "ae_render_background" && !(e.tool === "ae_call" && e.args && e.args.tool === "ae_render_background")) return;
+      var info = UI.renderStartInfo(e);
+      if (info) { info.at = e.at; starts[info.id] = info; }
+    });
+    var files = [];
+    try { files = fs.readdirSync(dir).filter(function (f) { return /\.log$/.test(f); }); } catch (e) { return out; }
+    files.forEach(function (f) {
+      var file = path.join(dir, f), st;
+      try { st = fs.statSync(file); } catch (e) { return; }
+      if (Date.now() - st.mtime.getTime() > 3 * 60 * 1000) return; // finished or abandoned long ago
+      var id = f.replace(/\.log$/, "");
+      var head = "";
+      try { var fd = fs.openSync(file, "r"), b = Buffer.alloc(Math.min(st.size, 4096)); fs.readSync(fd, b, 0, b.length, 0); fs.closeSync(fd); head = b.toString("utf8"); } catch (e) {}
+      var prog = UI.renderProgress(head + "\n" + readTail(file, 8192), starts[id]);
+      if (prog.done || prog.failed) return;
+      var started = starts[id] ? Date.parse(starts[id].at) : (st.birthtime || st.ctime).getTime();
+      prog.id = id;
+      prog.left = UI.timeLeft(prog.pct, Date.now() - started);
+      out.push(prog);
+    });
+    return out;
+  }
+
+  // ---------- feed ----------
+  var ICONS = {
+    change: '<svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M5 1 9 5 5 9 1 5z" fill="#3DD68C"></path></svg>',
+    problem: '<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="#FF8A80" stroke-width="1.6" aria-hidden="true"><path d="M5 1.8v4M5 7.8v.4"></path></svg>',
+    proof: '<svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="#3DD68C" stroke-width="1.7" aria-hidden="true"><path d="m2 5.8 2.2 2.2L9 3"></path></svg>',
+    read: '<svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="#8E8B85" stroke-width="1.2" aria-hidden="true"><path d="M1 5.5S3 2 5.5 2 10 5.5 10 5.5 8 9 5.5 9 1 5.5 1 5.5z"></path><circle cx="5.5" cy="5.5" r="1.4"></circle></svg>',
+    render: '<svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2.5 1.5v7L8.5 5z" fill="#14161A"></path></svg>',
+  };
+  var shownFeed = "";
+  function renderFeed(force) {
+    var limit = S.layout === "wide" ? 5 : S.layout === "narrow" ? 6 : 7;
+    var running = {};
+    S.renders.forEach(function (r) { running[r.id] = true; });
+    var items = UI.feedItems(S.activity, { limit: Math.max(1, limit - S.renders.length), undone: S.undone, runningRenders: running });
+    var key = JSON.stringify([S.layout, S.renders, items.map(function (i) { return [i.at, i.title, i.line, i.undoable, !!S.open[UI.entryKey(i.entry)]]; })]);
+    if (!force && key === shownFeed) return;
+    shownFeed = key;
+    var feed = $("feed");
+    feed.innerHTML = "";
+    S.renders.forEach(function (r) { feed.appendChild(renderItem(r)); });
+    items.forEach(function (it, k) { feed.appendChild(feedItem(it, k === 0)); });
+    if (!items.length && !S.renders.length) feed.appendChild(el("div", { cls: "empty", text: "What the AI does in After Effects shows up here." }));
+  }
+  function renderItem(r) {
+    var pct = r.pct === null || r.pct === undefined ? null : r.pct;
+    var label = pct === null ? "frame " + (r.frame || 0) : pct + "%";
+    var bar = el("div", { cls: "bar" + (pct === null ? " indet" : ""), "aria-hidden": "true" }, [el("div", { style: "width:" + (pct || 0) + "%" })]);
+    var title = "Rendering " + (r.comp || "in the background");
+    var body = el("div", { cls: "body" }, [
+      el("div", { cls: "row1" }, [el("span", { cls: "title", text: title }), el("span", { cls: "pct num", text: label })]),
+      bar,
+    ]);
+    var side = el("span", { cls: "side-act pct num", text: label + (r.left && S.layout === "wide" ? " \u00b7 " + r.left : "") });
+    var ico = el("span", { cls: "ico render", html: ICONS.render });
+    return el("div", { cls: "item render", role: "listitem", "aria-label": title + ", " + label }, [ico, body, side]);
+  }
+  function feedItem(it, first) {
+    var k = UI.entryKey(it.entry), open = !!S.open[k];
+    var cls = "item " + it.kind + (first && it.kind === "change" ? " top-change" : "");
+    var time = UI.hhmm(it.at);
+    var title = el("span", { cls: "title", text: it.title });
+    var inline = el("span", { cls: "inline", text: (it.line ? " \u00b7 " + it.line : "") + " \u00b7 " + time });
+    var row1 = el("div", { cls: "row1" }, [el("span", { style: "min-width:0;overflow:hidden;text-overflow:ellipsis" }, [title, inline]), el("span", { cls: "time", text: time })]);
+    var body = el("div", { cls: "body" }, [row1]);
+    var details = it.kind === "read" && !it.line ? null : function () { toggleDetails(k); };
+    if (it.kind !== "read") body.appendChild(el("div", { cls: "line", text: it.line }));
+    var acts = el("div", { cls: "acts" });
+    var side = el("div", { cls: "side-act" });
+    if (it.undoable) {
+      acts.appendChild(button("link green", "Undo", function () { undo(it); }, { "aria-label": "Undo " + it.title }));
+      side.appendChild(button("link green", "Undo", function () { undo(it); }, { "aria-label": "Undo " + it.title }));
+    }
+    if (it.kind === "change" || it.kind === "problem") {
+      acts.appendChild(button("link", open ? "Hide details" : "Details", details, { "aria-expanded": open ? "true" : "false" }));
+      // the two-column layout has room for "Show" on problems (the boards show it there only)
+      if (!it.undoable && it.kind === "problem") side.appendChild(button("link wide-only", open ? "Hide" : "Show", details, { "aria-expanded": open ? "true" : "false", "aria-label": "Show " + it.title }));
+    }
+    if (acts.children.length && first) body.appendChild(acts);
+    var node = el("div", { cls: cls, role: "listitem" }, [el("span", { cls: "ico " + it.kind, html: ICONS[it.kind] }), body, side]);
+    if (open) {
+      var pre = el("pre", { cls: "details", text: UI.entryDetails(it.entry) });
+      if (S.layout === "wide") node.appendChild(pre);
+      else body.appendChild(pre);
+    }
+    return node;
+  }
+  function toggleDetails(k) {
+    if (S.open[k]) delete S.open[k];
+    else S.open[k] = true;
+    renderFeed(true);
+  }
+  /**
+   * Undo the most recent change: Edit > Undo, like ae_undo. When the log records the project
+   * revision after the call (newer servers), only if nothing changed the project since.
+   */
+  function undo(it) {
+    var e = it.entry;
+    var guard = typeof e.revision === "number" ? "try{if(app.project.revision!==" + e.revision + ")return 'changed';}catch(x){}" : "";
+    var script = "(function(){if(!app.project)return 'no project';" + guard + "app.executeCommand(16);return 'undone';})()";
+    evalAE(script, "panel undo", function (err, r) {
+      if (err) return toast("Could not undo: " + err.message, true);
+      if (r === "changed") return toast("The project changed since then: use Edit \u203a Undo in After Effects.", true);
+      if (r !== "undone") return toast("Nothing to undo: no project is open.", true);
+      S.undone[UI.entryKey(e)] = true;
+      renderFeed(true);
+      toast("Undone: " + it.title + ". Edit \u203a Redo brings it back.");
     });
   }
 
@@ -211,34 +538,440 @@
     document.body.removeChild(ta);
     return ok;
   }
-  $("diag").onclick = function () {
+  function copyDiagnostics() {
+    var p = P();
     var lines = ["### Surehand MCP diagnostics", "time: " + new Date().toISOString()];
     var host = AEMCPBridge.hostInfo();
-    lines.push("host: " + host.appName + " " + host.appVersion + " · bridge v" + AEMCPBridge.VERSION + " · port " + myPort);
-    lines.push("os: " + process.platform + " " + os.release() + " " + os.arch() + " · CEP node " + process.versions.node);
+    lines.push("host: " + host.appName + " " + host.appVersion + " \u00b7 bridge v" + AEMCPBridge.VERSION + " \u00b7 port " + myPort);
+    lines.push("os: " + process.platform + " " + os.release() + " " + os.arch() + " \u00b7 CEP node " + process.versions.node);
     // file:///C:/... on Windows: drop the slash before the drive letter
     try { lines.push("extension: " + decodeURI(window.__adobe_cep__.getSystemPath("extension")).replace(/^file:\/\//, "").replace(/^\/([A-Za-z]:)/, "$1")); } catch (e) {}
-    var cfg = readJson(AEMCPBridge.CONFIG_FILE);
+    lines.push("files: " + p.dir + (p.legacy ? " (1.3 location, not migrated yet)" : ""));
+    var cfg = readJson(p.config);
     if (cfg) { if (cfg.token) cfg.token = "<set, " + cfg.token.length + " chars>"; lines.push("config: " + JSON.stringify(cfg)); }
-    else lines.push("config: MISSING (" + AEMCPBridge.CONFIG_FILE + ")");
-    lines.push("bridge status: " + JSON.stringify(readJson(path.join(AEMCP_DIR, "bridge-status.json"))));
-    try { lines.push("instances: " + fs.readdirSync(path.join(AEMCP_DIR, "instances")).join(", ")); } catch (e) {}
-    lines.push("update check: " + JSON.stringify(readJson(path.join(AEMCP_DIR, "update-check.json"))));
-    lines.push("server installed: " + fs.existsSync(path.join(AEMCP_DIR, "server", "ae-mcp.mjs")));
+    else lines.push("config: MISSING (" + p.config + ")");
+    lines.push("bridge status: " + JSON.stringify(readJson(p.bridgeStatus)));
+    try { lines.push("instances: " + fs.readdirSync(p.instances).join(", ")); } catch (e) {}
+    lines.push("update check: " + JSON.stringify(readJson(p.updateCheck)));
+    lines.push("runtime: " + JSON.stringify(readJson(p.runtime)));
     var script = "(function(){var w=null;try{w=app.preferences.getPrefAsLong('Main Pref Section','Pref_SCRIPTING_FILE_NETWORK_SECURITY')===1;}catch(e){}" +
-      "return 'ae: '+app.version+' · '+$.os+' · items '+app.project.numItems+' · scriptsCanWriteFiles '+w+' · helpers '+(typeof aemcp==='undefined'?'not loaded':aemcp.version);})()";
-    call("POST", "/eval", { script: script, timeoutMs: 10000, label: "diagnostics" }, function (err, r) {
-      lines.push(err ? "bridge eval: ERROR " + err.message : String(r.result));
+      "return 'ae: '+app.version+' \u00b7 '+$.os+' \u00b7 items '+app.project.numItems+' \u00b7 scriptsCanWriteFiles '+w+' \u00b7 helpers '+(typeof aemcp==='undefined'?'not loaded':aemcp.version);})()";
+    evalAE(script, "diagnostics", function (err, r) {
+      lines.push(err ? "bridge eval: ERROR " + err.message : String(r));
       lines.push("recent activity:");
-      readActivity(15).forEach(function (e) { lines.push("  " + e.at + " " + (e.ok ? "ok " : "ERR") + " " + e.ms + "ms " + e.tool + " " + (e.summary || "").slice(0, 120)); });
-      var text = lines.join("\n");
-      alert(copyText(text) ? "Diagnostics copied to the clipboard." : text);
+      S.activity.slice(0, 15).reverse().forEach(function (e) { lines.push("  " + e.at + " " + (e.ok ? "ok " : "ERR") + " " + e.ms + "ms " + e.tool + " " + (e.summary || "").slice(0, 120)); });
+      if (copyText(lines.join("\n"))) toast("Diagnostics copied: paste them in a bug report or a chat");
+      else toast("Could not copy to the clipboard.", true);
     });
-  };
+  }
 
-  // ---------- status ----------
+  // ---------- ☰ panel menu (After Effects' own flyout) ----------
+  function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;"); }
+  function menuXml(cfg) {
+    var shell = !(cfg.permissions && cfg.permissions.allowShell === false);
+    var all = cfg.toolProfile === "full";
+    function item(id, label, opts) {
+      opts = opts || {};
+      return '<MenuItem Id="' + id + '" Label="' + esc(label) + '" Enabled="' + (opts.disabled ? "false" : "true") + '"' +
+        (opts.check !== undefined ? ' Checkable="true" Checked="' + (opts.check ? "true" : "false") + '"' : "") + "/>";
+    }
+    var sep = '<MenuItem Label="---"/>';
+    return "<Menu>" +
+      item("hdrShell", "AI may run shell commands", { disabled: true }) + item("shellYes", "Yes", { check: shell }) + item("shellNo", "No", { check: !shell }) + sep +
+      item("hdrTools", "Tools the AI sees", { disabled: true }) + item("toolsCore", "Core (faster)", { check: !all }) + item("toolsAll", "All tools", { check: all }) + sep +
+      item("connect", "Connect an AI app\u2026") + item("checkpoints", "Checkpoints\u2026") + item("history", "Activity history\u2026") + sep +
+      item("test", "Test the connection") + item("diag", "Copy diagnostics") + sep +
+      item("update", "Check for updates\u2026") + item("about", "About & help\u2026") +
+      "</Menu>";
+  }
+  var shownMenu = "";
+  function setMenu() {
+    var xml = menuXml(S.cfg);
+    if (xml === shownMenu) return;
+    shownMenu = xml;
+    try { window.__adobe_cep__.invokeSync("setPanelFlyoutMenu", xml); } catch (e) {}
+  }
+  function onMenu(id) {
+    if (id === "shellYes" || id === "shellNo") {
+      writeConfig(function (cfg) { var p = cfg.permissions || {}; cfg.permissions = { mode: p.mode || "full", allowShell: id === "shellYes" }; });
+      S.cfg = readConfig();
+      setMenu();
+      return toast(id === "shellYes" ? "Scripts may run shell commands." : "Shell commands are blocked.");
+    }
+    if (id === "toolsCore" || id === "toolsAll") {
+      writeConfig(function (cfg) { cfg.toolProfile = id === "toolsAll" ? "full" : "core"; });
+      S.cfg = readConfig();
+      setMenu();
+      return toast("Saved. Restart your AI app to apply the tool set.");
+    }
+    if (id === "diag") return copyDiagnostics();
+    if (SCREENS[id]) openScreen(id);
+  }
+  function menuIdOf(ev) {
+    var d = ev && ev.data;
+    if (typeof d === "string") {
+      try { d = JSON.parse(d); } catch (e) {
+        var m = /<menuId>([^<]+)<\/menuId>/.exec(d);
+        return m ? m[1] : d;
+      }
+    }
+    return d && (d.menuId || d.menuName);
+  }
+  try {
+    window.__adobe_cep__.addEventListener("com.adobe.csxs.events.flyoutMenuClicked", function (ev) { onMenu(menuIdOf(ev)); });
+  } catch (e) {}
+
+  // ---------- ☰ screens ----------
+  var SCREENS = {
+    connect: { title: "Connect an AI app", render: screenConnect },
+    checkpoints: { title: "Checkpoints", render: screenCheckpoints },
+    history: { title: "Activity history", render: screenHistory },
+    test: { title: "Connection test", render: screenTest },
+    update: { title: "Updates", render: screenUpdate },
+    about: { title: "About & help", render: screenAbout },
+  };
+  var lastFocus = null, screenToken = 0;
+  function openScreen(id) {
+    if (!S.screen) lastFocus = document.activeElement;
+    S.screen = id;
+    screenToken++;
+    $("screenTitle").textContent = SCREENS[id].title;
+    $("screenAction").innerHTML = "";
+    $("screenBody").innerHTML = "";
+    $("screen").hidden = false;
+    SCREENS[id].render($("screenBody"), $("screenAction"), screenToken);
+    $("back").focus();
+  }
+  function closeScreen() {
+    S.screen = null;
+    screenToken++;
+    $("screen").hidden = true;
+    if (lastFocus && lastFocus.focus) try { lastFocus.focus(); } catch (e) {}
+  }
+  /** cb runs only if the same screen is still open (answers can come back late). */
+  function still(token, cb) { return function () { if (token === screenToken) cb.apply(null, arguments); }; }
+  $("back").onclick = closeScreen;
+  $("ver").onclick = function () { openScreen("update"); };
+  function loading(body, text) { body.innerHTML = ""; body.appendChild(el("div", { cls: "loading", text: text || "Loading\u2026" })); }
+  function message(body, text) { body.appendChild(el("div", { cls: "msg", text: text })); }
+  function openUrl(u) {
+    try { window.cep.util.openURLInDefaultBrowser(u); } catch (e) { copyText(u); toast("Link copied: " + u); }
+  }
+
+  // Connect an AI app
+  function screenConnect(body, action, token) {
+    loading(body);
+    loadClients(still(token, function () {
+      body.innerHTML = "";
+      body.appendChild(el("div", { cls: "intro", text: "Surehand works with the AI apps on this computer. Set one up, then restart that app." }));
+      var list = el("div", { cls: "list" });
+      body.appendChild(list);
+      if (S.clients.error) message(list, S.clients.error);
+      var recent = UI.lastClient(S.activity), recentAt = S.activity[0] ? Date.parse(S.activity[0].at) : 0;
+      S.clients.list.forEach(function (c) {
+        var inUse = c.inUse !== undefined ? c.inUse : c.configured && recent === c.name && Date.now() - recentAt < 15 * 60 * 1000;
+        var state = c.configured ? (inUse ? "Connected \u00b7 in use now" : "Set up" + (c.note ? " \u00b7 " + c.note : ""))
+          : c.installed === false ? "Not installed" : c.note || "Installed, not set up";
+        var btn = null;
+        if (c.configured) btn = button("link", "Remove", function () { disconnectClient(c); }, { "aria-label": "Remove " + c.name });
+        else if (c.installed !== false) btn = button(c.action === "start" ? "secondary pill sm" : "primary pill sm", c.action === "start" ? "Start" : "Set up", function () { connectClient(c); }, { "aria-label": "Set up " + c.name });
+        list.appendChild(el("div", { cls: "client" + (c.configured ? "" : " unset") }, [
+          el("span", { cls: "cdot", "aria-hidden": "true" }),
+          el("div", { style: "flex-grow:1;min-width:0" }, [el("div", { cls: "cname", text: c.name }), el("div", { cls: "cstate" + (inUse ? " live" : ""), text: state })]),
+          btn,
+        ]));
+      });
+      var foot = el("div", { cls: "sfoot" }, [el("span", {}, ["Another MCP app? Use command ", el("span", { cls: "mono", text: "surehand-ae" }), " \u00b7 ",
+        button("link green", "Copy the settings", copySettings)])]);
+      body.appendChild(foot);
+    }));
+  }
+  function disconnectClient(c) {
+    runCli(["disconnect", c.id, "--json"], function (err, r) {
+      if (err) return toast(err.friendly, true);
+      toast(r.message || (r.ok === false ? "Could not remove " + c.name + "." : "Removed from " + c.name + ". Restart it to apply."), r.ok === false);
+      loadClients(function () { if (S.screen === "connect") openScreen("connect"); });
+    }, { since: "1.4.0" });
+  }
+  /** The MCP settings for any other app: this install's node + server. */
+  function copySettings() {
+    var rt = runtime();
+    var snippet = S.clients && S.clients.snippet;
+    if (!snippet && !rt) return toast(NO_RUNTIME, true);
+    var text = typeof snippet === "string" ? snippet : JSON.stringify(snippet || { mcpServers: { "surehand-ae": { command: rt.node, args: [rt.server] } } }, null, 2);
+    if (copyText(text)) toast("Settings copied: paste them into your app\u2019s MCP settings.");
+    else toast("Could not copy to the clipboard.", true);
+  }
+
+  // Checkpoints
+  var PROJECT_SCRIPT = "(function(){return app.project&&app.project.file?app.project.file.fsName:'';})()";
+  function checkpointDir(project) {
+    var name = path.basename(project, path.extname(project)).replace(/[^\w.-]+/g, "_").slice(0, 60);
+    return path.join(P().checkpoints, name + "-" + crypto.createHash("sha1").update(project).digest("hex").slice(0, 8));
+  }
+  function readIndex(project) { return readJson(path.join(checkpointDir(project), "index.json")) || []; }
+  function screenCheckpoints(body, action, token) {
+    loading(body);
+    action.innerHTML = "";
+    evalAE(PROJECT_SCRIPT, "panel: project", still(token, function (err, project) {
+      body.innerHTML = "";
+      if (err) return message(body, "After Effects isn\u2019t answering: " + err.message);
+      if (!project) return message(body, "Save your project first: checkpoints are copies of a saved project.");
+      action.appendChild(button("primary pill sm", "Save one now", function () { saveCheckpoint(project, token); }));
+      var intro = el("div", { cls: "intro" }, ["Safety copies of ", el("span", { cls: "ink", text: path.basename(project) }),
+        ". Opening one makes a new file next to your project; your project is never overwritten."]);
+      body.appendChild(intro);
+      var list = el("div", { cls: "list" }, [el("div", { cls: "loading", text: "Loading\u2026" })]);
+      body.appendChild(list);
+      body.appendChild(el("div", { cls: "sfoot", text: "50 kept per project \u00b7 oldest are removed first" }));
+      runCli(["checkpoints", "--json", "--project", project], still(token, function (e2, json) {
+        // without the command (older server), read the checkpoint index directly
+        var cps = !e2 && json ? (Array.isArray(json) ? json : json.checkpoints || []) : readIndex(project).slice().reverse();
+        list.innerHTML = "";
+        if (!cps.length) return list.appendChild(el("div", { cls: "empty", text: "No checkpoints yet for this project." }));
+        cps.forEach(function (cp) { list.appendChild(checkpointCard(project, cp, token, !e2)); });
+      }), { since: "1.4.0" });
+    }));
+  }
+  function checkpointCard(project, cp, token, fromCli) {
+    var acts = el("div", { cls: "cp-acts" });
+    var out = el("pre", { cls: "details", hidden: true });
+    var canCompare = fromCli && (cp.history || cp.hasHistory || cp.canCompare || cp.snapshot);
+    if (canCompare) acts.appendChild(button("btn-green-outline", "Compare with now", function () {
+      out.hidden = false;
+      out.textContent = "Comparing\u2026";
+      runCli(["checkpoint-diff", cp.id, "--project", project], still(token, function (err, json, text) {
+        out.textContent = err ? err.friendly : (json && (json.text || json.message)) || text || "No differences.";
+      }), { since: "1.4.0", text: true, timeout: 120000 });
+    }));
+    acts.appendChild(button("btn-plain", "Open a copy", function () { openCheckpoint(project, cp); }));
+    if (fromCli && !canCompare) acts.appendChild(el("span", { cls: "muted2", text: "saved before history existed" }));
+    return el("div", { cls: "cp" }, [
+      el("div", { cls: "cp-row" }, [el("span", { cls: "ink", style: "font-weight:600", text: cp.label || cp.id }), el("span", { cls: "muted2", text: UI.whenLabel(cp.at, Date.now()) })]),
+      acts, out,
+    ]);
+  }
+  /** As ae_checkpoint save: save the project, keep a timestamped copy (50 per project). */
+  function saveCheckpoint(project, token) {
+    evalAE("(function(){var p=app.project;if(!p.file)return '';p.save();return p.file.fsName;})()", "panel: checkpoint", function (err, saved) {
+      if (err || !saved) return toast(err ? "Could not save: " + err.message : "Save your project first.", true);
+      try {
+        var dir = checkpointDir(saved);
+        fs.mkdirSync(dir, { recursive: true });
+        var id = new Date().toISOString().replace(/[:T]/g, "-").replace(/\..+$/, "");
+        var file = path.join(dir, id + "-saved_in_the_panel.aep");
+        fs.copyFileSync(saved, file);
+        var index = readIndex(saved);
+        index.push({ id: id, at: new Date().toISOString(), label: "saved in the panel", file: file, project: saved });
+        while (index.length > 50) { var old = index.shift(); try { fs.unlinkSync(old.file); } catch (e) {} }
+        fs.writeFileSync(path.join(dir, "index.json"), JSON.stringify(index, null, 2));
+        toast("Checkpoint saved.");
+        if (S.screen === "checkpoints") openScreen("checkpoints");
+      } catch (e) { toast("Could not save the checkpoint: " + e.message, true); }
+    }, 300000);
+  }
+  /** As ae_checkpoint restore: copy it next to the project under a new name and open that. */
+  function openCheckpoint(project, cp) {
+    if (!cp.file || !fs.existsSync(cp.file)) return toast("That checkpoint file is missing.", true);
+    evalAE("(function(){return app.project.dirty?'dirty':'clean';})()", "panel: project", function (err, d) {
+      if (err) return toast("After Effects isn\u2019t answering: " + err.message, true);
+      if (d === "dirty") return toast("Save your project first: it has unsaved changes.", true);
+      var base = path.join(path.dirname(project), path.basename(project, path.extname(project)) + " (restored " + cp.id), target;
+      for (var n = 1; ; n++) { target = base + (n > 1 ? " " + n : "") + ").aep"; if (!fs.existsSync(target)) break; }
+      try { fs.copyFileSync(cp.file, target, fs.constants.COPYFILE_EXCL); } catch (e) { return toast("Could not copy it: " + e.message, true); }
+      var script = "(function(){var f=new File(" + JSON.stringify(target) + ");app.open(f);return app.project.file&&app.project.file.fsName===f.fsName?'ok':'no';})()";
+      evalAE(script, "panel: open checkpoint", function (e2, r) {
+        if (e2 || r !== "ok") { try { fs.unlinkSync(target); } catch (x) {} return toast("After Effects did not open the copy.", true); }
+        toast("Opened a copy: " + path.basename(target));
+        closeScreen();
+      }, 300000);
+    });
+  }
+
+  // Activity history
+  function screenHistory(body) {
+    readActivity(4 * 1024 * 1024, true);
+    var all = S.activity.map(function (e) { return { item: UI.describeEntry(e), e: e }; });
+    var filter = "all", query = "";
+    var problems = all.filter(function (x) { return x.item.kind === "problem"; }).length;
+    var search = el("input", { id: "hsearch", placeholder: "Search layers, comps, tools\u2026", type: "search", autocomplete: "off" });
+    var filters = el("div", { cls: "filters", role: "group", "aria-label": "Show" });
+    [["all", "All"], ["change", "Changes"], ["problem", "Problems" + (problems ? " " + problems : "")]].forEach(function (f) {
+      var b = button("", f[1], function () { filter = f[0]; draw(); });
+      b.setAttribute("data-f", f[0]);
+      filters.appendChild(b);
+    });
+    body.appendChild(el("div", { cls: "hsearch" }, [el("label", { "for": "hsearch", cls: "sr", text: "Search the history" }), search, filters]));
+    var list = el("div", { cls: "list", style: "gap:0" });
+    body.appendChild(list);
+    body.appendChild(el("div", { cls: "sfoot" }, [el("span", { text: "Click an entry for what changed" }), button("link green", "Open log file", openLogFile)]));
+    var open = {};
+    function draw() {
+      Array.prototype.forEach.call(filters.children, function (b) { b.setAttribute("aria-pressed", b.getAttribute("data-f") === filter ? "true" : "false"); });
+      list.innerHTML = "";
+      var day = null, shown = 0;
+      all.forEach(function (x) {
+        if (filter !== "all" && x.item.kind !== filter) return;
+        var hay = (x.item.title + " " + x.item.line + " " + x.e.tool + " " + (x.e.client || "") + " " + JSON.stringify(x.e.args || {})).toLowerCase();
+        if (query && hay.indexOf(query) < 0) return;
+        if (shown >= 300) return;
+        shown++;
+        var d = UI.dayLabel(x.e.at, Date.now());
+        if (d !== day) { day = d; list.appendChild(el("div", { cls: "day", text: d })); }
+        var k = UI.entryKey(x.e);
+        var sub = [x.item.line, UI.clientName(x.e.client)].filter(Boolean).join(" \u00b7 ");
+        var row = el("button", { type: "button", cls: "hrow" + (x.item.kind === "problem" ? " bad" : ""), "aria-expanded": open[k] ? "true" : "false" }, [
+          el("span", { cls: "htime", text: UI.hhmm(x.e.at) }),
+          el("span", { cls: "hmain" }, [el("span", { cls: "htitle", text: x.item.title }), sub ? el("span", { cls: "hline", text: sub }) : null]),
+        ]);
+        row.onclick = function () { if (open[k]) delete open[k]; else open[k] = true; draw(); };
+        list.appendChild(row);
+        if (open[k]) list.appendChild(el("pre", { cls: "details", style: "margin:0 6px 6px 50px", text: UI.entryDetails(x.e) }));
+      });
+      if (!shown) list.appendChild(el("div", { cls: "empty", text: all.length ? "Nothing matches." : "No activity yet." }));
+    }
+    search.oninput = function () { query = search.value.trim().toLowerCase(); draw(); };
+    draw();
+  }
+  function openLogFile() {
+    var file = P().activity;
+    if (!fs.existsSync(file)) return toast("No activity yet.");
+    if (process.platform === "win32") childProcess.execFile("explorer", ["/select,", file]);
+    else childProcess.execFile("open", ["-R", file]);
+  }
+
+  // Connection test
+  var CHECK = '<svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#3DD68C" stroke-width="2" aria-hidden="true"><path d="m3 7.4 2.6 2.6L11 4.4"></path></svg>';
+  var CROSS = '<svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#FF8A80" stroke-width="2" aria-hidden="true"><path d="m3.5 3.5 7 7M10.5 3.5l-7 7"></path></svg>';
+  function screenTest(body, action, token) {
+    action.innerHTML = "";
+    var again = button("secondary pill sm", "Run again", function () { openScreen("test"); });
+    again.disabled = true;
+    action.appendChild(again);
+    loading(body, "Testing\u2026");
+    runCli(["test", "--json"], still(token, function (err, json) {
+      if (!err && json && json.checks) return showChecks(body, json.checks, again);
+      // the panel's own checks when the server can't run them
+      localChecks(still(token, function (checks) { showChecks(body, checks, again, err && err.friendly); }));
+    }), { since: "1.4.0", timeout: 120000 });
+  }
+  function localChecks(cb) {
+    var checks = [], host = AEMCPBridge.hostInfo();
+    call("GET", "/health", null, function (err, h) {
+      checks.push({ ok: !err && h && h.authorized !== false, name: err ? "The bridge isn\u2019t answering: " + err.message : "Bridge running in " + UI.aeLabel(host.appVersion) });
+      checks.push({ ok: !!readJson(P().config), name: readJson(P().config) ? "Settings file found" : "Settings file missing" });
+      var rt = runtime();
+      checks.push({ ok: !!rt, name: rt ? "Server " + (rt.version || "") + " installed" : "Server not installed with the installer" });
+      evalAE("'After Effects ' + app.version", "panel test", function (e2, r) {
+        checks.push({ ok: !e2, name: e2 ? "Scripts don\u2019t run: " + e2.message : "Scripts run (" + r + ")" });
+        cb(checks);
+      });
+    });
+  }
+  function showChecks(body, checks, again, note) {
+    again.disabled = false;
+    body.innerHTML = "";
+    var passed = checks.filter(function (c) { return c.ok; }).length, failed = checks.length - passed;
+    // as on the board: green while it basically works (a check or two to fix), red when it doesn't
+    var broken = !passed || (checks[0] && !checks[0].ok);
+    body.appendChild(el("div", { cls: "summary" + (broken ? " bad" : "") }, [
+      el("span", { cls: "badge", html: broken ? '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#14161A" stroke-width="2" aria-hidden="true"><path d="M7 3v5M7 10.5v.5"></path></svg>' : '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#14161A" stroke-width="2" aria-hidden="true"><path d="m3 7.4 2.6 2.6L11 4.4"></path></svg>' }),
+      el("div", {}, [el("div", { cls: "big", text: passed + " of " + checks.length + " checks passed" }),
+        el("div", { cls: "sub", text: failed ? (failed === 1 ? "One thing to fix below" : failed + " things to fix below") : "Everything works" })]),
+    ]));
+    var list = el("div", { cls: "list", style: "gap:2px" });
+    checks.forEach(function (c) {
+      var name = c.name || c.label || c.title || c.id;
+      var fix = c.fix && (c.fix.connect || c.fix.client) ? button("primary pill sm", c.fix.label || "Fix", function () { connectClient({ id: c.fix.connect || c.fix.client, name: c.fix.name || name }); }) : null;
+      list.appendChild(el("div", { cls: "check" + (c.ok ? "" : " bad") }, [
+        el("span", { html: c.ok ? CHECK : CROSS }),
+        el("span", { cls: "ctext" }, [el("span", { style: "display:block", text: name }), c.message && !c.ok ? el("span", { cls: "cmsg", text: c.message }) : null]),
+        fix,
+      ]));
+    });
+    body.appendChild(list);
+    if (note) message(body, note);
+  }
+
+  // Updates
+  function screenUpdate(body, action, token) {
+    var cached = readJson(P().updateCheck);
+    drawUpdate(body, cached, true);
+    runCli(["update", "--check", "--json"], still(token, function (err, json) {
+      if (!err && json) { S.update = json; drawUpdate(body, json, false); }
+      else drawUpdate(body, cached, false, err && err.friendly);
+    }), { since: "1.4.0", timeout: 30000 });
+  }
+  var updating = false, updatedTo = null;
+  function drawUpdate(body, u, checking, note) {
+    body.innerHTML = "";
+    var current = AEMCPBridge.VERSION, latest = u && u.latest;
+    var avail = latest && UI.cmpVersions(latest, current) > 0;
+    var rt = runtime();
+    var card = el("div", { cls: "upd" + (avail ? "" : " current") });
+    if (updatedTo) {
+      card.appendChild(el("div", { cls: "upd-head" }, [el("span", { cls: "v", text: "Updated to " + updatedTo })]));
+      card.appendChild(el("div", { cls: "note", text: "Restart After Effects and your AI apps to finish." }));
+    } else if (avail) {
+      card.appendChild(el("div", { cls: "upd-head" }, [el("span", { cls: "v", text: latest + " is ready" }), el("span", { cls: "have", text: "you have " + current })]));
+      var notes = u.notes || u.highlights;
+      if (notes && notes.length) card.appendChild(el("ul", {}, notes.slice(0, 5).map(function (n) { return el("li", { text: n }); })));
+      var b = button("primary big", updating ? "Updating\u2026" : rt ? "Update now" : "Download", function () {
+        if (!rt) return openUrl(u.url || REPO_URL + "/releases/latest");
+        runUpdate(body, latest);
+      });
+      b.disabled = updating;
+      card.appendChild(b);
+      card.appendChild(el("div", { cls: "note", text: rt ? "Takes a few seconds. Restart After Effects and your AI apps afterwards." : "Download the installer and run it." }));
+    } else {
+      card.appendChild(el("div", { cls: "upd-head" }, [el("span", { cls: "v", text: checking ? "Checking\u2026" : "You\u2019re up to date" }), el("span", { cls: "have", text: "version " + current })]));
+    }
+    body.appendChild(card);
+    var auto = S.cfg.updateCheck === false ? "off" : "once a day";
+    body.appendChild(el("div", { cls: "kv" }, [
+      el("div", {}, [el("span", { text: "Check automatically" }), el("span", { style: "color:#7FE3B2", text: auto })]),
+      el("div", {}, [el("span", { text: "Last checked" }), el("span", { style: "color:#A9A69F", text: u && u.checkedAt ? UI.whenLabel(u.checkedAt, Date.now()) : "not yet" })]),
+      button("link green", "See all release notes", function () { openUrl(REPO_URL + "/releases"); }),
+    ]));
+    if (note) { body.appendChild(el("div", { style: "height:10px" })); message(body, note); }
+    body.appendChild(el("div", { cls: "spacer" }));
+    body.appendChild(el("div", { cls: "sfoot", text: "Updates come only from the official release and are checked before they\u2019re installed." }));
+  }
+  function runUpdate(body, latest) {
+    updating = true;
+    drawUpdate(body, readJson(P().updateCheck) || { latest: latest }, false);
+    runCli(["update", "--json"], function (err, r) {
+      updating = false;
+      if (r && r.ok && r.updated) { updatedTo = r.to; toast("Updated to " + r.to + ". Restart After Effects and your AI apps."); }
+      else toast((r && r.message) || (err && err.friendly) || "The update did not finish.", true);
+      if (S.screen === "update") drawUpdate(body, readJson(P().updateCheck) || { latest: latest }, false);
+    }, { timeout: 180000 });
+  }
+
+  // About & help
+  function screenAbout(body) {
+    var logo = '<svg width="64" height="64" viewBox="0 0 200 200" role="img" aria-label="Surehand MCP"><rect width="200" height="200" rx="46" fill="#3DD68C"></rect><g transform="translate(28 28) scale(0.72)"><path d="M150 62 C128 18 50.5 50.5 78.8 78.8 L121.2 121.2 C149.5 149.5 72 182 50 138" fill="none" stroke="#14161A" stroke-width="20" stroke-linecap="round"></path><line x1="57.6" y1="57.6" x2="142.4" y2="142.4" stroke="#14161A" stroke-width="8" stroke-linecap="round"></line><circle cx="57.6" cy="57.6" r="12" fill="#14161A"></circle><circle cx="142.4" cy="142.4" r="12" fill="#14161A"></circle><rect x="87" y="87" width="26" height="26" fill="#3DD68C" stroke="#14161A" stroke-width="8"></rect></g></svg>';
+    body.appendChild(el("div", { cls: "about" }, [el("span", { html: logo }),
+      el("div", {}, [el("div", { cls: "t", text: "Surehand MCP" }), el("div", { cls: "s", text: "for Adobe\u00ae After Effects\u00ae \u00b7 version " + AEMCPBridge.VERSION })])]));
+    var links = el("div", { cls: "links" });
+    [["Getting started", REPO_URL + "#readme"], ["Troubleshooting", REPO_URL + "#troubleshooting"], ["Report a problem", REPO_URL + "/issues"]].forEach(function (l) {
+      var b = button("", "", function () { openUrl(l[1]); });
+      b.appendChild(el("span", { text: l[0] }));
+      b.appendChild(el("span", { text: "\u203a", "aria-hidden": "true" }));
+      links.appendChild(b);
+    });
+    body.appendChild(links);
+    body.appendChild(el("div", { cls: "spacer" }));
+    body.appendChild(el("div", { cls: "sfoot", text: "Made by Ron Yitzhaki \u00b7 MIT licence. Adobe and After Effects are trademarks of Adobe; Surehand MCP is not affiliated with Adobe." }));
+  }
+
+  // ---------- refresh loop ----------
   var triedStart = false;
   function refresh() {
+    S.cfg = readConfig();
+    S.update = S.update || readJson(P().updateCheck);
+    setMenu();
+    renderModes();
     call("GET", "/health", null, function (err, h) {
       if (err) {
         if (!triedStart) {
@@ -247,29 +980,32 @@
           setTimeout(function () { findMyPort(refresh); }, 500);
           return;
         }
-        setStatus("bad", AEMCPBridge.state.error || "Bridge not running: " + err.message);
+        S.bridgeError = AEMCPBridge.state.error ? "Bridge problem: " + AEMCPBridge.state.error : "Bridge not running";
+        renderHeader();
         return;
       }
-      if (!h.authorized) { setStatus("bad", "Token mismatch: re-run the installer"); return; }
-      var extra = [];
-      if (h.busy) extra.push("busy " + Math.round(h.busyForMs / 1000) + "s" + (h.busyWith ? " (" + h.busyWith + ")" : ""));
-      if (h.queue) extra.push("queue " + h.queue);
-      if (h.permissionMode && h.permissionMode !== "full") extra.push(h.permissionMode === "ask" ? "asks before changes" : "read-only");
-      setStatus(h.busy && h.busyForMs > 15000 ? "warn" : "ok", "Connected · port " + h.port + (extra.length ? " · " + extra.join(" · ") : ""));
-      pollPending(); // cheap local request; also clears cards answered elsewhere or cancelled by the AI app
+      S.health = h;
+      S.bridgeError = h.authorized === false ? "Token mismatch: re-run the installer" : null;
+      if (h.paused !== undefined) S.paused = h.paused;
+      renderHeader();
+      if (!S.bridgeError) pollPending(); // cheap local request; also the panel's heartbeat for the bridge
     });
-    renderActivity();
-    showUpdate();
+    readActivity();
+    S.renders = readRenders();
+    renderFeed(); // redraws only when something changed
+    renderHeader();
+    renderAsk();
+    renderSetup();
   }
 
-  $("test").onclick = function () {
-    call("POST", "/eval", { script: "'After Effects ' + app.version", timeoutMs: 10000, label: "panel test" }, function (err, r) {
-      alert(err ? "Error: " + err.message : r.ok ? "Bridge OK\n" + r.result : "Error: " + r.error);
-      refresh();
-    });
-  };
-  $("foot").textContent = "v" + AEMCPBridge.VERSION + " · " + AEMCP_DIR;
-  loadSettings();
+  window.addEventListener("resize", applyLayout);
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) refresh(); });
+  window.SurehandPanel = { state: S, menu: onMenu, refresh: refresh, menuXml: menuXml, openScreen: openScreen, closeScreen: closeScreen };
+
+  readActivity();
+  applyLayout();
+  renderModes();
   findMyPort(refresh);
-  setInterval(refresh, 1500);
+  loadClients();
+  setInterval(refresh, POLL_MS);
 })();

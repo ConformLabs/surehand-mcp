@@ -6,10 +6,13 @@ import { configPath, loadConfig } from "./config.js";
 import { defaultConfigPath, env, legacyDir } from "./paths.js";
 
 export class BridgeError extends Error {
-  constructor(message: string, readonly code: "NOT_RUNNING" | "STARTING" | "BLOCKED" | "AUTH" | "TIMEOUT" | "BRIDGE" | "DENIED" | "CANCELLED") {
+  constructor(message: string, readonly code: "NOT_RUNNING" | "STARTING" | "BLOCKED" | "AUTH" | "TIMEOUT" | "BRIDGE" | "DENIED" | "CANCELLED" | "PAUSED") {
     super(message);
   }
 }
+
+/** What the AI is told while the user has paused it in the Surehand panel (the bridge sends the same text). */
+export const PAUSED_MESSAGE = "Paused in the Surehand panel: nothing was run. Ask the user to resume.";
 
 const NOT_RUNNING_HELP =
   "Cannot reach After Effects. Make sure After Effects is running and the Surehand MCP bridge is loaded " +
@@ -32,6 +35,8 @@ export interface Health {
   queue?: number;
   pendingApprovals?: number;
   permissionMode?: string;
+  /** "Pause AI" in the panel: AI calls are refused (bridge 1.4+) */
+  paused?: { since?: string | null; refused?: number } | null;
   startedAt?: string;
   lastActivated?: string;
   authorized?: boolean;
@@ -213,6 +218,8 @@ async function request(path: string, init: RequestOptions = {}): Promise<any> {
   const body = await res.json().catch(() => ({}));
   if (res.status === 401) throw new BridgeError("Bridge rejected the token. Re-run the installer so server and AE share ~/.surehand/ae/config.json, then restart AE.", "AUTH");
   if (body.blocked) throw new BridgeError(explainBlocked(body), "BLOCKED");
+  // paused in the panel: nothing ran; a clean message, not a bridge error
+  if (body.paused) throw new BridgeError(PAUSED_MESSAGE, "PAUSED");
   if (body.denied) throw new BridgeError(body.error || "The change was denied in After Effects.", "DENIED");
   if (!res.ok || body.ok === false) throw new BridgeError(body.error || `Bridge error HTTP ${res.status}`, "BRIDGE");
   return body;
@@ -264,7 +271,7 @@ export interface EvalOptions {
   /** shown in the Surehand MCP panel / bridge log */
   label?: string;
   /** in "ask" permission mode the bridge holds the call until the user approves it */
-  approval?: { tool: string; summary: string };
+  approval?: { tool: string; summary: string; client?: string };
   cancel?: AbortSignal;
 }
 

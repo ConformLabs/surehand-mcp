@@ -177,6 +177,8 @@ export async function runJsx(body: string, args: unknown = {}, opts: RunOptions 
   // defaults from the tool call: label for the AE panel log, and the AI app's cancel signal
   const ctx = callContext.getStore();
   opts = { ...opts, bridge: { label: ctx?.tool, cancel: ctx?.signal, ...opts.bridge } };
+  // the approval prompt in After Effects names the AI app that asks
+  if (opts.bridge?.approval && ctx?.client && !opts.bridge.approval.client) opts.bridge = { ...opts.bridge, approval: { ...opts.bridge.approval, client: ctx.client } };
   if (opts.bridge?.approval) {
     // make sure the helpers are loaded first, so the user is asked to approve only once
     const probe = await evalRaw(`(typeof aemcp !== 'undefined' && aemcp.version === ${toJsLiteral(HELPER_VERSION)}) ? 'ok' : 'no'`, 10_000, { cancel: opts.bridge.cancel });

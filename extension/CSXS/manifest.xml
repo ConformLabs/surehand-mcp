@@ -7,6 +7,7 @@
   <ExtensionList>
     <Extension Id="com.aemcp.bridge" Version="__AEMCP_VERSION__" />
     <Extension Id="com.aemcp.panel" Version="__AEMCP_VERSION__" />
+    <Extension Id="com.aemcp.approval" Version="__AEMCP_VERSION__" />
   </ExtensionList>
   <ExecutionEnvironment>
     <HostList>
@@ -64,6 +65,28 @@
           <Geometry>
             <Size><Height>420</Height><Width>320</Width></Size>
             <MinSize><Height>200</Height><Width>240</Width></MinSize>
+          </Geometry>
+        </UI>
+      </DispatchInfo>
+    </Extension>
+    <!-- Approval pop-up: the bridge opens it when an edit waits for approval ("ask" mode) and the panel isn't showing -->
+    <Extension Id="com.aemcp.approval">
+      <DispatchInfo>
+        <Resources>
+          <MainPath>./approval.html</MainPath>
+          <CEFCommandLine>
+            <Parameter>--enable-nodejs</Parameter>
+            <Parameter>--mixed-context</Parameter>
+          </CEFCommandLine>
+        </Resources>
+        <Lifecycle>
+          <AutoVisible>true</AutoVisible>
+        </Lifecycle>
+        <UI>
+          <Type>Modeless</Type>
+          <Geometry>
+            <Size><Height>260</Height><Width>340</Width></Size>
+            <MinSize><Height>220</Height><Width>300</Width></MinSize>
           </Geometry>
         </UI>
       </DispatchInfo>

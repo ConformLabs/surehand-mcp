@@ -7,7 +7,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const require = createRequire(import.meta.url);
-const SRC = readFileSync(new URL("../../extension/js/bridge-core.js", import.meta.url), "utf8");
+// the bridge page loads paths.js first, then bridge-core.js
+const SRC =
+  readFileSync(new URL("../../extension/js/paths.js", import.meta.url), "utf8") +
+  "\n" +
+  readFileSync(new URL("../../extension/js/bridge-core.js", import.meta.url), "utf8");
 
 let home = "";
 let blocker: Server;
@@ -15,6 +19,7 @@ let basePort = 0;
 const token = "t".repeat(48);
 const evaluated: string[] = [];
 let opened = 0;
+const openedIds: string[] = [];
 
 type EvalScript = (script: string, cb: (r: string) => void) => void;
 
@@ -29,7 +34,10 @@ function loadBridge(appVersion: string, delayMs = 20, evalScript?: EvalScript) {
           evaluated.push(script);
           setTimeout(() => cb(script.startsWith("slow") ? "slow done" : "result:" + script), script.startsWith("slow") ? 400 : delayMs);
         }),
-      requestOpenExtension: () => opened++,
+      requestOpenExtension: (id: string) => {
+        opened++;
+        openedIds.push(id);
+      },
       addEventListener: () => {},
     },
     addEventListener: () => {},
@@ -136,7 +144,8 @@ describe("CEP bridge", () => {
     const before = opened;
     const pending = req(port, "/eval", { script: "edit 1", approval: { tool: "Set property", summary: "{...}" } });
     await waitFor(() => bridgeA.state.pending.length === 1);
-    expect(opened).toBe(before + 1); // the panel was asked to open
+    expect(opened).toBe(before + 1); // no panel showing: the approval pop-up was asked to open
+    expect(openedIds[openedIds.length - 1]).toBe("com.aemcp.approval");
     expect(evaluated).not.toContain("edit 1");
     const list = await req(port, "/pending");
     expect(list.body.pending[0]).toMatchObject({ tool: "Set property", summary: "{...}" });
@@ -363,5 +372,142 @@ describe("blocked After Effects is reported fast", () => {
       expect(r.isError).toBe(false);
       expect(r.text).toMatch(/^Connected to After Effects 2026 \(bridge v.* on port \d+/);
     });
+  });
+});
+
+describe("Pause AI (the bridge refuses AI calls while paused)", () => {
+  const cfgFile = () => join(home, ".aemcp", "config.json");
+  const writeCfg = (extra: object) => writeFileSync(cfgFile(), JSON.stringify({ token, bridgePort: basePort, httpPort: basePort + 1, ...extra }));
+  afterAll(() => writeCfg({}));
+
+  it("refuses at once, runs nothing, counts the refusals, and still runs the panel's own calls", async () => {
+    const port = bridgeA.state.port;
+    writeCfg({ paused: true, pausedAt: "2026-10-19T10:00:00.000Z" });
+    const r = await req(port, "/eval", { script: "paused edit", label: "ae_set_property" });
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({ ok: false, paused: true, error: bridgeA.PAUSED_MESSAGE });
+    expect(bridgeA.PAUSED_MESSAGE).toBe("Paused in the Surehand panel: nothing was run. Ask the user to resume.");
+    await req(port, "/eval", { script: "paused edit 2" });
+    expect(evaluated).not.toContain("paused edit");
+    expect(evaluated).not.toContain("paused edit 2");
+    const h = (await req(port, "/health")).body;
+    expect(h.paused).toEqual({ since: "2026-10-19T10:00:00.000Z", refused: 2 });
+    expect((await req(port, "/pending")).body.paused.refused).toBe(2);
+    // the panel's own calls (undo, diagnostics...) are not the AI's
+    expect((await req(port, "/eval", { script: "panel call", fromPanel: true })).body).toEqual({ ok: true, result: "result:panel call" });
+    // a new pause starts a new count
+    writeCfg({ paused: true, pausedAt: "2026-10-19T11:00:00.000Z" });
+    await req(port, "/eval", { script: "x" });
+    expect((await req(port, "/health")).body.paused.refused).toBe(1);
+    writeCfg({});
+    expect((await req(port, "/health")).body.paused).toBeNull();
+    expect((await req(port, "/eval", { script: "after resume" })).body.result).toBe("result:after resume");
+  });
+
+  it("lets a running script finish, and refuses the calls queued behind it", async () => {
+    const port = bridgeA.state.port;
+    const running = req(port, "/eval", { script: "slow running" });
+    await waitFor(() => bridgeA.state.busy);
+    const queued = req(port, "/eval", { script: "queued while running" });
+    await new Promise((r) => setTimeout(r, 50));
+    writeCfg({ paused: true, pausedAt: "2026-10-19T12:00:00.000Z" });
+    expect((await running).body).toEqual({ ok: true, result: "slow done" });
+    expect((await queued).body).toMatchObject({ ok: false, paused: true });
+    expect(evaluated).not.toContain("queued while running");
+    writeCfg({});
+  });
+
+  it("the server passes the clean message to the AI (BridgeError PAUSED)", async () => {
+    process.env.AEMCP_CONFIG = cfgFile();
+    const { evalRaw, selectInstance, BridgeError, PAUSED_MESSAGE } = await import("../src/bridge.js");
+    selectInstance(bridgeA.state.port);
+    writeCfg({ paused: true, pausedAt: "2026-10-19T13:00:00.000Z" });
+    try {
+      const e: any = await evalRaw("1+1", 5000, { label: "ae_run_script" }).catch((x) => x);
+      expect(e).toBeInstanceOf(BridgeError);
+      expect(e.code).toBe("PAUSED");
+      expect(e.message).toBe(PAUSED_MESSAGE);
+      expect(PAUSED_MESSAGE).toBe(bridgeA.PAUSED_MESSAGE);
+    } finally {
+      writeCfg({});
+      selectInstance(null);
+    }
+  });
+});
+
+describe("approvals: one answer, one place", () => {
+  const cfgFile = () => join(home, ".aemcp", "config.json");
+  const writeCfg = (extra: object) => writeFileSync(cfgFile(), JSON.stringify({ token, bridgePort: basePort, httpPort: basePort + 1, ...extra }));
+  beforeAll(() => writeCfg({ permissions: { mode: "ask" } }));
+  afterAll(() => writeCfg({}));
+
+  it("accepts only the first answer (panel and pop-up both open) and runs the edit once", async () => {
+    const port = bridgeA.state.port;
+    const call = req(port, "/eval", { script: "edit once", approval: { tool: "Set property", summary: "{}", client: "claude-ai" } });
+    await waitFor(() => bridgeA.state.pending.length === 1);
+    const p = (await req(port, "/pending")).body.pending[0];
+    expect(p.client).toBe("claude-ai");
+    expect(Date.parse(p.deadline) - Date.parse(p.at)).toBe(10 * 60 * 1000);
+    const [a, b] = await Promise.all([
+      req(port, "/approve", { id: p.id, allow: true, by: "panel" }),
+      req(port, "/approve", { id: p.id, allow: false, by: "popup" }),
+    ]);
+    expect([a.status, b.status].sort()).toEqual([200, 404]);
+    expect((await call).body).toEqual({ ok: true, result: "result:edit once" });
+    expect(evaluated.filter((s) => s === "edit once")).toHaveLength(1);
+    // a late answer for it is refused too
+    expect((await req(port, "/approve", { id: p.id, allow: true })).status).toBe(404);
+  });
+
+  it("opens the pop-up only when the panel isn't showing, and only once per request", async () => {
+    const port = bridgeA.state.port;
+    bridgeA.state.ui.requestedAt = 0;
+    // the panel is open and visible: it shows the card, no pop-up
+    await req(port, "/pending?ui=panel&visible=1");
+    const before = openedIds.length;
+    const c1 = req(port, "/eval", { script: "edit p1", approval: { tool: "Set property", summary: "{}" } });
+    await waitFor(() => bridgeA.state.pending.length === 1);
+    expect(openedIds.length).toBe(before);
+    await req(port, "/approve", { id: bridgeA.state.pending[0].id, allow: false });
+    await c1;
+
+    // the panel is closed (no poll for a while): the pop-up opens, once
+    bridgeA.state.ui.panel = { at: Date.now() - 10_000, visible: true };
+    const c2 = req(port, "/eval", { script: "edit p2", approval: { tool: "Set property", summary: "{}" } });
+    await waitFor(() => bridgeA.state.pending.length === 1);
+    expect(openedIds.slice(before)).toEqual(["com.aemcp.approval"]);
+    await req(port, "/pending?ui=popup"); // the pop-up reports in
+    bridgeA.checkPopup();
+    expect(openedIds.slice(before)).toEqual(["com.aemcp.approval"]);
+    await req(port, "/approve", { id: bridgeA.state.pending[0].id, allow: false, by: "popup" });
+    expect((await c2).body).toMatchObject({ ok: false, denied: true });
+    expect(bridgeA.state.log[0].preview).toMatch(/pop-up/);
+  });
+});
+
+describe("popupDecision (pure)", () => {
+  const d = (s: object) => bridgeA.popupDecision({ now: 100_000, pending: ["a"], presented: {}, ...s });
+  it("does nothing without a waiting request", () => {
+    expect(d({ pending: [] })).toEqual({ open: false, openPanel: false, present: false });
+  });
+  it("leaves it to a panel that is open and visible", () => {
+    expect(d({ panel: { at: 99_000, visible: true } })).toEqual({ open: false, openPanel: false, present: true });
+  });
+  it("opens the pop-up when the panel is closed, hidden or silent", () => {
+    expect(d({}).open).toBe(true);
+    expect(d({ panel: { at: 99_000, visible: false } }).open).toBe(true);
+    expect(d({ panel: { at: 90_000, visible: true } }).open).toBe(true);
+  });
+  it("doesn't open it again while it shows, while it loads, or for a request already shown", () => {
+    expect(d({ popup: { at: 99_500 } })).toEqual({ open: false, openPanel: false, present: true });
+    expect(d({ requestedAt: 97_000 }).open).toBe(false);
+    expect(d({ presented: { a: true } }).open).toBe(false);
+    // a newer request opens it again (the user closed the pop-up without answering)
+    expect(d({ pending: ["a", "b"], presented: { a: true } }).open).toBe(true);
+  });
+  it("opens the panel instead, once, when the pop-up never reported in", () => {
+    expect(d({ requestedAt: 90_000, presented: { a: true } })).toEqual({ open: false, openPanel: true, present: true });
+    expect(d({ requestedAt: 90_000, fellBackFor: 90_000, presented: { a: true } }).openPanel).toBe(false);
+    expect(d({ requestedAt: 90_000, popup: { at: 91_000 }, presented: { a: true } }).openPanel).toBe(false);
   });
 });

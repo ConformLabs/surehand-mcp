@@ -6,6 +6,8 @@ export interface CallContext {
   signal?: AbortSignal;
   /** the last script run with an undo group in this call: its undo step name and the revision after it */
   last?: { undoGroup?: string; revision?: number };
+  /** the AI app's name (MCP clientInfo), shown on approval requests in After Effects */
+  client?: string;
 }
 
 export const callContext = new AsyncLocalStorage<CallContext>();
