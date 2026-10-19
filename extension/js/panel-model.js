@@ -126,9 +126,11 @@
       return item;
     }
     if (!e.ok) {
+      var why = refusal(summary, e);
+      if (why) { item.kind = "blocked"; item.line = why; return item; }
       item.kind = "problem";
       item.title = toolName(e.tool, args) + " failed";
-      item.line = summary;
+      item.line = readableError(summary);
       return item;
     }
     var changes = Number(e.changes) || 0;
@@ -151,8 +153,34 @@
     return item;
   }
 
+  /**
+   * Calls that were not run because of a choice the user made (Pause, Deny, Read-only, shell commands off) or
+   * because nobody answered: not failures. Returns the reason in the user's words, or null.
+   */
+  function refusal(summary, e) {
+    var s = String(summary || "");
+    if ((e && e.paused) || /^Paused in the Surehand panel/.test(s)) return "Not run: the AI was paused";
+    if (/denied this change|denied in the Surehand/i.test(s)) return "You denied it";
+    if (/No one approved this change/i.test(s)) return "Not run: no answer within 10 minutes";
+    if (/read-only mode/i.test(s) && !/can.t undo|couldn.t reliably/i.test(s)) return "Not run: Read-only mode";
+    if (/Shell commands .*(disabled|blocked)/i.test(s)) return "Not run: shell commands are off";
+    return null;
+  }
+  /** A failure's first line for people: the known ones in plain words, others cut to their first sentence. */
+  function readableError(summary) {
+    var s = String(summary || "").replace(/^Error:\s*/, "");
+    if (/^Cannot reach After Effects/i.test(s)) return "After Effects wasn\u2019t reachable. Is it open?";
+    if (/busy or showing a dialog/i.test(s)) return "After Effects was busy or showing a dialog.";
+    var t = /^Timed out after (\d+)s/.exec(s);
+    if (t) return "Took longer than " + t[1] + " s: After Effects may have been busy.";
+    var first = /^(.{12,}?[.!?])(\s|$)/.exec(s);
+    s = first ? first[1] : s;
+    return s.length > 160 ? s.slice(0, 157) + "\u2026" : s;
+  }
+
   /** The change list for Details (newer logs carry it; older ones only the first line and the call itself). */
-  function entryDetails(e) {
+  function entryDetails(e, group) {
+    if (group && group.length > 1) return group.map(function (x) { return hhmm(x.at) + "  " + toolName(x.tool, x.args); }).join("\n");
     var list = e.changeList || e.changeLines;
     if (list && list.length) return list.join("\n");
     var args = e.args || {};
@@ -183,18 +211,65 @@
     opts = opts || {};
     var limit = opts.limit || 6, undone = opts.undone || {};
     var out = [];
-    for (var i = 0; i < activity.length && out.length < limit; i++) {
+    for (var i = 0; i < activity.length; i++) {
       var e = activity[i];
       if (!e || !e.tool) continue;
       if (e.tool === "ae_render_background" && e.ok && opts.runningRenders && opts.runningRenders[renderIdOf(e)]) continue;
-      out.push(describeEntry(e));
+      var it = describeEntry(e), prev = out[out.length - 1];
+      // looking around is one row: consecutive reads are grouped (the newest one's time)
+      if (it.kind === "read" && prev && prev.kind === "read") { addRead(prev, it); continue; }
+      if (out.length >= limit) break;
+      out.push(it);
     }
+    out.forEach(function (it) { if (it.group) finishReads(it); });
     out.forEach(function (it, k) {
       it.undoable = it.undoable && k === 0 && it.entry === activity[0] && !undone[entryKey(it.entry)] && canUndo(it.entry, opts.current);
     });
     return out;
   }
   function entryKey(e) { return e.at + "|" + e.tool; }
+  function addRead(row, it) {
+    if (!row.group) row.group = [row.entry];
+    row.group.push(it.entry);
+  }
+  /** "Read comp Main" ×3, or "Looked at the project" with what it read. */
+  function finishReads(row) {
+    var titles = [], seen = {};
+    row.group.forEach(function (e) {
+      var t = toolName(e.tool, e.args);
+      if (!seen[t]) { seen[t] = true; titles.push(t); }
+    });
+    var n = row.group.length;
+    if (titles.length === 1) { row.title = titles[0]; row.line = plural(n, "time"); }
+    else {
+      row.title = "Looked at the project";
+      row.line = titles.slice(0, 3).join(" \u00b7 ") + (titles.length > 3 ? " \u00b7 +" + (titles.length - 3) : "");
+    }
+    row.count = n;
+  }
+
+  // ---------- what the AI is doing right now ----------
+  function secsText(ms) { var s = Math.round((ms || 0) / 1000); return s >= 2 ? (s < 120 ? s + " s" : Math.floor(s / 60) + " min") : ""; }
+  /**
+   * What the AI is doing right now, for the row above the feed: { text, time, line, waiting }, or null.
+   * h: the bridge's /health while an AI call runs (busyWith: its tool; not the panel's own small jobs).
+   * unreachableMs: how long the bridge, which answered before, hasn't answered: it lives inside After
+   * Effects and can't answer while After Effects runs a script (which freezes this panel too); after a
+   * minute that is worth saying.
+   */
+  function workingView(h, unreachableMs) {
+    if (!h && typeof unreachableMs === "number" && unreachableMs >= 0) {
+      if (unreachableMs > 60000) return { text: "After Effects isn\u2019t answering", time: secsText(unreachableMs), waiting: true,
+        line: "It may be running a long script, rendering, or showing a dialog. Surehand picks up again when it\u2019s free." };
+      return null; // the panel itself is frozen while After Effects runs a script: nothing to draw
+    }
+    if (!h || !h.busy || !h.busyWith || /^panel|^diagnostics/.test(h.busyWith)) return null;
+    if ((h.waitingForMs || 0) > 4000) {
+      return { text: "Waiting for After Effects", time: secsText(h.waitingForMs), waiting: true,
+        line: "It\u2019s busy or showing a dialog. " + toolName(h.busyWith) + " runs when it\u2019s free." };
+    }
+    return { text: "Working \u00b7 " + toolName(h.busyWith), time: secsText(h.busyForMs), line: "", waiting: false };
+  }
 
   // ---------- background renders ----------
   function renderIdOf(e) {
@@ -321,7 +396,7 @@
 
   var api = {
     layoutFor: layoutFor, MODES: MODES, modeOf: modeOf, clientName: clientName, lastClient: lastClient, statusFor: statusFor,
-    toolName: toolName, describeEntry: describeEntry, entryDetails: entryDetails, feedItems: feedItems, entryKey: entryKey, canUndo: canUndo,
+    toolName: toolName, describeEntry: describeEntry, refusal: refusal, readableError: readableError, workingView: workingView, entryDetails: entryDetails, feedItems: feedItems, entryKey: entryKey, canUndo: canUndo,
     renderIdOf: renderIdOf, renderStartInfo: renderStartInfo, renderProgress: renderProgress, timeLeft: timeLeft,
     riskChips: riskChips, approvalView: approvalView, countdown: countdown,
     hhmm: hhmm, dayLabel: dayLabel, whenLabel: whenLabel, parseCliJson: parseCliJson, cmpVersions: cmpVersions, aeLabel: aeLabel,

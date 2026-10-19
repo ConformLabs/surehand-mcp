@@ -27,6 +27,9 @@ let revision = 812;
 // a test can answer server commands itself (undefined: the defaults below) and slow them down
 let cliAnswer: ((cmd: string) => unknown) | null = null;
 let cliDelay = 20;
+// the bridge can't answer while After Effects runs a long script: /health then gets no answer
+let healthDown = false;
+let ownBridgeStarts = 0;
 
 const waitFor = async (cond: () => boolean, ms = 4000) => {
   const t0 = Date.now();
@@ -45,6 +48,7 @@ beforeAll(async () => {
     const json = (o: unknown, status = 200) => res.writeHead(status, { "content-type": "application/json" }).end(JSON.stringify(o));
     const url = req.url || "";
     const secret = req.headers["x-surehand-panel"] as string | undefined;
+    if (url === "/health" && healthDown) return void req.socket.destroy();
     if (url === "/health") return json({ ok: true, authorized: true, port: 1, pid: 4242, busy: false, queue: 0, pendingApprovals: pending.length, permissionMode: "ask", paused });
     if (url.startsWith("/pending")) {
       heartbeats.push(url);
@@ -157,7 +161,9 @@ beforeAll(async () => {
       }
     },
     hostInfo: () => ({ appName: "AEFT", appVersion: "26.5" }),
-    start: () => {},
+    start: () => {
+      ownBridgeStarts++;
+    },
   };
   for (const f of ["js/paths.js", "js/panel-model.js", "js/control.js", "js/panel.js"]) w.eval(readFileSync(new URL(f, ROOT), "utf8"));
 });
@@ -537,7 +543,7 @@ describe("Surehand panel: ☰ screens (live findings)", () => {
     cliAnswer = null;
   });
 
-  it("Connection test: shows each check's message (its name as a small label), a red row with Fix that connects the app", async () => {
+  it("Connection test: shows each check's message (known names as a small readable label), a red row with Fix that connects the app", async () => {
     cliAnswer = (cmd) =>
       cmd === "test --json"
         ? {
@@ -553,7 +559,8 @@ describe("Surehand panel: ☰ screens (live findings)", () => {
     await waitFor(() => /1 of 2 checks passed/.test($("screenBody").textContent));
     const rows = [...doc().querySelectorAll("#screenBody .check")] as any[];
     expect(rows.map((r) => r.querySelector(".cmain").textContent)).toEqual(["Surehand MCP 1.4.0 is the latest version.", "Claude Desktop: its settings name a server that no longer exists."]);
-    expect(rows.map((r) => r.querySelector(".clabel").textContent)).toEqual(["update", "claude-desktop"]);
+    // known checks get a readable label; an app's check already names the app in its message
+    expect(rows.map((r) => r.querySelector(".clabel")?.textContent ?? null)).toEqual(["Updates", null]);
     expect(rows[1].className).toBe("check bad");
     const fix = rows[1].querySelector("button");
     expect(fix.textContent).toBe("Fix");
@@ -610,3 +617,57 @@ describe("Surehand panel: ☰ screens (live findings)", () => {
     cliAnswer = null;
   });
 });
+
+describe("Surehand panel: UX pass (menu button, refusals, long scripts)", () => {
+  it("the ☰ button opens the panel's own menu; a screen opened there goes Back to it", async () => {
+    $("menuBtn").click();
+    expect($("screen").hidden).toBe(false);
+    expect($("screenTitle").textContent).toBe("Surehand");
+    const rows = [...doc().querySelectorAll("#screenBody .mrow .mlabel")].map((x: any) => x.textContent);
+    expect(rows).toEqual(["Connect an AI app", "Checkpoints", "Activity history", "Test the connection", "Copy diagnostics", "Updates", "About & help"]);
+    // the update that is ready shows on its row
+    expect($("screenBody").textContent).toMatch(/99\.0\.0 is ready/);
+    (doc().querySelectorAll("#screenBody .mrow")[0] as any).click();
+    expect($("screenTitle").textContent).toBe("Connect an AI app");
+    $("back").click();
+    expect($("screenTitle").textContent).toBe("Surehand");
+    $("back").click();
+    expect($("screen").hidden).toBe(true);
+    // from After Effects' own flyout, Back closes the screen
+    (dom.window as any).SurehandPanel.menu("history");
+    $("back").click();
+    expect($("screen").hidden).toBe(true);
+  });
+
+  it("the menu's settings write the same config as the flyout", async () => {
+    $("menuBtn").click();
+    const seg = (label: string) => [...doc().querySelectorAll("#screenBody .mset")].find((x: any) => x.textContent.includes(label)) as any;
+    [...seg("Shell commands").querySelectorAll("button")].find((b: any) => b.textContent === "Off")!.click();
+    expect(config().permissions.allowShell).toBe(false);
+    expect(seg("Shell commands").querySelector("button.on").textContent).toBe("Off");
+    [...seg("Shell commands").querySelectorAll("button")].find((b: any) => b.textContent === "Allowed")!.click();
+    expect(config().permissions.allowShell).toBe(true);
+    [...seg("Tools the AI sees").querySelectorAll("button")].find((b: any) => b.textContent === "All")!.click();
+    expect(config().toolProfile).toBe("full");
+    [...seg("Tools the AI sees").querySelectorAll("button")].find((b: any) => b.textContent === "Core")!.click();
+    expect(config().toolProfile).toBe("core");
+    (dom.window as any).SurehandPanel.closeScreen();
+  });
+
+  it("Pause says so in words (not only an icon)", () => {
+    expect($("pause").textContent).toBe("Pause");
+  });
+
+  it("a long script (the bridge stops answering after it answered) never starts a second bridge or says it's disconnected", async () => {
+    await waitFor(() => /Ready/.test($("statusText").textContent));
+    const starts = ownBridgeStarts;
+    healthDown = true;
+    await new Promise((r) => setTimeout(r, 4500)); // longer than the ~8 health checks after which a never-seen bridge is started
+    expect($("statusText").textContent).toMatch(/Ready/);
+    expect($("setup").hidden).toBe(true);
+    healthDown = false;
+    await new Promise((r) => setTimeout(r, 1700));
+    expect(ownBridgeStarts).toBe(starts);
+  }, 15_000);
+});
+
