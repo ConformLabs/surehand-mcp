@@ -69,7 +69,7 @@ VIAddVersionKey /LANG=1033 "Comments" "${HOMEPAGE}"
 !define MUI_FINISHPAGE_LINK "Documentation and help: github.com/ConformLabs/surehand-mcp"
 !define MUI_FINISHPAGE_LINK_LOCATION "${HOMEPAGE}"
 !define MUI_FINISHPAGE_NOREBOOTSUPPORT
-!define MUI_UNCONFIRMPAGE_TEXT_TOP "${PRODUCT} will be removed: the server, the After Effects extension, its AI app connections and its private Node.js. Your settings (.aemcp\config.json) and project checkpoints (.aemcp\checkpoints) are kept."
+!define MUI_UNCONFIRMPAGE_TEXT_TOP "${PRODUCT} will be removed: the server, the After Effects extension, its AI app connections and its private Node.js. Your settings (.aemcp\config.json) and project checkpoints (.aemcp\checkpoints) and your other files there are kept."
 
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_INSTFILES
@@ -191,7 +191,7 @@ SectionEnd
 
 ; Uninstall keeps the user's data: ~/.aemcp/config.json (settings, token) and ~/.aemcp/checkpoints
 ; (project safety copies). It removes the server, the After Effects extension, the AI app entries
-; (all done by `ae-mcp uninstall --keep-config`), the private Node.js and the uninstaller.
+; (all done by `ae-mcp uninstall --keep-config`, which also leaves any other files in .aemcp alone), the private Node.js and the uninstaller.
 Section "Uninstall"
   SetShellVarContext current
   SetDetailsPrint both
@@ -201,39 +201,13 @@ Section "Uninstall"
 
   ${If} ${FileExists} "${NODE_DIR}\node.exe"
   ${AndIf} ${FileExists} "${SERVER}"
-    ; `ae-mcp uninstall --keep-config` removes everything in .aemcp except config.json and node\,
-    ; so move the checkpoints out of the way while it runs.
-    StrCpy $3 0
-    ${If} ${FileExists} "${AEMCP}\checkpoints\*.*"
-      ${If} ${FileExists} "$PROFILE\.aemcp-checkpoints-keep\*.*"
-        MessageBox MB_ICONSTOP "$PROFILE\.aemcp-checkpoints-keep already exists (left by an earlier uninstall). Move it back to ${AEMCP}\checkpoints or delete it, then uninstall again." /SD IDOK
-        SetErrorLevel 2
-        Abort "Nothing was removed."
-      ${EndIf}
-      ClearErrors
-      Rename "${AEMCP}\checkpoints" "$PROFILE\.aemcp-checkpoints-keep"
-      ${If} ${Errors}
-        MessageBox MB_ICONSTOP "Could not set the checkpoints aside (${AEMCP}\checkpoints is in use). Quit your AI apps and uninstall again." /SD IDOK
-        SetErrorLevel 2
-        Abort "Nothing was removed."
-      ${EndIf}
-      StrCpy $3 1
-    ${EndIf}
     InitPluginsDir
     SetOutPath "$PLUGINSDIR"
     File "/oname=log-filter.cjs" "${LOG_FILTER}"
+    ; keeps config.json, the checkpoints and any files in .aemcp that aren't ours
     nsExec::ExecToLog '"${NODE_DIR}\node.exe" "$PLUGINSDIR\log-filter.cjs" "${SERVER}" uninstall --keep-config'
     Pop $0
     SetOutPath "$TEMP"
-    ${If} $3 == 1
-      ClearErrors
-      Rename "$PROFILE\.aemcp-checkpoints-keep" "${AEMCP}\checkpoints"
-      ${If} ${Errors}
-        DetailPrint "Your project checkpoints are in $PROFILE\.aemcp-checkpoints-keep"
-      ${Else}
-        DetailPrint "Kept the project checkpoints in ${AEMCP}\checkpoints"
-      ${EndIf}
-    ${EndIf}
     ${If} $0 != 0
       DetailPrint "ae-mcp uninstall reported a problem (exit code $0)."
     ${EndIf}
