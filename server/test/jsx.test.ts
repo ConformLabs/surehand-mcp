@@ -137,7 +137,7 @@ describe("tool profiles", () => {
   it("every core tool exists", async () => {
     const { CORE_TOOLS } = await import("../src/tools/profile.js");
     const names = new Set(allTools.map((t) => t.name));
-    for (const n of ["ae_status", "ae_run_script", "ae_get_scripting_guide", "ae_render_frame", "ae_render_contact_sheet", "ae_batch", "ae_checkpoint", "ae_list_scripts", "ae_run_script_file", "ae_tools", "ae_call"]) names.add(n);
+    for (const n of ["ae_status", "ae_run_script", "ae_get_scripting_guide", "ae_render_frame", "ae_render_contact_sheet", "ae_batch", "ae_checkpoint", "ae_prove_identical", "ae_list_scripts", "ae_run_script_file", "ae_tools", "ae_call"]) names.add(n);
     for (const t of CORE_TOOLS) expect(names.has(t), t).toBe(true);
   });
 });

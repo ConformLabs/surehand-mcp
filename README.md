@@ -11,10 +11,11 @@
 
 Surehand MCP connects **Claude** (Desktop / Code), **ChatGPT** (desktop app or web), Cursor, Codex, or any MCP client to **Adobe® After Effects®**.
 The AI can run any script inside After Effects (modern JavaScript, converted for AE's ExtendScript engine automatically),
-read information back, and use up to 94 ready-made tools for projects, comps, layers, keyframes (Graph Editor level),
+read information back, and use up to 95 ready-made tools for projects, comps, layers, keyframes (Graph Editor level),
 text styling and animators, footage, effects, shapes, masks, 3D cameras/lights/materials, audio, color management,
 Essential Graphics and rendering (including background renders with aerender). Batch edits run many steps as one
-undo step, checkpoints keep safety copies of the project, and your own scripts can be listed and run. It can *see* and *measure* its work (frames, contact sheets, zoomed regions, difference
+undo step, checkpoints keep safety copies of the project, structural changes can be proven not to change the render,
+and your own scripts can be listed and run. It can *see* and *measure* its work (frames, contact sheets, zoomed regions, difference
 images, exact layer bounds, pixel colors), and every edit returns an exact list of what changed in the project.
 
 ```
@@ -153,7 +154,7 @@ To rotate the token, delete `token` from `~/.aemcp/config.json` and re-run the i
 | `ae_get_scripting_guide` | ExtendScript cheat sheet for the model (also an MCP resource `aemcp://docs/extendscript`). |
 
 **Tool profiles.** Every tool description is sent to the AI in every chat, so by default only a **core set of
-28 tools** is loaded (about 9k tokens instead of 26k for all 94), and **every other tool stays available on demand**:
+29 tools** is loaded (about 9k tokens instead of 26k for all 95), and **every other tool stays available on demand**:
 `ae_tools` lists all tools by category (or gives full parameter details of chosen ones), and `ae_call` runs any tool by
 name with the same validation, permissions, change report and activity log. Loading everything up front is optional:
 switch to **Full** in After Effects (**Window > Extensions > Surehand MCP > AI tools**), in Claude Desktop's
@@ -163,8 +164,8 @@ restart the AI app. Advanced: `"toolProfile": "core,ae_import_files,ae_render_qu
 Core set: `ae_status`, `ae_run_script`, `ae_get_scripting_guide`, `ae_render_frame`, `ae_render_contact_sheet`,
 `ae_get_project_info`, `ae_get_comp_info`, `ae_get_layer_info`, `ae_get_selection`, `ae_get_properties`,
 `ae_find_properties`, `ae_get_layer_bounds`, `ae_get_comp_map`, `ae_create_comp`, `ae_add_layer`, `ae_add_shape`, `ae_set_property`, `ae_set_keyframes`,
-`ae_set_expression`, `ae_apply_effect`, `ae_get_effect_params`, `ae_undo`, `ae_batch`, `ae_checkpoint`, `ae_list_scripts`,
-`ae_run_script_file`, `ae_tools`, `ae_call`.
+`ae_set_expression`, `ae_apply_effect`, `ae_get_effect_params`, `ae_undo`, `ae_batch`, `ae_checkpoint`, `ae_prove_identical`,
+`ae_list_scripts`, `ae_run_script_file`, `ae_tools`, `ae_call`.
 
 **Any After Effects language.** Property, effect and menu names are translated in non-English After Effects. Common
 English names still work everywhere: property paths like `Transform/Opacity`, effects like "Gaussian Blur" and menu
@@ -176,7 +177,8 @@ unknown effect name gets suggestions.
 
 - **Workflow:** `ae_batch` (many tool steps or scripts in one call and ONE undo step, with one change report; atomic by
   default: if a step fails everything is undone), `ae_checkpoint` (save a timestamped copy of the project, list, restore
-  as a new file next to the original; the original is never overwritten), `ae_list_scripts` (your scripts: AE's Scripts
+  as a new file next to the original; the original is never overwritten), `ae_prove_identical` (evidence that a
+  structural change left the render unchanged, see "Proven edits" below), `ae_list_scripts` (your scripts: AE's Scripts
   folder, ScriptUI Panels, and folders listed as `"scriptFolders"` in `~/.aemcp/config.json`, with their descriptions)
   + `ae_run_script_file`
 - **3D:** `ae_set_camera` (one/two-node, focal length in mm, depth of field; reports angle of view), `ae_set_light`
@@ -237,11 +239,26 @@ active comp and any comp named in the call. If a script fails halfway, the repor
 `ae_undo` reports what was reverted. On very large comps (tens of thousands of properties) this adds up to about a
 second per edit; turn it off with `"changeReport": false` in `~/.aemcp/config.json`, or per script with `report: false`.
 
+### Proven edits
+
+Some changes should not change the picture at all: un-precomposing, duplicating a comp deeply, baking or collapsing
+expressions, reordering effects, simplifying a rig. `ae_prove_identical` checks that. It renders reference frames of the
+comps (by default the active comp, 5 frames across the work area, full size, at most 1920 px), you or the AI make the
+change, and it renders the same frames again and compares them pixel by pixel. The answer is **identical**,
+**identical within tolerance** (for example 1/255 for rounding), or **differs**, with, for each frame, the largest
+channel difference, how many pixels changed, the largest color difference (ΔE), the area that changed, and a
+difference image of the worst frame (black = identical). If a comp was deleted or resized since the capture, it says so.
+`action: "run"` does it in one call: capture, the edits as `ae_batch` steps (one undo step, all or nothing), compare.
+Reference frames are stored in `~/.aemcp/proofs/` for 7 days (30 proofs at most). Rendering works like
+`ae_render_frame`: a temporary comp that is removed again, so the project is left as it was. Capture and compare are
+allowed in read-only mode; `run` makes edits, so it follows the same permissions as `ae_batch`.
+
 ### Example prompts
 
 - "Make a 10 second 1080p comp with a dark gradient background and the title 'Summer Sale' that pops in with an overshoot, then show me frame 1s."
 - "List every expression in the active comp that has an error and fix them."
 - "Rename all layers in the selected comp to Title Case and color-label text layers yellow."
+- "Un-precompose 'Logo Precomp' into the main comp and prove the render didn't change."
 - "Import /Users/me/footage/*.mov, make a comp for each clip and add them all to the render queue as ProRes."
 
 ## Control and trust

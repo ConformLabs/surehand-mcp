@@ -5,6 +5,8 @@ export const INSTRUCTIONS = `This server controls a running Adobe After Effects 
 - Use ae_get_properties to discover property paths/match names before setting values.
 - After visual changes, look at the result: ae_render_frame (one frame; can zoom a region, solo layers, show alpha, diff),
   ae_render_contact_sheet (motion over time). Check layout numerically with ae_get_layer_bounds.
+- For a structural change that should not change the picture (un-precompose, bake expressions, reorder effects, simplify a rig),
+  use ae_prove_identical (action "run" with the edits as batch steps) to get pixel evidence that the render is unchanged.
 - Every edit returns a "Changes" list of exactly what changed in the project; use it to confirm the edit did what you meant.
 - Every tool call is one undo step; ae_undo reverts it.
 - Tools never replace an existing file silently: ae_save_project (Save As), ae_render_frame and ae_render_contact_sheet (outputPath) refuse and say so. Pass overwrite: true only when replacing it is intended.

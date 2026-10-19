@@ -140,6 +140,7 @@ const EXPECTED: Record<string, Hints> = {
   // workflow
   ae_batch: SCRIPT, // steps can be ae_run_script
   ae_checkpoint: D, // save overwrites the .aep; restore closes the open project
+  ae_prove_identical: SCRIPT, // run executes ae_batch steps (can be ae_run_script); capture/compare only render
   ae_list_scripts: R,
   ae_tools: R,
   ae_call: SCRIPT, // runs any tool, including ae_run_script
