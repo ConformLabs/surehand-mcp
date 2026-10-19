@@ -4,7 +4,7 @@
 // Everything it creates is named __aemcp_fulltest_rev* and removed by the full self-test's cleanup.
 import { evalRaw } from "../bridge.js";
 import { evalBody, formatChanges, runJsx, type RunOptions, type RunResult } from "../jsx.js";
-import { runReadOnly } from "../tools/core.js";
+import { READ_ONLY_RUN_OPTIONS, runReadOnly } from "../tools/core.js";
 
 export interface RevisionStep { step: string; ok: boolean; ms: number; error?: string; skipped?: boolean; bench?: Record<string, number>; note?: string }
 
@@ -12,12 +12,23 @@ const P = "__aemcp_fulltest_rev";
 const COMPS = 30;
 const LAYERS = 12;
 // what ae_run_script sends in read-only mode (core.ts)
-const READ_ONLY: RunOptions = { undoGroup: "AE MCP Script (read-only check)", report: ["*"], checkOnly: true, timeoutMs: 300_000 };
+const READ_ONLY: RunOptions = { ...READ_ONLY_RUN_OPTIONS, rollback: undefined, timeoutMs: 300_000 };
 const user = (code: string) => evalBody(`(function(args, log){${code}\n})`);
 const findComp = `var c = null; for (var i = 1; i <= app.project.numItems; i++) if (app.project.item(i).name === "${P}") c = app.project.item(i);`;
 const U = `${P}_undo`;
 const UNDO = 16;
 const REDO = 2035;
+
+/** Names of rollback sentinels (temporary folders) left in the project, "" when there are none. */
+export async function sentinelsLeft(): Promise<string> {
+  const r = await runJsx(
+    `var n = []; for (var i = 1; i <= app.project.numItems; i++) if (String(app.project.item(i).name).indexOf("__aemcp_rollback_") === 0) n.push(app.project.item(i).name); return n.join(", ");`,
+    {},
+    { undoGroup: false },
+  );
+  if (!r.ok) throw new Error(`couldn't list the project items: ${r.error?.message}`);
+  return String(r.result ?? "");
+}
 
 export async function revisionSteps(features: Record<string, unknown>, say: (ok: boolean, line: string) => void): Promise<RevisionStep[]> {
   const fast = !!features.revision;
@@ -88,7 +99,10 @@ return app.project.numItems;`,
   // `refused`: must be refused before it runs. `assembled`: a call the text check can't see; the project must
   // be back, or the reply must say it isn't, with nothing undone twice (only the script's own Undo of the
   // user's rename). What happened is printed either way.
-  const undoSafe = (name: string, script: string, opts: { userUndoes?: boolean; refused?: boolean; assembled?: boolean } = {}) =>
+  // `unchanged`: the script only writes a value that is already set (AE may then leave no undo step, so a
+  // blind Edit > Undo would revert the user's rename): it must be undone as the script's own step
+  // (verified), and the user's rename must survive.
+  const undoSafe = (name: string, script: string, opts: { userUndoes?: boolean; refused?: boolean; assembled?: boolean; unchanged?: boolean } = {}) =>
     step(`read-only undo keeps the user's last edit: ${name}`, async () => {
       const comp = `${U}_${++k}`;
       const findLayer = `var c = null; for (var i = 1; i <= app.project.numItems; i++) if (app.project.item(i).name === "${comp}") c = app.project.item(i); var L = c && c.layer(1);`;
@@ -112,6 +126,8 @@ return app.project.numItems;`,
       if (!before.startsWith("user rename 1 |")) return `setup didn't leave the user's rename: ${before}`;
       const { refusal, r } = await runReadOnly(`${findLayer}\n${script}\nreturn L ? L.name : null;`, 300_000);
       const after = await state();
+      const left = await sentinelsLeft();
+      if (left) return `the rollback's temporary folder was left in the project: ${left}`;
       if (opts.refused) {
         if (r) return `not refused: the script ran (layer name ${r.result}); ${refusal ? `then: ${refusal}` : "no refusal"}; before: ${before}; after: ${after}`;
         if (!/^Nothing ran\./.test(refusal ?? "")) return `unexpected reply: ${refusal}`;
@@ -125,13 +141,18 @@ return app.project.numItems;`,
         if (after !== before.replace(/^user rename 1/, "solid")) return `the project isn't back and more than the script's own Undo changed it: before ${before}; after ${after}`;
         return refusal && /not undone again|nothing was undone/.test(refusal) ? null : `the project isn't back and the reply doesn't say so: ${refusal}`;
       }
-      if (after !== before) return `before the script: ${before}; after the ${refusal ? "refusal and Undo" : "script (not refused)"}: ${after}`;
+      if (after !== before) return `before the script: ${before}; after the ${refusal ? "refusal and Undo" : "script (not refused)"}: ${after} (the user's rename must survive)`;
+      if (opts.unchanged) {
+        note = `revision moved: ${!!r.rollback?.undone}; rollback: ${JSON.stringify(r.rollback)}; reply: ${refusal ?? "(none)"}`;
+        say(true, `  ${name}: ${note}`);
+        if (r.rollback && !r.rollback.verified) return `the rollback wasn't verified: ${refusal}`;
+      }
       return null;
     });
 
   await undoSafe("script calls Edit > Undo", `app.executeCommand(${UNDO});`, { refused: true });
   await undoSafe("script calls Edit > Redo", `app.executeCommand(${REDO});`, { userUndoes: true, refused: true });
-  await undoSafe("script sets a property to its current value", "L.opacity.setValue(L.opacity.value);");
+  await undoSafe("script sets a property to its current value", "L.opacity.setValue(L.opacity.value);", { unchanged: true });
   await undoSafe("script ends the undo group early, then edits", "app.endUndoGroup(); L.opacity.setValue(33);", { refused: true });
   await undoSafe("script edits, ends the undo group, edits again", "L.opacity.setValue(33); app.endUndoGroup(); L.rotation.setValue(10);", { refused: true });
   await undoSafe("script only ends the undo group early", "app.endUndoGroup();", { refused: true });

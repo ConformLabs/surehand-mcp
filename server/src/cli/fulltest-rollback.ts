@@ -5,6 +5,7 @@
 import { runJsx } from "../jsx.js";
 import { runReadOnly } from "../tools/core.js";
 import { runBatch } from "../tools/workflow.js";
+import { sentinelsLeft } from "./fulltest-revision.js";
 
 export interface RollbackStep { step: string; ok: boolean; ms: number; error?: string }
 
@@ -43,6 +44,8 @@ export async function rollbackSteps(say: (ok: boolean, line: string) => void): P
     out.push({ step: name, ok: !problem, ms, error: problem ?? undefined });
     say(!problem, problem ? `${name}: ${problem}` : `${name} (${ms} ms)`);
   };
+  // every case: the rollback's temporary folder (sentinel) never stays in the project
+  const clean = async (problem: string | null) => problem ?? ((await sentinelsLeft()) ? `the rollback's temporary folder was left: ${await sentinelsLeft()}` : null);
 
   await step("rollback: set up", async () => {
     const r = await runJsx(`var c = app.project.items.addComp("${P}", 640, 360, 1, 4, 25); c.layers.addSolid([0.2, 0.4, 0.6], "${P} solid", 64, 64, 1); return 1;`, {}, { undoGroup: "AE MCP self-test" });
@@ -65,7 +68,27 @@ export async function rollbackSteps(say: (ok: boolean, line: string) => void): P
     const r = await runBatch({ steps: [script(`${OP} op.setValue(5);`), script('throw new Error("fails after an edit")')], name: "AE MCP self-test batch" }, FULL);
     const after = await state();
     if (!/was rolled back \(nothing changed\)/.test(text(r))) return `unexpected reply: ${text(r)}`;
-    return after.opacity === 41 ? null : `Opacity is ${after.opacity}, expected 41 (5 = not rolled back, 100/37 = undone twice)`;
+    return clean(after.opacity === 41 ? null : `Opacity is ${after.opacity}, expected 41 (5 = not rolled back, 100/37 = undone twice)`);
+  });
+
+  // AE may make no undo step for a group in which only an unchanged value was written (the revision still
+  // moves): the rollback must undo the call's own step (its sentinel), never the manual edit
+  await step("rollback: read-only script that writes Opacity's current value: the manual edit survives", async () => {
+    await manualEdit(39);
+    const refusal = await readOnly(`${OP} op.setValue(op.value); return 1;`);
+    const after = await state();
+    if (after.opacity !== 39) return `the manual edit was reverted: Opacity is ${after.opacity}, expected 39`;
+    if (refusal && !/its changes were undone/.test(refusal)) return `unexpected reply: ${refusal}`;
+    return clean(null);
+  });
+
+  await step("rollback: atomic batch that writes Opacity's current value, then fails: the manual edit survives", async () => {
+    await manualEdit(40);
+    const r = await runBatch({ steps: [script(`${OP} op.setValue(op.value);`), script('throw new Error("fails after a no-op write")')] }, FULL);
+    const after = await state();
+    if (after.opacity !== 40) return `the manual edit was reverted: Opacity is ${after.opacity}, expected 40`;
+    if (!/was rolled back \(nothing changed\)|nothing to undo/.test(text(r))) return `unexpected reply: ${text(r)}`;
+    return clean(null);
   });
 
   await step("rollback: read-only script that edits is reverted exactly once", async () => {
@@ -73,7 +96,7 @@ export async function rollbackSteps(say: (ok: boolean, line: string) => void): P
     const refusal = await readOnly(`${OP} op.setValue(80); return 1;`);
     const after = await state();
     if (!refusal || !/its changes were undone/.test(refusal)) return `unexpected reply: ${refusal}`;
-    return after.opacity === 43 ? null : `Opacity is ${after.opacity}, expected 43 (80 = not reverted, 41 = undone twice)`;
+    return clean(after.opacity === 43 ? null : `Opacity is ${after.opacity}, expected 43 (80 = not reverted, 41 = undone twice)`);
   });
 
   await step("rollback: read-only script that only reads leaves the undo stack alone", async () => {
@@ -100,9 +123,10 @@ export async function rollbackSteps(say: (ok: boolean, line: string) => void): P
     await manualEdit(59);
     const refusal = await readOnly(`${OP} op.setValue(80); app["end" + "UndoGroup"](); op.setValue(90); return 1;`);
     const after = await state();
-    if (!refusal || !/not undone again/.test(refusal)) return `unexpected reply: ${refusal}`;
-    // one undo reverts only the last edit (90 -> 80); a second undo would have taken it to 59
-    return after.opacity === 80 ? null : `Opacity is ${after.opacity}, expected 80 (one undo)`;
+    if (!refusal || !/didn't revert the undo step of the script/.test(refusal) || !/not undone again/.test(refusal)) return `unexpected reply: ${refusal}`;
+    // the sentinel lands outside the closed group: the one undo only reverts its rename, so Opacity stays 90
+    // (80 = the script's last edit was undone, 59 = undone twice or the user's step)
+    return clean(after.opacity === 90 ? null : `Opacity is ${after.opacity}, expected 90 (only the sentinel's rename undone)`);
   });
 
   return out;

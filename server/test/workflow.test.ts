@@ -3,7 +3,8 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { evalBody, formatChanges, runJsx, type RunResult } from "../src/jsx.js";
-import { readOnlyRefusal, readOnlyRunOptions, registerCoreTools, undoStackCalls } from "../src/tools/core.js";
+import { READ_ONLY_RUN_OPTIONS, READ_ONLY_STILL_RUNNING, readOnlyBlockedCalls, readOnlyRefusal, readOnlyScriptRefusal, registerCoreTools } from "../src/tools/core.js";
+import { BridgeError } from "../src/bridge.js";
 import { _internal, runBatch } from "../src/tools/workflow.js";
 import { transpileUserCode } from "../src/transpile.js";
 import { fakeAE, loadHelpers, type Fake } from "./fake-ae.js";
@@ -50,9 +51,14 @@ describe("batch script", () => {
 // (test/fake-ae.ts). The bridge is replaced by a direct call into the fake.
 let fake: Fake;
 let helpers: any;
+/** when set, the bridge throws it instead of running the script (a timeout, a cancel) */
+let bridgeError: Error | null = null;
 vi.mock("../src/bridge.js", async (original) => ({
   ...(await original<typeof import("../src/bridge.js")>()),
-  evalRaw: async (script: string) => new Function("aemcp", "app", "return " + script)(helpers, fake.app),
+  evalRaw: async (script: string) => {
+    if (bridgeError) throw bridgeError;
+    return new Function("aemcp", "app", "return " + script)(helpers, fake.app);
+  },
 }));
 
 /** A fake AE where the user already made one edit (Opacity 100 -> 50): their last undo step. */
@@ -137,25 +143,86 @@ describe("guarded rollback in aemcp.run", () => {
     expect(opacity()).toBe(20);
   });
 
-  it("a call that closed its own undo group early: undone once, not back, reported, not undone again", () => {
+  it("a call that closed its own undo group early: the sentinel shows the undo missed it; reported, not undone again", () => {
     withManualEdit();
     const r = run(() => {
       fake.opacity.value = 20;
-      fake.app.endUndoGroup(); // closes the call's group: the next edit is an undo step of its own
+      fake.app.endUndoGroup(); // closes the call's group: the next edits (and the sentinel) are undo steps of their own
       fake.opacity.value = 30;
     }, { rollback: "changes" });
-    expect(fake.undos.n).toBe(1);
+    expect(fake.undos.n).toBe(1); // it only reverted the sentinel's rename
     expect(r.rollback?.undone).toBe(true);
     expect(r.rollback?.verified).toBe(false);
-    expect(r.rollback?.problem).toBe("not back");
-    expect(formatChanges(r.rollback?.remaining)).toContain("Opacity: 50 -> 20");
-    expect(fake.undoStack()).toEqual(["user: opacity 50", "AE MCP test"]); // the user's step is still there
+    expect(r.rollback?.problem).toBe("not this call");
+    expect(formatChanges(r.rollback?.remaining)).toContain("Opacity: 50 -> 30");
+    expect(formatChanges(r.rollback?.remaining)).not.toContain("__aemcp_rollback");
+    expect(opacity()).toBe(30);
+    expect(fake.folders()).toEqual([]); // the sentinel was removed by hand
+    expect(fake.undoStack().slice(0, 2)).toEqual(["user: opacity 50", "AE MCP test"]); // the user's step is still there
+  });
+
+  it("the same with the light (read-only) snapshot, which can't compare values: still caught by the sentinel", () => {
+    withManualEdit();
+    const r = run(() => {
+      fake.opacity.value = 20;
+      fake.app.endUndoGroup();
+      fake.opacity.value = 30;
+    }, { rollback: "changes", checkOnly: true });
+    expect(r.rollback).toMatchObject({ undone: true, verified: false, problem: "not this call" });
+    expect(fake.undos.n).toBe(1);
+    expect(fake.folders()).toEqual([]);
+  });
+
+  it("a value written unchanged (revision moves, no undo step): only the call is undone, the user's edit survives", () => {
+    withManualEdit();
+    const r = run(() => (fake.opacity.value = fake.opacity.value), { rollback: "changes", checkOnly: true });
+    expect(r.rollback).toEqual({ undone: true, verified: true });
+    expect(fake.undos.n).toBe(1);
+    expect(opacity()).toBe(50);
+    expect(fake.undoStack()).toEqual(["user: opacity 50"]);
+    expect(fake.folders()).toEqual([]);
+  });
+
+  it("the same with the full snapshot: nothing is listed as changed, the user's edit survives", () => {
+    withManualEdit();
+    const r = run(() => (fake.opacity.value = 50), { rollback: "changes" });
+    expect(formatChanges(r.changes)).toBe("Changes: none");
+    expect(r.rollback).toEqual({ undone: true, verified: true });
+    expect(opacity()).toBe(50);
+    expect(fake.undoStack()).toEqual(["user: opacity 50"]);
+    expect(fake.folders()).toEqual([]);
+  });
+
+  it("the sentinel is never part of a change report", () => {
+    withManualEdit();
+    const r = run(() => fake.app.project.items.addFolder("Renders"), { rollback: "changes" });
+    expect(formatChanges(r.changes)).toBe('Changes (layers/properties compared in: Main):\n+ folder "Renders"');
+    expect(r.rollback).toEqual({ undone: true, verified: true });
+    expect(fake.folders()).toEqual([]);
+  });
+
+  it("AE without revision, nothing listed but part of the project not compared (very large comp): unknown, nothing undone", () => {
+    fake = fakeAE({ revision: false, bigComp: true });
+    helpers = loadHelpers(fake);
+    const r = run(() => fake.comp.name, { rollback: "changes", checkOnly: true });
+    expect(r.changes?.partial).toBe(true);
+    expect(r.rollback).toEqual({ undone: false, verified: false, problem: "unknown" });
+    expect(fake.undos.n).toBe(0);
+    expect(readOnlyRefusal(r)).toContain("It couldn't be checked whether the script changed the project, so nothing was undone.");
+  });
+
+  it("AE without revision, a report scoped to some comps: unknown, nothing undone (read-only)", () => {
+    withManualEdit({ revision: false, otherComp: true });
+    const r = run(() => (fake.other!.opacity.value = 10), { rollback: "changes", report: ["Main"] });
+    expect(r.rollback).toEqual({ undone: false, verified: false, problem: "unknown" });
+    expect(fake.undos.n).toBe(0);
   });
 
   it("Edit > Undo that does nothing is reported", () => {
     withManualEdit({ undoWorks: false });
     const r = run(() => (fake.opacity.value = 20), { rollback: "changes" });
     expect(r.rollback).toMatchObject({ undone: true, verified: false, problem: "undo did nothing" });
+    expect(fake.folders()).toEqual([]); // the sentinel was removed by hand
   });
 
   it("can't tell whether anything changed (no revision, no snapshot): nothing is undone", () => {
@@ -201,10 +268,52 @@ describe("ae_batch: atomic rollback", () => {
   it("a rollback that can't be verified is reported and not undone again", async () => {
     withManualEdit();
     const r = await runBatch({ steps: [script(`${OP} op.setValue(10); app.endUndoGroup(); op.setValue(20);`), script('throw new Error("boom")')] }, full);
-    expect(text(r)).toContain("The undo step of the batch was undone once, but the project still isn't how it was before the batch");
+    expect(text(r)).toContain("Edit > Undo was run once for the batch, but it didn't revert the undo step of the batch");
+    expect(text(r)).toContain("the project still isn't how it was before the batch");
     expect(text(r)).toContain("It was not undone again");
+    expect(text(r)).not.toContain("__aemcp_rollback");
     expect(fake.undos.n).toBe(1);
-    expect(opacity()).toBe(10);
+    expect(opacity()).toBe(20); // the Undo only reverted the sentinel's rename
+    expect(fake.folders()).toEqual([]);
+  });
+
+  it("a step writes a value unchanged, a later step fails: the user's edit in another comp survives", async () => {
+    fake = fakeAE({ otherComp: true });
+    helpers = loadHelpers(fake);
+    fake.app.beginUndoGroup("user: Other opacity 50");
+    fake.other!.opacity.value = 50;
+    fake.app.endUndoGroup();
+    const r = await runBatch({ steps: [script(`${OP} op.setValue(op.value);`), script('throw new Error("boom")')] }, full);
+    expect(text(r)).toContain("Batch stopped at step 2 of 2 and was rolled back (nothing changed).");
+    expect(fake.undos.n).toBe(1);
+    expect(fake.other!.opacity.value).toBe(50);
+    expect(fake.undoStack()).toEqual(["user: Other opacity 50"]);
+    expect(fake.folders()).toEqual([]);
+  });
+
+  it("AE without revision: a step edits a comp outside the report, a later step fails: still rolled back, the user's edit survives", async () => {
+    fake = fakeAE({ otherComp: true, revision: false });
+    helpers = loadHelpers(fake);
+    fake.app.beginUndoGroup("user: Other opacity 50");
+    fake.other!.opacity.value = 50;
+    fake.app.endUndoGroup();
+    const other = "var op = app.project.item(2).layer(1).property(1).property(1);";
+    const r = await runBatch({ steps: [script(`${other} op.setValue(10);`), script('throw new Error("boom")')] }, full);
+    expect(text(r)).toContain("was rolled back (nothing changed)");
+    expect(fake.undos.n).toBe(1);
+    expect(fake.other!.opacity.value).toBe(50);
+    expect(fake.undoStack()).toEqual(["user: Other opacity 50"]);
+    expect(fake.folders()).toEqual([]);
+  });
+
+  it("AE without revision: a batch that changed nothing and fails is undone safely (only its own step)", async () => {
+    withManualEdit({ revision: false, otherComp: true });
+    const r = await runBatch({ steps: [script('throw new Error("boom")')] }, full);
+    expect(text(r)).toContain("was rolled back (nothing changed)");
+    expect(fake.undos.n).toBe(1); // reverted the sentinel only
+    expect(opacity()).toBe(50);
+    expect(fake.undoStack()).toEqual(["user: opacity 50"]);
+    expect(fake.folders()).toEqual([]);
   });
 
   it("atomic: false keeps the successful steps and never undoes", async () => {
@@ -226,7 +335,7 @@ describe("ae_batch: atomic rollback", () => {
 
 describe("ae_run_script in read-only mode", () => {
   const readOnly = async (code: string) => {
-    const r = await runJsx(evalBody(transpileUserCode(code).source), {}, readOnlyRunOptions(code));
+    const r = await runJsx(evalBody(transpileUserCode(code).source), {}, READ_ONLY_RUN_OPTIONS);
     return { r, refusal: readOnlyRefusal(r) };
   };
 
@@ -242,28 +351,50 @@ describe("ae_run_script in read-only mode", () => {
     withManualEdit();
     const { refusal } = await readOnly(`${OP} op.setValue(80); return 1;`);
     expect(refusal).toMatch(/read-only/i);
-    expect(refusal).toContain("This script changed the project, so its changes were undone.");
+    expect(refusal).toContain("so its changes were undone.");
     expect(fake.undos.n).toBe(1);
     expect(opacity()).toBe(50);
     expect(fake.undoStack()).toEqual(["user: opacity 50"]);
+    expect(fake.folders()).toEqual([]);
   });
 
-  it("a script that touches the undo stack gets the full comparison, so a partial undo is caught", async () => {
-    expect(readOnlyRunOptions("return app.project.numItems;")).toMatchObject({ checkOnly: true, rollback: "changes", report: ["*"] });
-    for (const code of ["app.endUndoGroup();", "app.beginUndoGroup('x');", "app.executeCommand(16);", "app.purge(PurgeTarget.UNDO_CACHES);"])
-      expect(readOnlyRunOptions(code).checkOnly).toBe(false);
+  it("a script that sets a value to what it already is: only its own step is undone, the user's edit survives", async () => {
     withManualEdit();
-    const { refusal } = await readOnly(`${OP} op.setValue(80); app.endUndoGroup(); op.setValue(90); return 1;`);
-    expect(refusal).toContain("the project still isn't how it was before the script");
-    expect(refusal).toContain("Opacity: 50 -> 80");
-    expect(refusal).toContain("It was not undone again");
+    const { r, refusal } = await readOnly(`${OP} op.value = op.value; return 1;`);
+    expect(r.rollback).toEqual({ undone: true, verified: true });
+    expect(refusal).toContain("This script wrote to the project (perhaps only values that were already set)");
+    expect(refusal).not.toContain("This script changed the project");
     expect(fake.undos.n).toBe(1);
+    expect(opacity()).toBe(50);
+    expect(fake.undoStack()).toEqual(["user: opacity 50"]);
+    expect(fake.folders()).toEqual([]);
+  });
+
+  it("a script that edits an attribute (listed): its change is named in the reply", async () => {
+    withManualEdit();
+    const { refusal } = await readOnly(`app.project.item(1).label = 5; return 1;`);
+    expect(refusal).toContain("This script changed the project, so its changes were undone:");
+    expect(refusal).toContain('~ comp "Main": label 1 -> 5');
+    expect(fake.comp.label).toBe(1);
+  });
+
+  it("a script that ends its undo group by an assembled name (past the text check): caught by the sentinel, not undone again", async () => {
+    expect(READ_ONLY_RUN_OPTIONS).toMatchObject({ checkOnly: true, rollback: "changes", report: ["*"] });
+    withManualEdit();
+    const { refusal } = await readOnly(`${OP} op.setValue(80); app["end" + "UndoGroup"](); op.setValue(90); return 1;`);
+    expect(refusal).toContain("it didn't revert the undo step of the script");
+    expect(refusal).toContain("It was not undone again");
+    expect(refusal).not.toContain("__aemcp_rollback");
+    expect(fake.undos.n).toBe(1);
+    expect(opacity()).toBe(90); // only the sentinel's rename was undone
+    expect(fake.undoStack()[0]).toBe("user: opacity 50");
+    expect(fake.folders()).toEqual([]);
   });
 });
 
 describe("ae_run_script in read-only mode: undo-stack calls are refused before anything runs", () => {
   // the real ae_run_script handler, with the permission mode from a temporary config file
-  const runScript = async (mode: string, code: string) => {
+  const runScript = async (mode: string, code: string, extra: Record<string, unknown> = {}) => {
     const dir = mkdtempSync(join(tmpdir(), "aemcp-perm-"));
     writeFileSync(join(dir, "config.json"), JSON.stringify({ token: "x", permissions: { mode } }));
     const prev = process.env.AEMCP_CONFIG;
@@ -271,8 +402,8 @@ describe("ae_run_script in read-only mode: undo-stack calls are refused before a
     try {
       let handler: any;
       registerCoreTools({ registerTool: (name: string, _def: unknown, h: unknown) => void (name === "ae_run_script" && (handler = h)) } as any);
-      const r = await handler({ code });
-      return { isError: !!r.isError, text: String(r.content?.[0]?.text ?? "") };
+      const r = await handler({ code, ...extra });
+      return { isError: !!r.isError, text: String(r.content?.[0]?.text ?? ""), all: (r.content ?? []).map((c: any) => c.text ?? "").join("\n") };
     } finally {
       if (prev === undefined) delete process.env.AEMCP_CONFIG;
       else process.env.AEMCP_CONFIG = prev;
@@ -285,7 +416,7 @@ describe("ae_run_script in read-only mode: undo-stack calls are refused before a
       const { isError, text } = await runScript("read-only", `${OP} op.setValue(80);\n${call}\nreturn 1;`);
       expect(isError).toBe(true);
       expect(text).toMatch(/^Nothing ran\./);
-      expect(text).toContain(call.replace(/^app\.|\(.*/g, ""));
+      expect(text).toContain(`this script mentions ${call.replace(/^app\.|\(.*/g, "")}`);
       expect(text).toMatch(/undo history outside AE MCP's control/);
       expect(text).toMatch(/edit mode/);
       expect(opacity()).toBe(50);
@@ -303,8 +434,69 @@ describe("ae_run_script in read-only mode: undo-stack calls are refused before a
   });
 
   it("a comment marker inside a string doesn't hide a call after it", () => {
-    expect(undoStackCalls('var u = "http://x"; app.executeCommand(16); // done')).toEqual(["executeCommand"]);
-    expect(undoStackCalls("var r = /\\/*/; app.endUndoGroup();")).toEqual(["endUndoGroup"]);
+    expect(readOnlyBlockedCalls('var u = "http://x"; app.executeCommand(16); // done')).toEqual(["executeCommand"]);
+    expect(readOnlyBlockedCalls("var r = /\\/*/; app.endUndoGroup();")).toEqual(["endUndoGroup"]);
+  });
+
+  it("a name written with \\u escapes is refused (checked decoded, and on the transpiled code)", async () => {
+    const code = "app.\\u0065xecuteCommand(16);";
+    expect(readOnlyBlockedCalls(code)).toEqual(["executeCommand"]);
+    expect(readOnlyBlockedCalls("app.\\u{65}ndUndoGroup();")).toEqual(["endUndoGroup"]);
+    // the transpiled code is checked too
+    expect(readOnlyBlockedCalls("return 1;", "(function(args, log){app.executeCommand(16)\n})")).toEqual(["executeCommand"]);
+    expect(readOnlyScriptRefusal(code, transpileUserCode(code).source)).toMatch(/^Nothing ran\./);
+    for (const transpile of [true, false]) {
+      withManualEdit();
+      const { isError, text } = await runScript("read-only", `${OP} op.setValue(80);\n${code}\nreturn 1;`, { transpile });
+      expect(isError).toBe(true);
+      expect(text).toMatch(/^Nothing ran\./);
+      expect(text).toContain("mentions executeCommand");
+      expect(opacity()).toBe(50);
+      expect(fake.undos.n).toBe(0);
+    }
+  });
+
+  for (const call of ["app.scheduleTask('x()', 1000, false);", "app.newProject();", "app.open(new File('/x.aep'));", "app.project.close(CloseOptions.DO_NOT_SAVE_CHANGES);", "app.project.save();", "app.project.saveWithDialog();"]) {
+    it(`refuses ${call.replace(/\(.*/, "")} (can't be undone): nothing ran`, async () => {
+      withManualEdit();
+      const { isError, text } = await runScript("read-only", `${OP} op.setValue(80);\n${call}\nreturn 1;`);
+      expect(isError).toBe(true);
+      expect(text).toMatch(/^Nothing ran\. AE MCP is in read-only mode, and this script mentions /);
+      expect(text).toContain("which read-only mode can't undo");
+      expect(text).not.toContain("undo history outside AE MCP's control");
+      expect(text).toMatch(/edit mode/);
+      expect(opacity()).toBe(50);
+      expect(fake.undos.n).toBe(0);
+    });
+  }
+
+  it("names what each refused call is: one list", () => {
+    expect(readOnlyBlockedCalls("app.scheduleTask('a', 1, false); app.newProject(); app.open(f); app.project.close(c); app.project.save(f); p.saveWithDialog();")).toEqual([
+      "scheduleTask", "newProject", "app.open", "project.close", "save", "saveWithDialog",
+    ]);
+  });
+
+  it("reading and writing files isn't refused (File.open / close are not project calls)", async () => {
+    expect(readOnlyBlockedCalls('var f = new File("/tmp/x.txt"); f.open("r"); var s = f.read(); f.close(); return s;')).toEqual([]);
+    withManualEdit();
+    const { isError } = await runScript("read-only", `var w = { close: function () {} }; w.close(); ${OP} return op.value;`);
+    expect(isError).toBe(false);
+  });
+
+  it("a timeout or cancel in read-only mode says the rollback still runs in After Effects", async () => {
+    withManualEdit();
+    for (const code of ["TIMEOUT", "CANCELLED"] as const) {
+      bridgeError = new BridgeError(`it ${code}`, code);
+      try {
+        const ro = await runScript("read-only", `${OP} return op.value;`);
+        expect(ro.isError).toBe(true);
+        expect(ro.all).toContain(READ_ONLY_STILL_RUNNING);
+        const full = await runScript("full", `${OP} return op.value;`);
+        expect(full.all).not.toContain(READ_ONLY_STILL_RUNNING);
+      } finally {
+        bridgeError = null;
+      }
+    }
   });
 
   it("edit mode is unaffected: the same calls run", async () => {

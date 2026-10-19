@@ -54,12 +54,16 @@ export interface Rollback {
   verified: boolean;
   /**
    * "unknown": couldn't tell whether the call changed anything, so nothing was undone;
-   * "undo did nothing"; "not back": still different after the undo (see `remaining`);
-   * "not checked...": undone but couldn't compare; "no undo group"; "failed: ...".
+   * "undo did nothing"; "not this call": Edit > Undo reverted something else than this call's undo step
+   * (the call closed its undo group itself; its sentinel was left behind and removed by hand);
+   * "not back": still different after the undo (see `remaining`); "not checked...": undone but couldn't
+   * compare; "no undo group"; "failed: ...".
    */
   problem?: string;
   /** what still differs from before the call, after the undo */
   remaining?: Changes;
+  /** the name of the rollback's temporary folder (sentinel) when it couldn't be removed */
+  leftover?: string;
 }
 
 export interface RunResult {
@@ -217,13 +221,22 @@ export function formatChanges(ch: Changes | undefined): string | null {
 export function rollbackProblem(rb: Rollback, what: string): string {
   if (rb.verified) return "";
   const check = "Check the project before going on (Edit > Undo and Edit > Redo still work step by step).";
+  const leftover = rb.leftover ? `\nA temporary folder "${rb.leftover}" (AE MCP's undo marker) couldn't be removed; it can be deleted.` : "";
   if (!rb.undone)
-    return `It couldn't be checked whether ${what} changed the project${rb.problem && rb.problem !== "unknown" ? ` (${rb.problem})` : ""}, so nothing was undone. ${check}`;
+    return `It couldn't be checked whether ${what} changed the project${rb.problem && rb.problem !== "unknown" ? ` (${rb.problem})` : ""}, so nothing was undone. ${check}${leftover}`;
+  const remaining = rb.remaining ? (formatChanges(rb.remaining) ?? "").replace(/^Changes[^\n]*:\n/, "") : "";
+  const notBack = `the project still isn't how it was before ${what}:\n${remaining}`;
+  if (rb.problem === "not this call")
+    return (
+      `Edit > Undo was run once for ${what}, but it didn't revert the undo step of ${what} (${what} may have ended its undo group itself), ` +
+      `${remaining ? `and ${notBack}` : "so some of its changes may still be in the project."}\n` +
+      `It was not undone again (that Undo only reverted AE MCP's temporary undo marker), so nothing else in the undo history was reverted. ${check}${leftover}`
+    );
   const why =
     rb.problem === "not back"
-      ? `the project still isn't how it was before ${what}:\n${(formatChanges(rb.remaining) ?? "").replace(/^Changes[^\n]*:\n/, "")}`
+      ? notBack
       : rb.problem === "undo did nothing"
         ? "After Effects didn't undo anything."
         : `the result couldn't be checked (${rb.problem}).`;
-  return `The undo step of ${what} was undone once, but ${why}\nIt was not undone again, so nothing else in the undo history was reverted. ${check}`;
+  return `The undo step of ${what} was undone once, but ${why}\nIt was not undone again, so nothing else in the undo history was reverted. ${check}${leftover}`;
 }

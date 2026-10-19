@@ -4,7 +4,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import { aeLabel, health, listInstances, matchInstance, resolvePort, selectInstance } from "../bridge.js";
+import { aeLabel, BridgeError, health, listInstances, matchInstance, resolvePort, selectInstance } from "../bridge.js";
 import { lastSetup } from "../cli/setup.js";
 import { checkForUpdate, updateMessage } from "../update.js";
 import { VERSION } from "../config.js";
@@ -181,53 +181,98 @@ async function renderPng(body: string, args: Record<string, unknown>): Promise<{
   return { info, data };
 }
 
-// Undo-stack calls in a script: its own undo groups, Edit > Undo/Redo (executeCommand), purging the undo
-// history. They change the undo history outside AE MCP's control, so in read-only mode such a script is
-// refused before it runs. A text check, comments ignored (a name inside a string counts too): a call
-// built at runtime (app["execute" + "Command"]) gets past it, and the guarded rollback is the backstop.
-const UNDO_STACK_CALLS = /\b(?:begin|end)UndoGroup\b|\bexecuteCommand\b|\bpurge\b/g;
+// What read-only mode refuses before a script runs (the one list): calls that change the undo history
+// outside AE MCP's control (its own undo groups, Edit > Undo/Redo via executeCommand, purging the undo
+// history), and calls whose effect can't be undone or happens after the rollback (opening, closing or
+// saving projects, code scheduled to run later). A text check on the code with its comments removed and
+// \u escapes decoded, and again on the transpiled code; a name inside a string counts too. A call built at
+// runtime (app["execute" + "Command"]) gets past it: the guarded rollback is the backstop.
+const READ_ONLY_BLOCKED: { name: string; re: RegExp; undoHistory?: true }[] = [
+  { name: "beginUndoGroup", re: /\bbeginUndoGroup\b/, undoHistory: true },
+  { name: "endUndoGroup", re: /\bendUndoGroup\b/, undoHistory: true },
+  { name: "executeCommand", re: /\bexecuteCommand\b/, undoHistory: true },
+  { name: "purge", re: /\bpurge\b/, undoHistory: true },
+  { name: "scheduleTask", re: /\bscheduleTask\b/ },
+  { name: "newProject", re: /\bnewProject\b/ },
+  { name: "app.open", re: /\bapp\s*\.\s*open\s*\(/ },
+  { name: "project.close", re: /\bproject\s*\.\s*close\s*\(/ },
+  { name: "save", re: /\.\s*save\s*\(/ },
+  { name: "saveWithDialog", re: /\bsaveWithDialog\b/ },
+];
 
-/** The undo-stack calls named in the code (comments ignored), each once. */
-export function undoStackCalls(code: string): string[] {
-  return [...new Set(withoutComments(code).match(UNDO_STACK_CALLS) ?? [])];
+/** \uXXXX and \u{X} escapes decoded (an escaped identifier is the same name to the JavaScript engine). */
+function decodeEscapes(code: string): string {
+  return code.replace(/\\u\{([0-9a-fA-F]{1,6})\}|\\u([0-9a-fA-F]{4})/g, (m, a, b) => {
+    const cp = parseInt(a ?? b, 16);
+    return cp <= 0x10ffff ? String.fromCodePoint(cp) : m;
+  });
 }
 
-/** Read-only mode: the refusal for a script that calls the undo stack (nothing has run yet), else null. */
-export function undoStackRefusal(code: string): string | null {
-  const calls = undoStackCalls(code);
-  if (!calls.length) return null;
+/**
+ * The calls read-only mode refuses that the code names (comments ignored), each once. `transpiled`: the
+ * code as it is sent to After Effects (transpileUserCode().source), checked as well.
+ */
+export function readOnlyBlockedCalls(code: string, transpiled?: string): string[] {
+  const texts = [decodeEscapes(withoutComments(code))];
+  if (transpiled !== undefined) texts.push(decodeEscapes(transpiled));
+  return READ_ONLY_BLOCKED.filter((b) => texts.some((t) => b.re.test(t))).map((b) => b.name);
+}
+
+/** Read-only mode: the refusal for a script that names a refused call (nothing has run yet), else null. */
+export function readOnlyScriptRefusal(code: string, transpiled?: string): string | null {
+  const names = readOnlyBlockedCalls(code, transpiled);
+  if (!names.length) return null;
+  const blocked = READ_ONLY_BLOCKED.filter((b) => names.includes(b.name));
+  const why: string[] = [];
+  if (blocked.some((b) => b.undoHistory))
+    why.push(
+      "executeCommand, beginUndoGroup, endUndoGroup and purge change the undo history outside AE MCP's control, " +
+        "so read-only mode couldn't reliably put the project back afterwards.",
+    );
+  if (blocked.some((b) => !b.undoHistory))
+    why.push(
+      "app.open, newProject, project.close, save, saveWithDialog and scheduleTask open, close or save projects or run code later, " +
+        "which read-only mode can't undo.",
+    );
   return (
-    `Nothing ran. AE MCP is in read-only mode, and this script calls ${calls.join(", ")}. ` +
-    "executeCommand, beginUndoGroup, endUndoGroup and purge change the undo history outside AE MCP's control, " +
-    "so read-only mode couldn't reliably put the project back afterwards; scripts that call them are refused. " +
+    `Nothing ran. AE MCP is in read-only mode, and this script mentions ${names.join(", ")}. ${why.join(" ")} ` +
+    "Scripts that mention these names are refused (the check reads the code, so a name in a string counts too). " +
     "To run it on purpose, the user can switch to edit mode (Full access, or Ask before every change) in " +
     "After Effects: Window > Extensions > AE MCP > Permissions."
   );
 }
 
 /**
- * How ae_run_script runs a script in read-only mode (after undoStackRefusal): in its own undo group,
- * compared over every comp, and undone in the same call if it changed anything (aemcp.jsxinc). Only items
- * and layer attributes are compared where AE has app.project.revision.
+ * How ae_run_script runs a script in read-only mode (after readOnlyScriptRefusal): in its own undo group,
+ * compared over every comp, and undone in the same call if it changed anything (aemcp.jsxinc). Where AE
+ * has app.project.revision only items and layer attributes are compared (checkOnly), not property values.
  */
-export function readOnlyRunOptions(code: string): RunOptions {
-  return { undoGroup: "AE MCP Script (read-only check)", report: ["*"], checkOnly: !undoStackCalls(code).length, rollback: "changes" };
-}
+export const READ_ONLY_RUN_OPTIONS: RunOptions = { undoGroup: "AE MCP Script (read-only check)", report: ["*"], checkOnly: true, rollback: "changes" };
 
 /** The refusal for a read-only script that changed the project (or may have), else null. */
 export function readOnlyRefusal(r: RunResult): string | null {
   const rb = r.rollback;
   if (!rb || (!rb.undone && rb.verified)) return null;
   if (!rb.verified) return `${READ_ONLY_REFUSAL}\n${rollbackProblem(rb, "the script")}`;
-  const changes = r.changes && !r.changes.unlisted ? formatChanges(r.changes) : null;
-  return `${READ_ONLY_REFUSAL}\nThis script changed the project, so its changes were undone${changes ? `:\n${changes}` : "."}`;
+  const ch = r.changes;
+  if (ch && !ch.unlisted && (ch.items.length || ch.layers.length || ch.props.length))
+    return `${READ_ONLY_REFUSAL}\nThis script changed the project, so its changes were undone:\n${formatChanges(ch)}`;
+  // app.project.revision moved, but nothing was listed: an edit not compared, or only a value written unchanged
+  return `${READ_ONLY_REFUSAL}\nThis script wrote to the project (perhaps only values that were already set), so its changes were undone.`;
 }
+
+/** Added to a timeout or cancel in read-only mode: the script, and then its rollback, still run to the end in AE. */
+export const READ_ONLY_STILL_RUNNING =
+  "Read-only mode: a script can't be interrupted, and when it ends, the read-only rollback still runs inside After Effects in the same run " +
+  "(whatever the script changed is undone, once, as usual), but this reply can't show its result. Check the project (ae_status, " +
+  "ae_get_project_info) before going on.";
 
 /** ae_run_script's read-only path, for the self-test: refused before anything runs, or run and rolled back. */
 export async function runReadOnly(code: string, timeoutMs = 120_000): Promise<{ refusal: string | null; r?: RunResult }> {
-  const refused = undoStackRefusal(code);
+  const t = transpileUserCode(code);
+  const refused = readOnlyScriptRefusal(code, t.source);
   if (refused) return { refusal: refused };
-  const r = await runJsx(evalBody(transpileUserCode(code).source), {}, { ...readOnlyRunOptions(code), timeoutMs });
+  const r = await runJsx(evalBody(t.source), {}, { ...READ_ONLY_RUN_OPTIONS, timeoutMs });
   return { refusal: readOnlyRefusal(r), r };
 }
 
@@ -260,16 +305,17 @@ export function registerCoreTools(server: McpServer) {
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },
     async ({ code, args, undoGroup, depth, timeoutSeconds, transpile, report }) => {
+      let readOnly = false;
       try {
         const perm = permissions();
         if (!perm.allowShell && usesShell(code)) return errorResult(SHELL_REFUSAL);
-        const readOnly = perm.mode === "read-only";
-        const undoStack = readOnly ? undoStackRefusal(code) : null;
-        if (undoStack) return errorResult(undoStack);
+        readOnly = perm.mode === "read-only";
         const t = transpileUserCode(code, transpile !== false);
+        const refused = readOnly ? readOnlyScriptRefusal(code, t.source) : null;
+        if (refused) return errorResult(refused);
         const r = await runJsx(evalBody(t.source), args ?? {}, {
           ...(readOnly
-            ? readOnlyRunOptions(code)
+            ? READ_ONLY_RUN_OPTIONS
             : { undoGroup: undoGroup === "" ? false : undoGroup || "AE MCP Script", report: report === false ? undefined : reportScope(args) }),
           depth,
           timeoutMs: (timeoutSeconds ?? 120) * 1000,
@@ -295,7 +341,9 @@ export function registerCoreTools(server: McpServer) {
         }
         return formatResult(r, { quietNoChanges: true });
       } catch (e) {
-        return errorResult(e);
+        const out = errorResult(e);
+        if (readOnly && e instanceof BridgeError && (e.code === "TIMEOUT" || e.code === "CANCELLED")) out.content.push({ type: "text", text: READ_ONLY_STILL_RUNNING });
+        return out;
       }
     },
   );
