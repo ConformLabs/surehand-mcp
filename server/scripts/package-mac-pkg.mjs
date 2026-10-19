@@ -4,6 +4,8 @@
 //   npm run package:mac-pkg                          build, sign, notarize (waits up to 30 min), staple, verify
 //   npm run package:mac-pkg -- --no-notarize         build and sign only (fast; the pkg is not notarized yet)
 //   npm run package:mac-pkg -- --notarize-only <pkg> notarize + staple + verify an already built pkg
+//   npm run package:mac-pkg -- --notarize-only <pkg> --submission-id <id>
+//                                                    wait for an earlier submission of that pkg, then staple + verify
 //   npm run package:mac-pkg -- --notary-timeout 2h   wait longer for Apple (default 30m)
 //
 // What it installs (no admin password; only the installing user's home folder):
@@ -80,7 +82,7 @@ const option = (name) => {
   if (!argv[i + 1] || argv[i + 1].startsWith("--")) die(`${name} needs a value`);
   return argv[i + 1];
 };
-const known = new Set(["--no-notarize", "--notarize-only", "--notary-timeout"]);
+const known = new Set(["--no-notarize", "--notarize-only", "--notary-timeout", "--submission-id"]);
 for (let i = 0; i < argv.length; i++) {
   if (!known.has(argv[i])) die(`unknown argument ${argv[i]} (see the usage at the top of ${basename(fileURLToPath(import.meta.url))})`);
   if (argv[i] !== "--no-notarize") i++;
@@ -89,27 +91,31 @@ const notaryTimeout = option("--notary-timeout") || "30m";
 if (process.platform !== "darwin") die("macOS only (pkgbuild, productbuild, codesign, notarytool).");
 
 // ---------- notarize + staple + verify ----------
-function notarize(pkg) {
-  log(`Notarizing ${basename(pkg)} (waits up to ${notaryTimeout})`);
-  const r = spawnSync("xcrun", ["notarytool", "submit", pkg, "--keychain-profile", NOTARY_PROFILE, "--wait", "--timeout", notaryTimeout, "--output-format", "json"], {
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "inherit"],
-  });
+function notarize(pkg, submissionId = null) {
+  // submit (or, with --submission-id, wait for an earlier submission of this same pkg) and wait up to notaryTimeout
+  const args = submissionId
+    ? ["notarytool", "wait", submissionId, "--keychain-profile", NOTARY_PROFILE, "--timeout", notaryTimeout, "--output-format", "json"]
+    : ["notarytool", "submit", pkg, "--keychain-profile", NOTARY_PROFILE, "--wait", "--timeout", notaryTimeout, "--output-format", "json"];
+  log(`Notarizing ${basename(pkg)}${submissionId ? ` (submission ${submissionId})` : ""} (waits up to ${notaryTimeout})`);
+  const r = spawnSync("xcrun", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  // the JSON result is on stdout, except for errors such as the timeout, which notarytool writes to stderr
+  const output = `${r.stdout || ""}\n${r.stderr || ""}`;
+  const jsonLine = output.split("\n").reverse().find((l) => l.trim().startsWith("{"));
   let result = {};
   try {
-    result = JSON.parse(r.stdout);
-  } catch {
-    console.log(r.stdout);
-  }
-  const id = result.id;
+    result = JSON.parse(jsonLine);
+  } catch {}
+  console.log(output.trim());
+  const id = result.id || submissionId;
   console.log(`submission id: ${id ?? "?"}  status: ${result.status ?? "?"}${result.message ? `  (${result.message})` : ""}`);
   if (result.status !== "Accepted") {
     if (id && result.status !== "Invalid" && result.status !== "Rejected")
       die(
-        `notarization not finished (status ${result.status ?? "unknown"}). Check later with\n` +
+        `notarization not finished yet (status ${result.status ?? "In Progress"}). Check with\n` +
           `  xcrun notarytool info ${id} --keychain-profile ${NOTARY_PROFILE}\n` +
-          `and once it is Accepted, staple and verify with\n  npm run package:mac-pkg -- --notarize-only ${pkg}\n` +
-          `(that submits again; Apple answers fast for an already accepted build) or run xcrun stapler staple ${pkg} yourself.`,
+          `then wait for it, staple and verify (without submitting again) with\n` +
+          `  npm run package:mac-pkg -- --notarize-only ${pkg} --submission-id ${id}\n` +
+          `Do not rebuild in between: the submission covers this exact file.`,
       );
     if (id) spawnSync("xcrun", ["notarytool", "log", id, "--keychain-profile", NOTARY_PROFILE], { stdio: "inherit" });
     die(`notarization failed (status ${result.status ?? "unknown"})`);
@@ -133,7 +139,7 @@ function verifyPkg(pkg, notarized) {
 if (flag("--notarize-only")) {
   const pkg = resolve(option("--notarize-only"));
   if (!existsSync(pkg)) die(`no such file: ${pkg}`);
-  notarize(pkg);
+  notarize(pkg, option("--submission-id"));
   console.log(`\nDone: ${pkg} (${mb(pkg)})`);
   process.exit(0);
 }
