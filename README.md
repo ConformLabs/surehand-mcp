@@ -22,8 +22,7 @@ Unzip it and open `START HERE.txt`.
 
 ## Requirements
 
-- After Effects 2020 (17.0) or newer on macOS or Windows, in any language (tested with AE 2025 and 2026 on macOS, and
-  AE 2026 on Windows 11)
+- After Effects 2020 (17.0) or newer on macOS or Windows, in any language (tested on After Effects 2025-2026; older versions best effort)
 - Nothing else: the `.mcpb` uses Claude Desktop's built-in Node.js, and the installer downloads Node.js if it is missing
 
 ## Install
@@ -183,6 +182,8 @@ unknown effect name gets suggestions.
 - **Seeing the result:** `ae_render_frame` (a frame as an image; options: zoom into a region, render only some layers,
   transparency on a checkerboard or a color, difference image against another time or comp), `ae_render_contact_sheet`
   (a grid of frames across time, labelled with time and frame number, to judge motion and easing)
+- **Existing files are not replaced silently:** Save As in `ae_save_project` and the `outputPath` of `ae_render_frame` and
+  `ae_render_contact_sheet` refuse when a file is already there, and the error says to pass `overwrite: true` to replace it
 - **Measuring:** `ae_get_layer_bounds` (exact on-screen boxes after transforms, parenting, 3D and camera; in-frame and
   action/title-safe checks), `ae_sample_pixels` (rendered RGBA/hex at points), `ae_get_comp_map` (nested precomps,
   parenting, track mattes, expression references)
