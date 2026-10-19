@@ -337,7 +337,7 @@ version or port). Set a permanent preference with `"instance": "2026"` in the co
 If After Effects doesn't answer, the error says what it is busy with and for how long, and suggests checking for an open
 dialog. `ae_status` shows the same.
 
-**Compatibility check.** `ae-mcp selftest --full` runs every major tool (41 steps) against temporary comps (removed
+**Compatibility check.** `ae-mcp selftest --full` runs every major tool (over 60 steps) against temporary comps (removed
 afterwards; if the open project has no unsaved changes, the Save As and checkpoint-restore checks briefly switch to a
 scratch project and then reopen it), lists which scripting features your After Effects version has, and saves a report to `~/.aemcp/compat/`.
 All steps pass on After Effects 2025 (25.6) and 2026 (26.5) on macOS and on 2026 on Windows 11, also with 2025 and 2026

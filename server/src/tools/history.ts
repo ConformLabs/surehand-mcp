@@ -21,13 +21,15 @@ export const CHECKPOINT_BUDGET_S = 15;
 // (isModified), animated or has an expression, indexed-group children (effects, masks, shape groups,
 // animators), markers, render queue. Output: one JSON array per line (no object graph kept in
 // ExtendScript, whose garbage collector slows down with many small objects).
-// Groups whose isModified is false are skipped (with their whole subtree) once a calibration over the
+// By default every property group is walked: After Effects' isModified on a group ignores expressions inside
+// it (seen in AE 26.5 on Mac and Windows), so skipping unmodified groups can miss an expression. With
+// args.fast, groups whose isModified is false are skipped (with their whole subtree) once a calibration over the
 // first layers has confirmed that isModified on groups covers every changed property inside them. Leaves of
 // the groups that are entered are always checked for keyframes and an expression, whatever isModified says;
 // a leaf whose isModified is false although it has an expression means isModified ignores expressions here,
 // and then groups are not skipped either.
 export const SNAPSHOT_JSX = `
-var P = app.project, T0 = new Date().getTime(), LIMIT = args.budgetMs || 90000, FULL = !!args.full, out = [], KEYCAP = 500;
+var P = app.project, T0 = new Date().getTime(), LIMIT = args.budgetMs || 90000, FULL = !args.fast, out = [], KEYCAP = 500;
 var st = { comps: 0, layers: 0, visited: 0, stored: 0 }, rev0 = aemcp.revision(), trustGroups = !FULL, exprIgnored = false, calib = !FULL, calibLayers = 0, confirmed = false;
 function E(n) { try { return $.global[n]; } catch (e) {} }
 var PT = E("PropertyType"), PVT = E("PropertyValueType"), TD = E("TextDocument"), SH = E("Shape"), MV = E("MarkerValue");
@@ -193,7 +195,11 @@ for (var qi = 1; rq && qi <= Math.min(rq.numItems, 50); qi++) {
 }
 if (rq && rq.numItems > 50) st.rqNotRead = rq.numItems - 50;
 st.ms = new Date().getTime() - T0;
-st.pruning = FULL ? "off (full)" : trustGroups ? (confirmed ? "on" : "unconfirmed") : exprIgnored ? "off (isModified ignores expressions)" : "off (isModified unreliable on groups)";
+// if/else, not a chain of ?: (ExtendScript evaluates "a ? x : b ? y : z" wrongly: seen live in AE 26.5)
+if (FULL) st.pruning = "off (every group read)";
+else if (trustGroups) st.pruning = confirmed ? "on" : "unconfirmed";
+else if (exprIgnored) st.pruning = "off (isModified ignores expressions)";
+else st.pruning = "off (isModified unreliable on groups)";
 st.revisionAfter = aemcp.revision();
 line(["M", { project: P.file ? P.file.fsName : null, revision: rev0, ae: app.version, scope: scope, skipped: skipped, stats: st }]);
 return out.join("\\n");`;
@@ -227,12 +233,12 @@ export function loadSnapshot(project: string, id: string): Snapshot {
 
 const stamp = () => new Date().toISOString().replace(/[:T]/g, "-").replace(/\..+$/, "");
 
-export interface CaptureOptions { comps?: (string | number)[]; timeBudgetSeconds?: number; full?: boolean; /** skip comps that no longer exist */ lenient?: boolean }
+export interface CaptureOptions { comps?: (string | number)[]; timeBudgetSeconds?: number; /** skip unmodified groups (faster; can miss expressions inside them) */ fast?: boolean; /** skip comps that no longer exist */ lenient?: boolean }
 
 /** Read the open project into a snapshot (not stored). Read-only: no undo group, no edits. */
 export async function captureSnapshot(o: CaptureOptions, meta: { id: string; label?: string }): Promise<Snapshot> {
   const budgetMs = (o.timeBudgetSeconds ?? DEFAULT_BUDGET_S) * 1000;
-  const r = await runJsx(SNAPSHOT_JSX, { comps: o.comps, budgetMs, full: o.full, lenient: o.lenient }, { undoGroup: false, timeoutMs: budgetMs + 120_000 });
+  const r = await runJsx(SNAPSHOT_JSX, { comps: o.comps, budgetMs, fast: o.fast, lenient: o.lenient }, { undoGroup: false, timeoutMs: budgetMs + 120_000 });
   if (!r.ok) throw new Error(r.error?.message || "the snapshot failed");
   return parseSnapshotLines(String(r.result), { ...meta, at: new Date().toISOString() });
 }
@@ -342,7 +348,7 @@ export function registerHistoryTools(server: McpServer) {
         label: z.string().max(80).optional().describe('snapshot: a short label, e.g. "v12" (diff can refer to it).'),
         comps: z.array(z.union([z.number().int(), z.string()])).max(200).optional().describe("snapshot: capture the layers of only these comps (id or name; default all). Items are always captured."),
         timeBudgetSeconds: z.number().min(5).max(900).optional().describe(`snapshot/diff: stop reading layers after this long (default ${DEFAULT_BUDGET_S}); comps not reached are reported.`),
-        full: z.boolean().optional().describe("snapshot: look at every property group instead of skipping unmodified ones (slower; for checking)."),
+        fast: z.boolean().optional().describe("snapshot: skip property groups After Effects reports as unmodified (faster on big projects, but an expression inside such a group can be missed: AE's group isModified ignores expressions). Default: read every group."),
         from: z.string().optional().describe('diff: snapshot id, label, checkpoint id/label, "latest", "previous" or "current" (default: latest snapshot).'),
         to: z.string().optional().describe('diff: same choices (default "current").'),
         detail: z.union([z.number().int(), z.string()]).optional().describe("diff: show every change in this one comp (id or name)."),
@@ -354,7 +360,7 @@ export function registerHistoryTools(server: McpServer) {
     async (a) => {
       try {
         if (a.action === "snapshot") {
-          const s = await saveSnapshot({ label: a.label, comps: a.comps, timeBudgetSeconds: a.timeBudgetSeconds, full: a.full });
+          const s = await saveSnapshot({ label: a.label, comps: a.comps, timeBudgetSeconds: a.timeBudgetSeconds, fast: a.fast });
           return { content: [{ type: "text", text: `Snapshot ${s.id}${s.label ? ` ("${s.label}")` : ""} saved: ${describe(s)}\nCompare later with ae_project_history {action: "diff", from: "${s.label ?? s.id}"}.` }] };
         }
         const pr = await runJsx("return app.project.file ? app.project.file.fsName : null;", {}, { undoGroup: false });

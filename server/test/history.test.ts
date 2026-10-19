@@ -364,17 +364,17 @@ describe("snapshot ExtendScript", () => {
 
   it("skips unmodified groups once isModified on groups is confirmed, and gets the same result as a full walk", async () => {
     const layers = Array.from({ length: 40 }, (_, i) => fakeLayer(i + 1, i + 1, `L${i + 1}`, { position: [i, i] }));
-    const pruned = await capture(fakeProject(layers));
-    const full = await capture(fakeProject(layers), { full: true });
+    const pruned = await capture(fakeProject(layers), { fast: true });
+    const full = await capture(fakeProject(layers));
     expect(pruned.stats.pruning).toBe("on");
-    expect(full.stats.pruning).toBe("off (full)");
+    expect(full.stats.pruning).toBe("off (every group read)");
     expect(pruned.stats.visited).toBeLessThan(full.stats.visited);
     expect(formatDiff(diffSnapshots(pruned, full))).toBe("Summary: No differences.");
   });
 
   it("doesn't skip groups when isModified on a group misses a changed property inside it", async () => {
     const layers = Array.from({ length: 30 }, (_, i) => fakeLayer(i + 1, i + 1, `L${i + 1}`, { position: [i, i], brokenGroups: true }));
-    const s = await capture(fakeProject(layers));
+    const s = await capture(fakeProject(layers), { fast: true });
     expect(s.stats.pruning).toBe("off (isModified unreliable on groups)");
     expect(s.items["1"].layers!.L30.props["ADBE Transform Group/ADBE Position"].v).toEqual([29, 29]);
   });
@@ -419,7 +419,7 @@ describe("snapshot ExtendScript", () => {
       );
     for (const ignored of [false, true]) {
       const app = mk(ignored);
-      const pruned = await capture(app), full = await capture(app, { full: true });
+      const pruned = await capture(app, { fast: true }), full = await capture(app);
       const p = pruned.items["1"].layers!.L30.props["ADBE Transform Group/ADBE Opacity"];
       expect(pruned.stats.pruning).toBe(ignored ? "off (isModified ignores expressions)" : "on");
       expect(p).toEqual({ path: "Transform/Opacity", v: 100, x: "value", ...(ignored ? { vd: true } : {}) });
