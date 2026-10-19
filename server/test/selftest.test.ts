@@ -9,6 +9,8 @@ const home = mkdtempSync(join(tmpdir(), "surehand-selftest-"));
 process.env.HOME = process.env.USERPROFILE = home;
 process.env.APPDATA = join(home, "AppData", "Roaming");
 process.env.SUREHAND_AE_NO_UPDATE_CHECK = "1";
+const { claudeDesktopDir } = await import("../src/cli/util.js");
+mkdirSync(claudeDesktopDir(), { recursive: true });
 
 /** A port nothing listens on. */
 const freePort = () =>
@@ -20,22 +22,24 @@ const freePort = () =>
   });
 
 describe("test --json", () => {
-  it("prints [{name, ok, detail, fix?}]: what is wrong and what to do about it", async () => {
+  it("prints {checks: [{ok, name, message?, fix?: {connect, label?}}]}: what is wrong and what to do about it", async () => {
     process.env.SUREHAND_AE_BRIDGE_PORT = String(await freePort());
     const { selftestJson } = await import("../src/cli/selftest.js");
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     const code = await selftestJson();
-    const checks = JSON.parse(log.mock.calls.at(-1)![0]);
+    const { checks } = JSON.parse(log.mock.calls.at(-1)![0]);
     log.mockRestore();
     expect(code).toBe(1);
     for (const c of checks) {
-      expect(Object.keys(c).every((k) => ["name", "ok", "detail", "fix", "warning"].includes(k))).toBe(true);
-      expect(typeof c.detail).toBe("string");
+      expect(Object.keys(c).every((k) => ["name", "ok", "message", "fix"].includes(k))).toBe(true);
+      if (c.fix) expect(typeof c.fix.connect).toBe("string");
     }
     const by = Object.fromEntries(checks.map((c: any) => [c.name, c]));
-    expect(by.config).toEqual({ name: "config", ok: false, detail: `No config at ${join(home, ".surehand", "ae", "config.json")}.`, fix: "Run the installer (1. Install) again." });
-    expect(by.extension).toMatchObject({ ok: false, fix: expect.any(String) });
-    expect(by.bridge).toMatchObject({ ok: false, detail: expect.stringMatching(/^Bridge not reachable/), fix: expect.stringMatching(/After Effects running/) });
+    expect(by.config).toEqual({ name: "config", ok: false, message: `No config at ${join(home, ".surehand", "ae", "config.json")}. Run the installer (1. Install) again.` });
+    expect(by.extension).toMatchObject({ ok: false, message: expect.stringMatching(/Run the installer/) });
+    expect(by.bridge).toMatchObject({ ok: false, message: expect.stringMatching(/^Bridge not reachable.*After Effects running/) });
+    // Claude Desktop is installed but not connected: the panel offers to connect it
+    expect(by["claude-desktop"]).toEqual({ name: "claude-desktop", ok: true, message: expect.stringMatching(/no surehand-ae entry/), fix: { connect: "claude-desktop", label: "Connect Claude Desktop" } });
     expect(checks.at(-1).name).toBe("bridge"); // nothing after an unreachable bridge
   });
 

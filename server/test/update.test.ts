@@ -116,7 +116,7 @@ describe("surehand-ae update", () => {
   it("--check reports without installing anything", async () => {
     publish("v99.0.0", fake("99.0.0"), { notes: "## What's new\n- things" });
     const c = await mod.checkUpdate();
-    expect(c).toEqual({ ok: true, current: "test", latest: "99.0.0", updateAvailable: true, notes: "## What's new\n- things", url: `${base}/release/v99.0.0` });
+    expect(c).toEqual({ current: "test", latest: "99.0.0", updateAvailable: true, notes: ["What's new", "things"], url: `${base}/release/v99.0.0`, checkedAt: expect.any(String) });
     expect(readFileSync(installed(), "utf8")).toBe(fake("0.0.1"));
     publish("v0.0.0", fake("0.0.0"));
     expect(await mod.checkUpdate()).toMatchObject({ updateAvailable: false, latest: "0.0.0" });
@@ -128,7 +128,8 @@ describe("surehand-ae update", () => {
     await mod.updateCommand(["--check", "--json"]);
     const out = JSON.parse(log.mock.calls[0][0]);
     log.mockRestore();
-    expect(out).toMatchObject({ current: "test", latest: "99.0.0", updateAvailable: true });
+    expect(out).toEqual({ current: "test", latest: "99.0.0", updateAvailable: true, url: `${base}/release/v99.0.0`, checkedAt: expect.any(String) });
+    expect(readFileSync(installed(), "utf8")).toBe(fake("0.0.1")); // nothing installed
     expect(process.exitCode).toBe(0);
   });
 });

@@ -3,8 +3,8 @@
 // can still be done with ae_run_script.
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { loadConfig } from "../config.js";
-import { logActivity } from "../activity.js";
-import { callContext } from "../context.js";
+import { activityDetails, logActivity } from "../activity.js";
+import { callContext, type CallContext } from "../context.js";
 import { env as envVar } from "../paths.js";
 
 export const CORE_TOOLS = new Set([
@@ -88,8 +88,9 @@ export function applyProfile(server: McpServer, profile: ToolProfile): Map<strin
     const wrapped = async (args: any, extra: any) => {
       const t0 = Date.now();
       let result: any;
+      const ctx: CallContext = { tool: name, signal: extra?.signal };
       try {
-        result = await callContext.run({ tool: name, signal: extra?.signal }, () => cb(args, extra));
+        result = await callContext.run(ctx, () => cb(args, extra));
         return result;
       } finally {
         const text: string = result?.content?.find((c: any) => c.type === "text")?.text ?? "";
@@ -103,6 +104,7 @@ export function applyProfile(server: McpServer, profile: ToolProfile): Map<strin
           ok: !!result && !result.isError,
           summary: text.split("\n")[0].slice(0, 300) || (result ? undefined : "no result (exception)"),
           changes: changesAt >= 0 ? text.slice(changesAt).split("\n").filter((l) => /^[+~-] /.test(l)).length : undefined,
+          ...activityDetails(name, text, ctx.last),
         });
       }
     };

@@ -555,7 +555,7 @@ describe("checkpoints / checkpoint-diff commands (the panel's Checkpoints screen
     return { lines, done: () => (log.mockRestore(), err.mockRestore()) };
   };
 
-  it("lists a project's checkpoints with hasSnapshot, and diffs one against the open project", async () => {
+  it("lists a project's checkpoints with their history snapshot, and diffs one against the open project", async () => {
     const root = mkdtempSync(join(tmpdir(), "surehand-proj-"));
     const file = join(root, "Cli.aep");
     writeFileSync(file, "aep");
@@ -570,9 +570,11 @@ describe("checkpoints / checkpoint-diff commands (the panel's Checkpoints screen
     expect(await checkpointsCommand(["--json"])).toBe(0); // the open project
     expect(await checkpointsCommand(["--json", "--project", file])).toBe(0);
     c.done();
-    const rows = JSON.parse(c.lines[0]);
-    expect(rows).toEqual([{ id: cp.id, at: expect.any(String), label: "v1", file: cp.file, hasSnapshot: true }]);
-    expect(JSON.parse(c.lines[1])).toEqual(rows);
+    const out = JSON.parse(c.lines[0]);
+    const { historyDir } = await import("../src/tools/history.js");
+    const snapId = JSON.parse(readFileSync(join(historyDir(file), "index.json"), "utf8"))[0].id;
+    expect(out).toEqual({ checkpoints: [{ id: cp.id, at: expect.any(String), label: "v1", file: cp.file, history: snapId }] });
+    expect(JSON.parse(c.lines[1])).toEqual(out);
 
     // a change in the open project shows up in the diff
     fakeApp = fakeProject([fakeLayer(7, 1, "Headline")]);
@@ -582,7 +584,7 @@ describe("checkpoints / checkpoint-diff commands (the panel's Checkpoints screen
     expect(await checkpointDiffCommand([cp.id])).toBe(0);
     c.done();
     const d = JSON.parse(c.lines[0]);
-    expect(d).toMatchObject({ ok: true, project: file, checkpoint: cp.id });
+    expect(Object.keys(d)).toEqual(["text"]);
     expect(d.text).toContain('~ layer #1 "Headline": renamed from "Title"');
     expect(c.lines[1]).toBe(d.text);
 
@@ -591,7 +593,7 @@ describe("checkpoints / checkpoint-diff commands (the panel's Checkpoints screen
     expect(await checkpointDiffCommand(["nope", "--json"])).toBe(1);
     expect(await checkpointDiffCommand([cp.id, "--json", "--project", join(root, "Other.aep")])).toBe(1);
     c.done();
-    expect(JSON.parse(c.lines[0])).toEqual({ ok: false, error: expect.stringMatching(/^No snapshot or checkpoint "nope"/) });
+    expect(JSON.parse(c.lines[0])).toEqual({ error: expect.stringMatching(/^No snapshot or checkpoint "nope"/) });
     expect(JSON.parse(c.lines[1]).error).toMatch(/compares with the project open in After Effects \(.*Cli\.aep\), not .*Other\.aep/);
   });
 
@@ -606,8 +608,8 @@ describe("checkpoints / checkpoint-diff commands (the panel's Checkpoints screen
     expect(await checkpointsCommand(["--json", "--project", "/nowhere/None.aep"])).toBe(0);
     c.done();
     spy.mockRestore();
-    expect(JSON.parse(c.lines[0]).error).toMatch(/After Effects isn't reachable .*pass --project/);
+    expect(JSON.parse(c.lines[0])).toEqual({ checkpoints: [], error: expect.stringMatching(/After Effects isn't reachable .*pass --project/) });
     expect(JSON.parse(c.lines[1]).error).toMatch(/After Effects isn't reachable.*has to be running/);
-    expect(JSON.parse(c.lines[2])).toEqual([]);
+    expect(JSON.parse(c.lines[2])).toEqual({ checkpoints: [] });
   });
 });

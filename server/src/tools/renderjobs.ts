@@ -2,7 +2,7 @@
 // usable while a separate render process works, with progress, status and cancel.
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { spawn, type ChildProcess } from "node:child_process";
-import { createWriteStream, existsSync, mkdirSync } from "node:fs";
+import { createWriteStream, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { z } from "zod";
 import { runJsx } from "../jsx.js";
@@ -36,6 +36,18 @@ function aerenderPath(appPackage: string): string | null {
       ? [join(appPackage, "aerender.exe"), join(dirname(appPackage), "aerender.exe"), join(appPackage, "Support Files", "aerender.exe")]
       : [join(dirname(appPackage), "aerender"), join(appPackage, "..", "aerender")];
   return candidates.find((p) => existsSync(p)) ?? null;
+}
+
+/**
+ * renders/<id>.json for the Surehand MCP panel, kept up to date while the job runs:
+ * {id, comp, frames, done, status, output, startedAt, endedAt?} (done = frames rendered so far).
+ */
+export function writeJobFile(j: Pick<Job, "id" | "comp" | "frames" | "frameRendered" | "status" | "output" | "startedAt" | "endedAt">) {
+  try {
+    mkdirSync(LOG_DIR(), { recursive: true });
+    const o = { id: j.id, comp: j.comp, frames: j.frames, done: j.status === "done" ? j.frames || j.frameRendered : j.frameRendered, status: j.status, output: j.output, startedAt: j.startedAt, ...(j.endedAt ? { endedAt: j.endedAt } : {}) };
+    writeFileSync(join(LOG_DIR(), `${j.id}.json`), JSON.stringify(o));
+  } catch {} // never fails a render
 }
 
 function view(j: Job) {
@@ -130,6 +142,8 @@ return { project: p.file.fsName, comp: name, frames: frames, app: Folder.appPack
         };
         const proc = spawn(bin, cli, { stdio: ["ignore", "pipe", "pipe"] });
         job.proc = proc;
+        writeJobFile(job);
+        let written = 0;
         const onData = (d: Buffer) => {
           const text = d.toString();
           logStream.write(text);
@@ -141,6 +155,11 @@ return { project: p.file.fsName, comp: name, frames: frames, app: Folder.appPack
             job.tail.push(line.trim());
             if (job.tail.length > 50) job.tail.shift();
           }
+          // progress for the panel, at most twice a second
+          if (Date.now() - written > 500) {
+            written = Date.now();
+            writeJobFile(job);
+          }
         };
         proc.stdout.on("data", onData);
         proc.stderr.on("data", onData);
@@ -148,6 +167,7 @@ return { project: p.file.fsName, comp: name, frames: frames, app: Folder.appPack
           job.status = "failed";
           job.tail.push(String(e));
           job.endedAt = new Date().toISOString();
+          writeJobFile(job);
         });
         proc.on("exit", (code) => {
           logStream.end();
@@ -155,6 +175,7 @@ return { project: p.file.fsName, comp: name, frames: frames, app: Folder.appPack
           job.endedAt = new Date().toISOString();
           if (job.status === "running") job.status = code === 0 && !job.tail.some((l) => /aerender ERROR|^ERROR/i.test(l)) ? "done" : "failed";
           job.proc = undefined;
+          writeJobFile(job);
         });
         jobs.set(id, job);
         return {
@@ -191,6 +212,7 @@ return { project: p.file.fsName, comp: name, frames: frames, app: Folder.appPack
         if (j.status === "running" && j.proc) {
           j.status = "cancelled";
           j.proc.kill();
+          writeJobFile(j);
         }
         return { content: [{ type: "text", text: JSON.stringify(view(j)) }] };
       }

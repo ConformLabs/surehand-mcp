@@ -53,32 +53,38 @@ async function latestRelease(): Promise<Release> {
   return (await (await get(api)).json()) as Release;
 }
 
+/** `update --check --json`: {latest, current, updateAvailable, url, checkedAt, notes?} (error when GitHub can't be reached). */
 export interface UpdateCheck {
-  ok: boolean;
-  current: string;
   latest: string | null;
+  current: string;
   updateAvailable: boolean;
-  notes?: string;
   url: string;
+  checkedAt: string;
+  /** the release notes, one line each (markdown bullets and heading marks removed) */
+  notes?: string[];
   error?: string;
+}
+
+/** Release notes as lines for the panel. */
+export function noteLines(body: string | null | undefined): string[] {
+  return (body ?? "")
+    .split(/\r?\n/)
+    .map((l) => l.replace(/^\s*(?:#{1,6}\s+|[-*+]\s+)/, "").trim())
+    .filter(Boolean)
+    .slice(0, 60);
 }
 
 /** `update --check`: what the latest release is, without installing anything. */
 export async function checkUpdate(): Promise<UpdateCheck> {
+  const checkedAt = new Date().toISOString();
   try {
     const rel = await latestRelease();
     const latest = rel.tag_name.replace(/^v/, "");
     void checkForUpdate(true); // refresh the cached banner state
-    return {
-      ok: true,
-      current: VERSION,
-      latest,
-      updateAvailable: compareVersions(latest, VERSION) > 0,
-      ...(rel.body ? { notes: rel.body.slice(0, 20_000) } : {}),
-      url: rel.html_url || RELEASES_URL,
-    };
+    const notes = noteLines(rel.body);
+    return { latest, current: VERSION, updateAvailable: compareVersions(latest, VERSION) > 0, url: rel.html_url || RELEASES_URL, checkedAt, ...(notes.length ? { notes } : {}) };
   } catch (e: any) {
-    return { ok: false, current: VERSION, latest: null, updateAvailable: false, url: RELEASES_URL, error: `Could not reach GitHub to check for updates (${e.message}).` };
+    return { latest: null, current: VERSION, updateAvailable: false, url: RELEASES_URL, checkedAt, error: `Could not reach GitHub to check for updates (${e.message}).` };
   }
 }
 
@@ -164,10 +170,10 @@ export async function updateCommand(args: string[]) {
   if (args.includes("--check")) {
     const c = await checkUpdate();
     if (args.includes("--json")) console.log(JSON.stringify(c));
-    else if (!c.ok) fail(c.error!);
+    else if (c.error) fail(c.error);
     else if (c.updateAvailable) warn(`v${c.latest} is available (you have v${c.current}): ${c.url}. Install it with: surehand-ae update`);
     else ok(`Surehand MCP is up to date (v${c.current}).`);
-    process.exitCode = c.ok ? 0 : 1;
+    process.exitCode = c.error ? 1 : 0;
     return;
   }
   const r = await runUpdate();

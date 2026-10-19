@@ -163,6 +163,29 @@ export function listClients(): ClientInfo[] {
   ];
 }
 
+/** The settings to paste into any other MCP app (the panel's "Copy the settings"). */
+export function settingsSnippet(entry = serverEntry()): string {
+  return JSON.stringify({ mcpServers: { [SERVER_NAME]: entry } }, null, 2);
+}
+
+/**
+ * `clients --json` for the panel's Connect screen:
+ * {clients: [{id, name, installed, configured, inUse?, note?, action?: "start"}], snippet?}
+ * (inUse: the app is running now, so a change needs a restart; chatgpt-web has action "start").
+ */
+export function clientsJson(): { clients: Record<string, unknown>[]; snippet?: string } {
+  const clients = listClients().map((c) => {
+    const o: Record<string, unknown> = { id: c.id, name: c.name, installed: c.installed, configured: c.configured };
+    if (c.id === "claude-desktop" && c.installed && claudeDesktopRunning()) o.inUse = true;
+    if (c.id === "chatgpt-web") {
+      o.action = "start";
+      o.note = c.howTo;
+    } else if (c.note) o.note = c.note;
+    return o;
+  });
+  return existsSync(installedServer()) ? { clients, snippet: settingsSnippet() } : { clients };
+}
+
 // ---------- connect / disconnect ----------
 
 const RESTART: Record<ClientId, string> = {

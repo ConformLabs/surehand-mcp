@@ -58,6 +58,16 @@ describe("clients --json", () => {
     expect(by["chatgpt-web"]).toMatchObject({ configured: false, configPath: null, howTo: expect.stringMatching(/Connect ChatGPT/) });
   });
 
+  it("--json is {clients: [{id, name, installed, configured, inUse?, note?, action?}], snippet}", () => {
+    put(util.cursorConfig(), { mcpServers: {} });
+    const out = clients.clientsJson();
+    expect(out.clients.map((c) => c.id)).toEqual(["claude-desktop", "claude-code", "codex", "cursor", "chatgpt-web"]);
+    for (const c of out.clients) expect(Object.keys(c).every((k) => ["id", "name", "installed", "configured", "inUse", "note", "action"].includes(k))).toBe(true);
+    expect(out.clients[3]).toEqual({ id: "cursor", name: "Cursor", installed: true, configured: false });
+    expect(out.clients[4]).toMatchObject({ id: "chatgpt-web", configured: false, action: "start" });
+    expect(JSON.parse(out.snippet!)).toEqual({ mcpServers: { "surehand-ae": { command: expect.any(String), args: [server()] } } });
+  });
+
   it("notes an entry whose Node.js is gone", () => {
     put(util.claudeDesktopConfig(), { mcpServers: { "surehand-ae": { command: join(home, "gone", "node"), args: [server()] } } });
     expect(clients.clientInfo("claude-desktop").note).toMatch(/Node\.js no longer exists/);

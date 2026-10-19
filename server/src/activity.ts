@@ -18,6 +18,38 @@ export interface ActivityEntry {
   summary?: string;
   /** number of lines in the change report, when there was one */
   changes?: number;
+  /** the change report's lines (at most 20), e.g. "~ Title > Transform/Position: ..." */
+  changeList?: string[];
+  /** app.project.revision after the call (the panel's Undo only undoes when nothing happened since) */
+  revision?: number;
+  /** the undo step the call made in After Effects */
+  undoGroup?: string;
+  /** ae_preflight / ae_prove_identical: the verdict and its line */
+  result?: { verdict: string; summary: string };
+}
+
+const MAX_CHANGE_LINES = 20;
+
+/** The optional fields the panel reads, from a tool's text result and its call context. */
+export function activityDetails(tool: string, text: string, last?: { revision?: number; undoGroup?: string }): Partial<ActivityEntry> {
+  const out: Partial<ActivityEntry> = {};
+  const at = text.indexOf("\nChanges");
+  if (at >= 0) {
+    const lines = text.slice(at).split("\n").filter((l) => /^[+~-] /.test(l));
+    if (lines.length) out.changeList = lines.slice(0, MAX_CHANGE_LINES).map((l) => l.slice(0, 300));
+  }
+  if (typeof last?.revision === "number") out.revision = last.revision;
+  if (last?.undoGroup) out.undoGroup = last.undoGroup;
+  const first = text.split("\n")[0] ?? "";
+  if (tool === "ae_preflight") {
+    const m = /^(PASS|FAIL|WARNINGS|INCOMPLETE)\b/.exec(first);
+    if (m) out.result = { verdict: m[1], summary: [first, text.split("\n")[1] ?? ""].filter(Boolean).join(" · ").slice(0, 300) };
+  } else if (tool === "ae_prove_identical") {
+    const m = /^Verdict: (IDENTICAL WITHIN TOLERANCE|IDENTICAL|DIFFERS|NOT PROVEN)\b[:.]?\s*(.*)$/.exec(first);
+    if (m) out.result = { verdict: m[1], summary: (m[2] || m[1]).slice(0, 300) };
+    else if (/^Captured proof /.test(first)) out.result = { verdict: "CAPTURED", summary: first.slice(0, 300) };
+  }
+  return out;
 }
 
 function trimArgs(args: unknown): unknown {

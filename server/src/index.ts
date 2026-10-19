@@ -10,7 +10,7 @@ import { checkForUpdate } from "./update.js";
 import { activityFile, readActivity } from "./activity.js";
 import { chatgpt } from "./cli/chatgpt.js";
 import { checkpointDiffCommand, checkpointsCommand } from "./cli/checkpoints.js";
-import { connectClient, disconnectClient, listClients, moveFromLegacy } from "./cli/clients.js";
+import { clientsJson, connectClient, disconnectClient, listClients, moveFromLegacy } from "./cli/clients.js";
 import { diagnostics } from "./cli/diagnostics.js";
 import { install } from "./cli/install.js";
 import { selftest, selftestJson } from "./cli/selftest.js";
@@ -101,13 +101,13 @@ Usage:
   surehand-ae uninstall [--keep-config] [--all]   (keeps checkpoints and files that are not ours unless --all)
   surehand-ae selftest [--full]  check the installation and the connection to After Effects;
                          --full also runs every major tool and saves a compatibility report
-  surehand-ae test --json     the quick self-test as data: [{name, ok, detail, fix?}]
+  surehand-ae test --json     the quick self-test as data: {checks: [{ok, name, message, fix?}]}
   surehand-ae diagnostics     print a report to paste into a bug report (no secrets)
   surehand-ae activity [n]    the last n tool calls (default 30); full log in ~/.surehand/ae/activity.jsonl
   surehand-ae chatgpt [--local]
                          HTTP server + public tunnel for ChatGPT
   surehand-ae update [--json]  install the latest release over this installation (and the AE extension)
-  surehand-ae update --check [--json]   only report: {current, latest, updateAvailable, notes, url}
+  surehand-ae update --check [--json]   only report: {latest, current, updateAvailable, url, checkedAt, notes}
   surehand-ae clients [--json]          the AI apps on this computer and whether they are connected
   surehand-ae connect <app> [--json]    connect one: claude-desktop, claude-code, codex, cursor
   surehand-ae disconnect <app> [--json]
@@ -157,13 +157,14 @@ async function main() {
   switch (cmd) {
     case "clients": {
       const list = listClients();
-      return print(list, list.map((c) => `${c.name.padEnd(24)} ${c.id === "chatgpt-web" ? "see `surehand-ae chatgpt`" : !c.installed ? "not installed" : c.configured ? "connected" : "not connected"}${c.note ? ` (${c.note})` : ""}`).join("\n"));
+      return print(clientsJson(), list.map((c) => `${c.name.padEnd(24)} ${c.id === "chatgpt-web" ? "see `surehand-ae chatgpt`" : !c.installed ? "not installed" : c.configured ? "connected" : "not connected"}${c.note ? ` (${c.note})` : ""}`).join("\n"));
     }
     case "connect":
     case "disconnect": {
       const id = rest.find((a) => !a.startsWith("--"));
       const r = id ? (cmd === "connect" ? connectClient(id) : disconnectClient(id)) : { ok: false, message: `usage: surehand-ae ${cmd} <claude-desktop|claude-code|codex|cursor> [--json]`, restartHint: null };
-      print(r, `${r.message}${r.restartHint ? `\n${r.restartHint}` : ""}`);
+      const message = `${r.message}${r.restartHint ? ` ${r.restartHint}` : ""}`;
+      print({ ok: r.ok, message }, message);
       process.exitCode = r.ok ? 0 : 1;
       return;
     }
@@ -200,6 +201,14 @@ async function main() {
       console.log(JSON.stringify(r, null, 2));
       return;
     }
+  }
+  // anything else that isn't an option is a mistake: never start the server (the panel spawns commands and would wait)
+  if (cmd && !cmd.startsWith("-")) {
+    const error = `Unknown command "${cmd}". Run surehand-ae --help for the list.`;
+    if (json) console.log(JSON.stringify({ ok: false, error }));
+    else console.error(error);
+    process.exitCode = 2;
+    return;
   }
   autoSetup();
   recordRuntime();

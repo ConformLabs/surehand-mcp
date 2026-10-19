@@ -78,6 +78,8 @@ export interface Rollback {
 export interface RunResult {
   ok: boolean;
   result?: unknown;
+  /** app.project.revision after a call with an undo group (AE versions that have it) */
+  revision?: number;
   changes?: Changes;
   rollback?: Rollback;
   logs: string[];
@@ -185,7 +187,12 @@ export async function runJsx(body: string, args: unknown = {}, opts: RunOptions 
     await ensureHelpers();
     raw = await evalRaw(script, opts.timeoutMs, opts.bridge);
   }
-  return parseResult(raw);
+  const res = parseResult(raw);
+  // for the activity log: the undo step this call made and the revision after it (the panel's Undo)
+  if (ctx && opts.undoGroup !== false && opts.undoGroup !== "") {
+    ctx.last = { undoGroup: typeof opts.undoGroup === "string" && opts.undoGroup ? opts.undoGroup : "Surehand MCP", ...(typeof res.revision === "number" ? { revision: res.revision } : {}) };
+  }
+  return res;
 }
 
 /** The change report as short, readable lines. */

@@ -1,6 +1,8 @@
 // `surehand-ae checkpoints` and `surehand-ae checkpoint-diff <id>`: the panel's Checkpoints screen.
-//   checkpoints --json [--project <path>]        the project's checkpoints: [{id, at, label, file, hasSnapshot}]
-//   checkpoint-diff <id> [--project <path>] [--json]   what changed between a checkpoint and the open project
+//   checkpoints --json [--project <path>]   {checkpoints: [{id, at, label, file, history?}]} (history: the id of the
+//                                           project history snapshot stored with it; only those can be diffed)
+//   checkpoint-diff <id> [--project <path>] [--json]   what changed since a checkpoint: plain text ({text} with --json)
+// Errors: a message on stderr, or with --json {error} (checkpoints: {checkpoints: [], error}); exit code 1.
 // Without --project, the project open in After Effects. The diff always needs After Effects (it reads
 // the open project), and only compares with the project that is open there.
 import { runJsx } from "../jsx.js";
@@ -14,8 +16,8 @@ export interface CheckpointRow {
   at: string;
   label: string | null;
   file: string;
-  /** a project history snapshot was stored with it, so it can be diffed */
-  hasSnapshot: boolean;
+  /** the project history snapshot stored with it (only those can be diffed) */
+  history?: string;
 }
 
 /** The project open in After Effects (null when it has never been saved); throws when AE can't be reached. */
@@ -30,13 +32,10 @@ const NO_AE = (e: any) =>
 
 export function listCheckpoints(project: string): CheckpointRow[] {
   const snaps = snapshotIndex(project);
-  return checkpointIndex(project).map((c) => ({
-    id: c.id,
-    at: c.at,
-    label: c.label ?? null,
-    file: c.file,
-    hasSnapshot: snaps.some((s) => s.checkpoint === c.id),
-  }));
+  return checkpointIndex(project).map((c) => {
+    const snap = snaps.find((s) => s.checkpoint === c.id);
+    return { id: c.id, at: c.at, label: c.label ?? null, file: c.file, ...(snap ? { history: snap.id } : {}) };
+  });
 }
 
 export async function checkpointsCommand(args: string[]): Promise<number> {
@@ -46,43 +45,42 @@ export async function checkpointsCommand(args: string[]): Promise<number> {
     try {
       project = (await openProject()) ?? undefined;
     } catch (e) {
-      return out(json, { ok: false, error: NO_AE(e) });
+      return out(json, NO_AE(e), { checkpoints: [] });
     }
-    if (!project) return out(json, { ok: false, error: "The project open in After Effects has never been saved, so it has no checkpoints." });
+    if (!project) return out(json, "The project open in After Effects has never been saved, so it has no checkpoints.", { checkpoints: [] });
   }
   const rows = listCheckpoints(project);
-  if (json) console.log(JSON.stringify(rows));
+  if (json) console.log(JSON.stringify({ checkpoints: rows }));
   else if (!rows.length) console.log(`No checkpoints for ${project}.`);
-  else for (const r of [...rows].reverse()) console.log(`${r.id}  ${r.label ? `"${r.label}"  ` : ""}${r.hasSnapshot ? "" : "(no snapshot: can't be diffed)  "}${r.file}`);
+  else for (const r of [...rows].reverse()) console.log(`${r.id}  ${r.label ? `"${r.label}"  ` : ""}${r.history ? "" : "(no snapshot: can't be diffed)  "}${r.file}`);
   return 0;
 }
 
 export async function checkpointDiffCommand(args: string[]): Promise<number> {
   const json = args.includes("--json");
   const id = args.find((a, i) => !a.startsWith("--") && args[i - 1] !== "--project");
-  if (!id) return out(json, { ok: false, error: "usage: surehand-ae checkpoint-diff <checkpoint id> [--project <path>] [--json]" });
+  if (!id) return out(json, "usage: surehand-ae checkpoint-diff <checkpoint id> [--project <path>] [--json]");
   let open: string | null;
   try {
     open = await openProject();
   } catch (e) {
-    return out(json, { ok: false, error: `${NO_AE(e).split(" Open")[0]}. The diff compares the checkpoint with the project open in After Effects, so After Effects has to be running.` });
+    return out(json, `${NO_AE(e).split(" Open")[0]}. The diff compares the checkpoint with the project open in After Effects, so After Effects has to be running.`);
   }
   const project = opt(args, "--project") ?? open;
-  if (!project) return out(json, { ok: false, error: "The project open in After Effects has never been saved, so it has no checkpoints." });
-  if (open !== project)
-    return out(json, { ok: false, error: `The diff compares with the project open in After Effects (${open ?? "an unsaved project"}), not ${project}. Open that project first.` });
+  if (!project) return out(json, "The project open in After Effects has never been saved, so it has no checkpoints.");
+  if (open !== project) return out(json, `The diff compares with the project open in After Effects (${open ?? "an unsaved project"}), not ${project}. Open that project first.`);
   try {
     const text = await historyDiff(project, { from: id, to: "current" });
-    if (json) console.log(JSON.stringify({ ok: true, project, checkpoint: id, text }));
+    if (json) console.log(JSON.stringify({ text }));
     else console.log(text);
     return 0;
   } catch (e: any) {
-    return out(json, { ok: false, error: e instanceof HistoryRefError ? e.message.replace(/^from: /, "") : e?.message || String(e) });
+    return out(json, e instanceof HistoryRefError ? e.message.replace(/^from: /, "") : e?.message || String(e));
   }
 }
 
-function out(json: boolean, r: { ok: false; error: string }): number {
-  if (json) console.log(JSON.stringify(r));
-  else console.error(r.error);
+function out(json: boolean, error: string, extra: Record<string, unknown> = {}): number {
+  if (json) console.log(JSON.stringify({ ...extra, error }));
+  else console.error(error);
   return 1;
 }

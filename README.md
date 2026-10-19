@@ -468,11 +468,16 @@ looked up next to it), `SUREHAND_AE_BRIDGE_PORT`, `SUREHAND_AE_TOKEN`, `SUREHAND
 `SUREHAND_AE_TOOLS` (`core` / `full`), `SUREHAND_AE_INSTANCE`, `SUREHAND_AE_BLOCKED_AFTER_SECONDS`,
 `SUREHAND_AE_STARTUP_WAIT_SECONDS`, `SUREHAND_AE_NO_UPDATE_CHECK`, `SUREHAND_AE_NO_AUTOSETUP`, `SUREHAND_AE_NO_ACTIVITY_LOG`.
 
-**Commands for the panel** (all print JSON with `--json` and never ask anything): `clients` (the AI apps and whether they
-are connected), `connect <app>` / `disconnect <app>` (`claude-desktop`, `claude-code`, `codex`, `cursor`), `checkpoints
-[--project <path>]`, `checkpoint-diff <id> [--project <path>]` (needs After Effects: it compares with the open project),
-`test --json` (the quick self-test as `[{name, ok, detail, fix}]`) and `update --check`. The panel runs them with the Node
-and server named in `~/.surehand/ae/runtime.json`.
+**Commands for the panel** (with `--json` they print one JSON object and never ask anything; an unknown command exits
+with an error): `clients` → `{clients: [{id, name, installed, configured, inUse?, note?, action?}], snippet?}`;
+`connect <app>` / `disconnect <app>` (`claude-desktop`, `claude-code`, `codex`, `cursor`) → `{ok, message}`;
+`checkpoints [--project <path>]` → `{checkpoints: [{id, at, label, file, history?}]}`; `checkpoint-diff <id> [--project
+<path>]` → text (`{text}`; needs After Effects: it compares with the open project); `test --json` →
+`{checks: [{ok, name, message?, fix?: {connect, label?}}]}`; `update --check` → `{latest, current, updateAvailable, url,
+checkedAt, notes?}` (installs nothing). Errors come as `{error}`. The panel runs them with the Node and server named in
+`~/.surehand/ae/runtime.json`. The activity log entries also carry `changeList`, `revision`, `undoGroup` and, for
+`ae_preflight` / `ae_prove_identical`, `result: {verdict, summary}`; background renders keep
+`~/.surehand/ae/renders/<id>.json` up to date.
 
 ## Security
 

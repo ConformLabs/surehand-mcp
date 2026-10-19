@@ -1,5 +1,6 @@
 // `surehand-ae selftest`: checks every link of the chain and runs a small non-destructive job in After Effects.
-// `surehand-ae test --json` gives the same quick checks as data for the panel: [{name, ok, detail, fix?}].
+// `surehand-ae test --json` gives the same quick checks as data for the panel:
+// {checks: [{ok, name, message?, fix?: {connect, label?}}]} (fix.connect: an AI app id the panel can connect).
 import { existsSync, mkdirSync, readFileSync, statSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { health } from "../bridge.js";
@@ -22,6 +23,14 @@ export interface Check {
   fix?: string;
   /** passed, with something worth knowing */
   warning?: boolean;
+  /** an AI app the panel can connect to fix it */
+  connect?: { id: string; label?: string };
+}
+
+/** The panel's shape of a check. */
+export function checkJson(c: Check): { ok: boolean; name: string; message?: string; fix?: { connect: string; label?: string } } {
+  const message = c.detail + (c.fix && (!c.ok || c.warning) ? ` ${c.fix}` : "");
+  return { ok: c.ok, name: c.name, ...(message ? { message } : {}), ...(c.connect ? { fix: { connect: c.connect.id, ...(c.connect.label ? { label: c.connect.label } : {}) } } : {}) };
 }
 
 /** The bridge's last status: this version's, else the one the 1.3 extension (before an AE restart) writes. */
@@ -74,9 +83,19 @@ export async function quickChecks(print: boolean, beforeJob?: () => Promise<void
   else bad("signature", `This is an unsigned development build and PlayerDebugMode is off for some CSXS versions (${CSXS_VERSIONS.join(", ")}).`, REINSTALL);
 
   const desktop = clientInfo("claude-desktop");
-  if (desktop.configured && desktop.note && /no longer exists/.test(desktop.note)) bad("claude-desktop", `Claude Desktop: ${desktop.note}.`, REINSTALL);
+  if (desktop.configured && desktop.note && /no longer exists/.test(desktop.note))
+    add({ name: "claude-desktop", ok: false, detail: `Claude Desktop: ${desktop.note}.`, fix: REINSTALL, connect: { id: "claude-desktop", label: "Reconnect Claude Desktop" } });
   else if (desktop.configured) pass("claude-desktop", `Claude Desktop configured${desktop.note ? ` (${desktop.note})` : ""}`);
-  else add({ name: "claude-desktop", ok: true, detail: "Claude Desktop has no surehand-ae entry (fine if you use the .mcpb extension or another app)" }, true);
+  else
+    add(
+      {
+        name: "claude-desktop",
+        ok: true,
+        detail: "Claude Desktop has no surehand-ae entry (fine if you use the .mcpb extension or another app)",
+        ...(desktop.installed ? { connect: { id: "claude-desktop", label: "Connect Claude Desktop" } } : {}),
+      },
+      true,
+    );
 
   // --- After Effects connection ---
   if (print) console.log("");
@@ -166,7 +185,7 @@ export async function selftest(full = false): Promise<number> {
 /** `test --json`: the quick checks as JSON on stdout. */
 export async function selftestJson(): Promise<number> {
   const checks = await quickChecks(false);
-  console.log(JSON.stringify(checks));
+  console.log(JSON.stringify({ checks: checks.map(checkJson) }));
   return checks.every((c) => c.ok) ? 0 : 1;
 }
 async function summary(failures: number): Promise<number> {
