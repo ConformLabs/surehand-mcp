@@ -6,7 +6,7 @@ import {
 } from "./util.js";
 
 export function uninstall(argv: string[]) {
-  console.log(bold("\nAfter Effects MCP uninstaller\n"));
+  console.log(bold("\nSurehand MCP uninstaller\n"));
   const keepConfig = argv.includes("--keep-config");
 
   if (existsSync(extensionDir())) {

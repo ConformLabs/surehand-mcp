@@ -159,7 +159,7 @@ export function setupHint(): string {
   return "";
 }
 
-/** Where the standalone install runs from, for the AE MCP panel's Update button. Only the
+/** Where the standalone install runs from, for the Surehand MCP panel's Update button. Only the
  *  standalone server (~/.aemcp/server) records itself: the Claude Desktop extension is updated
  *  by installing a new .mcpb. */
 export const RUNTIME_FILE = join(AEMCP_DIR, "runtime.json");

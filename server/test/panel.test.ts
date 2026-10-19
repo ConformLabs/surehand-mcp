@@ -1,4 +1,4 @@
-// Runs the real AE MCP panel (extension/index.html + js/panel.js) in jsdom against a fake bridge.
+// Runs the real Surehand MCP panel (extension/index.html + js/panel.js) in jsdom against a fake bridge.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { JSDOM } from "jsdom";
 import { createRequire } from "node:module";
@@ -82,7 +82,7 @@ afterAll(() => {
   server?.close();
 });
 
-describe("AE MCP panel approvals", () => {
+describe("Surehand MCP panel approvals", () => {
   const doc = () => dom.window.document;
   const cards = () => doc().querySelectorAll("#approvalList .approval");
 
@@ -120,7 +120,7 @@ describe("AE MCP panel approvals", () => {
   });
 });
 
-describe("AE MCP panel update button", () => {
+describe("Surehand MCP panel update button", () => {
   const doc = () => dom.window.document;
   it("updates a standalone install in place and asks for a restart", async () => {
     await waitFor(() => !(doc().getElementById("update") as any).hidden);

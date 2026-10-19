@@ -1,5 +1,5 @@
-// Builds the shareable release: dist-zip/AE-MCP/ (+ AE-MCP-<version>.zip), organised as
-//   START HERE.txt, "1. Claude Desktop (easiest)/AE-MCP.mcpb", "2. Mac/", "3. Windows/", "Support files/".
+// Builds the shareable release: dist-zip/Surehand-MCP/ (+ Surehand-MCP-<version>.zip), organised as
+//   START HERE.txt, "1. Claude Desktop (easiest)/Surehand-MCP.mcpb", "2. Mac/", "3. Windows/", "Support files/".
 // Usage: npm run package
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
@@ -12,7 +12,7 @@ const SERVER = join(dirname(fileURLToPath(import.meta.url)), "..");
 const ROOT = join(SERVER, "..");
 const pkg = JSON.parse(readFileSync(join(SERVER, "package.json"), "utf8"));
 const OUT_BASE = join(ROOT, "dist-zip");
-const OUT = join(OUT_BASE, "AE-MCP");
+const OUT = join(OUT_BASE, "Surehand-MCP");
 const STAGE = join(OUT_BASE, ".mcpb-stage");
 const bundle = join(SERVER, "dist", "ae-mcp.mjs");
 const run = (cmd, args, cwd = SERVER) => execFileSync(cmd, args, { cwd, stdio: "inherit" });
@@ -39,18 +39,18 @@ copyFileSync(join(SERVER, "assets", "icon.png"), join(STAGE, "icon.png"));
 const manifest = {
   manifest_version: "0.3",
   name: "after-effects",
-  display_name: "After Effects MCP",
+  display_name: "Surehand MCP",
   version: pkg.version,
-  description: "Control Adobe After Effects: run ExtendScript, build comps, animate, apply effects and preview frames.",
+  description: "Surehand MCP for Adobe® After Effects®: run ExtendScript, build comps, animate, apply effects and preview frames.",
   long_description:
     "Lets Claude drive a running Adobe After Effects on this computer. Claude can run any ExtendScript (JSX) and read the results, " +
     "and use 58 tools for projects, compositions, layers, keyframes, expressions, effects, shapes, masks, the render queue and frame previews it can look at.\n\n" +
     "**First run:** the extension installs a small companion extension into After Effects automatically. Restart After Effects once afterwards. " +
     "Everything runs locally; nothing is sent anywhere except to Claude.",
   author: { name: "Ron Yitzhaki", url: "https://github.com/ronyitzhaki" },
-  repository: { type: "git", url: "https://github.com/ronyitzhaki/after-effects-mcp" },
-  homepage: "https://github.com/ronyitzhaki/after-effects-mcp",
-  support: "https://github.com/ronyitzhaki/after-effects-mcp/issues",
+  repository: { type: "git", url: "https://github.com/ConformLabs/surehand-mcp" },
+  homepage: "https://github.com/ConformLabs/surehand-mcp",
+  support: "https://github.com/ConformLabs/surehand-mcp/issues",
   icon: "icon.png",
   server: {
     type: "node",
@@ -63,7 +63,7 @@ const manifest = {
       title: "Enable all tools",
       description:
         "Off (recommended): a fast core set of ~20 tools; everything else is still possible through scripts. " +
-        "On: all ~60 tools (uses more of Claude's context). Can also be switched in After Effects: Window > Extensions > AE MCP.",
+        "On: all ~60 tools (uses more of Claude's context). Can also be switched in After Effects: Window > Extensions > Surehand MCP.",
       default: false,
       required: false,
     },
@@ -84,15 +84,15 @@ const DIRS = {
   support: join(OUT, "Support files"),
 };
 for (const d of Object.values(DIRS)) mkdirSync(d, { recursive: true });
-run(process.execPath, [mcpbCli, "pack", STAGE, join(DIRS.claude, "AE-MCP.mcpb")]);
+run(process.execPath, [mcpbCli, "pack", STAGE, join(DIRS.claude, "Surehand-MCP.mcpb")]);
 rmSync(STAGE, { recursive: true, force: true });
 
 // launchers: one per command and platform, all calling the scripts in "Support files"
 const LAUNCHERS = [
-  ["1. Install", "install", "Installs AE MCP and connects your AI apps."],
-  ["2. Test Installation", "selftest", "Checks that AE MCP is installed and can talk to After Effects."],
+  ["1. Install", "install", "Installs Surehand MCP and connects your AI apps."],
+  ["2. Test Installation", "selftest", "Checks that Surehand MCP is installed and can talk to After Effects."],
   ["3. Connect ChatGPT", "chatgpt", "Connects ChatGPT (local server + secure tunnel). Keep the window open while you use it."],
-  ["4. Uninstall", "uninstall", "Removes AE MCP."],
+  ["4. Uninstall", "uninstall", "Removes Surehand MCP."],
 ];
 for (const [name, cmd, desc] of LAUNCHERS) {
   const mac = join(DIRS.mac, `${name}.command`);
@@ -112,9 +112,9 @@ copyFileSync(join(ROOT, "README.md"), join(DIRS.support, "README (technical).md"
 copyFileSync(join(ROOT, "installer", "START HERE.txt"), join(OUT, "START HERE.txt"));
 
 // --- zip (keeps the executable bits on the macOS launchers) ---
-const zip = `AE-MCP-${pkg.version}.zip`;
-if (process.platform === "darwin") run("ditto", ["-c", "-k", "--norsrc", "--noextattr", "--noqtn", "--noacl", "--keepParent", "AE-MCP", zip], OUT_BASE); // no ._ AppleDouble files (they show up on Windows)
+const zip = `Surehand-MCP-${pkg.version}.zip`;
+if (process.platform === "darwin") run("ditto", ["-c", "-k", "--norsrc", "--noextattr", "--noqtn", "--noacl", "--keepParent", "Surehand-MCP", zip], OUT_BASE); // no ._ AppleDouble files (they show up on Windows)
 else if (process.platform === "win32")
-  run("powershell", ["-NoProfile", "-Command", `Compress-Archive -Path AE-MCP -DestinationPath ${zip} -Force`], OUT_BASE);
-else run("zip", ["-qr", zip, "AE-MCP"], OUT_BASE);
+  run("powershell", ["-NoProfile", "-Command", `Compress-Archive -Path Surehand-MCP -DestinationPath ${zip} -Force`], OUT_BASE);
+else run("zip", ["-qr", zip, "Surehand-MCP"], OUT_BASE);
 console.log(`\nRelease ready:\n  ${OUT}\n  ${join(OUT_BASE, zip)}`);

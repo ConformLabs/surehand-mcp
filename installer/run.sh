@@ -1,6 +1,6 @@
 #!/bin/bash
 # macOS launcher: finds Node.js 18+ (or downloads a private copy into ~/.aemcp/node, verified
-# against the nodejs.org checksums) and runs the AE MCP command given as arguments.
+# against the nodejs.org checksums) and runs the Surehand MCP command given as arguments.
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
@@ -30,7 +30,7 @@ if [ -z "$NODE" ]; then
     echo "Removed the After Effects extension and ~/.aemcp (Node.js not found, so AI app settings were left unchanged)."
     exit 0
   fi
-  echo "Node.js was not found. Downloading a private copy for AE MCP (one time, about 45 MB)..."
+  echo "Node.js was not found. Downloading a private copy for Surehand MCP (one time, about 45 MB)..."
   case "$(uname -m)" in arm64) ARCH=arm64 ;; *) ARCH=x64 ;; esac
   BASE="https://nodejs.org/dist/latest-v22.x"
   LINE="$(curl -fsSL "$BASE/SHASUMS256.txt" | grep " node-v[0-9.]*-darwin-$ARCH.tar.gz$")"

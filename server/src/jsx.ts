@@ -52,7 +52,7 @@ export interface Rollback {
   undone: boolean;
   /**
    * true: nothing changed (not undone), or undone and the project is back to how it was before the call.
-   * "sentinel": undone, and AE MCP's undo marker shows the Undo reverted the undo step it was in, with items
+   * "sentinel": undone, and Surehand MCP's undo marker shows the Undo reverted the undo step it was in, with items
    * and layer attributes back as before, but property values were not compared (read-only check's light
    * snapshot), so a call that split its own undo group could still have left edits behind. Truthy: not a problem.
    */
@@ -94,7 +94,7 @@ export function toJsLiteral(v: unknown): string {
  * The body sees `args` (the JSON args) and `log(...)`.
  */
 export function wrapBody(body: string, args: unknown, opts: RunOptions = {}): string {
-  const runOpts = { undoGroup: opts.undoGroup === undefined ? "AE MCP" : opts.undoGroup, depth: opts.depth, report: opts.report, checkOnly: opts.checkOnly || undefined, rollback: opts.rollback };
+  const runOpts = { undoGroup: opts.undoGroup === undefined ? "Surehand MCP" : opts.undoGroup, depth: opts.depth, report: opts.report, checkOnly: opts.checkOnly || undefined, rollback: opts.rollback };
   return (
     "(function(){\n" +
     `if (typeof aemcp === 'undefined' || aemcp.version !== ${toJsLiteral(HELPER_VERSION)}) return ${toJsLiteral(NEED_HELPERS)};\n` +
@@ -230,7 +230,7 @@ export function formatChanges(ch: Changes | undefined): string | null {
 export function rollbackProblem(rb: Rollback, what: string): string {
   if (rb.verified) return "";
   const check = "Check the project before going on (Edit > Undo and Edit > Redo still work step by step).";
-  const leftover = rb.leftover ? `\nA temporary folder "${rb.leftover}" (AE MCP's undo marker) couldn't be removed; it can be deleted.` : "";
+  const leftover = rb.leftover ? `\nA temporary folder "${rb.leftover}" (Surehand MCP's undo marker) couldn't be removed; it can be deleted.` : "";
   if (!rb.undone)
     return `It couldn't be checked whether ${what} changed the project${rb.problem && rb.problem !== "unknown" ? ` (${rb.problem})` : ""}, so nothing was undone. ${check}${leftover}`;
   const remaining = rb.remaining ? (formatChanges(rb.remaining) ?? "").replace(/^Changes[^\n]*:\n/, "") : "";

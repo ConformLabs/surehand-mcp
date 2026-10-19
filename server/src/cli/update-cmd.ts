@@ -1,5 +1,5 @@
 // `ae-mcp update`: installs the latest GitHub release over the standalone install
-// (~/.aemcp/server/ae-mcp.mjs) and updates the After Effects extension. The AE MCP panel's
+// (~/.aemcp/server/ae-mcp.mjs) and updates the After Effects extension. The Surehand MCP panel's
 // Update button runs this too (with --json).
 //
 // Each release carries the single-file server (ae-mcp.mjs). It is checked against the
@@ -63,7 +63,7 @@ export async function runUpdate(): Promise<UpdateResult> {
   }
   const latest = rel.tag_name.replace(/^v/, "");
   void checkForUpdate(true); // refresh the cached banner state
-  if (compareVersions(latest, VERSION) <= 0) return { ...base, ok: true, to: latest, message: `AE MCP is up to date (v${VERSION}).` };
+  if (compareVersions(latest, VERSION) <= 0) return { ...base, ok: true, to: latest, message: `Surehand MCP is up to date (v${VERSION}).` };
   if (!rel.assets.some((a) => a.name === SERVER_ASSET))
     return { ...base, ok: false, to: latest, url: rel.html_url, message: `v${latest} can't be installed automatically. Download it from ${rel.html_url}` };
 
@@ -102,9 +102,9 @@ export async function runUpdate(): Promise<UpdateResult> {
     url: rel.html_url,
     restartAfterEffects: extension,
     message:
-      `Updated AE MCP from v${VERSION} to v${latest}. ` +
+      `Updated Surehand MCP from v${VERSION} to v${latest}. ` +
       (extension ? "Restart After Effects and your AI apps to use it." : "Restart your AI apps to use it.") +
-      (running ? " (If you use the Claude Desktop extension (.mcpb), install the new AE-MCP.mcpb from the release page as well.)" : ""),
+      (running ? " (If you use the Claude Desktop extension (.mcpb), install the new Surehand-MCP.mcpb from the release page as well.)" : ""),
   };
 }
 
@@ -112,7 +112,7 @@ export async function updateCommand(args: string[]) {
   const r = await runUpdate();
   if (args.includes("--json")) console.log(JSON.stringify(r));
   else {
-    console.log(bold(`\nAE MCP update`));
+    console.log(bold(`\nSurehand MCP update`));
     (r.ok ? ok : fail)(r.message);
     if (!r.ok && r.url) warn(`Release page: ${r.url}`);
   }

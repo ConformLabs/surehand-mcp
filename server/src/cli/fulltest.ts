@@ -120,7 +120,7 @@ async function projectSafetyTests(tmpDir: string, before: ProjectState | undefin
 /** `before`: the project state before any self-test edits (the project-switching checks need it). */
 export async function fullSelftest(before?: ProjectState): Promise<number> {
   console.log(bold(`\nFull self-test: every major tool against this After Effects (temporary comps, removed afterwards)\n`));
-  const caps = await runJsx(CAPABILITIES_JSX, {}, { undoGroup: "AE MCP self-test", timeoutMs: 60_000 });
+  const caps = await runJsx(CAPABILITIES_JSX, {}, { undoGroup: "Surehand MCP self-test", timeoutMs: 60_000 });
   if (!caps.ok) {
     fail(`Could not read capabilities: ${caps.error?.message}`);
     return 1;
@@ -198,7 +198,7 @@ export async function fullSelftest(before?: ProjectState): Promise<number> {
     try {
       const body = s.jsx ?? ALL.find((t) => t.name === s.tool)?.jsx;
       if (!body) throw new Error(`unknown tool ${s.tool}`);
-      r = await runJsx(body, s.args ?? {}, { undoGroup: "AE MCP self-test", timeoutMs: 120_000, report: [C] });
+      r = await runJsx(body, s.args ?? {}, { undoGroup: "Surehand MCP self-test", timeoutMs: 120_000, report: [C] });
     } catch (e: any) {
       r = { ok: false, logs: [], error: { message: e.message } };
     }
@@ -219,7 +219,7 @@ for (var r = rq.numItems; r > args.rq; r--) rq.item(r).remove();
 for (var i = p.numItems; i >= 1; i--) { var it = p.item(i); if (it.id > args.maxId) it.remove(); }
 return p.numItems;`,
     { maxId, rq },
-    { undoGroup: "AE MCP self-test cleanup" },
+    { undoGroup: "Surehand MCP self-test cleanup" },
   );
   try {
     unlinkSync(frame);

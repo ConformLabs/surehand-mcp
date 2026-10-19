@@ -81,12 +81,12 @@ function startHttp() {
     }
   });
   http.listen(port, host, () => {
-    console.error(`AE MCP (HTTP) v${VERSION} listening on http://${host}:${port}/mcp`);
+    console.error(`Surehand MCP (HTTP) v${VERSION} listening on http://${host}:${port}/mcp`);
     if (!noAuth) console.error(`Auth: header "Authorization: Bearer <token>" or URL http://${host}:${port}/mcp/<token> (token in ~/.aemcp/config.json)`);
   });
 }
 
-const HELP = `ae-mcp v${VERSION} - MCP server for Adobe After Effects
+const HELP = `Surehand MCP v${VERSION} for Adobe After Effects (command: ae-mcp)
 
 Usage:
   ae-mcp                 run the MCP server over stdio (Claude Desktop, Claude Code, Cursor...)

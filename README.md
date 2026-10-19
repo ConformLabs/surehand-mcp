@@ -1,8 +1,10 @@
-# After Effects MCP
+# Surehand MCP for Adobe® After Effects®
 
-[![CI](https://github.com/ronyitzhaki/after-effects-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/ronyitzhaki/after-effects-mcp/actions/workflows/ci.yml)
+[![CI](https://github.com/ConformLabs/surehand-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/ConformLabs/surehand-mcp/actions/workflows/ci.yml)
 
-Connect **Claude** (Desktop / Code), **ChatGPT** (desktop app or web), Cursor, Codex, or any MCP client to **Adobe After Effects**.
+*Formerly AE MCP. Same tools, same install folder and AI-app settings; only the name changed.*
+
+Surehand MCP connects **Claude** (Desktop / Code), **ChatGPT** (desktop app or web), Cursor, Codex, or any MCP client to **Adobe® After Effects®**.
 The AI can run any script inside After Effects (modern JavaScript, converted for AE's ExtendScript engine automatically),
 read information back, and use up to 94 ready-made tools for projects, comps, layers, keyframes (Graph Editor level),
 text styling and animators, footage, effects, shapes, masks, 3D cameras/lights/materials, audio, color management,
@@ -11,13 +13,13 @@ undo step, checkpoints keep safety copies of the project, and your own scripts c
 images, exact layer bounds, pixel colors), and every edit returns an exact list of what changed in the project.
 
 ```
-Claude / ChatGPT ──MCP──> ae-mcp server (Node) ──localhost──> AE MCP bridge (extension inside After Effects) ──> ExtendScript
+Claude / ChatGPT ──MCP──> ae-mcp server (Node) ──localhost──> Surehand MCP bridge (extension inside After Effects) ──> ExtendScript
 ```
 
 ## Download
 
-**[⬇ Download the latest release](https://github.com/ronyitzhaki/after-effects-mcp/releases/latest)**: get
-`AE-MCP-<version>.zip` (everything, Mac + Windows), or just `AE-MCP.mcpb` if you only use Claude Desktop.
+**[⬇ Download the latest release](https://github.com/ConformLabs/surehand-mcp/releases/latest)**: get
+`Surehand-MCP-<version>.zip` (everything, Mac + Windows), or just `Surehand-MCP.mcpb` if you only use Claude Desktop.
 Unzip it and open `START HERE.txt`.
 
 ## Requirements
@@ -27,12 +29,12 @@ Unzip it and open `START HERE.txt`.
 
 ## Install
 
-Get the release folder (`npm run package` in `server/` builds `dist-zip/AE-MCP/` and a zip). It looks like this:
+Get the release folder (`npm run package` in `server/` builds `dist-zip/Surehand-MCP/` and a zip). It looks like this:
 
 ```
-AE-MCP/
+Surehand-MCP/
   START HERE.txt
-  1. Claude Desktop (easiest)/   AE-MCP.mcpb
+  1. Claude Desktop (easiest)/   Surehand-MCP.mcpb
   2. Mac/                        1. Install, 2. Test Installation, 3. Connect ChatGPT, 4. Uninstall (.command)
   3. Windows/                    1. Install, 2. Test Installation, 3. Connect ChatGPT, 4. Uninstall (.bat)
   Support files/                 run.sh, run.ps1, ae-mcp.mjs, this README
@@ -40,7 +42,7 @@ AE-MCP/
 
 Then:
 
-**Claude Desktop only (easiest):** double-click **`AE-MCP.mcpb`** and click Install in Claude Desktop. Restart After Effects once.
+**Claude Desktop only (easiest):** double-click **`Surehand-MCP.mcpb`** and click Install in Claude Desktop. Restart After Effects once.
 On first start the server installs its After Effects extension by itself.
 
 **Any app (Claude Desktop, Claude Code, ChatGPT desktop, Cursor, Codex):** double-click **1. Install** in the
@@ -67,7 +69,7 @@ The server also checks the After Effects extension every time it starts and inst
 updating is just: replace the `.mcpb` (or re-run the installer) and restart After Effects.
 
 The bridge starts automatically with After Effects; nothing needs to be opened.
-To see its status, open **Window > Extensions > AE MCP** (green dot = connected, plus a log of recent calls).
+To see its status, open **Window > Extensions > Surehand MCP** (green dot = connected, plus a log of recent calls).
 
 To uninstall: double-click **4. Uninstall** (and remove the `.mcpb` in Claude Desktop >
 Settings > Extensions if you used it).
@@ -82,19 +84,19 @@ You need a Windows 10/11 PC (or VM) with After Effects. Your Creative Cloud lice
 so a second machine works. On a Mac, a Windows VM in Parallels/VMware also works, but performance under
 x64 emulation on Apple Silicon may be slow, so a real PC is better.
 
-1. Copy `AE-MCP-<version>.zip` to the PC, right-click > **Extract All**.
+1. Copy `Surehand-MCP-<version>.zip` to the PC, right-click > **Extract All**.
 2. Make sure After Effects is **closed**, then open `3. Windows` and double-click **1. Install**.
    - If SmartScreen appears: **More info > Run anyway**.
    - Expect: Node.js downloads if missing, then check marks for the server, the extension ("Extension is signed") and apps found.
 3. Start After Effects and wait for it to finish loading.
 4. Double-click **2. Test Installation** (same folder). All lines should show check marks, ending with
    "All checks passed".
-5. In After Effects, open **Window > Extensions > AE MCP**: the dot should be green.
+5. In After Effects, open **Window > Extensions > Surehand MCP**: the dot should be green.
 6. Open Claude Desktop (restart it if it was open during the install) and ask:
    *"Check After Effects is connected, then make a 1080p comp with an animated title and show me frame 1."*
 7. Optional, more thorough: with Node installed, run `node server\scripts\smoke.mjs` from a full source checkout
    (`npm install` in `server\` first). This calls all major tools and needs After Effects open.
-8. Also try the `.mcpb`: run **4. Uninstall**, double-click `1. Claude Desktop (easiest)\\AE-MCP.mcpb`, install it in Claude Desktop,
+8. Also try the `.mcpb`: run **4. Uninstall**, double-click `1. Claude Desktop (easiest)\\Surehand-MCP.mcpb`, install it in Claude Desktop,
    ask Claude to check the connection (it should say to restart After Effects), restart AE, ask again.
 
 Things worth checking specifically on Windows: paths with spaces or non-English characters in the user name,
@@ -149,7 +151,7 @@ To rotate the token, delete `token` from `~/.aemcp/config.json` and re-run the i
 28 tools** is loaded (about 9k tokens instead of 26k for all 94), and **every other tool stays available on demand**:
 `ae_tools` lists all tools by category (or gives full parameter details of chosen ones), and `ae_call` runs any tool by
 name with the same validation, permissions, change report and activity log. Loading everything up front is optional:
-switch to **Full** in After Effects (**Window > Extensions > AE MCP > AI tools**), in Claude Desktop's
+switch to **Full** in After Effects (**Window > Extensions > Surehand MCP > AI tools**), in Claude Desktop's
 extension settings ("Enable all tools") for the `.mcpb`, or with `"toolProfile": "full"` in `~/.aemcp/config.json`, then
 restart the AI app. Advanced: `"toolProfile": "core,ae_import_files,ae_render_queue_start"` adds single tools.
 
@@ -239,20 +241,20 @@ second per edit; turn it off with `"changeReport": false` in `~/.aemcp/config.js
 
 ## Control and trust
 
-**Permissions** (After Effects: Window > Extensions > AE MCP, or `"permissions"` in `~/.aemcp/config.json`; applies to
+**Permissions** (After Effects: Window > Extensions > Surehand MCP, or `"permissions"` in `~/.aemcp/config.json`; applies to
 the next request, no restart):
 
 | Mode | What happens |
 |---|---|
 | Full access (default) | Everything runs. Your AI app may still ask you before each tool call. |
-| Ask before every change | Every edit and script waits in the AE MCP panel, showing the exact code or arguments, until you click **Allow** or **Deny**. The panel opens by itself. Reads are not held. |
+| Ask before every change | Every edit and script waits in the Surehand MCP panel, showing the exact code or arguments, until you click **Allow** or **Deny**. The panel opens by itself. Reads are not held. |
 | Read-only | Tools that edit are refused. Scripts still run (to read information), but if one changes the project it is undone immediately and the AI is told what it tried to change. Scripts that touch the undo history (`executeCommand`, `beginUndoGroup`, `endUndoGroup`, `purge`) or do things that can't be undone (opening, closing or saving projects, `newProject`, `quit`, rendering, `scheduleTask`, saving preferences) are refused before they run. This is a text check (comments are ignored, escapes are decoded; a name inside a string or on another object counts too): a call assembled at runtime gets past it, and is then undone at most once, checked with a temporary undo marker, and reported if the project isn't back. |
 
 **Shell commands** (`system.callSystem`) can be blocked separately. These are safeguards against mistakes, not a
 sandbox: a script can still read and write files.
 
 **Activity log.** Every tool call is recorded in `~/.aemcp/activity.jsonl` with time, AI app, tool, arguments
-(including the full script code), duration and result. The AE MCP panel shows the latest calls (click one for its code),
+(including the full script code), duration and result. The Surehand MCP panel shows the latest calls (click one for its code),
 **Open log** reveals the file, and `ae-mcp activity` prints it.
 
 **Several After Effects versions at once.** Each running After Effects registers its own bridge (ports 8765+). The AI
@@ -274,7 +276,7 @@ Please share reports from other versions.
 
 | Problem | Fix |
 |---|---|
-| "Cannot reach After Effects" | Make sure AE is running. Open **Window > Extensions > AE MCP** to see the bridge status. If **AE MCP** is missing from the menu, re-run the installer and fully restart AE. |
+| "Cannot reach After Effects" | Make sure AE is running. Open **Window > Extensions > Surehand MCP** to see the bridge status. If **Surehand MCP** is missing from the menu, re-run the installer and fully restart AE. |
 | Extension missing from the menu | Run `selftest`: it checks the extension's files against its signature (After Effects silently skips a signed extension whose files changed). Re-running the installer rewrites them. As a last resort, allowing unsigned extensions also works: set `PlayerDebugMode` to `1` with `defaults write com.adobe.CSXS.12 PlayerDebugMode 1` (macOS) or in the registry under `HKCU\Software\Adobe\CSXS.12` (Windows). |
 | "Port 8765 is already in use" | Only one After Effects instance can host the bridge. Close the other instance, or change `bridgePort` in `~/.aemcp/config.json` and restart AE + your AI app. |
 | "Token mismatch" | Re-run the installer (it keeps the existing token) and restart AE. |
@@ -284,14 +286,14 @@ Please share reports from other versions.
 | Claude Desktop doesn't show the tools | Quit Claude Desktop completely (menu bar / tray) and reopen it. Check `claude_desktop_config.json` contains `after-effects`. |
 
 **Reporting a problem:** run **2. Test Installation**. If anything fails, it prints a diagnostics report at the end
-(no secrets in it). You can also click **Copy diagnostics** in the AE MCP panel, or run `ae-mcp diagnostics`.
+(no secrets in it). You can also click **Copy diagnostics** in the Surehand MCP panel, or run `ae-mcp diagnostics`.
 The panel also shows recent calls, and a banner when a new version is out (checked against GitHub at most once a day;
 turn off with `"updateCheck": false` in `~/.aemcp/config.json`).
 
 **Updating:** click **Update** in that banner, or run `ae-mcp update` (`node ~/.aemcp/server/ae-mcp.mjs update`). It
 downloads the server from the latest GitHub release, checks its SHA-256 checksum and that it starts, replaces the installed
 one (the old one is kept as `ae-mcp.mjs.previous`) and updates the After Effects extension. Restart After Effects and your
-AI apps afterwards. If you use the Claude Desktop extension (.mcpb), install the new `AE-MCP.mcpb` from the release page
+AI apps afterwards. If you use the Claude Desktop extension (.mcpb), install the new `Surehand-MCP.mcpb` from the release page
 instead.
 
 ## Security
@@ -330,7 +332,7 @@ npm run check            # what CI runs: type-check, all tests, build (run befor
 npm test                 # unit tests only
 npm run build            # -> dist/ae-mcp.mjs
 node scripts/smoke.mjs   # live test: needs After Effects running with the bridge
-npm run package          # -> ../dist-zip/AE-MCP/ (launchers, server, AE-MCP.mcpb) + zip
+npm run package          # -> ../dist-zip/Surehand-MCP/ (launchers, server, Surehand-MCP.mcpb) + zip
 npm run sign             # re-sign the After Effects extension after changing extension/ or the version
                          # (needs the certificate in ~/.aemcp-signing; see scripts/sign-extension.mjs)
 npm run test:mac         # install this build here and run the full self-test on each open After Effects
@@ -345,6 +347,16 @@ or updates it when it starts. After changing the server or the panel: rebuild, r
 To add a tool, add an entry to one of the arrays in `server/src/tools/*.ts`: a zod input schema plus an ExtendScript
 function body that receives `args` and can use the `aemcp` helpers.
 
+**Names kept from AE MCP, on purpose.** The product is now called Surehand MCP, but these identifiers are unchanged so
+existing installs, AI-app configs and scripts keep working: the tool names (`ae_*`), the MCP server name `after-effects`
+(`SERVER_NAME`, the key in each AI app's config), the CLI command and server file `ae-mcp` / `ae-mcp.mjs` (also the
+release asset the updater downloads), the `~/.aemcp` folder and its files, the `AEMCP_*` environment variables, the
+After Effects extension id `com.aemcp` (and its bundle ids), the `aemcp` helper object and `aemcp://` resource URIs, and
+the `.mcpb` manifest `name` (its `display_name` is "Surehand MCP"). The npm package name is `surehand-mcp`.
+
 ## License
 
 MIT, see [LICENSE](LICENSE). Created and maintained by Ron Yitzhaki ([@ronyitzhaki](https://github.com/ronyitzhaki)).
+
+Adobe and After Effects are either registered trademarks or trademarks of Adobe in the United States and/or other
+countries. Surehand MCP is not affiliated with or endorsed by Adobe.

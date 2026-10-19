@@ -1,5 +1,5 @@
 # Windows launcher: finds Node.js 18+ (or downloads a private copy into %USERPROFILE%\.aemcp\node,
-# verified against the nodejs.org checksums) and runs the AE MCP command given as arguments.
+# verified against the nodejs.org checksums) and runs the Surehand MCP command given as arguments.
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"   # Invoke-WebRequest is very slow with the progress bar
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -33,7 +33,7 @@ if (-not $node) {
     Write-Host "Removed the After Effects extension and .aemcp (Node.js not found, so AI app settings were left unchanged)."
     exit 0
   }
-  Write-Host "Node.js was not found. Downloading a private copy for AE MCP (one time, about 30 MB)..."
+  Write-Host "Node.js was not found. Downloading a private copy for Surehand MCP (one time, about 30 MB)..."
   $arch = if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") { "arm64" } else { "x64" }
   $base = "https://nodejs.org/dist/latest-v22.x"
   try {

@@ -917,7 +917,7 @@ aemcp = (function () {
     try {
       if (opts.suppressDialogs !== false) { try { app.beginSuppressDialogs(); } catch (e) {} }
       try {
-        if (undo) app.beginUndoGroup(opts.undoGroup || "AE MCP");
+        if (undo) app.beginUndoGroup(opts.undoGroup || "Surehand MCP");
         rev0 = opts.report || opts.rollback ? A.revision() : null;
         // checkOnly (read-only mode): with project.revision, no property snapshot at all
         if (opts.report) { try { before = A.snapshot(opts.report, !!opts.checkOnly && rev0 !== null); } catch (e) { before = null; } }

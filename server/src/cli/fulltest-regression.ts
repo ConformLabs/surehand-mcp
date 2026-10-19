@@ -110,7 +110,7 @@ export async function regressionSteps(tmpDir: string, say: (ok: boolean, line: s
   // ---- T4b: a frame preview never overwrites an existing file ----
   await step(NAMES[3], async () => {
     const comp = `${P}_frame`;
-    const made = await runJsx(`app.project.items.addComp(args.name, 320, 180, 1, 1, 25); return true;`, { name: comp }, { undoGroup: "AE MCP self-test" });
+    const made = await runJsx(`app.project.items.addComp(args.name, 320, 180, 1, 1, 25); return true;`, { name: comp }, { undoGroup: "Surehand MCP self-test" });
     if (!made.ok) return `couldn't create the test comp: ${made.error?.message}`;
     const file = join(tmpDir, `${P}_frame.png`);
     const keep = "DO-NOT-OVERWRITE";

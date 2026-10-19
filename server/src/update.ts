@@ -6,7 +6,7 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { loadConfig, VERSION } from "./config.js";
 
-export const REPO = "ronyitzhaki/after-effects-mcp";
+export const REPO = "ConformLabs/surehand-mcp";
 export const RELEASES_URL = `https://github.com/${REPO}/releases/latest`;
 const CACHE = join(homedir(), ".aemcp", "update-check.json");
 const DAY = 24 * 3600 * 1000;
@@ -71,5 +71,5 @@ export async function checkForUpdate(force = false): Promise<UpdateInfo | null> 
 }
 
 export function updateMessage(u: UpdateInfo | null): string | null {
-  return u?.updateAvailable ? `A newer version of AE MCP is available: v${u.latest} (you have v${u.current}). Download: ${u.url}` : null;
+  return u?.updateAvailable ? `A newer version of Surehand MCP is available: v${u.latest} (you have v${u.current}). Download: ${u.url}` : null;
 }

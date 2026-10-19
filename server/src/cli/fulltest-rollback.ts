@@ -23,7 +23,7 @@ async function state(): Promise<{ opacity: number; revision: number | null }> {
 
 /** The user's last action: Opacity -> value, as an undo step of its own. */
 async function manualEdit(value: number) {
-  const r = await runJsx(`${OP} op.setValue(args.value); return 1;`, { value }, { undoGroup: "AE MCP self-test: manual edit" });
+  const r = await runJsx(`${OP} op.setValue(args.value); return 1;`, { value }, { undoGroup: "Surehand MCP self-test: manual edit" });
   if (!r.ok) throw new Error(`manual edit failed: ${r.error?.message}`);
 }
 
@@ -51,7 +51,7 @@ export async function rollbackSteps(say: (ok: boolean, line: string) => void): P
   const clean = async (problem: string | null) => problem ?? ((await sentinelsLeft()) ? `the rollback's temporary folder was left: ${await sentinelsLeft()}` : null);
 
   await step("rollback: set up", async () => {
-    const r = await runJsx(`var c = app.project.items.addComp("${P}", 640, 360, 1, 4, 25); c.layers.addSolid([0.2, 0.4, 0.6], "${P} solid", 64, 64, 1); return 1;`, {}, { undoGroup: "AE MCP self-test" });
+    const r = await runJsx(`var c = app.project.items.addComp("${P}", 640, 360, 1, 4, 25); c.layers.addSolid([0.2, 0.4, 0.6], "${P} solid", 64, 64, 1); return 1;`, {}, { undoGroup: "Surehand MCP self-test" });
     return r.ok ? null : `couldn't create the test comp: ${r.error?.message}`;
   });
 
@@ -68,7 +68,7 @@ export async function rollbackSteps(say: (ok: boolean, line: string) => void): P
 
   await step("rollback: atomic batch that edits, then fails at step 2: rolled back once, the manual edit survives", async () => {
     await manualEdit(41);
-    const r = await runBatch({ steps: [script(`${OP} op.setValue(5);`), script('throw new Error("fails after an edit")')], name: "AE MCP self-test batch" }, FULL);
+    const r = await runBatch({ steps: [script(`${OP} op.setValue(5);`), script('throw new Error("fails after an edit")')], name: "Surehand MCP self-test batch" }, FULL);
     const after = await state();
     if (!/was rolled back \(nothing changed\)/.test(text(r))) return `unexpected reply: ${text(r)}`;
     return clean(after.opacity === 41 ? null : `Opacity is ${after.opacity}, expected 41 (5 = not rolled back, 100/37 = undone twice)`);

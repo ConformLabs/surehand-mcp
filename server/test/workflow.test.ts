@@ -78,7 +78,7 @@ const opacity = () => {
 
 describe("guarded rollback in aemcp.run", () => {
   const run = (fn: () => unknown, opts: Record<string, unknown>): RunResult =>
-    JSON.parse(helpers.run(fn, {}, { undoGroup: "AE MCP test", report: ["*"], ...opts }));
+    JSON.parse(helpers.run(fn, {}, { undoGroup: "Surehand MCP test", report: ["*"], ...opts }));
 
   it("a call that changed nothing leaves the undo stack alone (the user's last edit survives)", () => {
     withManualEdit();
@@ -159,7 +159,7 @@ describe("guarded rollback in aemcp.run", () => {
     expect(formatChanges(r.rollback?.remaining)).not.toContain("__aemcp_rollback");
     expect(opacity()).toBe(30);
     expect(fake.folders()).toEqual([]); // the sentinel was removed by hand
-    expect(fake.undoStack().slice(0, 2)).toEqual(["user: opacity 50", "AE MCP test"]); // the user's step is still there
+    expect(fake.undoStack().slice(0, 2)).toEqual(["user: opacity 50", "Surehand MCP test"]); // the user's step is still there
   });
 
   it("the same with the light (read-only) snapshot, which can't compare values: still caught by the sentinel", () => {
@@ -353,7 +353,7 @@ describe("ae_run_script in read-only mode", () => {
     withManualEdit();
     const { refusal } = await readOnly(`${OP} op.setValue(80); return 1;`);
     expect(refusal).toMatch(/read-only/i);
-    expect(refusal).toContain("so its changes were undone (checked by AE MCP's undo marker; property values were not compared).");
+    expect(refusal).toContain("so its changes were undone (checked by Surehand MCP's undo marker; property values were not compared).");
     expect(fake.undos.n).toBe(1);
     expect(opacity()).toBe(50);
     expect(fake.undoStack()).toEqual(["user: opacity 50"]);
@@ -375,7 +375,7 @@ describe("ae_run_script in read-only mode", () => {
   it("a script that edits an attribute (listed): its change is named in the reply", async () => {
     withManualEdit();
     const { refusal } = await readOnly(`app.project.item(1).label = 5; return 1;`);
-    expect(refusal).toContain("This script changed the project, so its changes were undone (checked by AE MCP's undo marker; property values were not compared):");
+    expect(refusal).toContain("This script changed the project, so its changes were undone (checked by Surehand MCP's undo marker; property values were not compared):");
     expect(refusal).toContain('~ comp "Main": label 1 -> 5');
     expect(fake.comp.label).toBe(1);
   });
@@ -420,7 +420,7 @@ describe("ae_run_script in read-only mode: undo-stack calls are refused before a
       expect(isError).toBe(true);
       expect(text).toMatch(/^Nothing ran\./);
       expect(text).toContain(`this script mentions ${call.replace(/^app\.|\(.*/g, "")}`);
-      expect(text).toMatch(/undo history outside AE MCP's control/);
+      expect(text).toMatch(/undo history outside Surehand MCP's control/);
       expect(text).toMatch(/edit mode/);
       expect(opacity()).toBe(50);
       expect(fake.undos.n).toBe(0);
@@ -464,9 +464,9 @@ describe("ae_run_script in read-only mode: undo-stack calls are refused before a
       withManualEdit();
       const { isError, text } = await runScript("read-only", `${OP} op.setValue(80);\n${call}\nreturn 1;`);
       expect(isError).toBe(true);
-      expect(text).toMatch(/^Nothing ran\. AE MCP is in read-only mode, and this script mentions /);
+      expect(text).toMatch(/^Nothing ran\. Surehand MCP is in read-only mode, and this script mentions /);
       expect(text).toContain("which read-only mode can't undo");
-      expect(text).not.toContain("undo history outside AE MCP's control");
+      expect(text).not.toContain("undo history outside Surehand MCP's control");
       expect(text).toMatch(/edit mode/);
       expect(opacity()).toBe(50);
       expect(fake.undos.n).toBe(0);
@@ -535,7 +535,7 @@ describe("no blind Edit > Undo", () => {
 
 describe("guarded rollback: what it can and can't prove", () => {
   const run = (fn: () => unknown, opts: Record<string, unknown>): RunResult =>
-    JSON.parse(helpers.run(fn, {}, { undoGroup: "AE MCP test", report: ["*"], ...opts }));
+    JSON.parse(helpers.run(fn, {}, { undoGroup: "Surehand MCP test", report: ["*"], ...opts }));
   const readOnly = async (code: string) => {
     const r = await runJsx(evalBody(transpileUserCode(code).source), {}, READ_ONLY_RUN_OPTIONS);
     return { r, refusal: readOnlyRefusal(r) };
@@ -570,7 +570,7 @@ describe("guarded rollback: what it can and can't prove", () => {
     withManualEdit();
     const { r, refusal } = await readOnly(`${OP} op.setValue(80); app["end" + "UndoGroup"](); app["begin" + "UndoGroup"]("x"); return 1;`);
     expect(r.rollback?.verified).toBe("sentinel");
-    expect(refusal).toContain("so its changes were undone (checked by AE MCP's undo marker; property values were not compared)");
+    expect(refusal).toContain("so its changes were undone (checked by Surehand MCP's undo marker; property values were not compared)");
     expect(refusal).not.toMatch(/values were compared|verified/);
     expect(fake.undos.n).toBe(1);
   });
@@ -693,7 +693,7 @@ describe("read-only refusal: bypass forms", () => {
     it(`refuses ${code}`, () => {
       expect(readOnlyBlockedCalls(code)).toEqual(names);
       const msg = readOnlyScriptRefusal(code, transpileUserCode(code).source)!;
-      expect(msg).toMatch(/^Nothing ran\. AE MCP is in read-only mode, and this script mentions /);
+      expect(msg).toMatch(/^Nothing ran\. Surehand MCP is in read-only mode, and this script mentions /);
     });
 
   it("the transpiled code is checked too (optional chaining and template keys)", () => {

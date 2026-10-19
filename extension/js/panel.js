@@ -212,7 +212,7 @@
     return ok;
   }
   $("diag").onclick = function () {
-    var lines = ["### AE MCP diagnostics", "time: " + new Date().toISOString()];
+    var lines = ["### Surehand MCP diagnostics", "time: " + new Date().toISOString()];
     var host = AEMCPBridge.hostInfo();
     lines.push("host: " + host.appName + " " + host.appVersion + " · bridge v" + AEMCPBridge.VERSION + " · port " + myPort);
     lines.push("os: " + process.platform + " " + os.release() + " " + os.arch() + " · CEP node " + process.versions.node);

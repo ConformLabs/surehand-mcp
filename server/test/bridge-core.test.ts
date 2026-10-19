@@ -342,7 +342,7 @@ describe("blocked After Effects is reported fast", () => {
       const r = await status();
       expect(Date.now() - t0).toBeLessThan(5000);
       expect(r.isError).toBe(true);
-      expect(r.text).toMatch(/The AE MCP bridge answers \(After Effects 2026/);
+      expect(r.text).toMatch(/The Surehand MCP bridge answers \(After Effects 2026/);
       expect(r.text).toMatch(/busy or showing a dialog \(it has not accepted a script for \d+s; waiting to run ae_status/);
       // the bridge started moments ago: it may still be starting up
       expect(r.text).toMatch(/may still be starting up/);

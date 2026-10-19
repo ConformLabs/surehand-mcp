@@ -63,7 +63,7 @@ export async function revisionSteps(features: Record<string, unknown>, say: (ok:
 }
 return app.project.numItems;`,
       { comps: COMPS, layers: LAYERS },
-      { undoGroup: "AE MCP self-test", timeoutMs: 300_000 },
+      { undoGroup: "Surehand MCP self-test", timeoutMs: 300_000 },
     );
     return check(r);
   });
@@ -111,7 +111,7 @@ return app.project.numItems;`,
       const comp = `${U}_${++k}`;
       const findLayer = `var c = null; for (var i = 1; i <= app.project.numItems; i++) if (app.project.item(i).name === "${comp}") c = app.project.item(i); var L = c && c.layer(1);`;
       const edit = async (code: string, label: string) => {
-        const r = await runJsx(code, {}, { undoGroup: `AE MCP self-test: ${label}` });
+        const r = await runJsx(code, {}, { undoGroup: `Surehand MCP self-test: ${label}` });
         if (!r.ok) throw new Error(`${label} failed: ${r.error?.message}`);
       };
       const state = async () => {

@@ -84,9 +84,9 @@ if (!flag("--skip-windows")) {
 step("package");
 run("npm", ["run", "package"]);
 const dist = join(ROOT, "dist-zip");
-const zip = join(dist, `AE-MCP-${version}.zip`);
-const mcpb = join(dist, "AE-MCP.mcpb");
-copyFileSync(join(dist, "AE-MCP", "1. Claude Desktop (easiest)", "AE-MCP.mcpb"), mcpb);
+const zip = join(dist, `Surehand-MCP-${version}.zip`);
+const mcpb = join(dist, "Surehand-MCP.mcpb");
+copyFileSync(join(dist, "Surehand-MCP", "1. Claude Desktop (easiest)", "Surehand-MCP.mcpb"), mcpb);
 // the single-file server, for `ae-mcp update` and the panel's Update button
 const serverFile = join(dist, "ae-mcp.mjs");
 copyFileSync(join(SERVER, "dist", "ae-mcp.mjs"), serverFile);

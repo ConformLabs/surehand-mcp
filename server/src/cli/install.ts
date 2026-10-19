@@ -10,7 +10,7 @@ import {
   sleep, stableNodePath, step, warn, writeJsonWithBackup, CSXS_VERSIONS,
 } from "./util.js";
 
-/** True if the Claude Desktop extension (.mcpb) version of AE MCP is installed. */
+/** True if the Claude Desktop extension (.mcpb) version of Surehand MCP is installed. */
 function mcpbInstalled(): boolean {
   try {
     return readdirSync(join(claudeDesktopDir(), "Claude Extensions")).some((n) => /after-effects/i.test(n) && !n.endsWith(".json"));
@@ -49,7 +49,7 @@ export async function install(argv: string[]) {
   const flags = new Set(argv);
   const want = (name: string) => !flags.has("--skip-clients") && !flags.has(`--no-${name}`);
 
-  console.log(bold(`\nAfter Effects MCP installer v${VERSION}`));
+  console.log(bold(`\nSurehand MCP installer v${VERSION}`));
   console.log(dim(`${process.platform} · node ${process.version}`));
   if (!isMac && !isWin) warn("After Effects only runs on macOS and Windows; continuing anyway.");
 
@@ -102,7 +102,7 @@ export async function install(argv: string[]) {
   let restartClaude = false;
   if (want("claude-desktop")) {
     if (mcpbInstalled()) {
-      ok("Claude Desktop: already connected through the AE MCP extension (.mcpb)");
+      ok("Claude Desktop: already connected through the Surehand MCP extension (.mcpb)");
       registered.push("Claude Desktop");
     } else if (existsSync(claudeDesktopDir())) {
       const cfg = readJson<any>(claudeDesktopConfig(), {});

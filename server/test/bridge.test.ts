@@ -100,7 +100,7 @@ describe("After Effects blocked or starting", () => {
   it("says when the bridge just started (AE may still be starting)", async () => {
     const { explainBlocked } = await import("../src/bridge.js");
     expect(explainBlocked({ waitingForMs: 4000, startedAt: new Date(Date.now() - 10_000).toISOString() })).toMatch(
-      /\(it has not accepted a script for 4s\)\. The AE MCP bridge started 10s ago, so After Effects may still be starting up\./,
+      /\(it has not accepted a script for 4s\)\. The Surehand MCP bridge started 10s ago, so After Effects may still be starting up\./,
     );
   });
 
@@ -119,7 +119,7 @@ describe("After Effects blocked or starting", () => {
     const e: any = await waitForBridge({ port: 1, waitMs: 1200, intervalMs: 200, isAERunning: () => true }).catch((x) => x);
     expect(Date.now() - t0).toBeGreaterThanOrEqual(900);
     expect(e.code).toBe("STARTING");
-    expect(e.message).toMatch(/^After Effects is running, but its AE MCP bridge did not start within 1s\. AE may still be starting, or be showing a startup dialog/);
+    expect(e.message).toMatch(/^After Effects is running, but its Surehand MCP bridge did not start within 1s\. AE may still be starting, or be showing a startup dialog/);
     expect(e.message).not.toMatch(/frozen or quitting/);
   });
 

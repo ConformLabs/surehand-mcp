@@ -11,8 +11,8 @@ export class BridgeError extends Error {
 }
 
 const NOT_RUNNING_HELP =
-  "Cannot reach After Effects. Make sure After Effects is running and the AE MCP bridge is loaded " +
-  "(it starts automatically with AE after install; you can also open Window > Extensions > AE MCP to check its status). " +
+  "Cannot reach After Effects. Make sure After Effects is running and the Surehand MCP bridge is loaded " +
+  "(it starts automatically with AE after install; you can also open Window > Extensions > Surehand MCP to check its status). " +
   "If you just installed, restart After Effects.";
 
 export interface Health {
@@ -210,7 +210,7 @@ export function explainBlocked(b: { waitingForMs?: number; waitingFor?: string |
   if (b.waitingFor) facts.push(`waiting to run ${b.waitingFor}`);
   if (b.queue) facts.push(`${b.queue} more call${b.queue === 1 ? "" : "s"} queued`);
   const up = b.startedAt ? Date.now() - Date.parse(b.startedAt) : NaN;
-  const starting = up >= 0 && up < 120_000 ? ` The AE MCP bridge started ${secs(up)}s ago, so After Effects may still be starting up.` : "";
+  const starting = up >= 0 && up < 120_000 ? ` The Surehand MCP bridge started ${secs(up)}s ago, so After Effects may still be starting up.` : "";
   return (
     `After Effects is busy or showing a dialog (${facts.join("; ")}).${starting} ` +
     "Check After Effects: close any open dialog or settings window (Project Settings, Preferences, an error or alert, a startup prompt) and retry. " +
@@ -227,7 +227,7 @@ async function explainTimeout(port: number, timeoutMs: number): Promise<string> 
       `After Effects did not respond within ${secs}s, and its bridge is not answering either. ` +
       "AE may still be starting (or showing a startup dialog), or it is frozen or quitting. Call ae_status to check: it waits for AE to finish starting."
     );
-  if (h.pendingApprovals) return `Still waiting for approval in After Effects (AE MCP panel) after ${secs}s.`;
+  if (h.pendingApprovals) return `Still waiting for approval in After Effects (Surehand MCP panel) after ${secs}s.`;
   if (h.busy) {
     const busy = Math.round((h.busyForMs || 0) / 1000);
     return (
@@ -245,7 +245,7 @@ export async function health(port?: number): Promise<Health> {
 }
 
 export interface EvalOptions {
-  /** shown in the AE MCP panel / bridge log */
+  /** shown in the Surehand MCP panel / bridge log */
   label?: string;
   /** in "ask" permission mode the bridge holds the call until the user approves it */
   approval?: { tool: string; summary: string };
@@ -321,11 +321,11 @@ export async function waitForBridge(opts: WaitOptions = {}): Promise<{ port: num
       const waited = secs((opts.waitMs ?? startupWaitMs()));
       throw new BridgeError(
         (err.code === "NOT_RUNNING"
-          ? `After Effects is running, but its AE MCP bridge did not start within ${waited}s. `
-          : `After Effects is running, but its AE MCP bridge did not answer within ${waited}s. `) +
+          ? `After Effects is running, but its Surehand MCP bridge did not start within ${waited}s. `
+          : `After Effects is running, but its Surehand MCP bridge did not answer within ${waited}s. `) +
           "AE may still be starting, or be showing a startup dialog (crash recovery, missing fonts or plugins, an update or sign-in prompt): " +
           "check After Effects, close any dialog, then call ae_status again. If AE has finished starting and this persists, " +
-          "open Window > Extensions > AE MCP to check the bridge, or restart After Effects." +
+          "open Window > Extensions > Surehand MCP to check the bridge, or restart After Effects." +
           setupHint(),
         "STARTING",
       );
