@@ -1,6 +1,6 @@
 // Activity log: every tool call with its arguments (including script code), duration and result,
 // one JSON object per line in ~/.aemcp/activity.jsonl (rotated at 5 MB, keeps one older file).
-// Shown in the AE MCP panel; `ae-mcp activity` prints it.
+// Shown in the Surehand MCP panel; `ae-mcp activity` prints it.
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";

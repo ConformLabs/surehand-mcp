@@ -37,7 +37,7 @@ if (remote("echo ok", { quiet: true }).out.trim() !== "ok") {
 const scp = spawnSync("scp", [...SSH, "-q", bundle, `${host}:ae-mcp-test.mjs`], { stdio: "inherit" });
 if (scp.status !== 0) process.exit(1);
 
-// AE MCP's own Node if the installer downloaded one, else the one on PATH
+// Surehand MCP's own Node if the installer downloaded one, else the one on PATH
 const nodeExe =
   remote(
     `powershell -NoProfile -Command "$p = Join-Path $env:USERPROFILE '.aemcp\\node\\node.exe'; if (Test-Path $p) { $p } else { (Get-Command node -ErrorAction SilentlyContinue).Source }"`,

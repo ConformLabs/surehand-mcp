@@ -88,7 +88,7 @@ await call("ae_status");
 await call("ae_get_layer_info", { layer: "does not exist" }, true);
 await call("ae_get_scripting_guide");
 // clean up everything we created
-const cleanup = await client.callTool({ name: "ae_run_script", arguments: { undoGroup: "AE MCP smoke cleanup", report: false, code: `
+const cleanup = await client.callTool({ name: "ae_run_script", arguments: { undoGroup: "Surehand MCP smoke cleanup", report: false, code: `
 var p = app.project, gone = [];
 for (var i = p.numItems; i >= 1; i--) {
   var it = p.item(i);

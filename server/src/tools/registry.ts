@@ -116,7 +116,7 @@ export function registerJsxTools(server: McpServer, tools: JsxTool[]) {
           const wantsReport = t.report ?? (!t.readOnly && !t.noUndo);
           return formatResult(
             await runJsx(t.jsx, args, {
-              undoGroup: t.tempItems ? "AE MCP " + t.title : t.readOnly || t.noUndo ? false : t.title,
+              undoGroup: t.tempItems ? "Surehand MCP " + t.title : t.readOnly || t.noUndo ? false : t.title,
               timeoutMs,
               report: wantsReport ? reportScope(args) : undefined,
               bridge: edits && perm.mode === "ask" ? { approval: { tool: t.title, summary: approvalSummary(t.name, args) } } : undefined,

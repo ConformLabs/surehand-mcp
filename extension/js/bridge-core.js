@@ -1,4 +1,4 @@
-/* AE MCP bridge: a tiny HTTP server inside After Effects (CEP + Node) that evaluates
+/* Surehand MCP bridge: a tiny HTTP server inside After Effects (CEP + Node) that evaluates
  * ExtendScript sent by the ae-mcp server. Binds to 127.0.0.1 only and requires the
  * shared token from ~/.aemcp/config.json.
  *
@@ -221,7 +221,7 @@
     res.on("close", function () { if (!finished) { finished = true; job.cancelled = true; clearTimeout(timer); clearInterval(watch); dropPending(job); } });
 
     if (body.approval && permissionMode() === "ask") {
-      // hold the edit until the user allows or denies it in the AE MCP panel
+      // hold the edit until the user allows or denies it in the Surehand MCP panel
       var p = {
         id: crypto.randomBytes(6).toString("hex"), at: new Date().toISOString(), tool: body.approval.tool || "edit",
         summary: String(body.approval.summary || "").slice(0, 4000), job: job,
@@ -230,15 +230,15 @@
         state.pending = state.pending.filter(function (x) { return x !== p; });
         if (finished) return;
         if (!allow) {
-          addLog({ at: new Date().toISOString(), ms: 0, ok: false, label: p.tool, preview: "denied in the AE MCP panel" });
-          return finish(200, { ok: false, denied: true, error: "The user denied this change in After Effects (AE MCP panel)." });
+          addLog({ at: new Date().toISOString(), ms: 0, ok: false, label: p.tool, preview: "denied in the Surehand MCP panel" });
+          return finish(200, { ok: false, denied: true, error: "The user denied this change in After Effects (Surehand MCP panel)." });
         }
         enqueue();
       };
       state.pending.push(p);
       openPanel();
       // waiting for a person: allow up to 10 minutes before giving up
-      setTimeout(function () { if (!finished && state.pending.indexOf(p) >= 0) { state.pending = state.pending.filter(function (x) { return x !== p; }); finish(200, { ok: false, denied: true, error: "No one approved this change in the AE MCP panel within 10 minutes." }); } }, 10 * 60 * 1000);
+      setTimeout(function () { if (!finished && state.pending.indexOf(p) >= 0) { state.pending = state.pending.filter(function (x) { return x !== p; }); finish(200, { ok: false, denied: true, error: "No one approved this change in the Surehand MCP panel within 10 minutes." }); } }, 10 * 60 * 1000);
       return;
     }
     enqueue();

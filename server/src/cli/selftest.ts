@@ -16,7 +16,7 @@ import { spawnSync } from "node:child_process";
 export async function selftest(full = false): Promise<number> {
   let failures = 0;
   const bad = (m: string) => { failures++; fail(m); };
-  console.log(bold(`\nAfter Effects MCP self-test v${VERSION}`));
+  console.log(bold(`\nSurehand MCP self-test v${VERSION}`));
   console.log(`  ${process.platform} · node ${process.version}\n`);
 
   if (updateCheckEnabled()) {
@@ -33,7 +33,7 @@ export async function selftest(full = false): Promise<number> {
   const hash = installedExtensionHash();
   if (!existsSync(join(extensionDir(), "CSXS", "manifest.xml"))) bad(`After Effects extension missing at ${extensionDir()}. Run the installer.`);
   else if (hash !== __AEMCP_CEP_HASH__ && compareVersions(installedExtensionVersion() ?? "0", VERSION) > 0)
-    warn(`A newer After Effects extension (v${installedExtensionVersion()}) is installed than this server (v${VERSION}): another copy of AE MCP is newer. Update this one (ae-mcp update, or the latest .mcpb).`);
+    warn(`A newer After Effects extension (v${installedExtensionVersion()}) is installed than this server (v${VERSION}): another copy of Surehand MCP is newer. Update this one (ae-mcp update, or the latest .mcpb).`);
   else if (hash !== __AEMCP_CEP_HASH__) warn(`Extension at ${extensionDir()} is a different version (${hash ?? "unknown"} vs ${__AEMCP_CEP_HASH__}). Re-run the installer.`);
   else ok("After Effects extension installed");
 
@@ -90,7 +90,7 @@ export async function selftest(full = false): Promise<number> {
   const before = full ? await projectState() : undefined;
   const job = await runJsx(
     `var c = app.project.items.addComp("__aemcp_selftest", 640, 360, 1, 2, 30);
-var t = c.layers.addText("AE MCP OK");
+var t = c.layers.addText("Surehand MCP OK");
 var p = t.property("ADBE Transform Group").property("ADBE Position");
 p.setValuesAtTimes([0, 1], [[100, 180], [540, 180]]);
 var fx = t.property("ADBE Effect Parade").addProperty("ADBE Drop Shadow");
@@ -103,7 +103,7 @@ var r = { keys: p.numKeys, effect: fx.matchName, exprError: t.property("ADBE Tra
 c.remove();
 return r;`,
     { png },
-    { undoGroup: "AE MCP self-test", timeoutMs: 60000 },
+    { undoGroup: "Surehand MCP self-test", timeoutMs: 60000 },
   );
   if (!job.ok) bad(`Test job failed: ${job.error?.message}`);
   else {
@@ -127,7 +127,7 @@ return r;`,
 
 async function summary(failures: number): Promise<number> {
   if (!failures) {
-    console.log(`\n${green(bold("All checks passed. After Effects MCP is ready."))}\n`);
+    console.log(`\n${green(bold("All checks passed. Surehand MCP is ready."))}\n`);
     return 0;
   }
   console.log(`\n${red(bold(`${failures} problem(s) found.`))} See README > Troubleshooting.`);

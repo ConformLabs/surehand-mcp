@@ -1,7 +1,7 @@
-// Permission modes, set in the AE MCP panel or ~/.aemcp/config.json:
+// Permission modes, set in the Surehand MCP panel or ~/.aemcp/config.json:
 //   "permissions": { "mode": "full" | "ask" | "read-only", "allowShell": true }
 // - full: everything runs (your AI app may still ask you per tool call)
-// - ask: every edit and script waits for Allow/Deny in After Effects (Window > Extensions > AE MCP)
+// - ask: every edit and script waits for Allow/Deny in After Effects (Window > Extensions > Surehand MCP)
 // - read-only: tools that edit are refused; scripts run, but if one changes the project it is undone
 //   (scripts that call executeCommand, begin/endUndoGroup or purge are refused before they run)
 // allowShell: false refuses scripts that call system.callSystem (shell commands).
@@ -22,12 +22,12 @@ export function usesShell(code: string): boolean {
 }
 
 export const READ_ONLY_REFUSAL =
-  "After Effects MCP is in read-only mode, so tools that change the project are disabled. " +
-  "The user can change this in After Effects: Window > Extensions > AE MCP > Permissions.";
+  "Surehand MCP is in read-only mode, so tools that change the project are disabled. " +
+  "The user can change this in After Effects: Window > Extensions > Surehand MCP > Permissions.";
 
 export const SHELL_REFUSAL =
-  "Shell commands (system.callSystem) are disabled in the AE MCP permissions. The user can allow them in " +
-  "Window > Extensions > AE MCP > Permissions (or \"allowShell\": true in ~/.aemcp/config.json).";
+  "Shell commands (system.callSystem) are disabled in the Surehand MCP permissions. The user can allow them in " +
+  "Window > Extensions > Surehand MCP > Permissions (or \"allowShell\": true in ~/.aemcp/config.json).";
 
 /** Short description of a tool call for the approval prompt in After Effects. */
 export function approvalSummary(tool: string, args: Record<string, unknown> | undefined): string {

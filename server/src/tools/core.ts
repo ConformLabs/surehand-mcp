@@ -158,7 +158,7 @@ async function renderPng(body: string, args: Record<string, unknown>): Promise<{
   mkdirSync(tmpDir, { recursive: true });
   // One undo group, so the temporary comps are created and removed in a single, invisible step
   // (otherwise Edit > Undo in AE could bring a temporary comp back).
-  const r = await runJsx(body, { ...args, tmpDir }, { undoGroup: "AE MCP preview", timeoutMs: 180_000 });
+  const r = await runJsx(body, { ...args, tmpDir }, { undoGroup: "Surehand MCP preview", timeoutMs: 180_000 });
   if (!r.ok) return { error: formatResult(r) };
   const info = r.result as any;
   // saveFrameToPng may finish writing asynchronously; wait for a stable non-empty file
@@ -182,7 +182,7 @@ async function renderPng(body: string, args: Record<string, unknown>): Promise<{
 }
 
 // What read-only mode refuses before a script runs (the one list): calls that change the undo history
-// outside AE MCP's control (its own undo groups, Edit > Undo/Redo via executeCommand, purging the undo
+// outside Surehand MCP's control (its own undo groups, Edit > Undo/Redo via executeCommand, purging the undo
 // history), and calls whose effect can't be undone or happens after the rollback (opening, closing or
 // saving projects, quitting, rendering, saving preferences, code scheduled to run later). A text check on
 // the code with its comments removed and \u, \x and octal escapes decoded, and again on the transpiled
@@ -190,7 +190,7 @@ async function renderPng(body: string, args: Record<string, unknown>): Promise<{
 // and [`name`]; the generic ones (save, quit, render) on any object, so obj.save() is refused too (the
 // reply says the script "mentions" it). A call built at runtime (app["execute" + "Command"]) gets past it:
 // the guarded rollback is the backstop.
-const UNDO_HISTORY = "changes the undo history outside AE MCP's control, so read-only mode couldn't reliably put the project back afterwards";
+const UNDO_HISTORY = "changes the undo history outside Surehand MCP's control, so read-only mode couldn't reliably put the project back afterwards";
 const word = (name: string) => new RegExp(`\\b${name}\\b`);
 /** obj.name, obj?.name, obj["name"], obj?.['name'], obj[`name`] (`call`: the dot forms only when called) */
 function member(obj: string | null, name: string, call: boolean): RegExp {
@@ -251,11 +251,11 @@ export function readOnlyScriptRefusal(code: string, transpiled?: string): string
   for (const b of READ_ONLY_BLOCKED) if (names.includes(b.name)) why.set(b.why, [...(why.get(b.why) ?? []), b.name]);
   const reasons = [...why].map(([w, ns]) => `${ns.join(", ")}: ${w}.`);
   return (
-    `Nothing ran. AE MCP is in read-only mode, and this script mentions ${names.join(", ")}.\n${reasons.join("\n")}\n` +
+    `Nothing ran. Surehand MCP is in read-only mode, and this script mentions ${names.join(", ")}.\n${reasons.join("\n")}\n` +
     "Scripts that mention these names are refused (the check reads the code, so a name in a string counts too, and so does " +
     "the same method name on another object, such as obj.save()). " +
     "To run it on purpose, the user can switch to edit mode (Full access, or Ask before every change) in " +
-    "After Effects: Window > Extensions > AE MCP > Permissions."
+    "After Effects: Window > Extensions > Surehand MCP > Permissions."
   );
 }
 
@@ -264,7 +264,7 @@ export function readOnlyScriptRefusal(code: string, transpiled?: string): string
  * compared over every comp, and undone in the same call if it changed anything (aemcp.jsxinc). Where AE
  * has app.project.revision only items and layer attributes are compared (checkOnly), not property values.
  */
-export const READ_ONLY_RUN_OPTIONS: RunOptions = { undoGroup: "AE MCP Script (read-only check)", report: ["*"], checkOnly: true, rollback: "changes" };
+export const READ_ONLY_RUN_OPTIONS: RunOptions = { undoGroup: "Surehand MCP Script (read-only check)", report: ["*"], checkOnly: true, rollback: "changes" };
 
 /** The refusal for a read-only script that changed the project (or may have), else null. */
 export function readOnlyRefusal(r: RunResult): string | null {
@@ -272,7 +272,7 @@ export function readOnlyRefusal(r: RunResult): string | null {
   if (!rb || (!rb.undone && rb.verified)) return null;
   if (!rb.verified) return `${READ_ONLY_REFUSAL}\n${rollbackProblem(rb, "the script")}`;
   // light snapshot: the undo marker shows the Undo reverted the script's undo step; values weren't compared
-  const how = rb.verified === "sentinel" ? " (checked by AE MCP's undo marker; property values were not compared)" : "";
+  const how = rb.verified === "sentinel" ? " (checked by Surehand MCP's undo marker; property values were not compared)" : "";
   const ch = r.changes;
   if (ch && !ch.unlisted && (ch.items.length || ch.layers.length || ch.props.length))
     return `${READ_ONLY_REFUSAL}\nThis script changed the project, so its changes were undone${how}:\n${formatChanges(ch)}`;
@@ -318,7 +318,7 @@ export function registerCoreTools(server: McpServer) {
       inputSchema: {
         code: z.string().describe("JavaScript source; a function body, use `return` to return data."),
         args: z.record(z.string(), z.any()).optional().describe("JSON object exposed to the script as `args`."),
-        undoGroup: z.string().optional().describe('Undo step name (default "AE MCP Script"). Pass "" to skip the undo group.'),
+        undoGroup: z.string().optional().describe('Undo step name (default "Surehand MCP Script"). Pass "" to skip the undo group.'),
         depth: z.number().int().min(0).max(8).optional().describe("How deep to serialize the returned value (default 4)."),
         timeoutSeconds: z.number().min(1).max(3600).optional().describe("Max seconds to wait for the result (default 120)."),
         transpile: z.boolean().optional().describe("Convert modern JS for ExtendScript (default true). Set false to send the code exactly as written."),
@@ -339,7 +339,7 @@ export function registerCoreTools(server: McpServer) {
         const r = await runJsx(evalBody(t.source), args ?? {}, {
           ...(readOnly
             ? READ_ONLY_RUN_OPTIONS
-            : { undoGroup: undoGroup === "" ? false : undoGroup || "AE MCP Script", report: report === false ? undefined : reportScope(args) }),
+            : { undoGroup: undoGroup === "" ? false : undoGroup || "Surehand MCP Script", report: report === false ? undefined : reportScope(args) }),
           depth,
           timeoutMs: (timeoutSeconds ?? 120) * 1000,
           bridge: perm.mode === "ask" ? { approval: { tool: "Run script", summary: approvalSummary("ae_run_script", { code }) } } : undefined,
@@ -400,7 +400,7 @@ export function registerCoreTools(server: McpServer) {
           "$.global.AEMCP_ARGS = args.args || {};\nreturn $.evalFile(f);";
         return formatResult(
           await runJsx(body, { path, args: args ?? {} }, {
-            undoGroup: "AE MCP Script File",
+            undoGroup: "Surehand MCP Script File",
             timeoutMs: (timeoutSeconds ?? 300) * 1000,
             report: reportScope(args),
             bridge: perm.mode === "ask" ? { approval: { tool: "Run script file", summary: `${path}\n\n${source.slice(0, 1500)}` } } : undefined,
@@ -460,7 +460,7 @@ export function registerCoreTools(server: McpServer) {
               if (!h.waitingForAE) continue;
             }
             return errorResult(
-              `The AE MCP bridge answers (${aeLabel(h.host?.appVersion)}, bridge v${h.version} on port ${port}), but After Effects is not taking scripts. ${e.message}`,
+              `The Surehand MCP bridge answers (${aeLabel(h.host?.appVersion)}, bridge v${h.version} on port ${port}), but After Effects is not taking scripts. ${e.message}`,
             );
           }
         }

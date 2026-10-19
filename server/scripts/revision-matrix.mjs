@@ -59,7 +59,7 @@ const C = 'var p=app.project,c=null;for(var i=1;i<=p.numItems;i++)if(p.item(i).n
 // harmless: these must NOT move revision
 const HARMLESS = [
   ["read-only script (every layer and property: value, valueAtTime, keys, expression, text)", 'var n=0;for(var i=1;i<=p.numItems;i++){var it=p.item(i);if(!(it instanceof CompItem))continue;for(var j=1;j<=it.numLayers;j++){var L=it.layer(j),g=L.property("ADBE Transform Group");for(var q=1;q<=g.numProperties;q++){var pr=g.property(q);try{pr.value;pr.valueAtTime(0.5,false);pr.numKeys;pr.expression;}catch(e){}}if(L instanceof TextLayer){L.sourceRectAtTime(0,false);L.property("ADBE Text Properties").property("ADBE Text Document").value.text;}}}'],
-  ["empty undo group (what read-only mode wraps scripts in)", 'app.beginUndoGroup("AE MCP Script (read-only check)");app.endUndoGroup();'],
+  ["empty undo group (what read-only mode wraps scripts in)", 'app.beginUndoGroup("Surehand MCP Script (read-only check)");app.endUndoGroup();'],
   ["open the comp in the viewer", "c.openInViewer();"],
   ["move the time indicator (comp.time)", "c.time=2;"],
   ["select a layer", "L2.selected=true;"],

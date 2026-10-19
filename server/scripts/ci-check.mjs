@@ -35,7 +35,7 @@ if (phase === "installed") {
     expect(/After Effects extension installed/.test(out), "selftest: extension check passes");
     expect(/Extension signature valid/.test(out), "selftest: installed extension matches its signature byte for byte");
     expect(/Bridge not reachable/.test(out), "selftest: reports After Effects not running (expected on CI)");
-    expect(/### AE MCP diagnostics/.test(out), "selftest: prints diagnostics on failure");
+    expect(/### Surehand MCP diagnostics/.test(out), "selftest: prints diagnostics on failure");
     expect(!out.includes(cfg.token), "selftest/diagnostics never print the token");
   }
 } else if (phase === "uninstalled") {

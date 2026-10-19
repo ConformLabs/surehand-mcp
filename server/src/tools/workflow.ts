@@ -193,7 +193,7 @@ return { steps: __out, failed: __failed, rollback: args.atomic && __failed >= 0 
   const scope = [...new Set(steps.map((s) => s.args?.comp).filter((c) => c !== undefined && c !== null))];
   const showReport = loadConfig().changeReport !== false;
   const r = await runJsx(body, { stepArgs, atomic: isAtomic }, {
-    undoGroup: name || "AE MCP Batch",
+    undoGroup: name || "Surehand MCP Batch",
     timeoutMs: 600_000,
     depth: 6,
     // an atomic batch always compares before/after: that is what makes its rollback safe
@@ -243,7 +243,7 @@ export function registerWorkflowTools(server: McpServer) {
       inputSchema: {
         steps: z.array(z.object({ tool: z.string(), args: z.record(z.string(), z.any()).optional() })).min(1).max(200),
         atomic: z.boolean().optional().describe("Undo everything if a step fails (default true). false = keep successful steps and continue."),
-        name: z.string().optional().describe('Undo step name shown in After Effects (default "AE MCP Batch").'),
+        name: z.string().optional().describe('Undo step name shown in After Effects (default "Surehand MCP Batch").'),
         checkpoint: z.boolean().optional().describe("Save a project checkpoint before running (see ae_checkpoint)."),
         verbose: z.boolean().optional().describe("Return each step's full result (default: short summaries)."),
       },

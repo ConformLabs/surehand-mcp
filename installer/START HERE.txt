@@ -1,14 +1,15 @@
-AFTER EFFECTS MCP - START HERE
-==============================
+SUREHAND MCP - START HERE
+=========================
 
-Lets Claude, ChatGPT (desktop app), Cursor or Codex control Adobe After Effects on your computer.
+Surehand MCP for Adobe After Effects (formerly AE MCP) lets Claude, ChatGPT (desktop app),
+Cursor or Codex control Adobe After Effects on your computer.
 
 Pick ONE way to install:
 
 
 >> Only use Claude Desktop?  Open the folder "1. Claude Desktop (easiest)"
 -------------------------------------------------------------------------
-1. Double-click  AE-MCP.mcpb
+1. Double-click  Surehand-MCP.mcpb
    Claude Desktop opens and asks to install it. Click Install.
 2. Restart After Effects (once).
 3. In Claude, ask: "Check After Effects is connected."
@@ -43,7 +44,7 @@ WHAT THE NUMBERED FILES DO (in the Mac and Windows folders)
 3. Connect ChatGPT     Only for ChatGPT on the WEB (chatgpt.com). The ChatGPT desktop app
                        doesn't need it. Follow the instructions it shows and keep the
                        window open while you use it.
-4. Uninstall           Removes everything. (If you used AE-MCP.mcpb, also remove it in
+4. Uninstall           Removes everything. (If you used Surehand-MCP.mcpb, also remove it in
                        Claude Desktop > Settings > Extensions.)
 
 The "Support files" folder is used by the files above; you don't need to open it.
@@ -59,7 +60,7 @@ Windows: "Windows protected your PC" -> click "More info" > "Run anyway".
 
 UPDATES & HELP
 --------------
-When a new version is out, After Effects shows it in Window > Extensions > AE MCP.
+When a new version is out, After Effects shows it in Window > Extensions > Surehand MCP.
 Something wrong? Run "2. Test Installation"; if it finds a problem it prints a report
 (with no passwords or keys in it) that you can send along with your question.
-New versions and questions: https://github.com/ronyitzhaki/after-effects-mcp
+New versions and questions: https://github.com/ConformLabs/surehand-mcp

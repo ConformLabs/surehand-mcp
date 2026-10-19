@@ -2,7 +2,7 @@
 <ExtensionManifest xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     ExtensionBundleId="com.aemcp"
     ExtensionBundleVersion="__AEMCP_VERSION__"
-    ExtensionBundleName="AE MCP"
+    ExtensionBundleName="Surehand MCP"
     Version="9.0">
   <ExtensionList>
     <Extension Id="com.aemcp.bridge" Version="__AEMCP_VERSION__" />
@@ -45,7 +45,7 @@
         </UI>
       </DispatchInfo>
     </Extension>
-    <!-- Status panel: Window > Extensions > AE MCP -->
+    <!-- Status panel: Window > Extensions > Surehand MCP -->
     <Extension Id="com.aemcp.panel">
       <DispatchInfo>
         <Resources>
@@ -60,7 +60,7 @@
         </Lifecycle>
         <UI>
           <Type>Panel</Type>
-          <Menu>AE MCP</Menu>
+          <Menu>Surehand MCP</Menu>
           <Geometry>
             <Size><Height>420</Height><Width>320</Width></Size>
             <MinSize><Height>200</Height><Width>240</Width></MinSize>

@@ -33,7 +33,7 @@ function clientEntry(file: string): string {
 }
 
 export async function diagnostics(): Promise<string> {
-  const L: string[] = ["### AE MCP diagnostics", `time: ${new Date().toISOString()}`];
+  const L: string[] = ["### Surehand MCP diagnostics", `time: ${new Date().toISOString()}`];
   L.push(`server: v${VERSION} (helpers ${HELPER_VERSION}) · tools profile: ${resolveProfile().name}`);
   L.push(`os: ${process.platform} ${release()} ${arch()} · node ${process.version} at ${process.execPath}`);
   const cfg = readJson<any>(CONFIG_FILE, null);
