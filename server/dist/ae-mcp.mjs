@@ -67382,6 +67382,7 @@ Surehand MCP installer v${VERSION}`));
   if (!isMac && !isWin) warn("After Effects only runs on macOS and Windows; continuing anyway.");
   step("1/4  Installing the MCP server");
   const self2 = fileURLToPath3(import.meta.url);
+  const fromInstaller = self2 === INSTALLED_SERVER;
   mkdirSync5(dirname5(INSTALLED_SERVER), { recursive: true });
   if (self2 !== INSTALLED_SERVER) copyFileSync2(self2, INSTALLED_SERVER);
   if (!isWin) chmodSync(INSTALLED_SERVER, 493);
@@ -67486,8 +67487,8 @@ Surehand MCP installer v${VERSION}`));
   ${registered.length ? `Connected: ${registered.join(", ")}. Restart ${registered.filter((r) => r !== "Claude Desktop" || !restartClaude).join(", ") || "nothing else"} if open.` : flags.has("--skip-clients") ? "AI apps were left as they are (--skip-clients)." : "No AI apps were found to connect."}
 
   Try asking Claude: ${bold('"Check After Effects is connected, then make a 1080p comp with an animated title."')}
-  Check the installation any time with ${bold("2. Test Installation")} (in the ${isWin ? "Windows" : "Mac"} folder).
-${registered.includes("ChatGPT desktop") ? "  ChatGPT desktop app: restart it; after-effects appears under Settings > Plugins > Servers.\n" : ""}  ChatGPT on the web: run ${bold("3. Connect ChatGPT")} from the same folder.
+  Check the installation any time with ${fromInstaller ? bold(`"${nodePath}" "${INSTALLED_SERVER}" selftest`) : `${bold("2. Test Installation")} (in the ${isWin ? "Windows" : "Mac"} folder)`}.
+${registered.includes("ChatGPT desktop") ? "  ChatGPT desktop app: restart it; after-effects appears under Settings > Plugins > Servers.\n" : ""}  ChatGPT on the web: run ${fromInstaller ? bold(`"${nodePath}" "${INSTALLED_SERVER}" chatgpt`) : `${bold("3. Connect ChatGPT")} from the same folder`}.
 
   Other MCP apps can use:  command ${nodePath}
                            args    ["${INSTALLED_SERVER}"]

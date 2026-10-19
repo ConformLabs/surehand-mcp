@@ -55,6 +55,8 @@ export async function install(argv: string[]) {
 
   step("1/4  Installing the MCP server");
   const self = fileURLToPath(import.meta.url);
+  // the Mac .pkg and the Windows installer run the already installed copy; there is no release folder with launchers
+  const fromInstaller = self === INSTALLED_SERVER;
   mkdirSync(dirname(INSTALLED_SERVER), { recursive: true });
   if (self !== INSTALLED_SERVER) copyFileSync(self, INSTALLED_SERVER);
   if (!isWin) chmodSync(INSTALLED_SERVER, 0o755);
@@ -167,8 +169,8 @@ export async function install(argv: string[]) {
   ${registered.length ? `Connected: ${registered.join(", ")}. Restart ${registered.filter((r) => r !== "Claude Desktop" || !restartClaude).join(", ") || "nothing else"} if open.` : flags.has("--skip-clients") ? "AI apps were left as they are (--skip-clients)." : "No AI apps were found to connect."}
 
   Try asking Claude: ${bold('"Check After Effects is connected, then make a 1080p comp with an animated title."')}
-  Check the installation any time with ${bold("2. Test Installation")} (in the ${isWin ? "Windows" : "Mac"} folder).
-${registered.includes("ChatGPT desktop") ? "  ChatGPT desktop app: restart it; after-effects appears under Settings > Plugins > Servers.\n" : ""}  ChatGPT on the web: run ${bold("3. Connect ChatGPT")} from the same folder.
+  Check the installation any time with ${fromInstaller ? bold(`"${nodePath}" "${INSTALLED_SERVER}" selftest`) : `${bold("2. Test Installation")} (in the ${isWin ? "Windows" : "Mac"} folder)`}.
+${registered.includes("ChatGPT desktop") ? "  ChatGPT desktop app: restart it; after-effects appears under Settings > Plugins > Servers.\n" : ""}  ChatGPT on the web: run ${fromInstaller ? bold(`"${nodePath}" "${INSTALLED_SERVER}" chatgpt`) : `${bold("3. Connect ChatGPT")} from the same folder`}.
 
   Other MCP apps can use:  command ${nodePath}
                            args    ["${INSTALLED_SERVER}"]
