@@ -36,6 +36,7 @@
 
   var VERSION = "__AEMCP_VERSION__"; // replaced with the release version at build time
   var PANEL_ID = "com.aemcp.panel";
+  var BRIDGE_ID = "com.aemcp.bridge";
   var POPUP_ID = "com.aemcp.approval";
   var PORT_RANGE = 10;
   var APPROVAL_TIMEOUT_MS = 10 * 60 * 1000;
@@ -242,7 +243,8 @@
     try { host = JSON.parse(global.__adobe_cep__.getHostEnvironment()); } catch (e) {}
     try {
       global.__adobe_cep__.dispatchEvent({
-        type: WELCOME_EVENT, scope: "APPLICATION", appId: host.appId || "AEFT", extensionId: "",
+        // After Effects drops a CEP event whose extensionId is empty: send the bridge's own id
+        type: WELCOME_EVENT, scope: "APPLICATION", appId: host.appId || "AEFT", extensionId: BRIDGE_ID,
         data: JSON.stringify({ port: state.port, secret: state.panelSecret, pid: process.pid, version: VERSION }),
       });
     } catch (e) {}

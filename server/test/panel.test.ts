@@ -129,9 +129,11 @@ beforeAll(async () => {
   const listeners: Record<string, ((e: any) => void)[]> = {};
   w.__adobe_cep__ = {
     getHostEnvironment: () => JSON.stringify({ appId: "AEFT", appVersion: "26.5" }),
+    getExtensionId: () => "com.aemcp.panel",
     addEventListener: (type: string, fn: (e: any) => void) => (listeners[type] ||= []).push(fn),
     dispatchEvent: (e: any) => {
-      if (e.type === "com.surehand.ae.hello")
+      // like After Effects: an event with an empty extensionId is dropped
+      if (e.type === "com.surehand.ae.hello" && e.extensionId)
         setTimeout(() => (listeners["com.surehand.ae.welcome"] || []).forEach((fn) => fn({ type: "com.surehand.ae.welcome", data: JSON.stringify({ port, secret: SECRET }) })), 5);
     },
     invokeSync: () => "",

@@ -453,6 +453,8 @@ describe("Pause AI (the bridge refuses AI calls while paused)", () => {
     const before = win.dispatched.length;
     for (const fn of win.listeners[bridgeA.HELLO_EVENT]) fn({ type: bridgeA.HELLO_EVENT, data: "{}" });
     const ev = win.dispatched.slice(before).find((e: any) => e.type === bridgeA.WELCOME_EVENT);
+    // After Effects drops an event with an empty extensionId (seen live in AE 2026)
+    expect(ev.extensionId).toBe("com.aemcp.bridge");
     expect(JSON.parse(ev.data)).toMatchObject({ port: bridgeA.state.port, secret: bridgeA.state.panelSecret });
     expect(bridgeA.state.panelSecret).toMatch(/^[0-9a-f]{64}$/);
     expect(bridgeB.state.panelSecret).not.toBe(bridgeA.state.panelSecret);

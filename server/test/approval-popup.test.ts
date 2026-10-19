@@ -46,12 +46,14 @@ function openPopup(): JSDOM {
   const listeners: Record<string, ((e: any) => void)[]> = {};
   w.__adobe_cep__ = {
     getHostEnvironment: () => JSON.stringify({ appId: "AEFT", appVersion: "26.5" }),
+    getExtensionId: () => "com.aemcp.approval",
     closeExtension: () => closed++,
     requestOpenExtension: (id: string) => opened.push(id),
     // the bridge answers a hello with the panel secret (a CEP event: inside After Effects only)
     addEventListener: (type: string, fn: (e: any) => void) => (listeners[type] ||= []).push(fn),
     dispatchEvent: (e: any) => {
-      if (e.type === "com.surehand.ae.hello")
+      // like After Effects: an event with an empty extensionId is dropped
+      if (e.type === "com.surehand.ae.hello" && e.extensionId)
         setTimeout(() => (listeners["com.surehand.ae.welcome"] || []).forEach((fn) => fn({ data: JSON.stringify({ port, secret: SECRET }) })), 5);
     },
   };

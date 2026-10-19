@@ -28,7 +28,10 @@
     listen();
     var host = {};
     try { host = JSON.parse(cep().getHostEnvironment()); } catch (e) {}
-    try { cep().dispatchEvent({ type: HELLO, scope: "APPLICATION", appId: host.appId || "AEFT", extensionId: "", data: "{}" }); } catch (e) {}
+    // After Effects drops a CEP event whose extensionId is empty (seen in AE 2026): send our own id
+    var me = "";
+    try { me = cep().getExtensionId(); } catch (e) {}
+    try { cep().dispatchEvent({ type: HELLO, scope: "APPLICATION", appId: host.appId || "AEFT", extensionId: me || "com.aemcp.panel", data: "{}" }); } catch (e) {}
   }
   /** The secret of the bridge on `port`, or null (not known yet: call hello()). */
   function secretFor(port) {
