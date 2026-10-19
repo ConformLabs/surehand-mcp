@@ -310,7 +310,7 @@ server/              MCP server (TypeScript) -> bundled into server/dist/ae-mcp.
   src/cli/             install / uninstall / selftest / chatgpt / setup commands (ae-mcp <command>)
   scripts/smoke.mjs    end-to-end test against a running After Effects
   scripts/package.mjs  builds the shareable release folder, zip and .mcpb
-  scripts/release.mjs  cuts a release: version, sign, check, Windows test, package, CI, GitHub release
+  scripts/release.mjs  cuts a release: version, sign, check, Mac + Windows tests, package, release PR, CI, merge, GitHub release
   scripts/test-mac.mjs      installs the build on this Mac and runs the full self-test on each open After Effects
   scripts/test-windows.mjs  the same on a Windows PC over SSH
   scripts/test-guard.mjs    lock and build checks so parallel test:mac runs don't test each other's build
@@ -336,7 +336,7 @@ npm run sign             # re-sign the After Effects extension after changing ex
 npm run test:mac         # install this build here and run the full self-test on each open After Effects
                          # (one run per Mac at a time: waits for ~/.aemcp/test-mac.lock; reports the commit tested)
 npm run test:windows     # the same on the Windows PC over SSH
-npm run release -- 1.4.0 --notes notes.md   # everything above, then commit, CI and the GitHub release
+npm run release -- 1.4.0 --notes notes.md   # everything above, then a release PR, its CI, merge and the GitHub release
 ```
 
 The After Effects extension in `extension/` is embedded in the server bundle at build time, and the server installs

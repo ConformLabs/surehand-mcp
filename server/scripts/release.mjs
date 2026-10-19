@@ -1,14 +1,17 @@
 // Cuts a release in one go:
 //   version bump -> sign the AE extension -> check (types, tests, build) -> Mac + Windows tests ->
-//   package -> commit + push -> wait for CI -> GitHub release with the zip, .mcpb and server file.
+//   package -> release pull request -> wait for its CI -> merge -> GitHub release with the zip, .mcpb
+//   and server file, on the merged commit.
 //
 //   npm run release -- 1.3.2 --notes notes.md
 //   options: --skip-mac       don't run the Mac test (scripts/test-mac.mjs: needs After Effects open here)
 //            --skip-windows   don't run the Windows test (scripts/test-windows.mjs)
 //            --draft          create the GitHub release as a draft
 //
-// Stops at the first failure. Nothing is pushed until everything local has passed; if CI then
-// fails, the commit is on main but no release is published.
+// main only accepts changes through a pull request with green CI (a GitHub ruleset), so the release
+// commit goes on a release/X.Y.Z branch with its own PR. Stops at the first failure: nothing is pushed
+// until everything local has passed, and if the PR's CI fails, main is untouched and nothing is published
+// (the PR stays open to fix or close).
 import { execFileSync, spawnSync } from "node:child_process";
 import { copyFileSync, createReadStream, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
@@ -50,7 +53,12 @@ if (sh("git", ["rev-parse", "--abbrev-ref", "HEAD"]) !== "main") die("not on mai
 if (sh("git", ["status", "--porcelain"])) die("the working tree has uncommitted changes: commit or stash them first");
 sh("git", ["fetch", "-q", "origin", "main"]);
 if (sh("git", ["rev-list", "--count", "HEAD..origin/main"]) !== "0") die("main is behind origin/main: pull first");
+if (sh("git", ["rev-list", "--count", "origin/main..HEAD"]) !== "0") die("main has commits that aren't on origin/main: get them merged through a PR first");
 if (sh("git", ["tag", "-l", tag])) die(`tag ${tag} already exists`);
+if (spawnSync("gh", ["release", "view", tag], { cwd: ROOT, stdio: "ignore" }).status === 0) die(`GitHub release ${tag} already exists`);
+const branch = `release/${version}`;
+if (sh("git", ["ls-remote", "--heads", "origin", branch])) die(`branch ${branch} already exists on GitHub: delete it or finish that release first`);
+const repo = sh("gh", ["repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"]);
 if (spawnSync("gh", ["auth", "status"], { stdio: "ignore" }).status !== 0) die("gh is not logged in");
 console.log(`releasing ${pkg.version} -> ${version}`);
 
@@ -89,24 +97,41 @@ const digest = await new Promise((ok, bad) => {
 writeFileSync(`${serverFile}.sha256`, `${digest}  ae-mcp.mjs\n`);
 for (const f of [zip, mcpb, serverFile]) if (!existsSync(f)) die(`missing ${f}`);
 
-step("commit and push");
+step(`release pull request (${branch})`);
+sh("git", ["checkout", "-q", "-b", branch]);
 sh("git", ["add", "-A"]);
 sh("git", ["commit", "-q", "-m", `Release ${version}\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`]);
-sh("git", ["push", "-q", "origin", "main"]);
-const sha = sh("git", ["rev-parse", "HEAD"]);
-console.log(sha.slice(0, 7));
+const tested = sh("git", ["rev-parse", "HEAD"]);
+sh("git", ["push", "-q", "-u", "origin", branch]);
+// gh api, not "gh pr create/merge": those can fail on GitHub's retired Projects (classic) GraphQL fields
+const prBody = `Version ${version}: made by \`npm run release\` after check, test:mac and test:windows passed locally. Merged by the release script when CI is green.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)`;
+const pr = JSON.parse(sh("gh", ["api", "-X", "POST", `repos/${repo}/pulls`, "-f", `title=Release ${version}`, "-f", `head=${branch}`, "-f", "base=main", "-f", `body=${prBody}`]));
+console.log(`PR #${pr.number}: ${pr.html_url}`);
 
-step("wait for CI");
-let runId = "";
-for (let i = 0; i < 40 && !runId; i++) {
-  runId = sh("gh", ["run", "list", "--commit", sha, "--json", "databaseId", "--jq", ".[0].databaseId"]);
-  if (!runId) await new Promise((r) => setTimeout(r, 3000));
+step("wait for the PR's CI");
+// checks appear a few seconds after the push
+const checks = () => spawnSync("gh", ["pr", "checks", String(pr.number)], { cwd: ROOT, encoding: "utf8" }).stdout || "";
+for (let i = 0; i < 60 && !/\t(pass|fail|pending)/.test(checks()); i++) await new Promise((r) => setTimeout(r, 5000));
+spawnSync("gh", ["pr", "checks", String(pr.number), "--watch", "--interval", "15"], { cwd: ROOT, stdio: ["ignore", "ignore", "inherit"] });
+const result = checks();
+console.log(result.split("\n").map((l) => l.split("\t").slice(0, 2).join(": ")).filter(Boolean).join("\n"));
+if (!/\tpass/.test(result) || /\t(fail|pending|cancel)/.test(result)) {
+  sh("git", ["checkout", "-q", "main"]);
+  die(`CI didn't pass on PR #${pr.number}; main is untouched and ${tag} was not released. Fix it on ${branch} or close the PR.`);
 }
-if (!runId) die("CI did not start for this commit");
-const ci = spawnSync("gh", ["run", "watch", runId, "--exit-status", "--interval", "15"], { cwd: ROOT, stdio: ["ignore", "ignore", "inherit"] });
-console.log(sh("gh", ["run", "view", runId, "--json", "jobs", "--jq", '.jobs[] | "\\(.name): \\(.conclusion)"']));
-if (ci.status !== 0) die(`CI failed (run ${runId}); ${tag} was not released`);
+
+step("merge");
+const merged = JSON.parse(sh("gh", ["api", "-X", "PUT", `repos/${repo}/pulls/${pr.number}/merge`, "-f", "merge_method=squash", "-f", `commit_title=Release ${version} (#${pr.number})`]));
+if (!merged.merged) die(`PR #${pr.number} wasn't merged: ${merged.message}`);
+const sha = merged.sha;
+sh("git", ["fetch", "-q", "origin", "main"]);
+// the merged commit must be exactly what was tested and packaged
+if (sh("git", ["rev-parse", `${sha}^{tree}`]) !== sh("git", ["rev-parse", `${tested}^{tree}`])) die(`the merged main (${sha.slice(0, 7)}) differs from the tested release commit (${tested.slice(0, 7)}); nothing was published`);
+sh("git", ["checkout", "-q", "main"]);
+sh("git", ["reset", "-q", "--hard", "origin/main"]);
+sh("git", ["branch", "-q", "-D", branch]);
+console.log(`main is at ${sha.slice(0, 7)}`);
 
 step("GitHub release");
-run("gh", ["release", "create", tag, zip, mcpb, serverFile, `${serverFile}.sha256`, "--title", tag, "--notes-file", notes, ...(flag("--draft") ? ["--draft"] : [])], ROOT);
+run("gh", ["release", "create", tag, zip, mcpb, serverFile, `${serverFile}.sha256`, "--target", sha, "--title", tag, "--notes-file", notes, ...(flag("--draft") ? ["--draft"] : [])], ROOT);
 console.log(`\n✔ released ${tag}: ${sh("gh", ["release", "view", tag, "--json", "url", "--jq", ".url"])}`);
