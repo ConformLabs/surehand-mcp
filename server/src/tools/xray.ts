@@ -141,7 +141,19 @@ if (has("missing")) {
     var mf = app.fonts.missingOrSubstitutedFonts, fl = [];
     for (var m = 0; m < mf.length; m++) fl.push({ ps: mf[m].postScriptName, family: mf[m].familyName, style: mf[m].styleName, sub: mf[m].isSubstitute });
     D.fonts = { missing: fl };
-    try { var uf = P.usedFonts; if (uf) { D.fonts.used = []; for (var u = 0; u < uf.length; u++) D.fonts.used.push({ ps: uf[u].font.postScriptName, layers: uf[u].usedAt ? uf[u].usedAt.length : 0 }); } } catch (e) {}
+    try {
+      var uf = P.usedFonts;
+      if (uf) {
+        D.fonts.used = [];
+        for (var u = 0; u < uf.length; u++) {
+          var ua = uf[u].usedAt, ue = { ps: uf[u].font.postScriptName, layers: ua ? ua.length : 0 }, ids = [];
+          // the text layers that use it (style runs and Source Text keyframes included), when this AE says so
+          for (var w = 0; ua && w < ua.length; w++) { try { if (typeof ua[w].layerID === "number") ids.push(ua[w].layerID); } catch (e) {} }
+          if (ua && ua.length && ids.length === ua.length) ue.ids = ids;
+          D.fonts.used.push(ue);
+        }
+      }
+    } catch (e) {}
   } catch (e) {}
 }
 

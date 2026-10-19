@@ -254,7 +254,9 @@ In the project, for the delivered comp (`comp` in the spec, otherwise the active
   the precomps it sits in, against title-safe, action-safe or the frame. Problems come back as time ranges, for example
   "Title: outside title-safe 00:00:02:03–00:00:03:10 (2.12s–3.40s), 46 px past it on the right at most". Layers that are off,
   transparent (opacity 0) or outside their in/out points are not visible and are not checked. 3D layers are reported
-  as not checked (check them with `ae_get_layer_bounds`, which projects through the camera).
+  as not checked (check them with `ae_get_layer_bounds`, which projects through the camera); auto-orient, and effects
+  that move or scale the pixels outside the transform (Transform, Offset, layer styles, text animators), are flagged as
+  a warning that the bounds may be off. A `layersMustBeIn` name that matches no layer is a warning, not a pass.
 - **Text:** smallest cap height (estimated as 0.7 x the font size x the layer's scale, since real fonts vary from about
   0.65 to 0.75), reading speed (characters per second while the text is visible, spaces included, line breaks not),
   shortest time on screen, paragraph text that overflows its box (After Effects 24.6 or later), and characters the font
@@ -265,10 +267,13 @@ color tags, legal range, black and frozen frames, loudness and true peak, and a 
 the one on your system, or a one-time download. The flash check is a **pre-check** to catch obvious problems early; it
 is not a certified PSE / Harding test.
 
-The report starts with the verdict (**PASS**, **FAIL (n)** or **WARNINGS (n)**), then the findings grouped by check
-and sorted by time, with timecode in the comp's frame rate and seconds, where the problem is (comp > layer) and a
-short fix, then what was not checked and why (a section not in the spec, a check that needs a newer After Effects,
-no ffmpeg). For files it also shows what ffprobe found and up to four frames at the worst problems. Preflight changes
+The report starts with the verdict: **FAIL (n)** when anything failed; otherwise **INCOMPLETE (n checks not run)**
+when a check the spec asks for couldn't run or ran on incomplete data (no ffmpeg, an RGB file for legal range, a check
+that needs a newer After Effects, a file that couldn't be read to the end), so a check that didn't run is never a pass;
+otherwise **WARNINGS (n)** or **PASS**. Then the checks that were requested but not run and why, the findings grouped by
+check (failures first, then warnings, by time), with timecode in the comp's frame rate and seconds, where the problem is
+(comp > layer) and a short fix, then what this run doesn't cover (a section not in the spec, a file check on a project
+target). For files it also shows what ffprobe found and up to four frames at the worst problems. Preflight changes
 nothing in the project and leaves no undo step, so it also runs in read-only mode. Long comps are checked within a
 time budget (`timeBudgetSeconds`, default 120 s); a partial check says so.
 
@@ -294,8 +299,13 @@ second per edit; turn it off with `"changeReport": false` in `~/.aemcp/config.js
 ### Preflight: rendered files
 
 Preflight also checks the rendered file itself against the same delivery spec, with ffprobe and one ffmpeg pass over
-the picture and sound. Each check runs only when its section is in the spec; checks that can't run are listed as
-skipped, with the reason (no ffmpeg, no audio stream, an RGB file for legal range...).
+the picture and sound. Each check runs only when its section is in the spec; a requested check that can't run is listed
+with the reason (no ffmpeg, an RGB file for legal range, a value ffmpeg didn't report...) and makes the verdict
+INCOMPLETE. A file with no audio stream fails when the spec asks for audio (usually Audio Output was off in the output
+module). Every decoded frame is counted against the picture's own duration: a truncated or damaged file fails ("only
+2.8 s of 8 s could be decoded") instead of passing on the part that was read, and decoding errors are a warning.
+Durations (and black / frozen at the end) are the picture's, not the container's; sound that runs longer or shorter
+than the picture by more than a frame is a warning.
 
 | Spec section | What is measured in the file |
 |---|---|
@@ -305,14 +315,16 @@ skipped, with the reason (no ffmpeg, no audio stream, an RGB file for legal rang
 | `black`, `frozen` | ffmpeg `blackdetect` / `freezedetect`: runs longer than `maxSeconds` (black allowed at the start / end per `allowAtStart` / `allowAtEnd`; a black run isn't reported again as frozen) |
 | `flash` | a **pre-check, not a certified PSE / Harding test**: the picture as a 32x18 grid, relative luminance per cell; a transition is a change of at least `minLuminanceChange` where the darker state is below 0.8, a flash is a pair of opposing transitions over at least `minAreaFraction` of the screen; more than `maxFlashesPerSecond` in any second fails. Saturated red flashes (R/(R+G+B) >= 0.8, change of (R-G-B)x320 > 20) are checked too unless `redFlash` is false (definitions after ITU-R BT.1702 / WCAG 2.x) |
 
-Times in the findings are seconds in the file. With thumbnails on, up to four PNG frames from the most important
-failing times are written to `~/.aemcp/tmp`. A one-minute 1080p ProRes 422 HQ file with every check takes about 4 s on
+Times in the findings are seconds in the file. Up to four JPEG frames (960 px wide at most) from the most important
+failing times are written to `~/.aemcp/tmp`, shown in the report and deleted right after (also when the check is
+cancelled; leftovers older than a day are swept). A one-minute 1080p ProRes 422 HQ file with every check takes about 4 s on
 an Apple Silicon Mac (legal range marks the out-of-range pixels and measures that mask averaged down to a small grid,
 which is exact and much faster than full statistics on every frame).
 
 **ffmpeg.** Surehand MCP uses, in this order: `"ffmpegPath"` / `"ffprobePath"` in `~/.aemcp/config.json`, a private
 copy in `~/.aemcp/ffmpeg`, then the PATH (plus `/opt/homebrew/bin` and `/usr/local/bin` on a Mac). If there is none, it
-can download FFmpeg 9.0.2 once into `~/.aemcp/ffmpeg`, only after you allow it. The download is a pinned build checked
+can download FFmpeg 9.0.2 once into `~/.aemcp/ffmpeg`, only after you allow it (in "ask" permission mode you also
+approve it in the Surehand MCP panel; in read-only mode it never downloads). The download is a pinned build checked
 against a SHA-256 written in the source, and must start and report the expected version before it is used; anything
 else is refused and nothing is installed:
 

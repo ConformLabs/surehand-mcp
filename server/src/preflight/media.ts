@@ -2,21 +2,23 @@
 // ffmpeg pass for the picture and sound (legal range, black, frozen, loudness, flash pre-check). Every check
 // runs only when its section is in the user's spec.
 import { randomBytes } from "node:crypto";
-import { existsSync, mkdirSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, statSync, unlinkSync } from "node:fs";
 import { homedir } from "node:os";
-import { extname, join } from "node:path";
-import { ensureFfmpeg, FfmpegMissingError, type FfmpegPaths, runTool } from "./ffmpeg.js";
+import { extname, join, resolve } from "node:path";
+import { ensureFfmpeg, type FfmpegBuild, FfmpegMissingError, type FfmpegPaths, runTool } from "./ffmpeg.js";
 import { FlashDetector, type FlashRun } from "./flash.js";
-import type { Finding, Spec } from "./spec.js";
+import type { Finding, NotRun, Spec } from "./spec.js";
 
 export interface FileCheck {
   findings: Finding[];
   /** what ffprobe reported (codec, size, rate, duration, audio...) in a compact form */
   probe: Record<string, unknown>;
-  /** PNG frames at notable times (absolute paths), for the report */
+  /** JPEG frames at notable times (absolute paths, in ~/.aemcp/tmp), for the report */
   thumbnails?: { at: number; path: string; label: string }[];
-  /** checks skipped and why (e.g. no ffmpeg) */
-  skipped?: string[];
+  /** requested checks that did not run (or ran on incomplete data), and why: the verdict can't be PASS */
+  notRun?: NotRun[];
+  /** remarks on how something was measured */
+  notes?: string[];
   /** checks that ran */
   ran?: string[];
   /** which ffmpeg was used, and how long the whole check took */
@@ -28,6 +30,8 @@ export interface CheckFileOptions {
   signal?: AbortSignal;
   /** download the pinned FFmpeg build into ~/.aemcp/ffmpeg when none is found (ask the user first) */
   allowDownload?: boolean;
+  /** asked right before the download starts (the approval in After Effects in "ask" mode); throw to refuse */
+  confirmDownload?: (build: FfmpegBuild) => Promise<void>;
   /** use these instead of searching (tests) */
   ffmpeg?: FfmpegPaths;
 }
@@ -67,6 +71,7 @@ export interface AudioInfo {
   sampleRate: number;
   channels: number;
   layout?: string;
+  duration?: number;
 }
 
 export interface ProbeInfo {
@@ -189,7 +194,12 @@ export function parseProbe(json: string | any, path: string): ProbeInfo {
   }
   const audio: AudioInfo[] = streams
     .filter((s) => s.codec_type === "audio")
-    .map((s) => ({ index: s.index, codec: String(s.codec_name ?? "unknown"), sampleRate: num(s.sample_rate) ?? 0, channels: num(s.channels) ?? 0, layout: s.channel_layout }));
+    .map((s) => {
+      const a: AudioInfo = { index: s.index, codec: String(s.codec_name ?? "unknown"), sampleRate: num(s.sample_rate) ?? 0, channels: num(s.channels) ?? 0, layout: s.channel_layout };
+      const d = num(s.duration);
+      if (d !== undefined) a.duration = d;
+      return a;
+    });
   return {
     formatName: String(fmt.format_name ?? "unknown"),
     formatLongName: fmt.format_long_name,
@@ -201,6 +211,33 @@ export function parseProbe(json: string | any, path: string): ProbeInfo {
     audio,
   };
 }
+
+/**
+ * The picture's duration: the video stream's own duration, else its frame count / frame rate, else the file's
+ * (the container's duration is the longest stream: audio that runs past the picture would make it too long).
+ */
+export function videoDuration(p: ProbeInfo): number | undefined {
+  const v = p.video;
+  if (!v) return p.duration;
+  if (v.duration !== undefined && v.duration > 0) return v.duration;
+  if (v.frames && v.frameRate) return v.frames / v.frameRate;
+  return p.duration;
+}
+
+/** What the spec's audio section asks to measure (for the "no audio stream" message). */
+function audioAsks(sa: NonNullable<Spec["audio"]>): string[] {
+  const asks: string[] = [];
+  if (sa.sampleRate !== undefined) asks.push(`${sa.sampleRate} Hz`);
+  if (sa.channels !== undefined) asks.push(`${sa.channels} channel${sa.channels === 1 ? "" : "s"}`);
+  if (sa.integratedLUFS !== undefined) asks.push(`${sa.integratedLUFS} LUFS integrated`);
+  if (sa.maxTruePeakDBTP !== undefined) asks.push(`true peak at most ${sa.maxTruePeakDBTP} dBTP`);
+  if (sa.maxShortTermLUFS !== undefined) asks.push(`short-term loudness at most ${sa.maxShortTermLUFS} LUFS`);
+  if (sa.loudnessRangeLU) asks.push("a loudness range");
+  return asks;
+}
+
+/** Loudness is asked for (needs the ffmpeg pass over the audio). */
+export const wantsLoudness = (sa: Spec["audio"]) => !!sa && (sa.integratedLUFS !== undefined || sa.maxTruePeakDBTP !== undefined || sa.maxShortTermLUFS !== undefined || !!sa.loudnessRangeLU);
 
 export function compactProbe(p: ProbeInfo): Record<string, unknown> {
   const v = p.video;
@@ -225,7 +262,7 @@ export function compactProbe(p: ProbeInfo): Record<string, unknown> {
       color: { primaries: v.colorPrimaries ?? "not signalled", transfer: v.colorTransfer ?? "not signalled", matrix: v.colorMatrix ?? "not signalled", range: v.colorRange ?? "not signalled" },
       frames: v.frames,
     },
-    audio: p.audio.map((a) => ({ codec: a.codec, sampleRate: a.sampleRate, channels: a.channels, layout: a.layout })),
+    audio: p.audio.map((a) => ({ codec: a.codec, sampleRate: a.sampleRate, channels: a.channels, layout: a.layout, ...(a.duration !== undefined ? { duration: round(a.duration, 3) } : {}) })),
   };
 }
 
@@ -289,7 +326,7 @@ export function compareProbe(p: ProbeInfo, spec: Spec): Finding[] {
       }
     }
     if (sv.duration !== undefined) {
-      const d = p.duration;
+      const d = videoDuration(p);
       const fps = v?.frameRate || 25;
       if (d === undefined) warn("file.duration", "The file's duration could not be read.");
       else if (typeof sv.duration === "number") {
@@ -305,14 +342,29 @@ export function compareProbe(p: ProbeInfo, spec: Spec): Finding[] {
   }
   const sa = spec.audio;
   if (sa) {
-    const a = p.audio[0];
-    if (sa.required === true && !a) fail("file.audio", "The file has no audio; the spec requires audio.", "Turn on Audio Output in the output module.");
-    if (sa.required === false && a) fail("file.audio", `The file has audio (${p.audio.length} stream${p.audio.length > 1 ? "s" : ""}); the spec wants none.`, "Turn off Audio Output in the output module.");
-    if (a) {
-      if (sa.sampleRate !== undefined && a.sampleRate !== sa.sampleRate) fail("file.audio", `Audio sample rate is ${a.sampleRate} Hz; the spec wants ${sa.sampleRate} Hz.`, "Set the output module's audio sample rate.");
+    const asks = audioAsks(sa);
+    const n = p.audio.length;
+    if (!n && (sa.required === true || (sa.required !== false && asks.length)))
+      // the common slip: Audio Output was off in the output module
+      fail("file.audio", `The file has no audio stream; the spec ${asks.length ? `asks for ${asks.join(", ")}` : "requires audio"}.`, "Turn on Audio Output in the output module and render again.");
+    if (sa.required === false && n) fail("file.audio", `The file has audio (${n} stream${n > 1 ? "s" : ""}); the spec wants none.`, "Turn off Audio Output in the output module.");
+    // every audio stream is compared (a file with several, e.g. stems, must have each one right)
+    for (const [k, a] of p.audio.entries()) {
+      const which = n > 1 ? `Audio stream ${k + 1} of ${n} (#${a.index})` : "Audio";
+      if (sa.sampleRate !== undefined && a.sampleRate !== sa.sampleRate) fail("file.audio", `${which} sample rate is ${a.sampleRate} Hz; the spec wants ${sa.sampleRate} Hz.`, "Set the output module's audio sample rate.");
       if (sa.channels !== undefined && a.channels !== sa.channels)
-        fail("file.audio", `Audio has ${a.channels} channel${a.channels === 1 ? "" : "s"}${a.layout ? ` (${a.layout})` : ""}; the spec wants ${sa.channels}.`, "Set the output module's audio channels.");
+        fail("file.audio", `${which} has ${a.channels} channel${a.channels === 1 ? "" : "s"}${a.layout ? ` (${a.layout})` : ""}; the spec wants ${sa.channels}.`, "Set the output module's audio channels.");
     }
+  }
+  // picture and sound of different lengths (more than a frame): usually a work-area / audio mismatch
+  if ((sv || sa) && v && p.audio.length) {
+    const vd = videoDuration(p), ad = p.audio[0].duration, fps = v.frameRate || 25;
+    if (vd !== undefined && ad !== undefined && Math.abs(ad - vd) > 1 / fps + 1e-6)
+      warn(
+        "file.duration",
+        `The audio (${round(ad, 3)} s) is ${ad > vd ? "longer" : "shorter"} than the picture (${round(vd, 3)} s) by ${round(Math.abs(ad - vd), 3)} s (${Math.round(Math.abs(ad - vd) * fps)} frames).`,
+        "Check the audio layers' in / out points against the comp and the rendered range.",
+      );
   }
   return out;
 }
@@ -344,7 +396,8 @@ export interface AnalysisPlan {
   black?: { minRun: number; threshold: number };
   frozen?: { minRun: number; noise: number };
   loudness: boolean;
-  flash?: { width: number; height: number };
+  /** the flash grid, and the frame rate it is resampled to (constant, so frame n is at n / rate) */
+  flash?: { width: number; height: number; rate?: string };
 }
 
 export const FLASH_GRID = { width: 32, height: 18 };
@@ -365,6 +418,15 @@ function legalMarkChain(L: LegalPlan): string {
   return `lutyuv=y=${lutExpr(L.luma, s)}:u=${lutExpr(L.chroma, s)}:v=${lutExpr(L.chroma, s)},scale=${LEGAL_GRID.width}:${LEGAL_GRID.height}:flags=area,format=yuv444p16le`;
 }
 
+/**
+ * The input path for ffmpeg / ffprobe: the file protocol and an absolute path, so a name that starts with "-"
+ * or contains "proto:" is read as a file name.
+ */
+export const inputUrl = (file: string) => `file:${resolve(file)}`;
+
+/** Counts every decoded frame (the coverage check), even when no other filter prints per frame. */
+const COUNT_TAP = "metadata@cnt=mode=add:key=aemcp.f:value=1,metadata@count=mode=print:key=aemcp.f";
+
 /** ffmpeg arguments for one pass over the file (null when nothing needs decoding). */
 export function buildArgs(file: string, plan: AnalysisPlan, audioIndex: number | null): string[] | null {
   const graph: string[] = [];
@@ -377,6 +439,7 @@ export function buildArgs(file: string, plan: AnalysisPlan, audioIndex: number |
     }
     if (plan.black) chain.push(`blackdetect@black=d=${plan.black.minRun}:pix_th=${plan.black.threshold}`);
     if (plan.frozen) chain.push(`freezedetect@frozen=n=${plan.frozen.noise}:d=${plan.frozen.minRun}`);
+    chain.push(COUNT_TAP);
     const branches = [plan.legal && "legal", plan.flash && "flash"].filter(Boolean) as string[];
     if (!branches.length) branches.push("main");
     const head = `[0:v:0]${chain.length ? chain.join(",") : "null"}`;
@@ -391,7 +454,8 @@ export function buildArgs(file: string, plan: AnalysisPlan, audioIndex: number |
       nullMaps.push("[o_legal]");
     }
     if (plan.flash) {
-      graph.push(`[b_flash]scale=${plan.flash.width}:${plan.flash.height}:flags=area,format=rgb24[o_flash]`);
+      // a constant frame rate (fps filter): on a variable-frame-rate file the flash timing is still right
+      graph.push(`[b_flash]${plan.flash.rate ? `fps=${plan.flash.rate},` : ""}scale=${plan.flash.width}:${plan.flash.height}:flags=area,format=rgb24[o_flash]`);
       pipeMaps.push("[o_flash]");
     }
     if (branches[0] === "main") nullMaps.push("[b_main]");
@@ -401,14 +465,14 @@ export function buildArgs(file: string, plan: AnalysisPlan, audioIndex: number |
     nullMaps.push("[o_audio]");
   }
   if (!graph.length) return null;
-  const args = ["-hide_banner", "-nostats", "-nostdin", "-loglevel", "repeat+info", "-i", file, "-filter_complex", graph.join(";")];
+  const args = ["-hide_banner", "-nostats", "-nostdin", "-loglevel", "repeat+info", "-i", inputUrl(file), "-filter_complex", graph.join(";")];
   if (nullMaps.length) {
     for (const m of nullMaps) args.push("-map", m);
     args.push("-f", "null", "-");
   }
   if (pipeMaps.length) {
     for (const m of pipeMaps) args.push("-map", m);
-    // constant frame rate (the default for rawvideo): frame n is at n / fps
+    // constant frame rate (the fps filter above): frame n is at n / rate
     args.push("-f", "rawvideo", "pipe:1");
   }
   return args;
@@ -424,21 +488,35 @@ export interface Analysis {
   frames: { t: number[]; oy: number[]; ou: number[]; ov: number[] };
   black: TimeRun[];
   frozen: { start: number; end?: number }[];
-  loudness: { integrated?: number; lra?: number; truePeak?: number; maxShortTerm?: number; maxShortTermAt?: number };
+  /** shortTermLines: ebur128 per-100-ms lines seen (0: none could be read) */
+  loudness: { integrated?: number; lra?: number; truePeak?: number; maxShortTerm?: number; maxShortTermAt?: number; shortTermLines?: number };
+  /** every decoded video frame (the count tap): how many, and the first / last frame time */
+  decoded: { frames: number; firstT?: number; lastT?: number };
+  /** ffmpeg's messages about a damaged or incomplete file: how many, and the first */
+  damage: { count: number; first?: string };
 }
+
+/** ffmpeg messages that mean the file is damaged or incomplete */
+const DAMAGE = /partial file|invalid data|decoding error|corrupt|truncat|error while decoding|concealing \d+ (DC|AC|MV) errors/i;
 
 const PREFIX = /^\[([A-Za-z0-9_]+)@([A-Za-z0-9_]+) @ [^\]]+\] ?(.*)$/;
 const FRAME_KEYS: Record<string, keyof Analysis["frames"]> = { oyavg: "oy", ouavg: "ou", ovavg: "ov" };
 
 /** Collects the per-frame metadata and the detector / loudness lines from ffmpeg's stderr, line by line. */
 export class LogCollector {
-  a: Analysis = { frames: { t: [], oy: [], ou: [], ov: [] }, black: [], frozen: [], loudness: {} };
+  a: Analysis = { frames: { t: [], oy: [], ou: [], ov: [] }, black: [], frozen: [], loudness: {}, decoded: { frames: 0 }, damage: { count: 0 } };
   private frameOf: Record<string, number> = {};
   private summary = false;
   private section = "";
+  /** the input's path: a line naming it (e.g. "Input #0 ... from 'corrupt.mov'") is not a damage message */
+  constructor(private inputPath?: string) {}
 
   line(l: string) {
     const m = PREFIX.exec(l);
+    if (DAMAGE.test(l) && !(m && m[1] === "metadata") && !/^Input #/.test(l) && !(this.inputPath && l.includes(this.inputPath))) {
+      this.a.damage.count++;
+      this.a.damage.first ??= l.trim().slice(0, 200);
+    }
     if (!m) {
       if (this.summary) this.summaryLine(l);
       return;
@@ -460,6 +538,13 @@ export class LogCollector {
       return;
     }
     const fr = /^frame:\s*(\d+)\s+pts:\s*\S+\s+pts_time:\s*([-\d.e+]+)/.exec(rest);
+    if (fr && name === "count") {
+      const d = this.a.decoded, t = Number(fr[2]);
+      d.frames++;
+      if (d.firstT === undefined) d.firstT = t;
+      d.lastT = t;
+      return;
+    }
     if (fr) {
       const i = Number(fr[1]);
       this.frameOf[name] = i;
@@ -482,6 +567,7 @@ export class LogCollector {
     const t = /^t:\s*([-\d.]+)/.exec(rest);
     const s = /\bS:\s*([-\d.]+)/.exec(rest);
     if (t && s) {
+      this.a.loudness.shortTermLines = (this.a.loudness.shortTermLines ?? 0) + 1;
       const v = Number(s[1]);
       // -120.7 / -70 and below: no signal (yet)
       if (v > -70 && (this.a.loudness.maxShortTerm === undefined || v > this.a.loudness.maxShortTerm)) {
@@ -640,7 +726,7 @@ export async function measureExtremes(ff: FfmpegPaths, file: string, t: number, 
   const v: Record<string, number> = {};
   const r = await runTool(
     ff.ffmpeg,
-    ["-hide_banner", "-nostats", "-nostdin", "-loglevel", "repeat+info", "-ss", t.toFixed(3), "-i", file, "-frames:v", "1", "-vf", `format=${plan.pixFmt},signalstats,metadata=print`, "-an", "-f", "null", "-"],
+    ["-hide_banner", "-nostats", "-nostdin", "-loglevel", "repeat+info", "-ss", t.toFixed(3), "-i", inputUrl(file), "-frames:v", "1", "-vf", `format=${plan.pixFmt},signalstats,metadata=print`, "-an", "-f", "null", "-"],
     { signal, onStderrLine: (l) => {
       const m = /lavfi\.signalstats\.([YUV](MIN|MAX))=([\d.]+)/.exec(l);
       if (m) v[m[1]] = Number(m[3]);
@@ -698,32 +784,46 @@ export function evaluateFrozen(runs: { start: number; end?: number }[], spec: No
   return out;
 }
 
-export function evaluateLoudness(l: Analysis["loudness"], spec: NonNullable<Spec["audio"]>): Finding[] {
-  const out: Finding[] = [];
+/**
+ * Loudness findings, and the values the spec asks for that couldn't be read from ffmpeg's output (not run: never
+ * a pass). Silence (-inf / -70 LUFS and below) is a measurement: no integrated loudness to speak of.
+ */
+export function evaluateLoudness(l: Analysis["loudness"], spec: NonNullable<Spec["audio"]>): { findings: Finding[]; notRun: NotRun[] } {
+  const out: Finding[] = [], notRun: NotRun[] = [];
   const fix = "Adjust the mix level and render again.";
+  const unread = (check: string, what: string) => notRun.push({ check, reason: `the ${what} could not be read from ffmpeg's loudness measurement` });
   if (spec.integratedLUFS !== undefined) {
     const tol = spec.toleranceLU ?? 1;
-    if (l.integrated === undefined || !Number.isFinite(l.integrated) || l.integrated <= -70)
-      out.push({ check: "loudness", severity: "fail", message: `Integrated loudness could not be measured (silent audio?); the spec wants ${spec.integratedLUFS} LUFS.` });
+    if (l.integrated === undefined || Number.isNaN(l.integrated)) unread("loudness.integrated", "integrated loudness");
+    else if (!Number.isFinite(l.integrated) || l.integrated <= -70)
+      out.push({ check: "loudness", severity: "fail", message: `Integrated loudness could not be measured: the audio is silent; the spec wants ${spec.integratedLUFS} LUFS.`, fix: "Check that the audio layers are on and audible in the rendered range." });
     else if (Math.abs(l.integrated - spec.integratedLUFS) > tol + 1e-9)
       out.push({ check: "loudness", severity: "fail", message: `Integrated loudness is ${l.integrated.toFixed(1)} LUFS; the spec wants ${spec.integratedLUFS} LUFS ±${tol} LU.`, fix });
   }
-  if (spec.maxTruePeakDBTP !== undefined && l.truePeak !== undefined && l.truePeak > spec.maxTruePeakDBTP + 1e-9)
-    out.push({ check: "loudness", severity: "fail", message: `True peak is ${l.truePeak.toFixed(1)} dBTP; the spec allows ${spec.maxTruePeakDBTP} dBTP.`, fix: "Lower the level or put a true-peak limiter on the mix." });
-  if (spec.maxShortTermLUFS !== undefined && l.maxShortTerm !== undefined && l.maxShortTerm > spec.maxShortTermLUFS + 1e-9)
-    out.push({
-      check: "loudness",
-      severity: "fail",
-      message: `Short-term loudness reaches ${l.maxShortTerm.toFixed(1)} LUFS (the 3 s from ${fmtTime(l.maxShortTermAt ?? 0)}); the spec allows ${spec.maxShortTermLUFS} LUFS.`,
-      ...(l.maxShortTermAt !== undefined ? { at: [round(l.maxShortTermAt, 2), round(l.maxShortTermAt + 3, 2)] as [number, number] } : {}),
-      fix,
-    });
-  if (spec.loudnessRangeLU && l.lra !== undefined) {
+  if (spec.maxTruePeakDBTP !== undefined) {
+    if (l.truePeak === undefined || Number.isNaN(l.truePeak)) unread("loudness.truePeak", "true peak");
+    else if (l.truePeak > spec.maxTruePeakDBTP + 1e-9)
+      out.push({ check: "loudness", severity: "fail", message: `True peak is ${l.truePeak.toFixed(1)} dBTP; the spec allows ${spec.maxTruePeakDBTP} dBTP.`, fix: "Lower the level or put a true-peak limiter on the mix." });
+  }
+  if (spec.maxShortTermLUFS !== undefined) {
+    // no per-100-ms lines at all: not measured; lines but nothing above -70 LUFS: silent, so never too loud
+    if (!l.shortTermLines) unread("loudness.maxShortTerm", "short-term loudness");
+    else if (l.maxShortTerm !== undefined && l.maxShortTerm > spec.maxShortTermLUFS + 1e-9)
+      out.push({
+        check: "loudness",
+        severity: "fail",
+        message: `Short-term loudness reaches ${l.maxShortTerm.toFixed(1)} LUFS (the 3 s from ${fmtTime(l.maxShortTermAt ?? 0)}); the spec allows ${spec.maxShortTermLUFS} LUFS.`,
+        ...(l.maxShortTermAt !== undefined ? { at: [round(l.maxShortTermAt, 2), round(l.maxShortTermAt + 3, 2)] as [number, number] } : {}),
+        fix,
+      });
+  }
+  if (spec.loudnessRangeLU) {
     const { min, max } = spec.loudnessRangeLU;
-    if ((min !== undefined && l.lra < min - 1e-9) || (max !== undefined && l.lra > max + 1e-9))
+    if (l.lra === undefined || Number.isNaN(l.lra)) unread("loudness.range", "loudness range (LRA)");
+    else if ((min !== undefined && l.lra < min - 1e-9) || (max !== undefined && l.lra > max + 1e-9))
       out.push({ check: "loudness", severity: "fail", message: `Loudness range (LRA) is ${l.lra.toFixed(1)} LU; the spec wants ${min ?? "any"} to ${max ?? "any"} LU.`, fix });
   }
-  return out;
+  return { findings: out, notRun };
 }
 
 export function evaluateFlash(r: { general: FlashRun[]; red: FlashRun[] }, max: number): Marked[] {
@@ -762,16 +862,16 @@ function abortError(): Error {
   return e;
 }
 
-/** Plans the ffmpeg pass for this file and spec; notes checks that can't run. */
-export function planAnalysis(info: ProbeInfo, spec: Spec, findings: Finding[], skipped: string[]): AnalysisPlan {
+/** Plans the ffmpeg pass for this file and spec; requested checks that can't run go to `notRun`. */
+export function planAnalysis(info: ProbeInfo, spec: Spec, findings: Finding[], notRun: NotRun[]): AnalysisPlan {
   const v = info.video;
   const fps = v?.frameRate || 25;
   const plan: AnalysisPlan = { loudness: false };
   const videoChecks = (["legalRange", "black", "frozen", "flash"] as const).filter((k) => spec[k]);
-  if (videoChecks.length && !v) skipped.push(`${videoChecks.join(", ")}: the file has no video stream`);
+  if (videoChecks.length && !v) for (const c of videoChecks) notRun.push({ check: c, reason: "the file has no video stream" });
   if (v && spec.legalRange) {
     const pf = analysisPixFmt(v.pixFmt);
-    if (!pf) skipped.push(`legalRange: the file is ${v.rgb ? "RGB" : "not Y'CbCr"} (${v.pixFmt}); legal range applies to YUV (Y'CbCr) video`);
+    if (!pf) notRun.push({ check: "legalRange", reason: `the file is ${v.rgb ? "RGB" : "not Y'CbCr"} (${v.pixFmt}); legal range is measured on YUV (Y'CbCr) video` });
     else {
       const lr = spec.legalRange;
       const both = !lr.luma && !lr.chroma;
@@ -786,148 +886,233 @@ export function planAnalysis(info: ProbeInfo, spec: Spec, findings: Finding[], s
   }
   if (v && spec.black) plan.black = { minRun: round(1 / fps, 6), threshold: spec.black.threshold ?? 0.1 };
   if (v && spec.frozen) plan.frozen = { minRun: round(Math.max(spec.frozen.maxSeconds, 1 / fps), 6), noise: spec.frozen.noise ?? 0.001 };
-  if (v && spec.flash) plan.flash = FLASH_GRID;
-  const a = spec.audio;
-  if (a && (a.integratedLUFS !== undefined || a.maxTruePeakDBTP !== undefined || a.maxShortTermLUFS !== undefined || a.loudnessRangeLU)) {
-    if (!info.audio.length) {
-      if (a.required !== false) skipped.push("loudness: the file has no audio stream");
-    } else {
-      plan.loudness = true;
-      if (info.audio.length > 1) findings.push({ check: "loudness", severity: "info", message: `The file has ${info.audio.length} audio streams; loudness was measured on the first.` });
-    }
+  if (v && spec.flash) plan.flash = { ...FLASH_GRID, rate: /^\d+(\/\d+)?$/.test(v.frameRateText) && parseRate(v.frameRateText) > 0 ? v.frameRateText : String(round(fps, 6)) };
+  // no audio stream: compareProbe fails it (unless the spec says no audio); nothing to measure
+  if (wantsLoudness(spec.audio) && info.audio.length) {
+    plan.loudness = true;
+    if (info.audio.length > 1)
+      findings.push({ check: "loudness", severity: "info", message: `The file has ${info.audio.length} audio streams; loudness was measured on the first (stream #${info.audio[0].index}).` });
   }
   return plan;
 }
 
+/** Removes Preflight thumbnails left in ~/.aemcp/tmp for more than a day (a call that crashed). */
+function sweepThumbnails(dir: string) {
+  try {
+    for (const n of readdirSync(dir))
+      if (n.startsWith("preflight-"))
+        try {
+          if (Date.now() - statSync(join(dir, n)).mtimeMs > 24 * 3600_000) unlinkSync(join(dir, n));
+        } catch {}
+  } catch {}
+}
+
+/**
+ * How much of the picture was decoded, against the file's own duration and frame count: a truncated or damaged
+ * file fails (its end was never checked), and no frames at all is "not run", never a pass.
+ */
+export function coverage(a: Analysis, info: ProbeInfo, videoChecks: string[]): { findings: Finding[]; notRun: NotRun[] } {
+  const findings: Finding[] = [], notRun: NotRun[] = [];
+  const v = info.video;
+  const damage = a.damage.count ? ` (ffmpeg: "${a.damage.first}"${a.damage.count > 1 ? ` and ${a.damage.count - 1} more` : ""})` : "";
+  const fix = "Render the file again and check the copy: a render that stopped early, a full disk or an incomplete copy look like this.";
+  let short = false;
+  if (v && videoChecks.length) {
+    const fps = v.frameRate || 25, vd = videoDuration(info), d = a.decoded;
+    if (!d.frames) {
+      for (const c of videoChecks) notRun.push({ check: c, reason: `no video frames could be read from ffmpeg's output${damage}` });
+      if (a.damage.count) findings.push({ check: "file.decode", severity: "fail", message: `No frame of the picture could be decoded${damage}.`, fix });
+      return { findings, notRun };
+    }
+    const covered = (d.lastT ?? 0) - (d.firstT ?? 0) + 1 / fps;
+    const cfr = !v.avgFrameRate;
+    if (vd !== undefined && covered < vd - 2 / fps - 1e-6) short = true;
+    else if (cfr && v.frames && d.frames < v.frames - 2) short = true;
+    if (short)
+      findings.push({
+        check: "file.decode",
+        severity: "fail",
+        message: `Only ${round(Math.min(covered, vd ?? covered), 2)} s of ${vd !== undefined ? `${round(vd, 2)} s` : "the picture"} could be decoded (${d.frames}${v.frames ? ` of ${v.frames}` : ""} frames): the file is truncated or damaged, and the rest was not checked${damage}.`,
+        at: [round(covered, 3), round(vd ?? covered, 3)],
+        fix,
+      });
+  }
+  if (!short && a.damage.count)
+    findings.push({ check: "file.decode", severity: "warn", message: `ffmpeg reported ${a.damage.count} decoding error${a.damage.count > 1 ? "s" : ""} in the file${damage}: parts of it may be damaged.`, fix });
+  return { findings, notRun };
+}
+
 export async function checkFile(path: string, spec: Spec, opts: CheckFileOptions = {}): Promise<FileCheck> {
   const t0 = Date.now();
+  const tmpDir = join(homedir(), ".aemcp", "tmp");
+  sweepThumbnails(tmpDir);
+  const allNotRun = (reason: string): NotRun[] => requestedChecks(spec).map((check) => ({ check, reason }));
   if (!existsSync(path) || !statSync(path).isFile())
-    return { findings: [{ check: "file", severity: "fail", message: `The rendered file was not found: ${path}` }], probe: {}, skipped: requestedChecks(spec).map((c) => `${c}: no file`) };
+    return { findings: [{ check: "file", severity: "fail", message: `The rendered file was not found: ${path}` }], probe: {}, notRun: allNotRun("no file") };
 
   let ff: FfmpegPaths;
   try {
-    ff = opts.ffmpeg ?? (await ensureFfmpeg({ allowDownload: opts.allowDownload, signal: opts.signal }));
+    ff = opts.ffmpeg ?? (await ensureFfmpeg({ allowDownload: opts.allowDownload, signal: opts.signal, confirmDownload: opts.confirmDownload }));
   } catch (e: any) {
     if (opts.signal?.aborted) throw abortError();
     const why = e instanceof FfmpegMissingError ? e.message : String(e?.message ?? e);
-    return { findings: [], probe: {}, skipped: requestedChecks(spec).map((c) => `${c}: ${why}`) };
+    return { findings: [], probe: {}, notRun: allNotRun(why) };
   }
 
-  // 1. ffprobe
-  let json = "";
-  const pr = await runTool(ff.ffprobe, ["-v", "error", "-print_format", "json", "-show_format", "-show_streams", path], { signal: opts.signal, onStdout: (b) => (json += b.toString("utf8")) });
+  // 1. ffprobe (stdout collected as bytes and decoded once: a multi-byte character can straddle two chunks)
+  const chunks: Buffer[] = [];
+  const pr = await runTool(ff.ffprobe, ["-v", "error", "-print_format", "json", "-show_format", "-show_streams", "-i", inputUrl(path)], { signal: opts.signal, onStdout: (b) => chunks.push(b) });
   if (pr.aborted) throw abortError();
   let info: ProbeInfo;
   try {
     if (pr.code !== 0) throw new Error(pr.stderrTail.trim().split("\n").pop() || `exit code ${pr.code}`);
-    info = parseProbe(json, path);
+    info = parseProbe(Buffer.concat(chunks).toString("utf8"), path);
   } catch (e: any) {
     return {
       findings: [{ check: "file", severity: "fail", message: `ffprobe could not read the file (${String(e?.message ?? e).slice(0, 200)}); it may be damaged, incomplete or not a media file.` }],
       probe: {},
-      skipped: requestedChecks(spec).map((c) => `${c}: the file could not be read`),
+      notRun: allNotRun("the file could not be read"),
     };
   }
   const findings: Marked[] = compareProbe(info, spec);
-  const skipped: string[] = [];
+  const notRun: NotRun[] = [];
+  const notes: string[] = [];
   const ran: string[] = [];
   if (spec.video) ran.push("video properties");
   if (spec.audio) ran.push("audio properties");
   const fps = info.video?.frameRate || 25;
+  const vd = videoDuration(info);
   const audioIndex = info.audio.length ? 0 : null;
-
-  // 2. one ffmpeg pass for everything that needs decoding
-  const plan = planAnalysis(info, spec, findings, skipped);
-  if (plan.legal && info.video) {
-    const cal = await calibrateLegal(ff, plan.legal, info.video.width, info.video.height, opts.signal);
-    if (opts.signal?.aborted) throw abortError();
-    if (cal) Object.assign(plan.legal, cal);
-  }
-  const args = buildArgs(path, plan, audioIndex);
-  if (args) {
-    const col = new LogCollector();
-    const det = plan.flash
-      ? new FlashDetector({
-          ...plan.flash,
-          fps,
-          maxFlashesPerSecond: spec.flash?.maxFlashesPerSecond,
-          minAreaFraction: spec.flash?.minAreaFraction,
-          minLuminanceChange: spec.flash?.minLuminanceChange,
-          redFlash: spec.flash?.redFlash !== false,
-        })
-      : null;
-    let pending: Buffer = Buffer.alloc(0);
-    const r = await runTool(ff.ffmpeg, args, {
-      signal: opts.signal,
-      onStderrLine: (l) => col.line(l),
-      onStdout: (b) => {
-        if (!det) return;
-        pending = pending.length ? Buffer.concat([pending, b]) : b;
-        const n = det.frameBytes;
-        let off = 0;
-        for (; pending.length - off >= n; off += n) det.push(pending.subarray(off, off + n));
-        pending = pending.subarray(off);
-      },
-    });
-    if (r.aborted) throw abortError();
-    const names = [plan.legal && "legalRange", plan.black && "black", plan.frozen && "frozen", plan.loudness && "loudness", plan.flash && "flash"].filter(Boolean) as string[];
-    if (r.code !== 0) {
-      skipped.push(`${names.join(", ")}: ffmpeg failed (${r.stderrTail.trim().split("\n").slice(-2).join(" ").slice(0, 300)})`);
-    } else {
+  const thumbnails: NonNullable<FileCheck["thumbnails"]> = [];
+  try {
+    // 2. one ffmpeg pass for everything that needs decoding
+    const plan = planAnalysis(info, spec, findings, notRun);
+    if (plan.legal && info.video) {
+      const cal = await calibrateLegal(ff, plan.legal, info.video.width, info.video.height, opts.signal);
+      if (opts.signal?.aborted) throw abortError();
+      if (cal) Object.assign(plan.legal, cal);
+      else notes.push("legal range: the measuring grid couldn't be calibrated with this ffmpeg; the standard values were used (percentages may be slightly off)");
+    }
+    const args = buildArgs(path, plan, audioIndex);
+    if (args) {
+      const col = new LogCollector(resolve(path));
+      const det = plan.flash
+        ? new FlashDetector({
+            width: plan.flash.width,
+            height: plan.flash.height,
+            fps: plan.flash.rate ? parseRate(plan.flash.rate) || fps : fps,
+            maxFlashesPerSecond: spec.flash?.maxFlashesPerSecond,
+            minAreaFraction: spec.flash?.minAreaFraction,
+            minLuminanceChange: spec.flash?.minLuminanceChange,
+            redFlash: spec.flash?.redFlash !== false,
+          })
+        : null;
+      let pending: Buffer = Buffer.alloc(0);
+      const r = await runTool(ff.ffmpeg, args, {
+        signal: opts.signal,
+        onStderrLine: (l) => col.line(l),
+        onStdout: (b) => {
+          if (!det) return;
+          pending = pending.length ? Buffer.concat([pending, b]) : b;
+          const n = det.frameBytes;
+          let off = 0;
+          for (; pending.length - off >= n; off += n) det.push(pending.subarray(off, off + n));
+          pending = pending.subarray(off);
+        },
+      });
+      if (r.aborted) throw abortError();
+      const videoNames = [plan.legal && "legalRange", plan.black && "black", plan.frozen && "frozen", plan.flash && "flash"].filter(Boolean) as string[];
+      const names = [...videoNames, ...(plan.loudness ? ["loudness"] : [])];
       const a = col.a;
-      ran.push(...names);
-      if (plan.legal) {
-        const maxPct = spec.legalRange?.maxOutOfRangePercent ?? 0;
-        const extremes = new Map<number, Extremes>();
-        for (const sec of legalSections(a, plan.legal, maxPct).sections.slice(0, MAX_RANGES)) {
-          const x = await measureExtremes(ff, path, a.frames.t[sec.worst] ?? sec.worst / fps, plan.legal, opts.signal);
-          if (x) extremes.set(sec.worst, x);
+      if (r.code !== 0) {
+        const why = `ffmpeg failed (${r.stderrTail.trim().split("\n").slice(-2).join(" ").slice(0, 300)})`;
+        for (const c of names) notRun.push({ check: c, reason: why });
+        if (a.damage.count) findings.push(...coverage({ ...a, decoded: { frames: 0 } }, info, []).findings);
+      } else {
+        const cov = coverage(a, info, videoNames);
+        findings.push(...cov.findings);
+        notRun.push(...cov.notRun);
+        const blind = new Set(cov.notRun.map((n) => n.check));
+        ran.push(...names.filter((n) => !blind.has(n)));
+        if (plan.legal && !blind.has("legalRange")) {
+          const measured = a.frames.oy.filter((x) => x !== undefined).length;
+          if (measured < a.decoded.frames - 2)
+            notRun.push({ check: "legalRange", reason: `only ${measured} of ${a.decoded.frames} frames could be measured (ffmpeg's per-frame output could not be read)` });
+          if (measured) {
+            const maxPct = spec.legalRange?.maxOutOfRangePercent ?? 0;
+            const extremes = new Map<number, Extremes>();
+            for (const sec of legalSections(a, plan.legal, maxPct).sections.slice(0, MAX_RANGES)) {
+              const x = await measureExtremes(ff, path, a.frames.t[sec.worst] ?? sec.worst / fps, plan.legal, opts.signal);
+              if (x) extremes.set(sec.worst, x);
+            }
+            if (opts.signal?.aborted) throw abortError();
+            findings.push(...evaluateLegal(a, plan.legal, maxPct, fps, extremes));
+          }
         }
-        if (opts.signal?.aborted) throw abortError();
-        findings.push(...evaluateLegal(a, plan.legal, maxPct, fps, extremes));
-      }
-      if (plan.black) findings.push(...evaluateBlack(a.black, spec.black!, info.duration, fps));
-      if (plan.frozen) findings.push(...evaluateFrozen(a.frozen, spec.frozen!, info.duration, plan.black ? a.black : null, fps));
-      if (plan.loudness) findings.push(...evaluateLoudness(a.loudness, spec.audio!));
-      if (det) {
-        const fr = det.result();
-        findings.push(...evaluateFlash(fr, spec.flash?.maxFlashesPerSecond ?? 3));
-        findings.push({ check: "flash", severity: "info", message: `Flash pre-check on a ${FLASH_GRID.width}x${FLASH_GRID.height} grid over ${fr.frames} frames; not a certified PSE / Harding test.` });
+        if (plan.black && !blind.has("black")) findings.push(...evaluateBlack(a.black, spec.black!, vd, fps));
+        if (plan.frozen && !blind.has("frozen")) findings.push(...evaluateFrozen(a.frozen, spec.frozen!, vd, plan.black ? a.black : null, fps));
+        if (plan.loudness) {
+          const l = evaluateLoudness(a.loudness, spec.audio!);
+          findings.push(...l.findings);
+          notRun.push(...l.notRun);
+        }
+        if (det && !blind.has("flash")) {
+          const fr = det.result();
+          if (!fr.frames) notRun.push({ check: "flash", reason: "no frames reached the flash pre-check" });
+          else {
+            findings.push(...evaluateFlash(fr, spec.flash?.maxFlashesPerSecond ?? 3));
+            findings.push({ check: "flash", severity: "info", message: `Flash pre-check on a ${FLASH_GRID.width}x${FLASH_GRID.height} grid over ${fr.frames} frames; not a certified PSE / Harding test.` });
+          }
+        }
       }
     }
-  }
 
-  // 3. thumbnails at the most important failing times
-  let thumbnails: FileCheck["thumbnails"];
-  if (opts.thumbnails && info.video) {
-    const picks = findings
-      .filter((f) => f.thumb)
-      .sort((a, b) => a.thumb!.prio - b.thumb!.prio || a.thumb!.at - b.thumb!.at)
-      .filter((f, i, all) => all.findIndex((g) => Math.abs(g.thumb!.at - f.thumb!.at) < 0.5) === i)
-      .slice(0, 4);
-    if (picks.length) {
-      thumbnails = [];
-      const dir = join(homedir(), ".aemcp", "tmp");
-      mkdirSync(dir, { recursive: true });
-      const id = randomBytes(5).toString("hex");
-      for (const [i, f] of picks.entries()) {
-        const at = Math.max(0, Math.min(f.thumb!.at, (info.duration ?? f.thumb!.at + 1) - 1 / fps));
-        // JPEG at 960 px: a full PNG frame is about 1 MB of base64 per image for the AI to read
-        const out = join(dir, `preflight-${id}-${i + 1}.jpg`);
-        const r = await runTool(ff.ffmpeg, ["-hide_banner", "-nostdin", "-loglevel", "error", "-ss", at.toFixed(3), "-i", path, "-frames:v", "1", "-vf", "scale='min(960,iw)':-2", "-q:v", "3", "-y", out], {
-          signal: opts.signal,
-        });
-        if (r.aborted) throw abortError();
-        if (r.code === 0 && existsSync(out)) thumbnails.push({ at: round(at, 3), path: out, label: f.thumb!.label });
+    // 3. thumbnails at the most important failing times
+    if (opts.thumbnails && info.video) {
+      const picks = findings
+        .filter((f) => f.thumb)
+        .sort((a, b) => a.thumb!.prio - b.thumb!.prio || a.thumb!.at - b.thumb!.at)
+        .filter((f, i, all) => all.findIndex((g) => Math.abs(g.thumb!.at - f.thumb!.at) < 0.5) === i)
+        .slice(0, 4);
+      if (picks.length) {
+        mkdirSync(tmpDir, { recursive: true });
+        const id = randomBytes(5).toString("hex");
+        for (const [i, f] of picks.entries()) {
+          const at = Math.max(0, Math.min(f.thumb!.at, (vd ?? f.thumb!.at + 1) - 1 / fps));
+          // JPEG at 960 px: a full PNG frame is about 1 MB of base64 per image for the AI to read
+          const out = join(tmpDir, `preflight-${id}-${i + 1}.jpg`);
+          const r = await runTool(ff.ffmpeg, ["-hide_banner", "-nostdin", "-loglevel", "error", "-ss", at.toFixed(3), "-i", inputUrl(path), "-frames:v", "1", "-vf", "scale='min(960,iw)':-2", "-q:v", "3", "-y", out], {
+            signal: opts.signal,
+          });
+          if (existsSync(out)) {
+            // written (perhaps in part) before a cancel: removed below with the others
+            thumbnails.push({ at: round(at, 3), path: out, label: f.thumb!.label });
+            if (r.code !== 0 && !r.aborted) {
+              thumbnails.pop();
+              try {
+                unlinkSync(out);
+              } catch {}
+            }
+          }
+          if (r.aborted) throw abortError();
+        }
       }
     }
+  } catch (e) {
+    // a cancel or an error: no thumbnail is left behind
+    for (const t of thumbnails)
+      try {
+        unlinkSync(t.path);
+      } catch {}
+    throw e;
   }
 
   return {
     findings: findings.map(({ thumb: _thumb, ...f }) => f),
     probe: compactProbe(info),
-    ...(thumbnails?.length ? { thumbnails } : {}),
-    ...(skipped.length ? { skipped } : {}),
+    ...(thumbnails.length ? { thumbnails } : {}),
+    ...(notRun.length ? { notRun } : {}),
+    ...(notes.length ? { notes } : {}),
     ran,
     tool: { ffmpeg: ff.ffmpeg, source: ff.source, seconds: round((Date.now() - t0) / 1000, 2) },
   };

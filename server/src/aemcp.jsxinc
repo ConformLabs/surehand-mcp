@@ -288,10 +288,15 @@ aemcp = (function () {
     var o = { index: l.index, id: l.id, name: l.name, type: A.layerType(l), enabled: l.enabled, solo: l.solo, locked: l.locked, shy: l.shy,
       inPoint: A.round(l.inPoint), outPoint: A.round(l.outPoint), startTime: A.round(l.startTime), stretch: l.stretch, label: l.label,
       parent: l.parent ? l.parent.index : null, selected: l.selected, comment: l.comment };
-    if (inst(l, "AVLayer")) {
-      o.threeD = l.threeDLayer; o.blendingMode = A.enumName(BlendingMode, l.blendingMode);
-      o.trackMatteType = A.enumName(TrackMatteType, l.trackMatteType); o.audioEnabled = l.audioEnabled;
-      o.adjustmentLayer = l.adjustmentLayer; o.motionBlur = l.motionBlur; o.collapseTransformation = l.collapseTransformation;
+    // in After Effects TextLayer and ShapeLayer are not AVLayer subclasses, but they have these attributes too
+    if (inst(l, "AVLayer") || inst(l, "TextLayer") || inst(l, "ShapeLayer")) {
+      try { o.threeD = l.threeDLayer; } catch (e) {}
+      try { o.blendingMode = A.enumName(BlendingMode, l.blendingMode); } catch (e) {}
+      try { o.trackMatteType = A.enumName(TrackMatteType, l.trackMatteType); } catch (e) {}
+      try { o.audioEnabled = l.audioEnabled; } catch (e) {}
+      try { o.adjustmentLayer = l.adjustmentLayer; } catch (e) {}
+      try { o.motionBlur = l.motionBlur; } catch (e) {}
+      try { o.collapseTransformation = l.collapseTransformation; } catch (e) {}
       try { if (l.source) o.source = { id: l.source.id, name: l.source.name, type: A.itemType(l.source) }; } catch (e) {}
     }
     if (detail) {

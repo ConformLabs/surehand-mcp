@@ -241,6 +241,12 @@ export interface FakeLayerSpec {
   boxOverflow?: boolean;
   /** characters the text's font has no glyph for (the font gets hasGlyphsFor, as in AE 25.1+) */
   glyphsMissing?: string;
+  /** per-character fonts (style runs, AE 24+ characterRange): the font of character i, and what it lacks */
+  charFonts?: { font: string; missing?: string }[];
+  /** auto-orient along the path */
+  autoOrient?: boolean;
+  /** reading threeDLayer throws */
+  threeDThrows?: boolean;
 }
 export interface FakeCompSpec {
   name: string;
@@ -273,6 +279,8 @@ export interface FakeProjectSpec {
   installedEffects?: { matchName: string; displayName: string }[];
   /** null: an After Effects without the font API */
   fonts?: { postScriptName: string; familyName: string; styleName: string; isSubstitute: boolean }[] | null;
+  /** app.project.usedFonts: a font and the layers (by name) that use it; noIds: usedAt entries without layerID */
+  usedFonts?: { ps: string; layers: string[]; noIds?: boolean }[];
   activeComp?: string;
 }
 
@@ -299,6 +307,7 @@ export function fakeProject(spec: FakeProjectSpec) {
     PropertyType, PropertyValueType, BlendingMode, TrackMatteType,
     AlphaMode: { IGNORE: 5412, STRAIGHT: 5413, PREMULTIPLIED: 5414 },
     RQItemStatus: { QUEUED: 3015, UNQUEUED: 3013, DONE: 3019 },
+    AutoOrientType: { NO_AUTO_ORIENT: 4212, ALONG_PATH: 4213 },
     FrameBlendingType: { NO_FRAME_BLEND: 4012, FRAME_MIX: 4013, PIXEL_MOTION: 4014 },
   };
   const writes: string[] = [];
@@ -375,8 +384,10 @@ export function fakeProject(spec: FakeProjectSpec) {
       ]);
       const children: any[] = [transform];
       if (type !== "camera") children.push(group("Effects", "ADBE Effect Parade", effectGroups(ls)));
+      const fontObj = (ps: string, missing: string) => ({ postScriptName: ps, hasGlyphsFor: (ch: string) => !missing.includes(ch) });
       const doc = (text: string) => ({ font: ls.font ?? "ArialMT", text, fontSize: ls.fontSize ?? 50, boxText: ls.boxOverflow !== undefined, boxOverflow: ls.boxOverflow,
-        ...(ls.glyphsMissing !== undefined ? { fontObject: { hasGlyphsFor: (ch: string) => !ls.glyphsMissing!.includes(ch) } } : {}) });
+        ...(ls.glyphsMissing !== undefined ? { fontObject: fontObj(ls.font ?? "ArialMT", ls.glyphsMissing) } : {}),
+        ...(ls.charFonts ? { characterRange: (i: number) => ({ font: ls.charFonts![i].font, fontObject: fontObj(ls.charFonts![i].font, ls.charFonts![i].missing ?? "") }) } : {}) });
       const textAnim = an["ADBE Text Document"];
       if (type === "text") children.push(group("Text", "ADBE Text Properties", [prop("Source Text", "ADBE Text Document", { value: doc(ls.text ?? ls.name) }, textAnim && ((t: number) => doc(String(textAnim(t)))))]));
       for (const [path, e] of Object.entries(ls.expressions ?? {})) {
@@ -396,7 +407,7 @@ export function fakeProject(spec: FakeProjectSpec) {
         index: li + 1, id: 1000 + nextId++, name: ls.name, enabled: ls.enabled !== false, shy: !!ls.shy, guideLayer: !!ls.guide, isTrackMatte: !!ls.isTrackMatte,
         nullLayer: type === "null", adjustmentLayer: type === "adjustment", source: source ?? null, collapseTransformation: !!ls.collapse, timeRemapEnabled: !!ls.timeRemap,
         frameBlendingType: ls.frameBlend ? (globals.FrameBlendingType as any)[ls.frameBlend] : (globals.FrameBlendingType as any).NO_FRAME_BLEND,
-        motionBlur: !!ls.motionBlur, threeDLayer: !!ls.threeD, inPoint: ls.inPoint ?? 0, outPoint: ls.outPoint ?? comp.duration, parent: null, children,
+        motionBlur: !!ls.motionBlur, inPoint: ls.inPoint ?? 0, outPoint: ls.outPoint ?? comp.duration, parent: null, children,
         startTime: ls.startTime ?? 0, stretch: 100,
         sourceRectAtTime: (t: number) => {
           calls.push("sourceRectAtTime");
@@ -404,6 +415,18 @@ export function fakeProject(spec: FakeProjectSpec) {
           return { left: r[0], top: r[1], width: r[2], height: r[3] };
         },
       });
+      Object.defineProperty(L, "threeDLayer", {
+        get: () => {
+          if (ls.threeDThrows) throw new Error("threeDLayer can't be read");
+          return !!ls.threeD;
+        },
+        enumerable: true,
+        configurable: true,
+      });
+      L.autoOrient = ls.autoOrient ? (globals.AutoOrientType as any).ALONG_PATH : (globals.AutoOrientType as any).NO_AUTO_ORIENT;
+      L.blendingMode = BlendingMode.NORMAL;
+      L.trackMatteType = TrackMatteType.NO_TRACK_MATTE;
+      L.audioEnabled = false;
       Object.defineProperty(L, "numProperties", { get: () => L.children.length });
       L.property = (k: number | string) => (typeof k === "number" ? L.children[k - 1] : L.children.find((x: any) => x.name === k || x.matchName === k)) ?? null;
       comp.layers.push(watch(L, ls.name));
@@ -437,6 +460,11 @@ export function fakeProject(spec: FakeProjectSpec) {
     executeCommand: () => calls.push("executeCommand"),
   };
   if (spec.fonts !== null) app.fonts = { missingOrSubstitutedFonts: spec.fonts ?? [] };
+  if (spec.usedFonts) {
+    const layerId = (n: string) => comps.flatMap((c) => c.layers).find((l: any) => l.name === n)?.id;
+    project.usedFonts = spec.usedFonts.map((u) => ({ font: { postScriptName: u.ps }, usedAt: u.layers.map((n) => (u.noIds ? { layerTimeD: {} } : { layerID: layerId(n), layerTimeD: {} })) }));
+    writes.length = 0;
+  }
   const names = Object.keys(globals);
   const values = names.map((n) => globals[n]);
   const aemcp = new Function("$", "app", ...names, "var aemcp;\n" + helperSource + "\nreturn aemcp;")({ global: { ...globals } }, app, ...values);

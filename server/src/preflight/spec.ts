@@ -177,3 +177,13 @@ export interface Finding {
   /** a short suggestion of how to fix it */
   fix?: string;
 }
+
+/**
+ * A check the spec asks for that did not run (or ran on incomplete data), and why. Distinct from a section that
+ * isn't in the spec and from a check this target can't do (project-only checks on a file): those are "not checked".
+ * Any of these keeps the verdict from being PASS.
+ */
+export interface NotRun {
+  check: string;
+  reason: string;
+}

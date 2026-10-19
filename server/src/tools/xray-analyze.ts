@@ -100,7 +100,7 @@ export interface XData {
   footage: XFootage[];
   rq: { comp: number; status: string; render: boolean; file?: string | null }[];
   /** null: this AE has no font API (before 24.0) */
-  fonts?: { missing: { ps: string; family?: string; style?: string; sub?: boolean }[]; used?: { ps: string; layers: number }[] } | null;
+  fonts?: { missing: { ps: string; family?: string; style?: string; sub?: boolean }[]; used?: { ps: string; layers: number; ids?: number[] }[] } | null;
   /** the scan stopped early */
   partial?: { reason: string };
   layersScanned: number;

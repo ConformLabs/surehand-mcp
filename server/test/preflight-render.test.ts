@@ -1,6 +1,6 @@
 // Integration: real ffmpeg on tiny generated files. Skipped when ffmpeg / ffprobe aren't installed (CI).
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, truncateSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -48,6 +48,28 @@ describe.skipIf(!ff)("rendered-file checks with ffmpeg", () => {
     make("flash10.mkv", ["-f", "lavfi", "-i", "color=black:s=160x90:r=20:d=2,format=yuv420p,geq=lum='if(mod(N,2),235,16)':cb=128:cr=128", "-c:v", "ffv1"]);
     make("flash2.mkv", ["-f", "lavfi", "-i", "color=black:s=160x90:r=20:d=3,format=yuv420p,geq=lum='if(mod(floor(N/5),2),235,16)':cb=128:cr=128", "-c:v", "ffv1"]);
     // saturated red against a grey of the same luminance, every frame
+    // picture only (Audio Output off), and picture with two audio streams (48 kHz stereo + 44.1 kHz mono)
+    make("noaudio.mov", ["-f", "lavfi", "-i", "testsrc2=s=160x90:r=25:d=2", "-c:v", "ffv1"]);
+    make("twoaudio.mkv", [
+      "-f", "lavfi", "-i", "testsrc2=s=160x90:r=25:d=2",
+      "-f", "lavfi", "-i", "aevalsrc=0.1*sin(2*PI*1000*t)|0.1*sin(2*PI*1000*t):s=48000:d=2",
+      "-f", "lavfi", "-i", "aevalsrc=0.1*sin(2*PI*500*t):s=44100:d=2",
+      "-map", "0:v", "-map", "1:a", "-map", "2:a", "-c:v", "ffv1", "-c:a", "pcm_s16le",
+    ]);
+    // 2 s of picture ending in 1 s of black, 4 s of sound: the container says 4 s
+    make("longaudio.mov", [
+      "-f", "lavfi", "-i", "testsrc2=s=160x90:r=25:d=1",
+      "-f", "lavfi", "-i", "color=black:s=160x90:r=25:d=1",
+      "-f", "lavfi", "-i", "aevalsrc=0.1*sin(2*PI*1000*t):s=48000:d=4",
+      "-filter_complex", "[0:v][1:v]concat=n=2:v=1,format=yuv420p[v]", "-map", "[v]", "-map", "2:a", "-c:v", "ffv1", "-c:a", "pcm_s16le",
+    ]);
+    // 8 s of moving picture, cut to a third of its bytes (a render that stopped / an incomplete copy)
+    for (const n of ["trunc.mkv", "trunc.mp4"]) {
+      make(n, ["-f", "lavfi", "-i", "testsrc2=s=320x180:r=25:d=8", "-c:v", "libx264", "-preset", "ultrafast", "-g", "25", "-pix_fmt", "yuv420p", ...(n.endsWith(".mp4") ? ["-movflags", "+faststart"] : [])]);
+      truncateSync(file(n), Math.floor(statSync(file(n)).size / 3));
+    }
+    // a name that starts with "-" and looks like an option
+    make("-i x.mkv", ["-f", "lavfi", "-i", "testsrc2=s=160x90:r=25:d=1", "-c:v", "ffv1"]);
     make("redflash.mkv", ["-f", "lavfi", "-i", "color=black:s=160x90:r=20:d=2,format=gbrp,geq=r='if(mod(N,2),255,127)':g='if(mod(N,2),0,127)':b='if(mod(N,2),0,127)'", "-pix_fmt", "yuv444p", "-c:v", "ffv1"]);
   }, 60_000);
   afterAll(() => rmSync(dir, { recursive: true, force: true }));
@@ -103,7 +125,7 @@ describe.skipIf(!ff)("rendered-file checks with ffmpeg", () => {
   it("loudness of an audio-only file; video checks are skipped", async () => {
     const r = await checkFile(file("tone.wav"), loadSpec({ audio: { integratedLUFS: -23, toleranceLU: 0.3, maxTruePeakDBTP: -19.5, maxShortTermLUFS: -22.5 }, black: { maxSeconds: 0 } }), { ffmpeg: ff! });
     expect(r.findings).toEqual([]);
-    expect(r.skipped).toEqual(["black: the file has no video stream"]);
+    expect(r.notRun).toEqual([{ check: "black", reason: "the file has no video stream" }]);
     const loud = await checkFile(file("tone.wav"), loadSpec({ audio: { integratedLUFS: -16, maxTruePeakDBTP: -21 } }), { ffmpeg: ff! });
     expect(loud.findings.map((f) => f.message)).toEqual([
       expect.stringMatching(/Integrated loudness is -23\.0 LUFS; the spec wants -16 LUFS/),
@@ -150,6 +172,85 @@ describe.skipIf(!ff)("rendered-file checks with ffmpeg", () => {
     spawnSync(process.execPath, ["-e", `require("fs").writeFileSync(${JSON.stringify(junk)}, "not a movie")`]);
     const r = await checkFile(junk, loadSpec({ video: { width: 1 } }), { ffmpeg: ff! });
     expect(r.findings[0].message).toMatch(/ffprobe could not read the file/);
+  });
+
+  it("no audio stream when the spec asks for audio: FAIL (Audio Output off)", async () => {
+    const r = await checkFile(file("noaudio.mov"), loadSpec({ audio: { sampleRate: 48000, integratedLUFS: -23 } }), { ffmpeg: ff! });
+    expect(r.findings).toEqual([expect.objectContaining({ check: "file.audio", severity: "fail", message: "The file has no audio stream; the spec asks for 48000 Hz, -23 LUFS integrated." })]);
+    expect(r.notRun).toBeUndefined();
+  });
+
+  it("several audio streams: each is compared; loudness names the one it measured", async () => {
+    const r = await checkFile(file("twoaudio.mkv"), loadSpec({ audio: { sampleRate: 48000, integratedLUFS: -20, toleranceLU: 1 } }), { ffmpeg: ff! });
+    expect(r.findings.filter((f) => f.severity === "fail").map((f) => f.message)).toEqual(["Audio stream 2 of 2 (#2) sample rate is 44100 Hz; the spec wants 48000 Hz."]);
+    expect(r.findings.find((f) => f.severity === "info")?.message).toMatch(/measured on the first \(stream #1\)/);
+  });
+
+  it("durations come from the picture: black to its end, and a warning when the sound runs on", async () => {
+    const r = await checkFile(file("longaudio.mov"), loadSpec({ video: { duration: 2 }, black: { maxSeconds: 0, allowAtEnd: 1 }, frozen: { maxSeconds: 0.5 } }), { ffmpeg: ff! });
+    // the picture is 2 s (the container's 4 s is the audio); its last second is black, which the spec allows
+    expect(r.findings.map((f) => `${f.severity}:${f.check}`)).toEqual(["warn:file.duration"]);
+    expect(r.findings[0].message).toMatch(/The audio \(4 s\) is longer than the picture \(2 s\)/);
+    expect(r.notRun).toBeUndefined();
+  });
+
+  it("a truncated file fails: only part of it could be decoded (also when only black is asked for)", async () => {
+    for (const n of ["trunc.mkv", "trunc.mp4"]) {
+      const r = await checkFile(file(n), loadSpec({ black: { maxSeconds: 1 } }), { ffmpeg: ff! });
+      expect(r.findings.find((f) => f.check === "file.decode")?.message, n).toMatch(/^Only [\d.]+ s of 8 s could be decoded \(\d+( of 200)? frames\): the file is truncated or damaged/);
+      expect(r.findings.find((f) => f.check === "file.decode")?.severity).toBe("fail");
+    }
+    const mkv = await checkFile(file("trunc.mkv"), loadSpec({ frozen: { maxSeconds: 1 } }), { ffmpeg: ff! });
+    expect(mkv.findings.find((f) => f.check === "file.decode")?.message).toMatch(/^Only [\d.]+ s of 8 s could be decoded/);
+  });
+
+  it("a file name that starts with a dash is read as a file", async () => {
+    const r = await checkFile(file("-i x.mkv"), loadSpec({ video: { width: 160 }, black: { maxSeconds: 0 } }), { ffmpeg: ff! });
+    expect(r.findings).toEqual([]);
+    expect(r.ran).toEqual(["video properties", "black"]);
+  });
+
+  it("old thumbnails left in ~/.aemcp/tmp are swept", async () => {
+    const home = mkdtempSync(join(tmpdir(), "aemcp-home-"));
+    const saved = { HOME: process.env.HOME, USERPROFILE: process.env.USERPROFILE };
+    process.env.HOME = process.env.USERPROFILE = home;
+    try {
+      const tmp = join(home, ".aemcp", "tmp");
+      mkdirSync(tmp, { recursive: true });
+      const old = join(tmp, "preflight-old-1.jpg"), fresh = join(tmp, "preflight-new-1.jpg"), other = join(tmp, "other.jpg");
+      for (const p of [old, fresh, other]) writeFileSync(p, "x");
+      const twoDays = Date.now() / 1000 - 2 * 86400;
+      utimesSync(old, twoDays, twoDays);
+      utimesSync(other, twoDays, twoDays);
+      await checkFile(file("clean.mkv"), loadSpec({ video: { width: 320 } }), { ffmpeg: ff! });
+      expect([existsSync(old), existsSync(fresh), existsSync(other)]).toEqual([false, true, true]);
+    } finally {
+      Object.assign(process.env, saved);
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it.skipIf(process.platform === "win32")("a cancel while thumbnails are written leaves none behind", async () => {
+    const home = mkdtempSync(join(tmpdir(), "aemcp-home-"));
+    const saved = { HOME: process.env.HOME, USERPROFILE: process.env.USERPROFILE };
+    process.env.HOME = process.env.USERPROFILE = home;
+    // ffmpeg as it is, except that a thumbnail is written and then the program hangs
+    const wrapper = join(home, "ffmpeg");
+    writeFileSync(wrapper, `#!/bin/sh\nfor a in "$@"; do last="$a"; done\ncase "$last" in *.jpg) echo partial > "$last"; exec sleep 10;; esac\nexec "${ff!.ffmpeg}" "$@"\n`);
+    spawnSync("chmod", ["755", wrapper]);
+    try {
+      const ac = new AbortController();
+      const tmp = join(home, ".aemcp", "tmp");
+      const run = checkFile(file("blackfrozen.mkv"), loadSpec({ black: { maxSeconds: 0.5 } }), { ffmpeg: { ...ff!, ffmpeg: wrapper }, thumbnails: true, signal: ac.signal });
+      for (let i = 0; i < 200 && !(existsSync(tmp) && readdirSync(tmp).length); i++) await new Promise((r) => setTimeout(r, 25));
+      expect(readdirSync(tmp)).toHaveLength(1);
+      ac.abort();
+      await expect(run).rejects.toMatchObject({ name: "AbortError" });
+      expect(readdirSync(tmp)).toEqual([]);
+    } finally {
+      Object.assign(process.env, saved);
+      rmSync(home, { recursive: true, force: true });
+    }
   });
 
   it("cancels: the ffmpeg process is killed and the check rejects", async () => {

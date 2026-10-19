@@ -21,19 +21,15 @@ describe("no ffmpeg", () => {
   writeFileSync(f, "x");
   const spec = loadSpec({ video: { width: 1920 }, legalRange: {}, black: { maxSeconds: 0 }, flash: { check: true } });
 
-  it("skips every file check with the install hint", async () => {
+  it("every requested file check is not run, with the install hint", async () => {
     const r = await checkFile(f, spec);
     expect(r.findings).toEqual([]);
-    expect(r.skipped).toEqual([
-      "video properties: ffmpeg / ffprobe were not found (install hint).",
-      "legalRange: ffmpeg / ffprobe were not found (install hint).",
-      "black: ffmpeg / ffprobe were not found (install hint).",
-      "flash: ffmpeg / ffprobe were not found (install hint).",
-    ]);
+    const why = "ffmpeg / ffprobe were not found (install hint).";
+    expect(r.notRun).toEqual(["video properties", "legalRange", "black", "flash"].map((check) => ({ check, reason: why })));
   });
 
   it("a failed download is reported the same way", async () => {
     const r = await checkFile(f, loadSpec({ audio: { integratedLUFS: -23 } }), { allowDownload: true });
-    expect(r.skipped).toEqual(["audio: Downloading FFmpeg 9.0.2 failed: offline. Nothing was installed."]);
+    expect(r.notRun).toEqual([{ check: "audio", reason: "Downloading FFmpeg 9.0.2 failed: offline. Nothing was installed." }]);
   });
 });

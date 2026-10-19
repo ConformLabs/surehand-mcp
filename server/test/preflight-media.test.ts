@@ -3,6 +3,10 @@ import {
   analysisPixFmt,
   buildArgs,
   compareProbe,
+  coverage,
+  inputUrl,
+  LogCollector,
+  videoDuration,
   evaluateBlack,
   evaluateFrozen,
   evaluateLegal,
@@ -146,18 +150,49 @@ describe("file properties against the spec", () => {
     const silent = parseProbe({ ...PRORES, streams: [PRORES.streams[0]] }, "a.mov");
     expect(checks(compareProbe(silent, loadSpec({ audio: { required: true } })))).toEqual(["fail:file.audio"]);
     expect(checks(compareProbe(p, loadSpec({ audio: { required: false } })))).toEqual(["fail:file.audio"]);
-    // loudness asked for, no audio: skipped (not a failure unless audio is required)
-    const skipped: string[] = [];
-    planAnalysis(silent, loadSpec({ audio: { integratedLUFS: -23 } }), [], skipped);
-    expect(skipped).toEqual(["loudness: the file has no audio stream"]);
+    // loudness / sample rate asked for and no audio stream (Audio Output off): a failure, not a skip
+    const noAudio = compareProbe(silent, loadSpec({ audio: { integratedLUFS: -23, sampleRate: 48000 } }));
+    expect(checks(noAudio)).toEqual(["fail:file.audio"]);
+    expect(noAudio[0].message).toBe("The file has no audio stream; the spec asks for 48000 Hz, -23 LUFS integrated.");
+    expect(noAudio[0].fix).toMatch(/Audio Output/);
+    const notRun: { check: string; reason: string }[] = [];
+    expect(planAnalysis(silent, loadSpec({ audio: { integratedLUFS: -23 } }), [], notRun).loudness).toBe(false);
+    expect(notRun).toEqual([]);
+    // the spec says no audio: nothing to measure, nothing wrong
+    expect(compareProbe(silent, loadSpec({ audio: { required: false, integratedLUFS: -23 } }))).toEqual([]);
+  });
+
+  it("several audio streams: each one is compared, loudness says which one it measured", () => {
+    const two = parseProbe({ ...PRORES, streams: [...PRORES.streams, { index: 2, codec_name: "pcm_s24le", codec_type: "audio", sample_rate: "44100", channels: 1 }] }, "a.mov");
+    const f = compareProbe(two, loadSpec({ audio: { sampleRate: 48000, channels: 2 } }));
+    expect(f.map((x) => x.message)).toEqual(["Audio stream 2 of 2 (#2) sample rate is 44100 Hz; the spec wants 48000 Hz.", "Audio stream 2 of 2 (#2) has 1 channel; the spec wants 2."]);
+    const notes: Finding[] = [];
+    planAnalysis(two, loadSpec({ audio: { integratedLUFS: -23 } }), notes, []);
+    expect(notes[0].message).toMatch(/2 audio streams; loudness was measured on the first \(stream #1\)/);
+  });
+
+  it("durations: the picture's own duration, and a warning when the sound is longer", () => {
+    // the container says 12 s (the audio runs on); the picture is 300 frames at 29.97 = 10.01 s
+    const long = parseProbe({ ...PRORES, streams: [PRORES.streams[0], { ...PRORES.streams[1], duration: "12.0" }], format: { ...PRORES.format, duration: "12.0" } }, "a.mov");
+    expect(long.duration).toBe(12);
+    expect(videoDuration(long)).toBeCloseTo(10.01);
+    const f = compareProbe(long, loadSpec({ video: { duration: 10 } }));
+    expect(checks(f)).toEqual(["warn:file.duration"]);
+    expect(f[0].message).toMatch(/The audio \(12 s\) is longer than the picture \(10\.01 s\) by 1\.99 s \(60 frames\)/);
+    // no stream duration: nb_frames / fps
+    const noDur = parseProbe({ ...PRORES, streams: [{ ...PRORES.streams[0], duration: undefined }], format: { ...PRORES.format, duration: "12.0" } }, "a.mov");
+    expect(videoDuration(noDur)).toBeCloseTo(300 / (30000 / 1001));
+    // within a frame: fine
+    const ok = parseProbe({ ...PRORES, streams: [PRORES.streams[0], { ...PRORES.streams[1], duration: "10.02" }] }, "a.mov");
+    expect(compareProbe(ok, loadSpec({ audio: { channels: 2 } }))).toEqual([]);
   });
 
   it("legal range is skipped for RGB files", () => {
     const rgb = parseProbe({ ...PRORES, streams: [{ ...PRORES.streams[0], codec_name: "qtrle", pix_fmt: "argb" }] }, "a.mov");
-    const skipped: string[] = [];
-    const plan = planAnalysis(rgb, loadSpec({ legalRange: {} }), [], skipped);
+    const notRun: { check: string; reason: string }[] = [];
+    const plan = planAnalysis(rgb, loadSpec({ legalRange: {} }), [], notRun);
     expect(plan.legal).toBeUndefined();
-    expect(skipped[0]).toMatch(/legalRange: the file is RGB \(argb\)/);
+    expect(notRun).toEqual([{ check: "legalRange", reason: expect.stringMatching(/^the file is RGB \(argb\)/) }]);
   });
 });
 
@@ -174,7 +209,11 @@ describe("the ffmpeg pass", () => {
     expect(graph).toContain("freezedetect@frozen=n=0.001:d=2");
     expect(graph).toContain("split=2[b_legal][b_flash]");
     expect(graph).toContain("[b_legal]lutyuv=y='if(between(val/4,16,235),64,800)':u=64:v=64,scale=64:36:flags=area,format=yuv444p16le,signalstats@out,");
-    expect(graph).toContain("[b_flash]scale=32:18:flags=area,format=rgb24[o_flash]");
+    // a constant frame rate for the flash grid (frame n at n / rate, also on a variable-frame-rate file)
+    expect(graph).toContain("[b_flash]fps=30000/1001,scale=32:18:flags=area,format=rgb24[o_flash]");
+    // every decoded frame is counted (coverage), before the branches
+    expect(graph).toContain("freezedetect@frozen=n=0.001:d=2,metadata@cnt=mode=add:key=aemcp.f:value=1,metadata@count=mode=print:key=aemcp.f,split=2");
+    expect(args[args.indexOf("-i") + 1]).toBe("file:/x/out.mov");
     expect(graph).toContain("[0:a:0]ebur128@loud=peak=true:framelog=info[o_audio]");
     expect(args.slice(-6)).toEqual(["-", "-map", "[o_flash]", "-f", "rawvideo", "pipe:1"]);
   });
@@ -183,6 +222,8 @@ describe("the ffmpeg pass", () => {
     const p = parseProbe(PRORES, "/x/out.mov");
     const args = buildArgs("/x/out.mov", planAnalysis(p, loadSpec({ audio: { maxTruePeakDBTP: -1 } }), [], []), 0)!;
     expect(args.join(" ")).not.toContain("0:v");
+    // black alone still counts frames
+    expect(buildArgs("/x/out.mov", planAnalysis(p, loadSpec({ black: { maxSeconds: 1 } }), [], []), 0)!.join(" ")).toContain("metadata@count=mode=print");
     expect(buildArgs("/x/out.mov", planAnalysis(p, loadSpec({ video: { width: 1920 } }), [], []), 0)).toBeNull();
   });
 
@@ -225,7 +266,43 @@ describe("the ffmpeg pass", () => {
     expect(a.frames.ou[0]).toBe(4096);
     expect(a.black).toEqual([{ start: 0, end: 1.5 }, { start: 58.5, end: 60 }]);
     expect(a.frozen).toEqual([{ start: 10.01, end: 13.013 }, { start: 57 }]);
-    expect(a.loudness).toEqual({ integrated: -21.4, lra: 6.2, truePeak: -0.4, maxShortTerm: -18.2, maxShortTermAt: expect.closeTo(0.2, 3) });
+    expect(a.loudness).toEqual({ integrated: -21.4, lra: 6.2, truePeak: -0.4, maxShortTerm: -18.2, maxShortTermAt: expect.closeTo(0.2, 3), shortTermLines: 2 });
+    expect(a.decoded).toEqual({ frames: 0 });
+    expect(a.damage).toEqual({ count: 0 });
+  });
+
+  it("counts decoded frames and notes damage messages (not the file's own name)", () => {
+    const c = new LogCollector("/r/corrupt take.mov");
+    for (const l of [
+      "Input #0, mov,mp4,m4a,3gp,3g2,mj2, from 'file:/r/corrupt take.mov':",
+      "[metadata@count @ 0x1] frame:0    pts:0       pts_time:0",
+      "[metadata@count @ 0x1] aemcp.f=1",
+      "[metadata@count @ 0x1] frame:1    pts:1       pts_time:0.04",
+      "[mov,mp4,m4a,3gp,3g2,mj2 @ 0x2] stream 0, offset 0x30: partial file",
+      "[prores @ 0x3] Invalid data found when processing input",
+    ])
+      c.line(l);
+    expect(c.a.decoded).toEqual({ frames: 2, firstT: 0, lastT: 0.04 });
+    expect(c.a.damage).toEqual({ count: 2, first: "[mov,mp4,m4a,3gp,3g2,mj2 @ 0x2] stream 0, offset 0x30: partial file" });
+    expect(c.a.frames.t).toEqual([]);
+  });
+
+  it("coverage: a truncated file fails, no frames is not run, damage alone warns", () => {
+    const p = parseProbe(PRORES, "/x/out.mov"); // 300 frames, 10.01 s
+    const a = (frames: number, lastT: number, damage = 0) => ({ ...parseLog(""), decoded: { frames, firstT: 0, lastT }, damage: { count: damage, ...(damage ? { first: "partial file" } : {}) } });
+    expect(coverage(a(300, 299 / (30000 / 1001)), p, ["black"])).toEqual({ findings: [], notRun: [] });
+    // half the file
+    const half = coverage(a(150, 149 / (30000 / 1001), 1), p, ["black"]);
+    expect(half.findings).toEqual([expect.objectContaining({ check: "file.decode", severity: "fail" })]);
+    expect(half.findings[0].message).toMatch(/^Only 5.01 s of 10\.01 s could be decoded \(150 of 300 frames\): the file is truncated or damaged, and the rest was not checked \(ffmpeg: "partial file"\)/);
+    // a frame short is fine (rounding); three short is not
+    expect(coverage(a(299, 298 / (30000 / 1001)), p, ["frozen"]).findings).toEqual([]);
+    expect(coverage(a(297, 296 / (30000 / 1001)), p, ["frozen"]).findings).toHaveLength(1);
+    // nothing read (e.g. another ffmpeg's log format): not run, never a pass
+    expect(coverage(a(0, 0), p, ["black", "flash"]).notRun.map((n) => n.check)).toEqual(["black", "flash"]);
+    // whole, but ffmpeg complained: a warning
+    expect(coverage(a(300, 299 / (30000 / 1001), 3), p, ["black"]).findings).toEqual([expect.objectContaining({ check: "file.decode", severity: "warn" })]);
+    expect(inputUrl("-odd name.mov")).toMatch(/^file:\/.*-odd name\.mov$/);
   });
 
   it("legal range: the out-of-range share from the marked grid's average", () => {
@@ -260,11 +337,22 @@ describe("the ffmpeg pass", () => {
 
   it("loudness against the spec", () => {
     const l = parseLog(LOG).loudness;
-    expect(evaluateLoudness(l, { integratedLUFS: -23 }).map((f) => f.message)).toEqual(["Integrated loudness is -21.4 LUFS; the spec wants -23 LUFS ±1 LU."]);
-    expect(evaluateLoudness(l, { integratedLUFS: -23, toleranceLU: 2 })).toEqual([]);
-    expect(evaluateLoudness(l, { maxTruePeakDBTP: -1 })[0].message).toMatch(/True peak is -0\.4 dBTP/);
-    expect(evaluateLoudness(l, { maxShortTermLUFS: -20 })[0].message).toMatch(/reaches -18\.2 LUFS/);
-    expect(evaluateLoudness(l, { loudnessRangeLU: { max: 5 } })[0].message).toMatch(/LRA\) is 6\.2 LU/);
-    expect(evaluateLoudness({ integrated: -70 }, { integratedLUFS: -23 })[0].message).toMatch(/could not be measured/);
+    const ev = (x: typeof l, s: Parameters<typeof evaluateLoudness>[1]) => evaluateLoudness(x, s).findings;
+    expect(ev(l, { integratedLUFS: -23 }).map((f) => f.message)).toEqual(["Integrated loudness is -21.4 LUFS; the spec wants -23 LUFS ±1 LU."]);
+    expect(evaluateLoudness(l, { integratedLUFS: -23, toleranceLU: 2 })).toEqual({ findings: [], notRun: [] });
+    expect(ev(l, { maxTruePeakDBTP: -1 })[0].message).toMatch(/True peak is -0\.4 dBTP/);
+    expect(ev(l, { maxShortTermLUFS: -20 })[0].message).toMatch(/reaches -18\.2 LUFS/);
+    expect(ev(l, { loudnessRangeLU: { max: 5 } })[0].message).toMatch(/LRA\) is 6\.2 LU/);
+    expect(ev({ integrated: -70 }, { integratedLUFS: -23 })[0].message).toMatch(/could not be measured: the audio is silent/);
+    // silent: no short-term value above -70, but the lines were there: never too loud
+    expect(evaluateLoudness({ integrated: -Infinity, shortTermLines: 30, truePeak: -Infinity }, { maxShortTermLUFS: -20, maxTruePeakDBTP: -1 })).toEqual({ findings: [], notRun: [] });
+  });
+
+  it("loudness values that couldn't be read are not run, never a pass", () => {
+    const r = evaluateLoudness({ integrated: -23 }, { integratedLUFS: -23, maxTruePeakDBTP: -1, maxShortTermLUFS: -18, loudnessRangeLU: { max: 10 } });
+    expect(r.findings).toEqual([]);
+    expect(r.notRun.map((n) => n.check)).toEqual(["loudness.truePeak", "loudness.maxShortTerm", "loudness.range"]);
+    expect(r.notRun[0].reason).toBe("the true peak could not be read from ffmpeg's loudness measurement");
+    expect(evaluateLoudness({}, { integratedLUFS: -23 }).notRun.map((n) => n.check)).toEqual(["loudness.integrated"]);
   });
 });

@@ -1,6 +1,6 @@
 // Preflight report: a verdict line, then the findings grouped by check and sorted by time, with timecode in
 // the delivered comp's frame rate (HH:MM:SS:FF, drop-frame HH;MM;SS;FF where the comp uses it) and seconds.
-import type { Finding } from "./spec.js";
+import type { Finding, NotRun } from "./spec.js";
 
 /** SMPTE timecode of a time in seconds. Drop-frame only for 29.97 / 59.94 when asked. */
 export function timecode(seconds: number, fps: number, dropFrame = false, offset = 0): string {
@@ -38,9 +38,32 @@ export function formatAt(at: Finding["at"], tb?: TimeBase): string {
   return tb ? `${tc(a)}–${tc(b)} (${secs(a)}–${secs(b)})` : `${secs(a)}–${secs(b)}`;
 }
 
-export function verdict(findings: Finding[]): string {
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+/** Distinct checks in a not-run list (one check can be listed with several reasons). */
+export const notRunCount = (notRun: NotRun[] = []) => new Set(notRun.map((n) => n.check)).size;
+
+/**
+ * FAIL (n) when anything failed; else INCOMPLETE when a requested check did not run (a QC tool never says PASS for
+ * a check it couldn't do); else WARNINGS (n); else PASS.
+ */
+export function verdict(findings: Finding[], notRun: NotRun[] = []): string {
   const fails = findings.filter((f) => f.severity === "fail").length, warns = findings.filter((f) => f.severity === "warn").length;
-  return fails ? `FAIL (${fails})` : warns ? `WARNINGS (${warns})` : "PASS";
+  if (fails) return `FAIL (${fails})`;
+  const nr = notRunCount(notRun);
+  if (nr) return `INCOMPLETE (${plural(nr, "check")} not run${warns ? `, ${plural(warns, "warning")}` : ""})`;
+  return warns ? `WARNINGS (${warns})` : "PASS";
+}
+
+/** "black, flash: no ffmpeg" lines: one per reason. */
+export function notRunLines(notRun: NotRun[]): string[] {
+  const byReason = new Map<string, string[]>();
+  for (const n of notRun) {
+    const list = byReason.get(n.reason) ?? [];
+    if (!list.includes(n.check)) list.push(n.check);
+    byReason.set(n.reason, list);
+  }
+  return [...byReason].map(([why, names]) => `${names.join(", ")}: ${why}`);
 }
 
 const ORDER = ["video", "project", "safeAreas", "text"];
@@ -52,6 +75,9 @@ export interface ReportInput {
   title: string;
   findings: Finding[];
   timeBase?: TimeBase;
+  /** requested checks that did not run (the verdict can't be PASS) */
+  notRun?: NotRun[];
+  /** checks not run because the spec doesn't ask for them, or this target can't do them */
   skipped?: string[];
   notes?: string[];
   /** the rendered file's probe, shown compactly */
@@ -61,7 +87,8 @@ export interface ReportInput {
 
 /** The whole report as text. */
 export function formatReport(r: ReportInput): string {
-  const out = [verdict(r.findings), r.title];
+  const out = [verdict(r.findings, r.notRun), r.title];
+  if (r.notRun?.length) out.push("", "requested but NOT checked", ...notRunLines(r.notRun).map((s) => `  - ${s}`));
   const groups = new Map<string, Finding[]>();
   for (const f of r.findings) {
     const g = f.check.split(".")[0];
@@ -74,9 +101,16 @@ export function formatReport(r: ReportInput): string {
   const max = r.maxFindings ?? 60, perGroup = Math.max(3, Math.floor(max / Math.max(1, keys.length)));
   let shown = 0;
   for (const g of keys) {
-    const list = groups.get(g)!.sort((a, b) => startOf(a) - startOf(b) || SEV[a.severity] - SEV[b.severity]);
-    const n = Math.min(list.length, perGroup, Math.max(0, max - shown));
-    out.push("", `${g} (${list.length}${n < list.length ? `, showing ${n}` : ""})`);
+    // fails first, then warnings, then info (so a cut never hides a failure), by time within each
+    const list = groups.get(g)!.sort((a, b) => SEV[a.severity] - SEV[b.severity] || startOf(a) - startOf(b));
+    const fails = list.filter((f) => f.severity === "fail").length, warns = list.filter((f) => f.severity === "warn").length, infos = list.length - fails - warns;
+    let n = Math.min(list.length, perGroup, Math.max(0, max - shown));
+    if (fails && n < 1) n = 1;
+    // counts by severity when they're mixed or the list is cut: "text (6: 1 fail, 5 warnings; showing 3)"
+    const bySev = [fails && plural(fails, "fail"), warns && plural(warns, "warning"), infos && plural(infos, "note")].filter(Boolean).join(", ");
+    const mixed = [fails, warns, infos].filter(Boolean).length > 1;
+    const head = mixed ? `${list.length}: ${bySev}` : n < list.length ? bySev : String(list.length);
+    out.push("", `${g} (${head}${n < list.length ? `; showing ${n}` : ""})`);
     for (const f of list.slice(0, n)) {
       const when = formatAt(f.at, r.timeBase);
       const head = [f.severity.toUpperCase().padEnd(4), when, f.where ? `${f.where}:` : ""].filter(Boolean).join("  ");

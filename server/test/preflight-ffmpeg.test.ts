@@ -1,11 +1,11 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, utimesSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { FFMPEG_BUILDS, ffmpegNotFoundMessage, installFfmpeg, locateFfmpeg, type FfmpegBuild } from "../src/preflight/ffmpeg.js";
+import { anySignal, ensureFfmpeg, FFMPEG_BUILDS, ffmpegNotFoundMessage, installFfmpeg, locateFfmpeg, runTool, type FfmpegBuild } from "../src/preflight/ffmpeg.js";
 
 const tmp = () => mkdtempSync(join(tmpdir(), "aemcp-ff-"));
 const touch = (p: string) => {
@@ -74,9 +74,15 @@ describe("the one-time download", () => {
   let server: Server;
   let base = "";
   const files: Record<string, Buffer> = {};
+  const redirects: Record<string, string> = {};
+  const delays: Record<string, number> = {};
   beforeAll(async () => {
     server = createServer((req, res) => {
+      const to = redirects[req.url ?? ""];
+      if (to) return res.writeHead(302, { location: to }).end();
+      const wait = delays[req.url ?? ""];
       const body = files[req.url ?? ""];
+      if (wait && body) return void setTimeout(() => res.writeHead(200, { "content-length": body.length }).end(body), wait);
       if (!body) return res.writeHead(404).end();
       res.writeHead(200, { "content-length": body.length }).end(body);
     });
@@ -87,17 +93,22 @@ describe("the one-time download", () => {
 
   const sha = (b: Buffer) => createHash("sha256").update(b).digest("hex");
 
-  /** a zip with fake ffmpeg / ffprobe scripts that print a version line */
-  function fakeZip(version: string): Buffer {
+  /** a zip with fake ffmpeg / ffprobe scripts that print a version line (Windows: .exe names, a DLL and the licence) */
+  function fakeZip(version: string, win = false): Buffer {
     const d = tmp();
     const src = join(d, "src", "bin");
     mkdirSync(src, { recursive: true });
     for (const p of ["ffmpeg", "ffprobe"]) {
-      writeFileSync(join(src, p), `#!/bin/sh\necho "${p} version ${version} Copyright (c) the FFmpeg developers"\n`);
-      chmodSync(join(src, p), 0o755);
+      const n = win ? `${p}.exe` : p;
+      writeFileSync(join(src, n), `#!/bin/sh\necho "${p} version ${version} Copyright (c) the FFmpeg developers"\n`);
+      chmodSync(join(src, n), 0o755);
+    }
+    if (win) {
+      writeFileSync(join(src, "avcodec-62.dll"), "dll");
+      writeFileSync(join(d, "src", "LICENSE.txt"), "LGPL");
     }
     const zip = join(d, "a.zip");
-    const r = spawnSync("/usr/bin/tar", ["-a", "-cf", zip, "-C", join(d, "src"), "bin"], { encoding: "utf8" });
+    const r = spawnSync("/usr/bin/tar", ["-a", "-cf", zip, "-C", join(d, "src"), ...readdirSync(join(d, "src"))], { encoding: "utf8" });
     if (r.status !== 0) throw new Error(r.stderr);
     return readFileSync(zip);
   }
@@ -138,5 +149,98 @@ describe("the one-time download", () => {
     const dir = tmp();
     await expect(installFfmpeg(build(`${base}/old.zip`, sha(files["/old.zip"])), dir)).rejects.toThrow(/did not start correctly/);
     expect(existsSync(join(dir, "ffmpeg"))).toBe(false);
+  });
+
+  it("refuses a redirect that leaves HTTPS, before requesting it", async () => {
+    redirects["/hop.zip"] = "http://example.invalid/ffmpeg.zip";
+    const dir = tmp();
+    await expect(installFfmpeg(build(`${base}/hop.zip`, "0".repeat(64)), dir)).rejects.toThrow(/refusing a non-HTTPS download: http:\/\/example\.invalid/);
+    expect(readdirSync(dir)).toEqual([]);
+  });
+
+  it("sweeps staging folders an interrupted install left behind", async () => {
+    files["/bad2.zip"] = Buffer.from("x");
+    const dir = tmp();
+    const old = join(dir, ".staging-0123456789ab"), recent = join(dir, ".staging-ba9876543210");
+    mkdirSync(old);
+    mkdirSync(recent);
+    const hoursAgo = Date.now() / 1000 - 3 * 3600;
+    utimesSync(old, hoursAgo, hoursAgo);
+    await expect(installFfmpeg(build(`${base}/bad2.zip`, "0".repeat(64)), dir)).rejects.toThrow(/checksum/);
+    // an old one is removed; a recent one may be another install in progress
+    expect(readdirSync(dir)).toEqual([".staging-ba9876543210"]);
+  });
+
+  // bsdtar unpacks the zip (see above); the fake .exe files are shell scripts here
+  it.skipIf(process.platform !== "darwin")("Windows: the DLLs and licence move in with the programs, and nothing is left on a failure", async () => {
+    files["/win.zip"] = fakeZip("9.0.2", true);
+    const dir = tmp();
+    await installFfmpeg(build(`${base}/win.zip`, sha(files["/win.zip"])), dir, { platform: "win32" });
+    expect(readdirSync(dir).sort()).toEqual(["LICENSE.txt", "SOURCE.json", "avcodec-62.dll", "ffmpeg.exe", "ffprobe.exe"]);
+    files["/winold.zip"] = fakeZip("4.4", true);
+    const dir2 = tmp();
+    await expect(installFfmpeg(build(`${base}/winold.zip`, sha(files["/winold.zip"])), dir2, { platform: "win32" })).rejects.toThrow(/did not start correctly.*Nothing was installed/);
+    expect(readdirSync(dir2)).toEqual([]);
+  });
+
+  it.skipIf(process.platform !== "darwin")("one download for every caller; a caller that cancels doesn't cancel it for the others", async () => {
+    const home = tmp();
+    const key = `${process.platform}-${process.arch}`;
+    const real = FFMPEG_BUILDS[key];
+    files["/slow.zip"] = fakeZip("9.0.2");
+    delays["/slow.zip"] = 300;
+    FFMPEG_BUILDS[key] = build(`${base}/slow.zip`, sha(files["/slow.zip"]));
+    // no ffmpeg anywhere
+    const find = { dir: join(home, "ffmpeg"), pathEnv: "", platform: "linux" as const, config: {} };
+    try {
+      const ac = new AbortController();
+      let asked = 0;
+      const first = ensureFfmpeg({ allowDownload: true, signal: ac.signal, confirmDownload: async () => void asked++, find });
+      const second = ensureFfmpeg({ allowDownload: true, confirmDownload: async () => void asked++, find });
+      ac.abort();
+      await expect(first).rejects.toMatchObject({ name: "AbortError" });
+      const p = await second;
+      expect(p).toMatchObject({ source: "private", ffmpeg: join(home, "ffmpeg", "ffmpeg") });
+      // asked once, by the call that started the download
+      expect(asked).toBe(1);
+    } finally {
+      FFMPEG_BUILDS[key] = real;
+    }
+  });
+
+  it.skipIf(process.platform === "win32")("a private copy that doesn't start (e.g. missing DLLs) counts as not installed", async () => {
+    const home = tmp();
+    const priv = join(home, "ffmpeg");
+    mkdirSync(priv, { recursive: true });
+    for (const p of ["ffmpeg", "ffprobe"]) {
+      writeFileSync(join(priv, p), "#!/bin/sh\nexit 127\n");
+      chmodSync(join(priv, p), 0o755);
+    }
+    const bin = join(home, "bin");
+    mkdirSync(bin);
+    for (const p of ["ffmpeg", "ffprobe"]) {
+      writeFileSync(join(bin, p), "#!/bin/sh\necho ok\n");
+      chmodSync(join(bin, p), 0o755);
+    }
+    const find = { dir: priv, pathEnv: bin, platform: "linux" as const, config: {} };
+    expect(locateFfmpeg(find).found?.source).toBe("private");
+    expect(await ensureFfmpeg({ find })).toMatchObject({ source: "path", ffmpeg: join(bin, "ffmpeg") });
+    // and with nothing else: "not found", saying why the private copy wasn't used
+    await expect(ensureFfmpeg({ find: { ...find, pathEnv: "" } })).rejects.toThrow(/doesn't start/);
+  });
+});
+
+describe("process helpers", () => {
+  it("a combined signal aborts when either does (the download's own timeout and the caller's cancel)", () => {
+    const a = new AbortController(), b = new AbortController();
+    const s = anySignal([a.signal, undefined, b.signal]);
+    expect(s.aborted).toBe(false);
+    b.abort();
+    expect(s.aborted).toBe(true);
+  });
+
+  it.skipIf(process.platform === "win32")("runTool kills a program that runs past its timeout", async () => {
+    const r = await runTool("/bin/sh", ["-c", "sleep 5"], { timeoutMs: 100 });
+    expect(r).toMatchObject({ timedOut: true, aborted: false });
   });
 });

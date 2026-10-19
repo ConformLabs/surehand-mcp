@@ -161,6 +161,29 @@ describe("the report", () => {
     expect(verdict([f("info")])).toBe("PASS");
     expect(verdict([f("warn"), f("warn")])).toBe("WARNINGS (2)");
     expect(verdict([f("warn"), f("fail")])).toBe("FAIL (1)");
+    // a requested check that didn't run: never PASS (and never WARNINGS alone)
+    const nr = [{ check: "legalRange", reason: "RGB" }, { check: "loudness.truePeak", reason: "not read" }, { check: "legalRange", reason: "again" }];
+    expect(verdict([], nr)).toBe("INCOMPLETE (2 checks not run)");
+    expect(verdict([f("warn")], nr.slice(0, 1))).toBe("INCOMPLETE (1 check not run, 1 warning)");
+    expect(verdict([f("fail")], nr)).toBe("FAIL (1)");
+  });
+  it("requested checks that didn't run come right under the verdict, one line per reason", () => {
+    const text = formatReport({ title: "t", findings: [], notRun: [{ check: "black", reason: "no ffmpeg" }, { check: "flash", reason: "no ffmpeg" }, { check: "legalRange", reason: "the file is RGB" }] });
+    expect(text.split("\n").slice(0, 6)).toEqual(["INCOMPLETE (3 checks not run)", "t", "", "requested but NOT checked", "  - black, flash: no ffmpeg", "  - legalRange: the file is RGB"]);
+  });
+  it("a cut list keeps the failures: fails first, counts by severity in the header", () => {
+    const list: Finding[] = [
+      ...Array.from({ length: 5 }, (_, k): Finding => ({ check: "text.onScreen", severity: "warn", at: k, message: `w${k}` })),
+      { check: "text.glyphs", severity: "fail", at: 9, message: "the fail" },
+      { check: "text.note", severity: "info", message: "i" },
+    ];
+    const text = formatReport({ title: "t", findings: list, maxFindings: 3 });
+    const lines = text.split("\n");
+    expect(lines).toContain("text (7: 1 fail, 5 warnings, 1 note; showing 3)");
+    expect(lines[lines.indexOf("text (7: 1 fail, 5 warnings, 1 note; showing 3)") + 1]).toBe("  FAIL  9.00s the fail");
+    // even when the overall limit is used up by an earlier group, a group with failures shows one
+    const two = formatReport({ title: "t", findings: [...Array.from({ length: 5 }, (_, k): Finding => ({ check: "video.x", severity: "warn", message: `v${k}` })), { check: "text.glyphs", severity: "fail", message: "late fail" }], maxFindings: 3 });
+    expect(two).toContain("text (1)\n  FAIL late fail");
   });
   it("groups by check, sorted by time, with fixes, skipped and notes; maxFindings cuts per group", () => {
     const findings: Finding[] = [
@@ -202,7 +225,7 @@ describe("the report", () => {
     );
     const many = Array.from({ length: 20 }, (_, k): Finding => ({ check: "safeAreas.title", severity: "fail", at: k, message: `m${k}` }));
     const cut = formatReport({ title: "t", findings: many, maxFindings: 5 });
-    expect(cut).toContain("safeAreas (20, showing 5)");
+    expect(cut).toContain("safeAreas (20 fails; showing 5)");
     expect(cut).toContain("... 15 more (raise maxFindings to see them)");
     expect(cut.split("\n")[0]).toBe("FAIL (20)");
   });
@@ -239,6 +262,12 @@ const SPEC = loadSpec({
 });
 
 describe("preflight JSX (fake After Effects)", () => {
+  it("is ES3 (ExtendScript)", async () => {
+    const { parse } = await import("acorn");
+    expect(() => parse(`(function(args, log){${PREFLIGHT_JSX}\n})`, { ecmaVersion: 3, allowReserved: false })).not.toThrow();
+    expect(() => parse(`(function(args, log){${XRAY_JSX}\n})`, { ecmaVersion: 3, allowReserved: false })).not.toThrow();
+  });
+
   it("reads only: no writes, no undo group", () => {
     const fp = fakeProject(DELIVERY);
     const r = fp.run(PREFLIGHT_JSX, jsxArgs(SPEC) as any);
@@ -275,7 +304,7 @@ describe("preflight JSX (fake After Effects)", () => {
     expect(by("text.onScreen")).toHaveLength(1);
     // 50 px font x 0.7 = 35 px cap height: above 30
     expect(by("text.capHeight")).toEqual([]);
-    expect(r.skipped).toContain("text.glyphs: not available in this After Effects (needs 25.1 or later)");
+    expect(r.notRun).toContainEqual({ check: "text.glyphs", reason: "not available in this After Effects (needs 25.1 or later)" });
     expect(r.findings.filter((f) => f.check.startsWith("video"))).toEqual([]);
   });
 
@@ -336,15 +365,132 @@ describe("preflight JSX (fake After Effects)", () => {
   });
 });
 
+describe("review fixes: what must not pass silently", () => {
+  it("a layersMustBeIn name that matches no layer is a warning; one that is never visible is a note", () => {
+    const fp = fakeProject({ comps: [{ name: "Main", fps: 25, duration: 1, layers: [{ name: "Logo off", type: "solid", enabled: false }] }], activeComp: "Main" });
+    const spec = loadSpec({ safeAreas: { action: 0.05, layersMustBeIn: [{ layer: "Logo*", area: "action" }, { layer: "Bug", area: "action" }] } });
+    const d = JSON.parse(fp.run(PREFLIGHT_JSX, jsxArgs(spec) as any).result) as PData;
+    const r = checkItems(spec, d);
+    expect(r.findings).toEqual([expect.objectContaining({ check: "safeAreas.layersMustBeIn", severity: "warn", message: 'no layer named "Bug" in comp "Main"' })]);
+    expect(r.notes).toContain('safeAreas.layersMustBeIn "Logo*": the matching layers in Main are never visible');
+    // the default text area (title) without a title margin: a note, not a check that didn't run
+    expect(r.notRun).toEqual([]);
+    expect(checkItems(loadSpec({ safeAreas: { action: 0.05, textMustBeIn: "title" } }), d).notRun).toEqual([{ check: "safeAreas.textMustBeIn", reason: '"title" has no margin in the spec (add safeAreas.title)' }]);
+  });
+
+  it("auto-orient and pixel-moving effects warn that the bounds may be off; an unreadable 3D switch counts as 3D", () => {
+    const fp = fakeProject({
+      comps: [
+        {
+          name: "Main", fps: 25, duration: 1,
+          layers: [
+            { name: "Orient", type: "text", autoOrient: true, position: [600, 500] },
+            { name: "Shifted", type: "text", position: [600, 500], effects: [{ matchName: "ADBE Geometry2", name: "Transform" }] },
+            { name: "Unknown", type: "text", threeDThrows: true, position: [600, 500] },
+            { name: "Plain", type: "text", position: [600, 500], effects: [{ matchName: "ADBE Offset", name: "Offset", enabled: false }] },
+          ],
+        },
+      ],
+      activeComp: "Main",
+    });
+    const spec = loadSpec({ safeAreas: { title: 0.1 } });
+    const d = JSON.parse(fp.run(PREFLIGHT_JSX, jsxArgs(spec) as any).result) as PData;
+    const r = checkItems(spec, d);
+    expect(r.findings.map((f) => [f.check, f.severity, f.where])).toEqual([
+      ["safeAreas.autoOrient", "warn", "Main > 1: Orient"],
+      ["safeAreas.bounds", "warn", "Main > 2: Shifted"],
+      ["safeAreas.3d", "warn", "Main > 3: Unknown"],
+    ]);
+    expect(r.findings[1].message).toBe("bounds may be off: Shifted: Transform effect moves or scales the pixels, which isn't included in the layer's box");
+    expect(verdict(r.findings, r.notRun)).toBe("WARNINGS (3)");
+  });
+
+  it("glyphs are checked per character against its own font (style runs)", () => {
+    const fp = fakeProject({
+      comps: [{ name: "Main", fps: 25, duration: 1, layers: [{ name: "Mixed", type: "text", text: "A→Ω", font: "Main-Regular", glyphsMissing: "", charFonts: [{ font: "Main-Regular" }, { font: "Main-Regular", missing: "→" }, { font: "Greek-Bold", missing: "Ω" }] }] }],
+      activeComp: "Main",
+    });
+    const spec = loadSpec({ text: { glyphs: true } });
+    const d = JSON.parse(fp.run(PREFLIGHT_JSX, jsxArgs(spec) as any).result) as PData;
+    const r = checkItems(spec, d);
+    expect(r.findings.map((f) => f.message)).toEqual(['font Main-Regular has no glyph for "→"', 'font Greek-Bold has no glyph for "Ω"']);
+    expect(r.notes.join("\n")).not.toMatch(/first character's font/);
+  });
+
+  it("missing fonts from AE's used-fonts list: style runs / keyframes in the delivered comp fail, unplaced ones warn", () => {
+    const base: FakeProjectSpec = {
+      fonts: [{ postScriptName: "Gotham-Bold", familyName: "Gotham", styleName: "Bold", isSubstitute: false }],
+      comps: [{ name: "Main", layers: [{ name: "Title", type: "text", font: "ArialMT" }] }, { name: "Elsewhere", layers: [{ name: "Other", type: "text", font: "ArialMT" }] }],
+      activeComp: "Main",
+    };
+    const spec = loadSpec({ project: { noMissingFonts: true } });
+    const run = (p: FakeProjectSpec) => checkFromXray(spec, JSON.parse(fakeProject(p).run(XRAY_JSX, { sections: ["missing"], comps: ["Main"] }).result));
+    // the layer's font at the current time is fine, but a style run uses the missing font
+    const placed = run({ ...base, usedFonts: [{ ps: "Gotham-Bold", layers: ["Title"] }] });
+    expect(placed.findings).toEqual([expect.objectContaining({ check: "project.missingFonts", severity: "fail", where: "Main > 1: Title" })]);
+    // used only outside the delivered comp: not this delivery's problem
+    expect(run({ ...base, usedFonts: [{ ps: "Gotham-Bold", layers: ["Other"] }] }).findings).toEqual([]);
+    // this AE doesn't say where: a warning, never silence
+    const unplaced = run({ ...base, usedFonts: [{ ps: "Gotham-Bold", layers: ["Title"], noIds: true }] });
+    expect(unplaced.findings).toEqual([expect.objectContaining({ check: "project.missingFonts", severity: "warn" })]);
+    // no font API: not run
+    expect(run({ ...base, fonts: null }).notRun).toEqual([{ check: "project.noMissingFonts", reason: expect.stringMatching(/24\.0/) }]);
+  });
+
+  it("an X-ray read cut short by its budget is a warning, like the frame scan", () => {
+    const x = JSON.parse(fakeProject(DELIVERY).run(XRAY_JSX, { sections: ["missing"], comps: ["Main"] }).result);
+    x.partial = { reason: "time budget (90 s) used up" };
+    const r = checkFromXray(loadSpec({ project: { noMissingFootage: true } }), x);
+    expect(r.findings).toEqual([expect.objectContaining({ check: "project.partial", severity: "warn" })]);
+  });
+
+  it("a working space this AE doesn't report is not run", () => {
+    const d: PData = { v: 1, comp, project: {}, step: 1, n: 1, feat: {}, items: [] };
+    expect(projectChecks(loadSpec({ project: { workingSpace: "sRGB" } }), d).notRun).toEqual([{ check: "project.workingSpace", reason: "this After Effects doesn't report the working space to scripts" }]);
+  });
+});
+
+describe("ae_get_layer_info on text and shape layers (not AVLayers in After Effects)", () => {
+  it("has the 3D switch, blending mode, track matte and collapse fields", () => {
+    const fp = fakeProject({ comps: [{ name: "Main", layers: [{ name: "T", type: "text", threeD: true }, { name: "S", type: "shape", collapse: true }] }], activeComp: "Main" });
+    const info = (i: number) => JSON.parse(fp.run(`return aemcp.stringify(aemcp.layerInfo(aemcp.findComp("Main").layer(${i}), false));`, {}).result);
+    expect(info(1)).toMatchObject({ type: "text", threeD: true, blendingMode: "NORMAL", trackMatteType: "NO_TRACK_MATTE", collapseTransformation: false });
+    expect(info(2)).toMatchObject({ type: "shape", threeD: false, blendingMode: "NORMAL", collapseTransformation: true });
+  });
+});
+
 // ---------- the tool ----------
 
-const fake = vi.hoisted(() => ({ fp: null as any, file: null as any }));
+const fake = vi.hoisted(() => ({
+  fp: null as any,
+  file: null as any,
+  /** the options ae_preflight passed to checkFile */
+  opts: null as any,
+  mode: "full" as "full" | "ask" | "read-only",
+  /** runJsx calls with an approval request, and what the user answers */
+  approvals: [] as any[],
+  deny: false,
+  xrayFails: false,
+}));
 vi.mock("../src/jsx.js", async (orig) => ({
   ...(await orig<typeof import("../src/jsx.js")>()),
-  runJsx: async (body: string, args: any) => fake.fp.run(body, args),
+  runJsx: async (body: string, args: any, opts: any) => {
+    if (opts?.bridge?.approval) {
+      fake.approvals.push(opts.bridge.approval);
+      if (fake.deny) throw new Error("The change was denied in After Effects.");
+      return { ok: true, result: "ok", logs: [] };
+    }
+    if (fake.xrayFails && /D\.fonts = null/.test(body)) return { ok: false, error: { message: "X-ray broke" }, logs: [] };
+    return fake.fp.run(body, args);
+  },
+}));
+vi.mock("../src/permissions.js", async (orig) => ({
+  ...(await orig<typeof import("../src/permissions.js")>()),
+  permissions: () => ({ mode: fake.mode, allowShell: true }),
 }));
 vi.mock("../src/preflight/media.js", () => ({
-  checkFile: async () => {
+  checkFile: async (_path: string, _spec: unknown, opts: unknown) => {
+    fake.opts = opts;
     if (!fake.file) throw new Error("no ffmpeg");
     return fake.file;
   },
@@ -359,8 +505,7 @@ async function callTool(args: Record<string, unknown>) {
 
 describe("ae_preflight", () => {
   afterEach(() => {
-    fake.fp = null;
-    fake.file = null;
+    Object.assign(fake, { fp: null, file: null, opts: null, mode: "full", approvals: [], deny: false, xrayFails: false });
   });
 
   it("schema: the JSON schema and guidance with placeholders, no example values", async () => {
@@ -401,7 +546,7 @@ describe("ae_preflight", () => {
       findings: [{ check: "legalRange", severity: "fail", at: [10, 11], message: "luma above 235" }],
       probe: { codec: "prores", frameRate: 25 },
       thumbnails: [0, 1, 2, 3, 4].map((n) => ({ at: n === 4 ? 10.5 : n, path: png(n), label: `t${n}` })),
-      skipped: ["flash: no ffmpeg"],
+      notRun: [{ check: "flash", reason: "no ffmpeg" }],
     };
     const file = png(9);
     const r = await callTool({ spec: { legalRange: { luma: { max: 235 } } }, target: "file", file });
@@ -415,7 +560,7 @@ describe("ae_preflight", () => {
     expect(r.content[2].text).toBe("t4 (10.5 s)");
   });
 
-  it("file checks that can't run: an error for target file, a warning for both", async () => {
+  it("file checks that can't run: an error for target file, INCOMPLETE for both", async () => {
     fake.fp = fakeProject(DELIVERY);
     const { fileURLToPath } = await import("node:url");
     const file = fileURLToPath(import.meta.url);
@@ -423,7 +568,8 @@ describe("ae_preflight", () => {
     expect(r1.isError).toBe(true);
     expect(r1.content[0].text).toBe("The file checks could not run: no ffmpeg");
     const r2 = await callTool({ spec: {}, target: "both", file });
-    expect(r2.content[0].text.split("\n")[0]).toBe("WARNINGS (1)");
+    expect(r2.content[0].text.split("\n")[0]).toBe("INCOMPLETE (1 check not run)");
+    expect(r2.content[0].text).toContain("  - file: the file checks could not run: no ffmpeg");
     expect((await callTool({ spec: {}, target: "file" })).content[0].text).toMatch(/needs file/);
     expect((await callTool({ spec: { video: { widht: 1 } } })).content[0].text).toMatch(/video/);
   });
@@ -431,17 +577,61 @@ describe("ae_preflight", () => {
   it("no ffmpeg: never PASS, one line for the skipped checks, and a hint to ask about the download", async () => {
     const { fileURLToPath } = await import("node:url");
     const why = "ffmpeg / ffprobe were not found, so the rendered file can't be checked.";
-    fake.file = { findings: [], probe: {}, skipped: [`black: ${why}`, `flash: ${why}`, `legalRange: ${why}`] };
+    fake.file = { findings: [], probe: {}, notRun: ["black", "flash", "legalRange"].map((check) => ({ check, reason: why })) };
     try {
       const r = await callTool({ spec: { black: { maxSeconds: 0.5 }, flash: { check: true } }, target: "file", file: fileURLToPath(import.meta.url) });
       const t: string = r.content[0].text;
-      expect(t.split("\n")[0]).toBe("WARNINGS (1)");
-      expect(t).toMatch(/the rendered file was NOT checked/);
+      expect(t.split("\n")[0]).toBe("INCOMPLETE (3 checks not run)");
+      expect(t).toMatch(/requested but NOT checked/);
       expect(t).toContain(`black, flash, legalRange: ${why}`);
       expect(t.split(why).length - 1).toBe(1);
       expect(t).toMatch(/allowFfmpegDownload: true/);
     } finally {
       fake.file = null;
     }
+  });
+
+  it("target project ignores a file argument (even one that doesn't exist) and says so", async () => {
+    fake.fp = fakeProject(DELIVERY);
+    const r = await callTool({ spec: { video: { frameRate: 25 } }, file: "/nonexistent/render.mov" });
+    expect(r.isError).toBeUndefined();
+    expect(r.content[0].text.split("\n")[0]).toBe("PASS");
+    expect(r.content[0].text).toContain('file /nonexistent/render.mov was not checked: target "project" checks the project only');
+  });
+
+  it("an X-ray read that fails: its checks are not run (INCOMPLETE), not passed", async () => {
+    fake.fp = fakeProject(DELIVERY);
+    fake.xrayFails = true;
+    const r = await callTool({ spec: { project: { noMissingFootage: true, noExpressionErrors: true } } });
+    const t: string = r.content[0].text;
+    expect(t.split("\n")[0]).toBe("INCOMPLETE (2 checks not run)");
+    expect(t).toContain("  - project.noMissingFootage, project.noExpressionErrors: the project could not be read: X-ray broke");
+  });
+
+  it("the ffmpeg download: refused in read-only mode, approved in After Effects in ask mode, the AI's flag in full mode", async () => {
+    const { fileURLToPath } = await import("node:url");
+    const file = fileURLToPath(import.meta.url);
+    const build = { version: "9.0.2", publisher: "p", licence: "l", archives: [{ url: "https://x/ffmpeg.zip", sha256: "0".repeat(64), maxBytes: 1, programs: ["ffmpeg" as const] }] };
+    fake.file = { findings: [], probe: {}, notRun: [{ check: "black", reason: "ffmpeg / ffprobe were not found" }] };
+
+    fake.mode = "read-only";
+    const ro = await callTool({ spec: { black: { maxSeconds: 1 } }, target: "file", file, allowFfmpegDownload: true });
+    expect(fake.opts.allowDownload).toBe(false);
+    expect(ro.content[0].text).toMatch(/read-only mode, which doesn't download programs/);
+    expect(ro.content[0].text.split("\n")[0]).toBe("INCOMPLETE (1 check not run)");
+
+    fake.mode = "ask";
+    await callTool({ spec: { black: { maxSeconds: 1 } }, target: "file", file, allowFfmpegDownload: true });
+    expect(fake.opts.allowDownload).toBe(true);
+    await fake.opts.confirmDownload(build);
+    expect(fake.approvals).toEqual([{ tool: "Download FFmpeg", summary: expect.stringMatching(/^Download FFmpeg 9\.0\.2 once into ~\/\.aemcp\/ffmpeg[\s\S]*https:\/\/x\/ffmpeg\.zip/) }]);
+    fake.deny = true;
+    await expect(fake.opts.confirmDownload(build)).rejects.toThrow(/not approved in After Effects .*nothing was downloaded/);
+
+    fake.mode = "full";
+    await callTool({ spec: { black: { maxSeconds: 1 } }, target: "file", file, allowFfmpegDownload: true });
+    expect(fake.opts).toMatchObject({ allowDownload: true, confirmDownload: undefined });
+    await callTool({ spec: { black: { maxSeconds: 1 } }, target: "file", file });
+    expect(fake.opts.allowDownload).toBe(false);
   });
 });

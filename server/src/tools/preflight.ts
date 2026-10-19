@@ -8,10 +8,12 @@ import { extname } from "node:path";
 import { z } from "zod";
 import { callContext } from "../context.js";
 import { runJsx } from "../jsx.js";
+import { permissions } from "../permissions.js";
+import type { FfmpegBuild } from "../preflight/ffmpeg.js";
 import { checkFile, type FileCheck } from "../preflight/media.js";
-import { jsxArgs, needsXray, PREFLIGHT_JSX, projectChecks, type PData } from "../preflight/project.js";
+import { jsxArgs, needsXray, PREFLIGHT_JSX, projectChecks, xrayChecks, type PData } from "../preflight/project.js";
 import { formatReport, type TimeBase } from "../preflight/report.js";
-import { loadSpec, specSchema, type Finding, type Spec } from "../preflight/spec.js";
+import { loadSpec, specSchema, type Finding, type NotRun, type Spec } from "../preflight/spec.js";
 import type { XData } from "./xray-analyze.js";
 import { XRAY_JSX } from "./xray.js";
 import { compRef, errorResult, formatResult } from "./registry.js";
@@ -71,13 +73,28 @@ export function targetSkips(spec: Spec, target: "project" | "file" | "both"): st
   return out;
 }
 
+/** In "ask" mode: the same Allow / Deny request in After Effects as for other tools, before anything is downloaded. */
+async function approveDownload(build: FfmpegBuild): Promise<void> {
+  const summary =
+    `Download FFmpeg ${build.version} once into ~/.aemcp/ffmpeg for the Preflight file checks ` +
+    `(${build.publisher}; ${build.licence}; checked against a pinned SHA-256):\n${build.archives.map((a) => a.url).join("\n")}`;
+  try {
+    // a script that does nothing: it only carries the approval request
+    const r = await runJsx(`return "ok";`, {}, { undoGroup: false, bridge: { approval: { tool: "Download FFmpeg", summary } } });
+    if (!r.ok) throw new Error(r.error?.message ?? "no answer");
+  } catch (e: any) {
+    throw new Error(`the FFmpeg download was not approved in After Effects (${e?.message ?? e}); nothing was downloaded`);
+  }
+}
+
 async function runPreflight(args: Record<string, any>): Promise<CallToolResult> {
   if (args.spec === undefined) return errorResult('Pass the delivery spec: a path to its JSON file or the spec object. action: "schema" describes its fields.');
   const spec = loadSpec(args.spec);
   const target: "project" | "file" | "both" = args.target ?? "project";
   if (target !== "project" && !args.file) return errorResult(`target "${target}" needs file: the path of the rendered file to check.`);
-  if (args.file && !existsSync(args.file)) return errorResult(`No file at ${args.file}`);
-  const findings: Finding[] = [], skipped: string[] = targetSkips(spec, target), notes: string[] = [];
+  if (target !== "project" && !existsSync(args.file)) return errorResult(`No file at ${args.file}`);
+  const findings: Finding[] = [], skipped: string[] = targetSkips(spec, target), notes: string[] = [], notRun: NotRun[] = [];
+  if (target === "project" && args.file) notes.push(`file ${args.file} was not checked: target "project" checks the project only (target "both" checks the file too)`);
   const titleParts: string[] = [];
   let timeBase: TimeBase | undefined;
 
@@ -91,11 +108,11 @@ async function runPreflight(args: Record<string, any>): Promise<CallToolResult> 
     if (needsXray(spec)) {
       const xr = await runJsx(XRAY_JSX, { sections: ["missing", "expressions"], comps: [d.comp.id], timeBudgetSeconds: Math.min(budget, 90) }, { undoGroup: false, timeoutMs: 300_000 });
       if (xr.ok) x = (typeof xr.result === "string" ? JSON.parse(xr.result) : xr.result) as XData;
-      else skipped.push(`project (missing items, expression errors): could not be read: ${xr.error?.message ?? "unknown error"}`);
+      else for (const check of xrayChecks(spec)) notRun.push({ check, reason: `the project could not be read: ${xr.error?.message ?? "unknown error"}` });
     }
     const pr = projectChecks(spec, d, x);
     findings.push(...pr.findings);
-    skipped.push(...pr.skipped);
+    notRun.push(...pr.notRun);
     notes.push(...pr.notes);
     timeBase = { fps: d.comp.fps, dropFrame: !!d.comp.df, offset: d.comp.dst ?? 0 };
     titleParts.push(`comp "${d.comp.name}" (${d.comp.w}x${d.comp.h}, ${Math.round(d.comp.fps * 1000) / 1000} fps, ${fmtSecs(d.comp.dur)})`);
@@ -103,22 +120,33 @@ async function runPreflight(args: Record<string, any>): Promise<CallToolResult> 
 
   let fc: FileCheck | undefined;
   if (target !== "project") {
+    // the one-time ffmpeg download only with the user's consent: the AI asks first, then passes allowFfmpegDownload;
+    // never in read-only mode; in "ask" mode the user also approves it in After Effects
+    const mode = permissions().mode;
+    const wantDownload = args.allowFfmpegDownload === true;
     try {
-      // the one-time ffmpeg download only with the user's consent (the AI asks first, then passes allowFfmpegDownload)
-      fc = await checkFile(args.file, spec, { thumbnails: true, signal: callContext.getStore()?.signal, allowDownload: args.allowFfmpegDownload === true });
+      fc = await checkFile(args.file, spec, {
+        thumbnails: true,
+        signal: callContext.getStore()?.signal,
+        allowDownload: wantDownload && mode !== "read-only",
+        confirmDownload: mode === "ask" ? approveDownload : undefined,
+      });
     } catch (e: any) {
       const why = e?.message ?? String(e);
       if (target === "file") return errorResult(`The file checks could not run: ${why}`);
-      findings.push({ check: "file", severity: "warn", message: `the file checks could not run: ${why}` });
+      notRun.push({ check: "file", reason: `the file checks could not run: ${why}` });
     }
     if (fc) {
       findings.push(...fc.findings);
-      skipped.push(...(fc.skipped ?? []));
-      // nothing in the file was measured without ffmpeg: never let that read as a PASS
-      if (!fc.tool && !fc.findings.length)
-        findings.push({ check: "file", severity: "warn", message: "the rendered file was NOT checked: ffmpeg isn't available (see \"not checked\" below)" });
-      if (!fc.tool && args.allowFfmpegDownload !== true)
-        notes.push("ffmpeg isn't installed, so the file checks didn't run. Ask the user whether to download it once (a pinned, checksum-verified build into ~/.aemcp/ffmpeg), then call again with allowFfmpegDownload: true; or they can install it themselves (brew install ffmpeg / winget install ffmpeg).");
+      notRun.push(...(fc.notRun ?? []));
+      notes.push(...(fc.notes ?? []));
+      // without ffmpeg nothing in the file was measured: every requested file check is "not run" (INCOMPLETE)
+      if (!fc.tool) {
+        if (wantDownload && mode === "read-only")
+          notes.push("ffmpeg isn't installed, and Surehand MCP is in read-only mode, which doesn't download programs, so allowFfmpegDownload was not used. The user can install ffmpeg themselves (brew install ffmpeg / winget install ffmpeg) or change the permission mode in Window > Extensions > Surehand MCP.");
+        else if (!wantDownload)
+          notes.push("ffmpeg isn't installed, so the file checks didn't run. Ask the user whether to download it once (a pinned, checksum-verified build into ~/.aemcp/ffmpeg), then call again with allowFfmpegDownload: true; or they can install it themselves (brew install ffmpeg / winget install ffmpeg).");
+      }
       if (!timeBase) {
         // the file's own frame rate (probe.video.frameRate); the spec's only when the file has no video
         const v = (fc.probe.video ?? {}) as { frameRate?: number };
@@ -129,7 +157,7 @@ async function runPreflight(args: Record<string, any>): Promise<CallToolResult> 
     titleParts.push(`file ${args.file}`);
   }
 
-  // one line for checks skipped for the same reason (e.g. "ffmpeg not found" for every file check)
+  // one line for checks skipped for the same reason
   const byReason = new Map<string, string[]>();
   for (const line of skipped) {
     const m = /^([^:]{1,40}): (.+)$/s.exec(line);
@@ -139,24 +167,26 @@ async function runPreflight(args: Record<string, any>): Promise<CallToolResult> 
   skipped.splice(0, skipped.length, ...[...byReason].map(([why, names]) => (names.every(Boolean) ? `${names.join(", ")}: ${why}` : why)));
 
   const title = `Preflight against ${spec.name ? `"${spec.name}"` : "the delivery spec"}: ${titleParts.join("; ")}`;
-  const text = formatReport({ title, findings, timeBase, skipped, notes, probe: fc?.probe, maxFindings: args.maxFindings });
+  const text = formatReport({ title, findings, timeBase, notRun, skipped, notes, probe: fc?.probe, maxFindings: args.maxFindings });
   const content: CallToolResult["content"] = [{ type: "text", text }];
   if (fc) {
-    const picked = pickThumbnails(fc);
-    for (const t of picked) {
-      try {
-        const ext = extname(t.path).toLowerCase();
-        const mimeType = ext === ".jpg" || ext === ".jpeg" ? "image/jpeg" : "image/png";
-        content.push({ type: "image", data: readFileSync(t.path).toString("base64"), mimeType }, { type: "text", text: `${t.label} (${fmtSecs(t.at)})` });
-      } catch {
-        // a thumbnail that can't be read is left out
+    try {
+      for (const t of pickThumbnails(fc)) {
+        try {
+          const ext = extname(t.path).toLowerCase();
+          const mimeType = ext === ".jpg" || ext === ".jpeg" ? "image/jpeg" : "image/png";
+          content.push({ type: "image", data: readFileSync(t.path).toString("base64"), mimeType }, { type: "text", text: `${t.label} (${fmtSecs(t.at)})` });
+        } catch {
+          // a thumbnail that can't be read is left out
+        }
       }
+    } finally {
+      // the thumbnails are temporary files in ~/.aemcp/tmp: remove all of them, shown or not
+      for (const t of fc.thumbnails ?? [])
+        try {
+          unlinkSync(t.path);
+        } catch {}
     }
-    // the thumbnails are temporary files in ~/.aemcp/tmp: remove all of them, shown or not
-    for (const t of fc.thumbnails ?? [])
-      try {
-        unlinkSync(t.path);
-      } catch {}
   }
   return { content };
 }
@@ -172,8 +202,8 @@ export function registerPreflightTools(server: McpServer) {
         "space; missing footage, fonts, effects; expression errors; disabled layers with effects; text and named layers inside " +
         "title/action-safe on every frame (through parents and precomps); text cap height, reading speed, time on screen, box " +
         "overflow, missing glyphs. File checks (target \"file\"/\"both\", needs ffmpeg): codec, container, color, legal range, black " +
-        "and frozen frames, loudness, a flash pre-check. Returns a verdict (PASS / FAIL (n) / WARNINGS (n)) and timecoded findings " +
-        "with fixes. Changes nothing in the project.",
+        "and frozen frames, loudness, a flash pre-check. Returns a verdict (PASS / FAIL (n) / INCOMPLETE (checks not run) / WARNINGS (n)) and " +
+        "timecoded findings with fixes. Changes nothing in the project.",
       inputSchema: {
         action: z.enum(["check", "schema"]).optional().describe('"check" (default) runs the checks; "schema" returns the spec\'s JSON schema and how to write one.'),
         spec: z.union([z.string(), z.record(z.string(), z.any())]).optional().describe("The delivery spec: path to a JSON file, or the spec object."),
