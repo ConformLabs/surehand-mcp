@@ -10,6 +10,9 @@ import { transpileUserCode } from "../transpile.js";
 import { ALL_JSX_TOOLS } from "../tools/all.js";
 import { CONTACT_SHEET_JSX, RENDER_FRAME_JSX } from "../tools/core.js";
 import { restoreCheckpoint, saveCheckpoint } from "../tools/workflow.js";
+import { regressionSteps } from "./fulltest-regression.js";
+import { revisionSteps } from "./fulltest-revision.js";
+import { rollbackSteps } from "./fulltest-rollback.js";
 import { bold, fail, green, ok, red, warn } from "./util.js";
 
 const ALL = ALL_JSX_TOOLS;
@@ -181,18 +184,6 @@ export async function fullSelftest(before?: ProjectState): Promise<number> {
       args: {},
       check: (r) => (Number(r.result) >= 1 ? null : `unexpected result ${JSON.stringify(r.result)}`),
     },
-    {
-      name: "ES3 reserved word as a name",
-      jsx: evalBody(transpileUserCode("const int = 1; return int;").source),
-      args: {},
-      check: (r) => (r.result === 1 ? null : `unexpected result ${JSON.stringify(r.result)}`),
-    },
-    {
-      name: "keyword property names",
-      jsx: evalBody(transpileUserCode("const o = { default: 1, class: 2 }; o.default += o.class; return o.default;").source),
-      args: {},
-      check: (r) => (r.result === 3 ? null : `unexpected result ${JSON.stringify(r.result)}`),
-    },
   ];
 
   const results: StepResult[] = await projectSafetyTests(tmpDir, before ?? (await projectState()));
@@ -216,6 +207,10 @@ export async function fullSelftest(before?: ProjectState): Promise<number> {
     results.push({ step: s.name, ok: !problem, ms, error: problem ?? undefined });
     problem ? fail(`${s.name}: ${problem}`) : ok(`${s.name} (${ms} ms)`);
   }
+
+  results.push(...(await revisionSteps(features, (good, line) => (good ? ok : fail)(line))));
+  results.push(...(await rollbackSteps((good, line) => (good ? ok : fail)(line))));
+  results.push(...(await regressionSteps(tmpDir, (good, line) => (good ? ok : fail)(line))));
 
   // clean up everything the test created
   await runJsx(

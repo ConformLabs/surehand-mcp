@@ -245,7 +245,7 @@ the next request, no restart):
 |---|---|
 | Full access (default) | Everything runs. Your AI app may still ask you before each tool call. |
 | Ask before every change | Every edit and script waits in the AE MCP panel, showing the exact code or arguments, until you click **Allow** or **Deny**. The panel opens by itself. Reads are not held. |
-| Read-only | Tools that edit are refused. Scripts still run (to read information), but if one changes the project it is undone immediately and the AI is told what it tried to change. |
+| Read-only | Tools that edit are refused. Scripts still run (to read information), but if one changes the project it is undone immediately and the AI is told what it tried to change. Scripts that touch the undo history (`executeCommand`, `beginUndoGroup`, `endUndoGroup`, `purge`) or do things that can't be undone (opening, closing or saving projects, `newProject`, `quit`, rendering, `scheduleTask`, saving preferences) are refused before they run. This is a text check (comments are ignored, escapes are decoded; a name inside a string or on another object counts too): a call assembled at runtime gets past it, and is then undone at most once, checked with a temporary undo marker, and reported if the project isn't back. |
 
 **Shell commands** (`system.callSystem`) can be blocked separately. These are safeguards against mistakes, not a
 sandbox: a script can still read and write files.
@@ -279,6 +279,7 @@ Please share reports from other versions.
 | "Token mismatch" | Re-run the installer (it keeps the existing token) and restart AE. |
 | Scripts can't write files or use the network | Enable **Settings > Scripting & Expressions > Allow Scripts to Write Files and Access Network** in After Effects. Frame previews and the built-in tools work without it. |
 | A call times out | ExtendScript can't be interrupted: long scripts or renders keep AE busy, and modal dialogs block it. Check AE, then retry. Pass `timeoutSeconds` for long jobs. |
+| "After Effects is busy or showing a dialog" | A dialog or settings window (Project Settings, Preferences, an alert) is open in AE, or AE is still starting. Close it and retry: the call did not run and won't run later. Reported after 3s; change with `"blockedAfterSeconds"` in `~/.aemcp/config.json` (`0` waits for the full timeout). Scripts that have started are never cut short. |
 | Claude Desktop doesn't show the tools | Quit Claude Desktop completely (menu bar / tray) and reopen it. Check `claude_desktop_config.json` contains `after-effects`. |
 
 **Reporting a problem:** run **2. Test Installation**. If anything fails, it prints a diagnostics report at the end

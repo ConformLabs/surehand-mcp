@@ -12,8 +12,19 @@ export const helperSource = helperTemplate.replace("__AEMCP_VERSION__", HELPER_V
 export interface RunOptions {
   /** Report what changed: comps (refs) to compare layer by layer besides the active comp. */
   report?: unknown[];
+  /**
+   * Read-only check: where AE has app.project.revision, take no property snapshot and only say whether
+   * the project changed (`changes.unlisted`). Older AE versions get the full report.
+   */
+  checkOnly?: boolean;
   /** Undo group name; false = no undo group (read-only tools). */
   undoGroup?: string | false;
+  /**
+   * Undo this call in the same script, only if it changed something, and check the project is back
+   * (`RunResult.rollback`). "changes": whenever it changed something (read-only mode); "requested": only
+   * when the body returns `{ rollback: true }` (atomic batch). Needs an undo group.
+   */
+  rollback?: "changes" | "requested";
   /** Serialization depth for the returned value. */
   depth?: number;
   timeoutMs?: number;
@@ -29,12 +40,46 @@ export interface Changes {
   partial?: boolean;
   truncated?: boolean;
   error?: string;
+  /** app.project.revision was used: properties weren't snapshotted after the call (they hadn't changed) */
+  fast?: boolean;
+  /** the project changed, but nothing was snapshotted to list what (checkOnly) */
+  unlisted?: boolean;
+}
+
+/** What the guarded rollback did (aemcp.jsxinc). */
+export interface Rollback {
+  /** Edit > Undo was run once */
+  undone: boolean;
+  /**
+   * true: nothing changed (not undone), or undone and the project is back to how it was before the call.
+   * "sentinel": undone, and AE MCP's undo marker shows the Undo reverted the undo step it was in, with items
+   * and layer attributes back as before, but property values were not compared (read-only check's light
+   * snapshot), so a call that split its own undo group could still have left edits behind. Truthy: not a problem.
+   */
+  verified: boolean | "sentinel";
+  /** with verified "sentinel": "values were not compared" */
+  note?: string;
+  /**
+   * "unknown": couldn't tell whether the call changed anything, so nothing was undone;
+   * "undo did nothing"; "not this call": Edit > Undo reverted something else than this call's undo step
+   * (the call opened or closed undo groups itself; its sentinel was left behind and removed by hand);
+   * "undo did nothing / not this call": the sentinel was untouched and this AE has no project.revision to
+   * tell which;
+   * "not back": still different after the undo (see `remaining`); "not checked...": undone but couldn't
+   * compare; "no undo group"; "failed: ...".
+   */
+  problem?: string;
+  /** what still differs from before the call, after the undo */
+  remaining?: Changes;
+  /** the name of the rollback's temporary folder (sentinel) when it couldn't be removed */
+  leftover?: string;
 }
 
 export interface RunResult {
   ok: boolean;
   result?: unknown;
   changes?: Changes;
+  rollback?: Rollback;
   logs: string[];
   error?: { message: string; name?: string; line?: number; user?: boolean };
 }
@@ -49,7 +94,7 @@ export function toJsLiteral(v: unknown): string {
  * The body sees `args` (the JSON args) and `log(...)`.
  */
 export function wrapBody(body: string, args: unknown, opts: RunOptions = {}): string {
-  const runOpts = { undoGroup: opts.undoGroup === undefined ? "AE MCP" : opts.undoGroup, depth: opts.depth, report: opts.report };
+  const runOpts = { undoGroup: opts.undoGroup === undefined ? "AE MCP" : opts.undoGroup, depth: opts.depth, report: opts.report, checkOnly: opts.checkOnly || undefined, rollback: opts.rollback };
   return (
     "(function(){\n" +
     `if (typeof aemcp === 'undefined' || aemcp.version !== ${toJsLiteral(HELPER_VERSION)}) return ${toJsLiteral(NEED_HELPERS)};\n` +
@@ -147,6 +192,7 @@ export async function runJsx(body: string, args: unknown = {}, opts: RunOptions 
 export function formatChanges(ch: Changes | undefined): string | null {
   if (!ch) return null;
   if (ch.error) return `Changes: (could not be determined: ${ch.error})`;
+  if (ch.unlisted) return "Changes: the project changed (not listed)";
   const lines: string[] = [];
   for (const [op, type, name, extra] of ch.items) {
     if (op === "+") {
@@ -175,4 +221,34 @@ export function formatChanges(ch: Changes | undefined): string | null {
   if (ch.partial) notes.push("very large comp: some properties not compared");
   if (ch.truncated) notes.push("more changes not listed");
   return `Changes${notes.length ? ` (${notes.join("; ")})` : ""}:\n${lines.join("\n")}`;
+}
+
+/**
+ * What to tell the user when a guarded rollback isn't verified ("" when it is). `what` names the
+ * call: "the script", "the batch".
+ */
+export function rollbackProblem(rb: Rollback, what: string): string {
+  if (rb.verified) return "";
+  const check = "Check the project before going on (Edit > Undo and Edit > Redo still work step by step).";
+  const leftover = rb.leftover ? `\nA temporary folder "${rb.leftover}" (AE MCP's undo marker) couldn't be removed; it can be deleted.` : "";
+  if (!rb.undone)
+    return `It couldn't be checked whether ${what} changed the project${rb.problem && rb.problem !== "unknown" ? ` (${rb.problem})` : ""}, so nothing was undone. ${check}${leftover}`;
+  const remaining = rb.remaining ? (formatChanges(rb.remaining) ?? "").replace(/^Changes[^\n]*:\n/, "") : "";
+  const notBack = `the project still isn't how it was before ${what}:\n${remaining}`;
+  if (rb.problem === "not this call" || rb.problem === "undo did nothing / not this call")
+    return (
+      `Edit > Undo was run once for ${what}, but the Undo did not revert ${what}'s changes as a whole ` +
+      (rb.problem === "not this call"
+        ? `(${what} may have opened or closed undo groups itself), `
+        : `(After Effects either undid nothing or undid a different step; this version of After Effects can't tell which), `) +
+      `${remaining ? `and ${notBack}` : "so some of its changes may still be in the project."}\n` +
+      `The Undo was not repeated. ${check}${leftover}`
+    );
+  const why =
+    rb.problem === "not back"
+      ? notBack
+      : rb.problem === "undo did nothing"
+        ? "After Effects didn't undo anything."
+        : `the result couldn't be checked (${rb.problem}).`;
+  return `The undo step of ${what} was undone once, but ${why}\nIt was not undone again, so nothing else in the undo history was reverted. ${check}${leftover}`;
 }

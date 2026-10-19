@@ -54,6 +54,23 @@ export function transpileUserCode(code: string, enabled = true): TranspileResult
   }
 }
 
+/**
+ * The code with its comments blanked out (strings, regexes and line numbers stay as they are). Code that
+ * doesn't parse is returned unchanged, comments and all.
+ */
+export function withoutComments(code: string): string {
+  const plain = PREFIX + code + "\n})";
+  let comments: { start: number; end: number }[];
+  try {
+    comments = (Babel.transform(plain, { ast: true, code: false, sourceType: "script", babelrc: false, configFile: false } as any) as any).ast.comments;
+  } catch {
+    return code;
+  }
+  let out = plain;
+  for (const c of comments) out = out.slice(0, c.start) + out.slice(c.start, c.end).replace(/[^\n]/g, " ") + out.slice(c.end);
+  return out.slice(PREFIX.length, out.length - 3);
+}
+
 /** Hint for a failed script that uses reserved words as undeclared globals (see TranspileResult.reservedGlobals). */
 export function reservedGlobalsHint(names: string[] | undefined): string | null {
   if (!names?.length) return null;

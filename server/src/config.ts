@@ -20,6 +20,10 @@ export interface AemcpConfig {
   instance?: string;
   /** extra folders with the user's own scripts, listed by ae_list_scripts */
   scriptFolders?: string[];
+  /** report "After Effects is blocked" when it hasn't accepted a script for this long (default 3, 0 = off) */
+  blockedAfterSeconds?: number;
+  /** how long ae_status waits for an After Effects that is still starting (default 15) */
+  startupWaitSeconds?: number;
 }
 
 export function configPath(): string {
@@ -44,5 +48,7 @@ export function loadConfig(): AemcpConfig {
     permissions: file.permissions,
     instance: file.instance,
     scriptFolders: file.scriptFolders,
+    blockedAfterSeconds: file.blockedAfterSeconds,
+    startupWaitSeconds: file.startupWaitSeconds,
   };
 }

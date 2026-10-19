@@ -3,6 +3,7 @@
 // - full: everything runs (your AI app may still ask you per tool call)
 // - ask: every edit and script waits for Allow/Deny in After Effects (Window > Extensions > AE MCP)
 // - read-only: tools that edit are refused; scripts run, but if one changes the project it is undone
+//   (scripts that call executeCommand, begin/endUndoGroup or purge are refused before they run)
 // allowShell: false refuses scripts that call system.callSystem (shell commands).
 // These are safeguards against mistakes, not a sandbox: a script can still write files.
 import { loadConfig } from "./config.js";

@@ -639,13 +639,16 @@ aemcp = (function () {
     }
     walk(L, "", 0);
   }
-  function snapComp(c, budget) {
-    var o = { name: c.name, layers: {}, order: [] };
-    budget.time = c.time;
+  // light: layer attributes and order only, no properties (the slow part)
+  // time: compare at this time instead of the comp's current time (see snapshotAgain)
+  function snapComp(c, budget, light, time) {
+    var o = { name: c.name, layers: {}, order: [], time: time === undefined ? c.time : time };
+    if (light) o.light = true;
+    budget.time = o.time;
     for (var i = 1; i <= c.numLayers; i++) {
       var L = c.layer(i), k = layerKey(L);
       var e = { sig: layerSig(L), props: {}, groups: {} };
-      snapProps(L, e.props, e.groups, budget);
+      if (!light) snapProps(L, e.props, e.groups, budget);
       o.layers[k] = e; o.order.push(k);
     }
     if (budget.over) o.partial = true;
@@ -680,8 +683,9 @@ aemcp = (function () {
     return [enc(g("bitsPerChannel")), enc(g("workingSpace")), enc(g("linearBlending")), enc(g("linearizeWorkingSpace")), enc(g("compensateForSceneReferredProfiles")),
       enc(g("colorManagementSystem") === 1 ? "OCIO" : "Adobe"), enc(g("ocioConfigurationFile")), enc(g("workingColorSpace")), enc(g("displayColorSpace")), enc(g("expressionEngine")), enc(g("timeDisplayType"))].join(SEP);
   }
-  A.snapshot = function (scopeRefs) {
+  A.snapshot = function (scopeRefs, light) {
     var p = app.project, snap = { items: {}, comps: {}, project: projectSig(p) }, budget = { n: PROP_BUDGET, over: false };
+    if (light) snap.light = true;
     for (var i = 1; i <= p.numItems; i++) { var it = p.item(i); snap.items["i" + it.id] = itemSig(it); }
     var ids = {};
     // a call that names a comp is compared there only; otherwise the active comp is compared
@@ -691,9 +695,34 @@ aemcp = (function () {
       if (scopeRefs[r] === "*") { for (var ai = 1; ai <= p.numItems; ai++) if (p.item(ai) instanceof CompItem) ids["c" + p.item(ai).id] = true; continue; } // every comp
       try { ids["c" + A.findComp(scopeRefs[r]).id] = true; } catch (e) {}
     }
-    for (var id in ids) { if (!ids.hasOwnProperty(id)) continue; var c = p.itemByID(Number(id.substr(1))); if (c) snap.comps[id] = snapComp(c, budget); }
+    for (var id in ids) { if (!ids.hasOwnProperty(id)) continue; var c = p.itemByID(Number(id.substr(1))); if (c) snap.comps[id] = snapComp(c, budget, light); }
     return snap;
   };
+  // A new snapshot comparable with `a`: the same comps at the same times, as light as `a`
+  // (an undo doesn't move the time indicator, and the active comp may have changed meanwhile).
+  function snapshotAgain(a) {
+    var p = app.project, snap = { items: {}, comps: {}, project: projectSig(p) }, budget = { n: PROP_BUDGET, over: false };
+    if (a.light) snap.light = true;
+    for (var i = 1; i <= p.numItems; i++) { var it = p.item(i); snap.items["i" + it.id] = itemSig(it); }
+    for (var id in a.comps) { if (!a.comps.hasOwnProperty(id)) continue; var c = p.itemByID(Number(id.substr(1))); if (c) snap.comps[id] = snapComp(c, budget, a.light, a.comps[id].time); }
+    return snap;
+  }
+  // app.project.revision goes up with every edit (also undo/redo, and writing an unchanged value) and
+  // not on selection, viewer, time-indicator or preview changes or scripts that only read (AE 25/26).
+  // It does NOT move for some attributes: item comment/label/folder, work area, expression engine, and
+  // blend mode on some layers. So an unchanged revision only proves no property changed; items and layer attributes still
+  // have to be compared (cheap). null when this AE has no project.revision.
+  A.revision = function () {
+    try { var r = app.project.revision; return typeof r === "number" ? r : null; } catch (e) { return null; }
+  };
+  // The change report for a call that started with snapshot `before` and revision `rev0`.
+  function changesSince(before, rev0, scope) {
+    var rev1 = rev0 === null ? null : A.revision(), ch;
+    if (rev1 !== null && rev1 === rev0) { ch = A.diff(before, A.snapshot(scope, true)); ch.fast = true; return ch; }
+    // a light "before" (read-only check) has no properties to compare against: only say that something changed
+    if (before.light) return { items: [], layers: [], props: [], scope: [], fast: true, unlisted: true };
+    return A.diff(before, A.snapshot(scope));
+  }
   A.diff = function (a, b) {
     var ch = { items: [], layers: [], props: [], scope: [], partial: false }, MAX = 80, n = 0;
     function add(list, v) { if (n++ < MAX) list.push(v); else ch.truncated = true; }
@@ -705,6 +734,7 @@ aemcp = (function () {
     for (var id in b.items) {
       if (!b.items.hasOwnProperty(id)) continue;
       var xb = b.items[id], xa = a.items[id], fb = xb.split(SEP);
+      if (isSentinel(raw(fb[2])) || (xa !== undefined && isSentinel(raw(xa.split(SEP)[2])))) continue; // the rollback's own marker
       if (xa === undefined) {
         var extra = undefined; // reset explicitly: ES3 'var' keeps the previous iteration's value
         if (fb[1] === "comp") {
@@ -723,13 +753,14 @@ aemcp = (function () {
       for (var f = 2; f < fb.length; f++) if (fa[f] !== fb[f]) d.push(labels[f - 2] + " " + show(fa[f]) + " -> " + show(fb[f]));
       if (d.length) add(ch.items, ["~", fb[0], raw(fb[2]), d.join("; ")]);
     }
-    for (var id2 in a.items) if (a.items.hasOwnProperty(id2) && b.items[id2] === undefined) { var fr = a.items[id2].split(SEP); add(ch.items, ["-", fr[0], raw(fr[2])]); }
+    for (var id2 in a.items) if (a.items.hasOwnProperty(id2) && b.items[id2] === undefined) { var fr = a.items[id2].split(SEP); if (!isSentinel(raw(fr[2]))) add(ch.items, ["-", fr[0], raw(fr[2])]); }
     for (var cid in b.comps) {
       if (!b.comps.hasOwnProperty(cid)) continue;
       var cb = b.comps[cid], ca = a.comps[cid];
       if (!ca) continue; // comp entered the scope during the call (e.g. newly opened): reported as an item
       ch.scope.push(cb.name);
       if (ca.partial || cb.partial) ch.partial = true;
+      var noProps = ca.light || cb.light;
       for (var k in cb.layers) {
         if (!cb.layers.hasOwnProperty(k)) continue;
         var lb = cb.layers[k], la = ca.layers[k], lbs = lb.sig.split(SEP), lname = raw(lbs[0]);
@@ -739,6 +770,7 @@ aemcp = (function () {
           for (var g = 0; g < lbs.length; g++) if (las[g] !== lbs[g]) ld.push(LAYER_FIELDS[g] + " " + show(las[g]) + " -> " + show(lbs[g]));
           if (ld.length) add(ch.layers, ["~", cb.name, lname, ld.join("; ")]);
         }
+        if (noProps) continue;
         // added/removed groups (effects, masks, shape groups...): report only the outermost one
         var addedG = [], removedG = [];
         for (var gp in lb.groups) {
@@ -785,6 +817,91 @@ aemcp = (function () {
   };
 
   // ---------- runner ----------
+  function listed(ch) { return !!(ch && (ch.items.length || ch.layers.length || ch.props.length || ch.unlisted)); }
+  function allComps(scope) { for (var i = 0; scope && i < scope.length; i++) if (scope[i] === "*") return true; return false; }
+  // Guarded rollback (opts.rollback): undo what this call changed, in the same script as the call, so
+  // nothing else can land on the undo stack in between. Never undoes a second time.
+  // Whether to undo: null = undo; otherwise the rollback result without undoing.
+  function rollbackPlan(before, rev0, rev1, ch, scope, requested) {
+    if (rev0 !== null && rev1 !== null && rev1 !== rev0) return null; // the project changed (maybe only a value written unchanged)
+    if (!before || !ch || ch.error) return { undone: false, verified: false, problem: "unknown" }; // can't tell: leave it
+    if (listed(ch)) return null;
+    // Nothing listed. Without project.revision that proves nothing when part of the project wasn't
+    // compared (a comp out of scope, properties over the budget, a truncated list).
+    if (rev0 === null && (ch.partial || ch.truncated || !allComps(scope))) {
+      // atomic batch: undo anyway, the sentinel makes it safe; read-only check: say it couldn't be told
+      return requested ? null : { undone: false, verified: false, problem: "unknown" };
+    }
+    return { undone: false, verified: true }; // nothing changed: the undo stack is left alone
+  }
+  // The sentinel: a real edit made inside the call's still-open undo group, just before it closes, and
+  // only when the call is about to be undone. An undo group becomes an undo step only if something
+  // changed in it, and a value written unchanged moves app.project.revision without changing anything:
+  // without the sentinel, Edit > Undo could revert the user's previous step instead of this call. With
+  // it, the group is never empty, so Edit > Undo reverts this call together with the sentinel. It is two
+  // edits (add a folder, rename it): inside the group they are one undo step; if the call closed its
+  // group itself, they are two, the undo only reverts the rename, and the folder left behind shows it.
+  var SENTINEL = "__aemcp_rollback_";
+  function isSentinel(name) { return String(name).indexOf(SENTINEL) === 0; }
+  function addSentinel() {
+    var id = SENTINEL + new Date().getTime() + "_" + Math.floor(Math.random() * 1000000000);
+    var f = app.project.items.addFolder(id + "_new"), named = false;
+    try { f.name = id; named = String(f.name) === id; } catch (e) {}
+    if (!named) {
+      // without the rename the marker can't tell which undo step the Undo reverted: don't undo at all
+      try { f.remove(); } catch (e) {}
+      throw new Error("the undo marker couldn't be renamed");
+    }
+    return id;
+  }
+  function findSentinel(id) {
+    var p = app.project;
+    for (var i = 1; i <= p.numItems; i++) { var it = p.item(i); if (it instanceof FolderItem && String(it.name).indexOf(id) === 0) return it; }
+    return null;
+  }
+  // Edit > Undo once, then check: the sentinel must be gone (the undo reverted this call's group), and
+  // the project must be as before the call. Undo moves app.project.revision forward (it doesn't restore
+  // it), so the check compares a new snapshot with the one from before the call.
+  //
+  // With a light snapshot (read-only check: items and layer attributes only), a sentinel that is gone
+  // proves that the Undo reverted the undo step the sentinel was in, not that it was the call's only
+  // step: a script that ends its group and opens a new one leaves its first edits in a closed step of
+  // their own, and property values aren't compared to show it. That is reported as verified: "sentinel"
+  // (never as true). app.project.revision can't show it either: Undo moves it forward, it doesn't restore it.
+  function rollback(before, revS, id, st) {
+    try { app.executeCommand(16); } // Edit > Undo: this call's undo group, sentinel included
+    catch (e) { return failedRollback(id, e, false); }
+    st.ran = true;
+    var out = { undone: true, verified: true }, left = findSentinel(id);
+    if (left) {
+      // the undo didn't revert this call's group: never undo again, remove the sentinel by hand
+      out.verified = false;
+      var leftName = String(left.name);
+      if (revS !== null && A.revision() === revS) out.problem = "undo did nothing";
+      // only the marker's rename was reverted: the call's group had closed before the marker went in
+      else if (leftName !== id) out.problem = "not this call";
+      // the marker is untouched: without revision, AE may have undone nothing, or another step
+      else out.problem = revS === null ? "undo did nothing / not this call" : "not this call";
+      try { left.remove(); } catch (e) { out.leftover = leftName; }
+    }
+    if (!before) { if (out.verified) { out.verified = false; out.problem = "not checked"; } return out; }
+    try {
+      var d = A.diff(before, snapshotAgain(before));
+      if (listed(d)) { if (out.verified) { out.verified = false; out.problem = "not back"; } out.remaining = d; }
+      else if (out.verified && before.light) { out.verified = "sentinel"; out.note = "values were not compared"; }
+    } catch (e) { if (out.verified) { out.verified = false; out.problem = "not checked: " + (e.message || e); } }
+    return out;
+  }
+  // The rollback failed with `e`. `ran`: Edit > Undo had completed. Otherwise whether it undid anything is
+  // told by the sentinel (gone = the Undo reverted it). A sentinel still there is removed by hand.
+  function failedRollback(id, e, ran) {
+    var still = null;
+    try { still = id ? findSentinel(id) : null; } catch (e1) {}
+    var fail = { undone: ran || (!!id && !still), verified: false, problem: "failed: " + (e.message || e) };
+    if (ran && still) fail.problem = "not this call"; // the Undo ran but didn't revert this call's marker
+    if (still) { try { still.remove(); } catch (e2) { fail.leftover = String(still.name); } }
+    return fail;
+  }
   A.run = function (fn, args, opts) {
     opts = opts || {};
     var logs = [];
@@ -794,21 +911,45 @@ aemcp = (function () {
       logs.push(parts.join(" "));
     }
     var undo = opts.undoGroup !== false && opts.undoGroup !== "";
-    var res;
+    // rollback: "changes" = undo whatever the call changed (read-only mode);
+    // "requested" = only when the call returns { rollback: true } (atomic batch)
+    var res, before = null, rev0 = null, rev1 = null, back = false, plan = null, sentinel = null, revS = null;
     try {
       if (opts.suppressDialogs !== false) { try { app.beginSuppressDialogs(); } catch (e) {} }
-      if (undo) app.beginUndoGroup(opts.undoGroup || "AE MCP");
-      var before = null;
-      if (opts.report) { try { before = A.snapshot(opts.report); } catch (e) { before = null; } }
-      var r = fn(args || {}, log);
-      res = { ok: true, result: opts.raw ? r : A.serialize(r, opts.depth || 4), logs: logs };
-      if (before) { try { res.changes = A.diff(before, A.snapshot(opts.report)); } catch (e) { res.changes = { error: e.message }; } }
-    } catch (e) {
-      res = { ok: false, error: { message: e.message || String(e), name: e.name, line: e.line, user: !!e.aemcpUser }, logs: logs };
-      // a failed script may have changed things before it stopped: report those too
-      if (before) { try { res.changes = A.diff(before, A.snapshot(opts.report)); } catch (e2) {} }
+      try {
+        if (undo) app.beginUndoGroup(opts.undoGroup || "AE MCP");
+        rev0 = opts.report || opts.rollback ? A.revision() : null;
+        // checkOnly (read-only mode): with project.revision, no property snapshot at all
+        if (opts.report) { try { before = A.snapshot(opts.report, !!opts.checkOnly && rev0 !== null); } catch (e) { before = null; } }
+        try {
+          var r = fn(args || {}, log);
+          back = opts.rollback === "changes" || (opts.rollback === "requested" && !!r && r.rollback === true);
+          res = { ok: true, result: opts.raw ? r : A.serialize(r, opts.depth || 4), logs: logs };
+          if (before) { try { res.changes = changesSince(before, rev0, opts.report); } catch (e) { res.changes = { error: e.message }; } }
+        } catch (e) {
+          back = opts.rollback === "changes";
+          res = { ok: false, error: { message: e.message || String(e), name: e.name, line: e.line, user: !!e.aemcpUser }, logs: logs };
+          // a failed script may have changed things before it stopped: report those too
+          if (before) { try { res.changes = changesSince(before, rev0, opts.report); } catch (e2) {} }
+        }
+        rev1 = rev0 === null ? null : A.revision();
+        // to be undone: the sentinel goes in while this call's undo group is still open
+        if (back && undo) {
+          try { plan = rollbackPlan(before, rev0, rev1, res.changes, opts.report, opts.rollback === "requested"); } catch (e) { plan = { undone: false, verified: false, problem: "failed: " + (e.message || e) }; }
+          if (!plan) {
+            try { sentinel = addSentinel(); revS = A.revision(); }
+            catch (e) { plan = { undone: false, verified: false, problem: "failed: couldn't prepare the undo (" + (e.message || e) + ")" }; }
+          }
+        }
+      } finally {
+        if (undo) { try { app.endUndoGroup(); } catch (e) {} }
+      }
+      if (back) {
+        if (!undo) res.rollback = { undone: false, verified: false, problem: "no undo group" };
+        else if (plan) res.rollback = plan;
+        else { var st = { ran: false }; try { res.rollback = rollback(before, revS, sentinel, st); } catch (e) { res.rollback = failedRollback(sentinel, e, st.ran); } }
+      }
     } finally {
-      if (undo) { try { app.endUndoGroup(); } catch (e) {} }
       if (opts.suppressDialogs !== false) { try { app.endSuppressDialogs(false); } catch (e) {} }
     }
     return A.stringify(res);

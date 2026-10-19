@@ -47,7 +47,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 var define_AEMCP_CEP_FILES_default;
 var init_define_AEMCP_CEP_FILES = __esm({
   "<define:__AEMCP_CEP_FILES__>"() {
-    define_AEMCP_CEP_FILES_default = { "CSXS/manifest.xml": '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n<ExtensionManifest xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n    ExtensionBundleId="com.aemcp"\n    ExtensionBundleVersion="1.3.3"\n    ExtensionBundleName="AE MCP"\n    Version="9.0">\n  <ExtensionList>\n    <Extension Id="com.aemcp.bridge" Version="1.3.3" />\n    <Extension Id="com.aemcp.panel" Version="1.3.3" />\n  </ExtensionList>\n  <ExecutionEnvironment>\n    <HostList>\n      <Host Name="AEFT" Version="[16.0,99.9]" />\n    </HostList>\n    <LocaleList>\n      <Locale Code="All" />\n    </LocaleList>\n    <RequiredRuntimeList>\n      <RequiredRuntime Name="CSXS" Version="9.0" />\n    </RequiredRuntimeList>\n  </ExecutionEnvironment>\n  <DispatchInfoList>\n    <!-- Invisible background extension: starts with After Effects and runs the local bridge server. -->\n    <Extension Id="com.aemcp.bridge">\n      <DispatchInfo>\n        <Resources>\n          <MainPath>./bridge.html</MainPath>\n          <CEFCommandLine>\n            <Parameter>--enable-nodejs</Parameter>\n            <Parameter>--mixed-context</Parameter>\n          </CEFCommandLine>\n        </Resources>\n        <Lifecycle>\n          <AutoVisible>false</AutoVisible>\n          <StartOn>\n            <Event>com.adobe.csxs.events.ApplicationInitialized</Event>\n            <Event>applicationActivate</Event>\n          </StartOn>\n        </Lifecycle>\n        <UI>\n          <Type>Custom</Type>\n          <Geometry>\n            <Size><Height>1</Height><Width>1</Width></Size>\n          </Geometry>\n        </UI>\n      </DispatchInfo>\n    </Extension>\n    <!-- Status panel: Window > Extensions > AE MCP -->\n    <Extension Id="com.aemcp.panel">\n      <DispatchInfo>\n        <Resources>\n          <MainPath>./index.html</MainPath>\n          <CEFCommandLine>\n            <Parameter>--enable-nodejs</Parameter>\n            <Parameter>--mixed-context</Parameter>\n          </CEFCommandLine>\n        </Resources>\n        <Lifecycle>\n          <AutoVisible>true</AutoVisible>\n        </Lifecycle>\n        <UI>\n          <Type>Panel</Type>\n          <Menu>AE MCP</Menu>\n          <Geometry>\n            <Size><Height>420</Height><Width>320</Width></Size>\n            <MinSize><Height>200</Height><Width>240</Width></MinSize>\n          </Geometry>\n        </UI>\n      </DispatchInfo>\n    </Extension>\n  </DispatchInfoList>\n</ExtensionManifest>\n', "META-INF/signatures.xml": '<signatures>\n<Signature xmlns="http://www.w3.org/2000/09/xmldsig#" Id="PackageSignature">\n<SignedInfo>\n<CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>\n<SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/>\n<Reference Type="http://www.w3.org/2000/09/xmldsig#Manifest" URI="#PackageContents">\n<Transforms>\n<Transform Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>\n</Transforms>\n<DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>\n<DigestValue>bXoO1Y36CRXbs7GWWel1WJTieqKU+LsgrCKrnFk91wg=</DigestValue>\n</Reference>\n</SignedInfo>\n<SignatureValue Id="PackageSignatureValue">dL02Viq/K75NEhOySzAOVfdo8EUdUiHBpNT096MFLp+LRYACgV0v4TQOKzYH3WBT\n5K8LkYRv2YhBm19SWbxyI9xkkVk880ERIXstrrm44c3REkTanutjHvBpxEbXsx7j\nld2Cm8G5pTkmuGXXoqV0oRD2wh9uKfpcfH9C0qFpUek=</SignatureValue>\n\n<KeyInfo>\n<X509Data>\n<X509Certificate>MIIB/TCCAWYCCQDt8b8ZOqaroDANBgkqhkiG9w0BAQsFADBCMQswCQYDVQQGEwJJ\nTDELMAkGA1UECAwCTkExFTATBgNVBAoMDFJvbnkgSXR6aGFraTEPMA0GA1UEAwwG\nQUUgTUNQMCAXDTI2MTAxNzIwNDc0MFoYDzIwNTExMDExMjA0NzQwWjBCMQswCQYD\nVQQGEwJJTDELMAkGA1UECAwCTkExFTATBgNVBAoMDFJvbnkgSXR6aGFraTEPMA0G\nA1UEAwwGQUUgTUNQMIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCpv3D0LnoK\nVfHJj9cZffhfUTRVl/xYETq83Z2ftcLTjYUiHQqYAcAl43NQC869moAPfOgB0A/+\nF7aCAOQVPSKeVh4czeyAy4nCfdiNbRxHu9/ZUFW8tk71EjhfEHWc6jHcmlc143i3\nrkyG1DsgzyWnajm1JmvQ/QCNb/OTxv+RnwIDAQABMA0GCSqGSIb3DQEBCwUAA4GB\nAHVqZQs1/Q5O0B+WhgDBSJBXThC391CMyfoVAZnvQVodHAz73ubv/aN00wwPjFzL\ntT8pmLbStTaHMHVX7vQcvOcKJMiP/ki8T0zx5y1/qcU9C62O8RvpXaxruZmX+B1T\nyxFmRt6UHmiLiOgWpZtEyN94gOPAUp5guQ6i8yMnyjZW\n</X509Certificate>\n</X509Data>\n</KeyInfo>\n<Object>\n<Manifest Id="PackageContents">\n<Reference URI="mimetype"><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>b07Onu9cTlGK1WpvgtFOlfk+Tl0HscuNIt6GZtesPX8=</DigestValue></Reference><Reference URI="index.html"><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>pf38+vwTJ8WJsr4epGr+W/0S2d7aG14RYPL2qZYox54=</DigestValue></Reference><Reference URI="css/panel.css"><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>eUGSUu7v7xyduFiO38UWttti+BeJ7POEVpfkiXIfaZo=</DigestValue></Reference><Reference URI="js/bridge-core.js"><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>3XDXebtMaGPlhCGNqkJEAWLVvpLZWnc5UUULRiURLis=</DigestValue></Reference><Reference URI="js/panel.js"><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>K8ugFkAm4neGRj1H9luikeNwBDZ7845FfLaqvbZ/Pgs=</DigestValue></Reference><Reference URI="CSXS/manifest.xml"><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>f8jsOEyOtY5s4S6CdRcqyn/8rB8vNfqAxLwQFJBA554=</DigestValue></Reference><Reference URI="bridge.html"><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>z3EV4R9yzRLZ2sOysVkF2kYhXAeuVXx3JvZOtB2nJuI=</DigestValue></Reference></Manifest>\n</Object>\n<Object xmlns:xades="http://uri.etsi.org/01903/v1.1.1#" >\n<xades:QualifyingProperties>\n<xades:UnsignedProperties>\n<xades:UnsignedSignatureProperties>\n<xades:SignatureTimeStamp>\n<xades:HashDataInfo uri="SignatureValue">\n<Transforms>\n<Transform Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>\n</Transforms>\n</xades:HashDataInfo>\n<xades:EncapsulatedTimeStamp>\nMIIXczADAgEAMIIXagYJKoZIhvcNAQcCoIIXWzCCF1cCAQMxDzANBglghkgBZQME\nAgEFADCBggYLKoZIhvcNAQkQAQSgcwRxMG8CAQEGCWCGSAGG/WwHATAxMA0GCWCG\nSAFlAwQCAQUABCCmQ9PbFa8P0V9NIXxf7nBRgNPmpkuUR5V9skVxeMH7twIQJM5F\njz+80bcilYrEatwQ8BgPMjAyNjEwMTcyMjA3NTBaAgkAwQUQICRh/26gghM6MIIG\n7TCCBNWgAwIBAgIQCE/cM09+RU7bww+P+ZIYNTANBgkqhkiG9w0BAQsFADBpMQsw\nCQYDVQQGEwJVUzEXMBUGA1UEChMORGlnaUNlcnQsIEluYy4xQTA/BgNVBAMTOERp\nZ2lDZXJ0IFRydXN0ZWQgRzQgVGltZVN0YW1waW5nIFJTQTQwOTYgU0hBMjU2IDIw\nMjUgQ0ExMB4XDTI2MDgwNTAwMDAwMFoXDTM3MTEwNDIzNTk1OVowYzELMAkGA1UE\nBhMCVVMxFzAVBgNVBAoTDkRpZ2lDZXJ0LCBJbmMuMTswOQYDVQQDEzJEaWdpQ2Vy\ndCBTSEEyNTYgUlNBNDA5NiBUaW1lc3RhbXAgUmVzcG9uZGVyIDIwMjYgMTCCAiIw\nDQYJKoZIhvcNAQEBBQADggIPADCCAgoCggIBALZ7pvLJ/s1K+NSbTGWz/TjGMPh8\nCQ6RucZCLv5anHzWJjF/NWJrFIhy24fcpKXlgRiky4WAawDfU3YP0BMxt9l3Dm5o\nCG5Z69AqEN1kgHg2epx+l+lZBcmJCcN0ASURML5uFIS80sZsDwO3BSkUxDjLJhBI\n+qiZP3aixAC/qEGLjsBNlLol9VZ7pfGEXiMlneJIC5/YKuizVzNFKZZEeoy/0B8Z\nm+nzKBgSWG52lCO1w+nCg6XpCtklTJXeIg283hw7TmmsZXR+SMbjbrEOvZ3fP2Vx\nIgeR28Y90ZStd3F9VuA5RVynb/whITPAo9b75Zr4Ta6Mj3URm26QZYMn/FnbuTeg\ncoRcFEZ9FOqM5T6MTdtr/n74lIT/ug0eeOzmZ6QTFg33otX+bFRsIolvykE1jive\n4PuESaT8zzVeFWDAMDtozNgLctkGD1ZjkEyZtJrLl5ya0m5doH/ScpaZCZVl6pNU\nOCybMc/kxC6EAmSJY24L0yYKD1Nkddsnb/ItVKi/2nXpQNMu1PT5prW83vV8d67W\nowuUs0HdY4H8AMLGvdL/WHEj3ZnqMqAQQP9u3Ai9t+5eQ02GDwy0ODjdzi0xlp70\nW+ow63/0++YDEX1M0iwgUHwbrJvfpklkZQvw3+kv3vUPItdwroczk9icflf55W1z\nOEKAcJVAIXpcMCU9AgMBAAGjggGVMIIBkTAMBgNVHRMBAf8EAjAAMB0GA1UdDgQW\nBBQUyWOKMC7USvtulPPm40B+9ezN4jAfBgNVHSMEGDAWgBTvb1NK6eQGfHrK4pBW\n9i/USezLTjAOBgNVHQ8BAf8EBAMCB4AwFgYDVR0lAQH/BAwwCgYIKwYBBQUHAwgw\ngZUGCCsGAQUFBwEBBIGIMIGFMCQGCCsGAQUFBzABhhhodHRwOi8vb2NzcC5kaWdp\nY2VydC5jb20wXQYIKwYBBQUHMAKGUWh0dHA6Ly9jYWNlcnRzLmRpZ2ljZXJ0LmNv\nbS9EaWdpQ2VydFRydXN0ZWRHNFRpbWVTdGFtcGluZ1JTQTQwOTZTSEEyNTYyMDI1\nQ0ExLmNydDBfBgNVHR8EWDBWMFSgUqBQhk5odHRwOi8vY3JsMy5kaWdpY2VydC5j\nb20vRGlnaUNlcnRUcnVzdGVkRzRUaW1lU3RhbXBpbmdSU0E0MDk2U0hBMjU2MjAy\nNUNBMS5jcmwwIAYDVR0gBBkwFzAIBgZngQwBBAIwCwYJYIZIAYb9bAcBMA0GCSqG\nSIb3DQEBCwUAA4ICAQCNxTphHp1SCt+ZrAmAfn0oQLFr0mLywSLaDXQIENoyKqxr\nFbJblzCVP/pkXmwXOdrOpWygLzlT12os5ipDCy35RBCg2UMeApEtrfGhz45F4Wt4\nWGdNdIbRWt3YTYJmpR+b7lr4d7Uwn+H600u4D7RnOGf8Wj4UNgAdZkfHhHv1mx9E\nVh71SJelcEN/oORSjXzdjfw1iZH9d8Nh/thn6hH23d+VsPAr6GAYyzSA02nXD1nY\nLI7Ijmiv+xLCiYC41DSFYL3GhTiy0PxpawPtGRyaBVGzq+UiTfM8pD7KVyF5aQyW\nP4KhVGUUTnmm/RlYJoW3TiXA/+t0YcT2oRVBm3JETjajHug2AL+v5jhtKVnd3D0r\nbHXEu27o+Q8p4sEWPMqKDB+qbceb6T/6WcwTwXmQ9lOCLLYcsQeSWmvKqzpAec9e\ntE14jOQAzLKWdE3w/TCaKtLRaRT7LCkRYVnhA2D73FLje1O5b3HR5eHs0NzU/+xX\n7NbEdcofy0W3Wdwd1XOqtlpg/JgwtKfZM5dqO94lbUveOiJBI+xZEbGRsMNbXmMR\nEUTgu+Oca7Y73MPWcslIx2VhkSKSXjDbD6rgg39H5Mh7QfieAIjWagkJNt68Yfim\n6cjEzVSiLSeZfdkr5dtFPTW6jATlWJdYeeDRGCyatf8R1hSjzSvdN8yWQPT9gzCC\nBrQwggScoAMCAQICEA3HrFcF/yGZLkBDIgw6SYYwDQYJKoZIhvcNAQELBQAwYjEL\nMAkGA1UEBhMCVVMxFTATBgNVBAoTDERpZ2lDZXJ0IEluYzEZMBcGA1UECxMQd3d3\nLmRpZ2ljZXJ0LmNvbTEhMB8GA1UEAxMYRGlnaUNlcnQgVHJ1c3RlZCBSb290IEc0\nMB4XDTI1MDUwNzAwMDAwMFoXDTM4MDExNDIzNTk1OVowaTELMAkGA1UEBhMCVVMx\nFzAVBgNVBAoTDkRpZ2lDZXJ0LCBJbmMuMUEwPwYDVQQDEzhEaWdpQ2VydCBUcnVz\ndGVkIEc0IFRpbWVTdGFtcGluZyBSU0E0MDk2IFNIQTI1NiAyMDI1IENBMTCCAiIw\nDQYJKoZIhvcNAQEBBQADggIPADCCAgoCggIBALR4MdMKmEFyvjxGwBysddujRmh0\ntFEXnU2tjQ2UtZmWgyxU7UNqEY81FzJsQqr5G7A6c+Gh/qm8Xi4aPCOo2N8S9SLr\nC6Kbltqn7SWCWgzbNfiR+2fkHUiljNOqnIVD/gG3SYDEAd4dg2dDGpeZGKe+42DF\nUF0mR/vtLa4+gKPsYfwEu7EEbkC9+0F2w4QJLVSTEG8yAR2CQWIM1iI5PHg62IVw\nxKSpO0XaF9DPfNBKS7Zazch8NF5vp7eaZ2CVNxpqumzTCNSOxm+SAWSuIr21Qomb\n+zzQWKhxKTVVgtmUPAW35xUUFREmDrMxSNlr/NsJyUXzdtFUUt4aS4CEeIY8y9Ia\naGBpPNXKFifinT7zL2gdFpBP9qh8SdLnEut/GcalNeJQ55IuwnKCgs+nrpuQNfVm\nUB5KlCX3ZA4x5HHKS+rqBvKWxdCyQEEGcbLe1b8Aw4wJkhU1JrPsFfxW1gaou30y\nZ46t4Y9F20HHfIY4/6vHespYMQmUiote8ladjS/nJ0+k6MvqzfpzPDOy5y6gqzti\nT96Fv/9bH7mQyogxG9QEPHrPV6/7umw052AkyiLA6tQbZl1KhBtTasySkuJDpsZG\nKdlsjg4u70EwgWbVRSX1Wd4+zoFpp4Ra+MlKM2baoD6x0VR4RjSpWM8o5a6D8bpf\nm4CLKczsG7ZrIGNTAgMBAAGjggFdMIIBWTASBgNVHRMBAf8ECDAGAQH/AgEAMB0G\nA1UdDgQWBBTvb1NK6eQGfHrK4pBW9i/USezLTjAfBgNVHSMEGDAWgBTs1+OC0nFd\nZEzfLmc/57qYrhwPTzAOBgNVHQ8BAf8EBAMCAYYwEwYDVR0lBAwwCgYIKwYBBQUH\nAwgwdwYIKwYBBQUHAQEEazBpMCQGCCsGAQUFBzABhhhodHRwOi8vb2NzcC5kaWdp\nY2VydC5jb20wQQYIKwYBBQUHMAKGNWh0dHA6Ly9jYWNlcnRzLmRpZ2ljZXJ0LmNv\nbS9EaWdpQ2VydFRydXN0ZWRSb290RzQuY3J0MEMGA1UdHwQ8MDowOKA2oDSGMmh0\ndHA6Ly9jcmwzLmRpZ2ljZXJ0LmNvbS9EaWdpQ2VydFRydXN0ZWRSb290RzQuY3Js\nMCAGA1UdIAQZMBcwCAYGZ4EMAQQCMAsGCWCGSAGG/WwHATANBgkqhkiG9w0BAQsF\nAAOCAgEAF877FoAc/gc9EXZxML2+C8i1NKZ/zdCHxYgaMH9Pw5tcBnPw6O6FTGNp\noV2V4wzSUGvI9NAzaoQk97frPBtIj+ZLzdp+yXdhOP4hCFATuNT+ReOPK0mCefSG\n+tXqGpYZ3essBS3q8nL2UwM+NMvEuBd/2vmdYxDCvwzJv2sRUoKEfJ+nN57mQfQX\nwcAEGCvRR2qKtntujB71WPYAgwPyWLKu6RnaID/B0ba2H3LUiwDRAXx1Neq9ydOa\nl95CHfmTnM4I+ZI2rVQfjXQA1WSjjf4J2a7jLzWGNqNX+DF0SQzHU0pTi4dBwp9n\nEC8EAqoxW6q17r0z0noDjs6+BFo+z7bKSBwZXTRNivYuve3L2oiKNqetRHdqfMTC\nW/NmKLJ9M+MtucVGyOxiDf06VXxyKkOirv6o02OoXN4bFzK0vlNMsvhlqgF2puE6\nFndlENSmE+9JGYxOGLS/D284NHNboDGcmWXfwXRy4kbu4QFhOm0xJuF2EZAOk5eC\nkhSxZON3rGlHqhpB/8MluDezooIs8CVnrpHMiD2wL40mm53+/j7tFaxYKIqL0Q4s\nsd8xHZnIn/7GELH3IdvG2XlM9q7WP/UwgOkw/HQtyRN62JK4S1C8uw3PdBunvAZa\npsiI5YKdvlarEvf8EA+8hcpSM9LHJmyrxaFtoza2zNaQ9k+5t1wwggWNMIIEdaAD\nAgECAhAOmxiO+dAt5+/bUOIIQBhaMA0GCSqGSIb3DQEBDAUAMGUxCzAJBgNVBAYT\nAlVTMRUwEwYDVQQKEwxEaWdpQ2VydCBJbmMxGTAXBgNVBAsTEHd3dy5kaWdpY2Vy\ndC5jb20xJDAiBgNVBAMTG0RpZ2lDZXJ0IEFzc3VyZWQgSUQgUm9vdCBDQTAeFw0y\nMjA4MDEwMDAwMDBaFw0zMTExMDkyMzU5NTlaMGIxCzAJBgNVBAYTAlVTMRUwEwYD\nVQQKEwxEaWdpQ2VydCBJbmMxGTAXBgNVBAsTEHd3dy5kaWdpY2VydC5jb20xITAf\nBgNVBAMTGERpZ2lDZXJ0IFRydXN0ZWQgUm9vdCBHNDCCAiIwDQYJKoZIhvcNAQEB\nBQADggIPADCCAgoCggIBAL/mkHNo3rvkXUo8MCIwaTPswqclLskhPfKK2FnC4Smn\nPVirdprNrnsbhA3EMB/zG6Q4FutWxpdtHauyefLKEdLkX9YFPFIPUh/GnhWlfr6f\nqVcWWVVyr2iTcMKyunWZanMylNEQRBAu34LzB4TmdDttceItDBvuINXJIB1jKS3O\n7F5OyJP4IWGbNOsFxl7sWxq868nPzaw0QF+xembud8hIqGZXV59UWI4MK7dPpzDZ\nVu7Ke13jrclPXuU15zHL2pNe3I6PgNq2kZhAkHnDeMe2scS1ahg4AxCN2NQ3pC4F\nfYj1gj4QkXCrVYJBMtfbBHMqbpEBfCFM1LyuGwN1XXhm2ToxRJozQL8I11pJpMLm\nqaBn3aQnvKFPObURWBf3JFxGj2T3wWmIdph2PVldQnaHiZdpekjw4KISG2aadMre\nSx7nDmOu5tTvkpI6nj3cAORFJYm2mkQZK37AlLTSYW3rM9nF30sEAMx9HJXDj/ch\nsrIRt7t/8tWMcCxBYKqxYxhElRp2Yn72gLD76GSmM9GJB+G9t+ZDpBi4pncB4Q+U\nDCEdslQpJYls5Q5SUUd0viastkF13nqsX40/ybzTQRESW+UQUOsxxcpyFiIJ33xM\ndT9j7CFfxCBRa2+xq4aLT8LWRV+dIPyhHsXAj6KxfgommfXkaS+YHS312amyHeUb\nAgMBAAGjggE6MIIBNjAPBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQWBBTs1+OC0nFd\nZEzfLmc/57qYrhwPTzAfBgNVHSMEGDAWgBRF66Kv9JLLgjEtUYunpyGd823IDzAO\nBgNVHQ8BAf8EBAMCAYYweQYIKwYBBQUHAQEEbTBrMCQGCCsGAQUFBzABhhhodHRw\nOi8vb2NzcC5kaWdpY2VydC5jb20wQwYIKwYBBQUHMAKGN2h0dHA6Ly9jYWNlcnRz\nLmRpZ2ljZXJ0LmNvbS9EaWdpQ2VydEFzc3VyZWRJRFJvb3RDQS5jcnQwRQYDVR0f\nBD4wPDA6oDigNoY0aHR0cDovL2NybDMuZGlnaWNlcnQuY29tL0RpZ2lDZXJ0QXNz\ndXJlZElEUm9vdENBLmNybDARBgNVHSAECjAIMAYGBFUdIAAwDQYJKoZIhvcNAQEM\nBQADggEBAHCgv0NcVec4X6CjdBs9thbX979XB72arKGHLOyFXqkauyL4hxppVCLt\npIh3bb0aFPQTSnovLbc47/T/gLn4offyct4kvFIDyE7QKt76LVbP+fT3rDB6mouy\nXtTP0UNEm0Mh65ZyoUi0mcudT6cGAxN3J0TU53/oWajwvy8LpunyNDzs9wPHh6jS\nTEAZNUZqaVSwuKFWjuyk1T3osdz9HNj0d1pcVIxv76FQPfx2CWiEn2/K2yCNNWAc\nAgPLILCsWKAOQGPFmCLBsln1VWvPJ6tsds5vIy30fnFqI2si/xK4VC0nftg62fC2\nh5b9W9FcrBjDTZ9ztwGpn1eqXijiuZQxggN8MIIDeAIBATB9MGkxCzAJBgNVBAYT\nAlVTMRcwFQYDVQQKEw5EaWdpQ2VydCwgSW5jLjFBMD8GA1UEAxM4RGlnaUNlcnQg\nVHJ1c3RlZCBHNCBUaW1lU3RhbXBpbmcgUlNBNDA5NiBTSEEyNTYgMjAyNSBDQTEC\nEAhP3DNPfkVO28MPj/mSGDUwDQYJYIZIAWUDBAIBBQCggdEwGgYJKoZIhvcNAQkD\nMQ0GCyqGSIb3DQEJEAEEMBwGCSqGSIb3DQEJBTEPFw0yNjEwMTcyMjA3NTBaMCsG\nCyqGSIb3DQEJEAIMMRwwGjAYMBYEFFHZq9oDSXPYT0JmrKSCSOazacQ5MC8GCSqG\nSIb3DQEJBDEiBCCJOhtOe0kABwQAofsFMrZ8LAR4VNq2yzPqWTpEHV8qrDA3Bgsq\nhkiG9w0BCRACLzEoMCYwJDAiBCAtoJ2n9BMfn+cttsXm6cllZ1WvBD8ep0LMDSEg\n4UHr/DANBgkqhkiG9w0BAQEFAASCAgBcjTVP4NZazXf2MWlWYYhmI6c3BD0okIO6\noYf6Py2Shfa9pPBXk+m/TpSywdq4xZqohRoa5deJ9hs8gj7tSZShNtfDkj+XQhA1\nrqKOxU6B7+ruBpxg/g+y/2fiBaC7AxaqPzEH/npOU0pfQGOA3cXClRUqnMbtTdiJ\nm7LF74wpxgzOUoYiUgoVyPM0HcN4mkSf1r34NlLggT/kODQzRSzhQFaN03bwatBv\nzuQSjB26ZPSh0XcsixCWkkGcsxxaH2sHhIUEOwFWcUDUukCVmFvbs1eXdCFj08lD\npo/qQGDCcbfRC0sxBpdsoJFzy/VDMyfFzMqEZEu78j3El1tsAYSiAF+jDv1gLn8a\nk3DNsJgAaKFW45c6Ts0gMHUk71HpYElubxjkrmmuSI867ZNYmazdczULTwwWMfF+\nGDPMMoo6Ha6ByE9nIdXyPLqS90e5r21OBNrovdtay2FVaGZsGCyipbfUf3ZnplL1\n1+wuWcCQ8q9ewWKlH9ImangekcmvenHO/75NMhALBMgD2U2iEKWs1Mv/uy9956qn\nxvB/JYXpCslxHcJxvCcp2DYTo5XMX38Ldu2KUaMVmURSqZT11/UKGoDo1NRH19kn\nuufpwkiSA4/fl3UlOgzPg1MOk/ZUhJZrCGET5+2t9gljQ7kQm6cJtbzFSfH9dDOh\nLibVkmILrg==\n</xades:EncapsulatedTimeStamp>\n</xades:SignatureTimeStamp>\n</xades:UnsignedSignatureProperties>\n</xades:UnsignedProperties>\n</xades:QualifyingProperties>\n</Object>\n</Signature>\n</signatures>', "bridge.html": '<!DOCTYPE html>\n<html>\n<head><meta charset="utf-8"><title>AE MCP Bridge</title></head>\n<body>\n<script src="js/bridge-core.js"></script>\n<script>AEMCPBridge.start();</script>\n</body>\n</html>\n', "css/panel.css": ':root { --bg: #232323; --fg: #d6d6d6; --muted: #8a8a8a; --ok: #3fb950; --bad: #f85149; --warn: #d29922; --line: #3a3a3a; }\n* { box-sizing: border-box; }\nbody { margin: 0; padding: 10px; background: var(--bg); color: var(--fg); font: 12px -apple-system, "Segoe UI", sans-serif; }\nheader { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }\n#title { font-weight: 600; font-size: 13px; }\n.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--warn); flex: none; }\n.dot.ok { background: var(--ok); } .dot.bad { background: var(--bad); }\n.muted { color: var(--muted); }\n.row { display: flex; gap: 6px; margin-bottom: 10px; }\nbutton { background: #3a3a3a; color: var(--fg); border: 1px solid #4a4a4a; border-radius: 4px; padding: 4px 10px; cursor: pointer; font: inherit; }\nbutton:hover { background: #454545; }\n.label { text-transform: uppercase; font-size: 10px; letter-spacing: .05em; color: var(--muted); margin-bottom: 4px; }\nul { list-style: none; padding: 0; margin: 0; }\nli { border-top: 1px solid var(--line); padding: 4px 0; word-break: break-all; }\nli .t { color: var(--muted); margin-right: 6px; }\nli.err .s { color: var(--bad); } li.ok .s { color: var(--ok); }\nfooter { margin-top: 10px; font-size: 10px; }\n.banner { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #2d2a12; border: 1px solid #5c531c; border-radius: 4px; padding: 6px 8px; margin-bottom: 10px; }\n.banner[hidden], [hidden] { display: none; }\n.setting { align-items: center; }\n.setting label { color: var(--muted); }\nselect { background: #3a3a3a; color: var(--fg); border: 1px solid #4a4a4a; border-radius: 4px; padding: 3px 6px; font: inherit; flex: 1; }\n.small { font-size: 10px; margin: -6px 0 10px; }\n.grid { display: grid; grid-template-columns: auto 1fr; gap: 6px 8px; align-items: center; margin-bottom: 8px; }\n.grid label { color: var(--muted); }\n#approvals { border: 1px solid #5c531c; background: #2d2a12; border-radius: 4px; padding: 6px 8px; margin-bottom: 10px; }\n.approval { border-top: 1px solid #4a4520; padding: 6px 0; }\n.approval:first-child { border-top: 0; }\n.approval .what { font-weight: 600; margin-bottom: 4px; }\n.approval pre, li pre { max-height: 160px; overflow: auto; background: #181818; padding: 6px; border-radius: 3px; margin: 4px 0; white-space: pre-wrap; word-break: break-word; font: 11px Menlo, Consolas, monospace; }\n.approval .row { margin: 4px 0 0; }\nbutton.allow { background: #1f4d2b; border-color: #2e6b3d; }\nbutton.deny { background: #5a1f1f; border-color: #7a2c2c; }\nli { cursor: pointer; }\nli .c { color: var(--muted); }\n', "index.html": '<!DOCTYPE html>\n<html>\n<head>\n  <meta charset="utf-8">\n  <title>AE MCP</title>\n  <link rel="stylesheet" href="css/panel.css">\n</head>\n<body>\n  <header>\n    <span id="dot" class="dot"></span>\n    <div>\n      <div id="title">AE MCP</div>\n      <div id="sub" class="muted">checking\u2026</div>\n    </div>\n  </header>\n  <div id="update" class="banner" hidden>\n    <span id="updateText"></span>\n    <button id="updateBtn">Update</button>\n  </div>\n\n  <section id="approvals" hidden>\n    <div class="label">Waiting for your approval</div>\n    <div id="approvalList"></div>\n  </section>\n\n  <section class="row">\n    <button id="test">Test</button>\n    <button id="diag" title="Copies a report to paste into a bug report or a chat">Copy diagnostics</button>\n    <button id="openLog" title="Show the full activity log file">Open log</button>\n  </section>\n\n  <section class="grid">\n    <label for="perm">Permissions</label>\n    <select id="perm">\n      <option value="full">Full access</option>\n      <option value="ask">Ask before every change</option>\n      <option value="read-only">Read-only</option>\n    </select>\n    <label for="shell">Shell commands</label>\n    <select id="shell">\n      <option value="on">Allowed</option>\n      <option value="off">Blocked</option>\n    </select>\n    <label for="profile">AI tools</label>\n    <select id="profile">\n      <option value="core">Core (faster, recommended)</option>\n      <option value="full">Full (all tools)</option>\n    </select>\n  </section>\n  <div id="note" class="muted small" hidden></div>\n\n  <section>\n    <div class="label">Activity <span class="muted" id="activityHint">(click an entry for details)</span></div>\n    <ul id="log"><li class="muted">No calls yet</li></ul>\n  </section>\n  <footer class="muted" id="foot"></footer>\n  <script src="js/bridge-core.js"></script>\n  <script src="js/panel.js"></script>\n</body>\n</html>\n', "js/bridge-core.js": `/* AE MCP bridge: a tiny HTTP server inside After Effects (CEP + Node) that evaluates
+    define_AEMCP_CEP_FILES_default = { "CSXS/manifest.xml": '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n<ExtensionManifest xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n    ExtensionBundleId="com.aemcp"\n    ExtensionBundleVersion="1.3.3"\n    ExtensionBundleName="AE MCP"\n    Version="9.0">\n  <ExtensionList>\n    <Extension Id="com.aemcp.bridge" Version="1.3.3" />\n    <Extension Id="com.aemcp.panel" Version="1.3.3" />\n  </ExtensionList>\n  <ExecutionEnvironment>\n    <HostList>\n      <Host Name="AEFT" Version="[16.0,99.9]" />\n    </HostList>\n    <LocaleList>\n      <Locale Code="All" />\n    </LocaleList>\n    <RequiredRuntimeList>\n      <RequiredRuntime Name="CSXS" Version="9.0" />\n    </RequiredRuntimeList>\n  </ExecutionEnvironment>\n  <DispatchInfoList>\n    <!-- Invisible background extension: starts with After Effects and runs the local bridge server. -->\n    <Extension Id="com.aemcp.bridge">\n      <DispatchInfo>\n        <Resources>\n          <MainPath>./bridge.html</MainPath>\n          <CEFCommandLine>\n            <Parameter>--enable-nodejs</Parameter>\n            <Parameter>--mixed-context</Parameter>\n          </CEFCommandLine>\n        </Resources>\n        <Lifecycle>\n          <AutoVisible>false</AutoVisible>\n          <StartOn>\n            <Event>com.adobe.csxs.events.ApplicationInitialized</Event>\n            <Event>applicationActivate</Event>\n          </StartOn>\n        </Lifecycle>\n        <UI>\n          <Type>Custom</Type>\n          <Geometry>\n            <Size><Height>1</Height><Width>1</Width></Size>\n          </Geometry>\n        </UI>\n      </DispatchInfo>\n    </Extension>\n    <!-- Status panel: Window > Extensions > AE MCP -->\n    <Extension Id="com.aemcp.panel">\n      <DispatchInfo>\n        <Resources>\n          <MainPath>./index.html</MainPath>\n          <CEFCommandLine>\n            <Parameter>--enable-nodejs</Parameter>\n            <Parameter>--mixed-context</Parameter>\n          </CEFCommandLine>\n        </Resources>\n        <Lifecycle>\n          <AutoVisible>true</AutoVisible>\n        </Lifecycle>\n        <UI>\n          <Type>Panel</Type>\n          <Menu>AE MCP</Menu>\n          <Geometry>\n            <Size><Height>420</Height><Width>320</Width></Size>\n            <MinSize><Height>200</Height><Width>240</Width></MinSize>\n          </Geometry>\n        </UI>\n      </DispatchInfo>\n    </Extension>\n  </DispatchInfoList>\n</ExtensionManifest>\n', "META-INF/signatures.xml": '<signatures>\n<Signature xmlns="http://www.w3.org/2000/09/xmldsig#" Id="PackageSignature">\n<SignedInfo>\n<CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>\n<SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/>\n<Reference Type="http://www.w3.org/2000/09/xmldsig#Manifest" URI="#PackageContents">\n<Transforms>\n<Transform Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>\n</Transforms>\n<DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>\n<DigestValue>7D8RcIPsHv4xsXloLPNOefhi6BLkf9HPkTTSNFLTepg=</DigestValue>\n</Reference>\n</SignedInfo>\n<SignatureValue Id="PackageSignatureValue">JibTz5XcysIzU0PNRdAhs5/v46aUhPnYxOkY+7QBsyloDhAdvY1lHJBTAlQzi1nm\nWmttr3o7GXvHzcM/WkuilJ/ESgBKNPf0eKfr4Focl6A/b/lPWMQT0a0ya77GVz6r\n3wam5EIIqikfMioeNYETw18tLXX9d+WK/8HsHKK0/88=</SignatureValue>\n\n<KeyInfo>\n<X509Data>\n<X509Certificate>MIIB/TCCAWYCCQDt8b8ZOqaroDANBgkqhkiG9w0BAQsFADBCMQswCQYDVQQGEwJJ\nTDELMAkGA1UECAwCTkExFTATBgNVBAoMDFJvbnkgSXR6aGFraTEPMA0GA1UEAwwG\nQUUgTUNQMCAXDTI2MTAxNzIwNDc0MFoYDzIwNTExMDExMjA0NzQwWjBCMQswCQYD\nVQQGEwJJTDELMAkGA1UECAwCTkExFTATBgNVBAoMDFJvbnkgSXR6aGFraTEPMA0G\nA1UEAwwGQUUgTUNQMIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCpv3D0LnoK\nVfHJj9cZffhfUTRVl/xYETq83Z2ftcLTjYUiHQqYAcAl43NQC869moAPfOgB0A/+\nF7aCAOQVPSKeVh4czeyAy4nCfdiNbRxHu9/ZUFW8tk71EjhfEHWc6jHcmlc143i3\nrkyG1DsgzyWnajm1JmvQ/QCNb/OTxv+RnwIDAQABMA0GCSqGSIb3DQEBCwUAA4GB\nAHVqZQs1/Q5O0B+WhgDBSJBXThC391CMyfoVAZnvQVodHAz73ubv/aN00wwPjFzL\ntT8pmLbStTaHMHVX7vQcvOcKJMiP/ki8T0zx5y1/qcU9C62O8RvpXaxruZmX+B1T\nyxFmRt6UHmiLiOgWpZtEyN94gOPAUp5guQ6i8yMnyjZW\n</X509Certificate>\n</X509Data>\n</KeyInfo>\n<Object>\n<Manifest Id="PackageContents">\n<Reference URI="mimetype"><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>b07Onu9cTlGK1WpvgtFOlfk+Tl0HscuNIt6GZtesPX8=</DigestValue></Reference><Reference URI="index.html"><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>pf38+vwTJ8WJsr4epGr+W/0S2d7aG14RYPL2qZYox54=</DigestValue></Reference><Reference URI="css/panel.css"><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>eUGSUu7v7xyduFiO38UWttti+BeJ7POEVpfkiXIfaZo=</DigestValue></Reference><Reference URI="js/bridge-core.js"><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>eFvJS9Il+QMlNVbfA5MWgI2pVdttree1sCMtNbORUN8=</DigestValue></Reference><Reference URI="js/panel.js"><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>K8ugFkAm4neGRj1H9luikeNwBDZ7845FfLaqvbZ/Pgs=</DigestValue></Reference><Reference URI="CSXS/manifest.xml"><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>f8jsOEyOtY5s4S6CdRcqyn/8rB8vNfqAxLwQFJBA554=</DigestValue></Reference><Reference URI="bridge.html"><DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><DigestValue>z3EV4R9yzRLZ2sOysVkF2kYhXAeuVXx3JvZOtB2nJuI=</DigestValue></Reference></Manifest>\n</Object>\n<Object xmlns:xades="http://uri.etsi.org/01903/v1.1.1#" >\n<xades:QualifyingProperties>\n<xades:UnsignedProperties>\n<xades:UnsignedSignatureProperties>\n<xades:SignatureTimeStamp>\n<xades:HashDataInfo uri="SignatureValue">\n<Transforms>\n<Transform Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>\n</Transforms>\n</xades:HashDataInfo>\n<xades:EncapsulatedTimeStamp>\nMIIXcjADAgEAMIIXaQYJKoZIhvcNAQcCoIIXWjCCF1YCAQMxDzANBglghkgBZQME\nAgEFADCBgQYLKoZIhvcNAQkQAQSgcgRwMG4CAQEGCWCGSAGG/WwHATAxMA0GCWCG\nSAFlAwQCAQUABCBH2GbiZmW9yH34r5k/1/GcFNIKEuydHgUtd7XwvK8XWAIQALjb\nV4hSBnAtJgSDQbxG3hgPMjAyNjEwMTkxMDQ1NTRaAggM5kzs3VC08aCCEzowggbt\nMIIE1aADAgECAhAIT9wzT35FTtvDD4/5khg1MA0GCSqGSIb3DQEBCwUAMGkxCzAJ\nBgNVBAYTAlVTMRcwFQYDVQQKEw5EaWdpQ2VydCwgSW5jLjFBMD8GA1UEAxM4RGln\naUNlcnQgVHJ1c3RlZCBHNCBUaW1lU3RhbXBpbmcgUlNBNDA5NiBTSEEyNTYgMjAy\nNSBDQTEwHhcNMjYwODA1MDAwMDAwWhcNMzcxMTA0MjM1OTU5WjBjMQswCQYDVQQG\nEwJVUzEXMBUGA1UEChMORGlnaUNlcnQsIEluYy4xOzA5BgNVBAMTMkRpZ2lDZXJ0\nIFNIQTI1NiBSU0E0MDk2IFRpbWVzdGFtcCBSZXNwb25kZXIgMjAyNiAxMIICIjAN\nBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAtnum8sn+zUr41JtMZbP9OMYw+HwJ\nDpG5xkIu/lqcfNYmMX81YmsUiHLbh9ykpeWBGKTLhYBrAN9Tdg/QEzG32XcObmgI\nblnr0CoQ3WSAeDZ6nH6X6VkFyYkJw3QBJREwvm4UhLzSxmwPA7cFKRTEOMsmEEj6\nqJk/dqLEAL+oQYuOwE2UuiX1Vnul8YReIyWd4kgLn9gq6LNXM0UplkR6jL/QHxmb\n6fMoGBJYbnaUI7XD6cKDpekK2SVMld4iDbzeHDtOaaxldH5IxuNusQ69nd8/ZXEi\nB5Hbxj3RlK13cX1W4DlFXKdv/CEhM8Cj1vvlmvhNroyPdRGbbpBlgyf8Wdu5N6By\nhFwURn0U6ozlPoxN22v+fviUhP+6DR547OZnpBMWDfei1f5sVGwiiW/KQTWOK97g\n+4RJpPzPNV4VYMAwO2jM2Aty2QYPVmOQTJm0msuXnJrSbl2gf9JylpkJlWXqk1Q4\nLJsxz+TELoQCZIljbgvTJgoPU2R12ydv8i1UqL/adelA0y7U9Pmmtbze9Xx3rtaj\nC5SzQd1jgfwAwsa90v9YcSPdmeoyoBBA/27cCL237l5DTYYPDLQ4ON3OLTGWnvRb\n6jDrf/T75gMRfUzSLCBQfBusm9+mSWRlC/Df6S/e9Q8i13CuhzOT2Jx+V/nlbXM4\nQoBwlUAhelwwJT0CAwEAAaOCAZUwggGRMAwGA1UdEwEB/wQCMAAwHQYDVR0OBBYE\nFBTJY4owLtRK+26U8+bjQH717M3iMB8GA1UdIwQYMBaAFO9vU0rp5AZ8esrikFb2\nL9RJ7MtOMA4GA1UdDwEB/wQEAwIHgDAWBgNVHSUBAf8EDDAKBggrBgEFBQcDCDCB\nlQYIKwYBBQUHAQEEgYgwgYUwJAYIKwYBBQUHMAGGGGh0dHA6Ly9vY3NwLmRpZ2lj\nZXJ0LmNvbTBdBggrBgEFBQcwAoZRaHR0cDovL2NhY2VydHMuZGlnaWNlcnQuY29t\nL0RpZ2lDZXJ0VHJ1c3RlZEc0VGltZVN0YW1waW5nUlNBNDA5NlNIQTI1NjIwMjVD\nQTEuY3J0MF8GA1UdHwRYMFYwVKBSoFCGTmh0dHA6Ly9jcmwzLmRpZ2ljZXJ0LmNv\nbS9EaWdpQ2VydFRydXN0ZWRHNFRpbWVTdGFtcGluZ1JTQTQwOTZTSEEyNTYyMDI1\nQ0ExLmNybDAgBgNVHSAEGTAXMAgGBmeBDAEEAjALBglghkgBhv1sBwEwDQYJKoZI\nhvcNAQELBQADggIBAI3FOmEenVIK35msCYB+fShAsWvSYvLBItoNdAgQ2jIqrGsV\nsluXMJU/+mRebBc52s6lbKAvOVPXaizmKkMLLflEEKDZQx4CkS2t8aHPjkXha3hY\nZ010htFa3dhNgmalH5vuWvh3tTCf4frTS7gPtGc4Z/xaPhQ2AB1mR8eEe/WbH0RW\nHvVIl6VwQ3+g5FKNfN2N/DWJkf13w2H+2GfqEfbd35Ww8CvoYBjLNIDTadcPWdgs\njsiOaK/7EsKJgLjUNIVgvcaFOLLQ/GlrA+0ZHJoFUbOr5SJN8zykPspXIXlpDJY/\ngqFUZRROeab9GVgmhbdOJcD/63RhxPahFUGbckRONqMe6DYAv6/mOG0pWd3cPSts\ndcS7buj5DyniwRY8yooMH6ptx5vpP/pZzBPBeZD2U4IsthyxB5Jaa8qrOkB5z160\nTXiM5ADMspZ0TfD9MJoq0tFpFPssKRFhWeEDYPvcUuN7U7lvcdHl4ezQ3NT/7Ffs\n1sR1yh/LRbdZ3B3Vc6q2WmD8mDC0p9kzl2o73iVtS946IkEj7FkRsZGww1teYxER\nROC745xrtjvcw9ZyyUjHZWGRIpJeMNsPquCDf0fkyHtB+J4AiNZqCQk23rxh+Kbp\nyMTNVKItJ5l92Svl20U9NbqMBOVYl1h54NEYLJq1/xHWFKPNK903zJZA9P2DMIIG\ntDCCBJygAwIBAgIQDcesVwX/IZkuQEMiDDpJhjANBgkqhkiG9w0BAQsFADBiMQsw\nCQYDVQQGEwJVUzEVMBMGA1UEChMMRGlnaUNlcnQgSW5jMRkwFwYDVQQLExB3d3cu\nZGlnaWNlcnQuY29tMSEwHwYDVQQDExhEaWdpQ2VydCBUcnVzdGVkIFJvb3QgRzQw\nHhcNMjUwNTA3MDAwMDAwWhcNMzgwMTE0MjM1OTU5WjBpMQswCQYDVQQGEwJVUzEX\nMBUGA1UEChMORGlnaUNlcnQsIEluYy4xQTA/BgNVBAMTOERpZ2lDZXJ0IFRydXN0\nZWQgRzQgVGltZVN0YW1waW5nIFJTQTQwOTYgU0hBMjU2IDIwMjUgQ0ExMIICIjAN\nBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAtHgx0wqYQXK+PEbAHKx126NGaHS0\nURedTa2NDZS1mZaDLFTtQ2oRjzUXMmxCqvkbsDpz4aH+qbxeLho8I6jY3xL1IusL\nopuW2qftJYJaDNs1+JH7Z+QdSKWM06qchUP+AbdJgMQB3h2DZ0Mal5kYp77jYMVQ\nXSZH++0trj6Ao+xh/AS7sQRuQL37QXbDhAktVJMQbzIBHYJBYgzWIjk8eDrYhXDE\npKk7RdoX0M980EpLtlrNyHw0Xm+nt5pnYJU3Gmq6bNMI1I7Gb5IBZK4ivbVCiZv7\nPNBYqHEpNVWC2ZQ8BbfnFRQVESYOszFI2Wv82wnJRfN20VRS3hpLgIR4hjzL0hpo\nYGk81coWJ+KdPvMvaB0WkE/2qHxJ0ucS638ZxqU14lDnki7CcoKCz6eum5A19WZQ\nHkqUJfdkDjHkccpL6uoG8pbF0LJAQQZxst7VvwDDjAmSFTUms+wV/FbWBqi7fTJn\njq3hj0XbQcd8hjj/q8d6ylgxCZSKi17yVp2NL+cnT6Toy+rN+nM8M7LnLqCrO2JP\n3oW//1sfuZDKiDEb1AQ8es9Xr/u6bDTnYCTKIsDq1BtmXUqEG1NqzJKS4kOmxkYp\n2WyODi7vQTCBZtVFJfVZ3j7OgWmnhFr4yUozZtqgPrHRVHhGNKlYzyjlroPxul+b\ngIspzOwbtmsgY1MCAwEAAaOCAV0wggFZMBIGA1UdEwEB/wQIMAYBAf8CAQAwHQYD\nVR0OBBYEFO9vU0rp5AZ8esrikFb2L9RJ7MtOMB8GA1UdIwQYMBaAFOzX44LScV1k\nTN8uZz/nupiuHA9PMA4GA1UdDwEB/wQEAwIBhjATBgNVHSUEDDAKBggrBgEFBQcD\nCDB3BggrBgEFBQcBAQRrMGkwJAYIKwYBBQUHMAGGGGh0dHA6Ly9vY3NwLmRpZ2lj\nZXJ0LmNvbTBBBggrBgEFBQcwAoY1aHR0cDovL2NhY2VydHMuZGlnaWNlcnQuY29t\nL0RpZ2lDZXJ0VHJ1c3RlZFJvb3RHNC5jcnQwQwYDVR0fBDwwOjA4oDagNIYyaHR0\ncDovL2NybDMuZGlnaWNlcnQuY29tL0RpZ2lDZXJ0VHJ1c3RlZFJvb3RHNC5jcmww\nIAYDVR0gBBkwFzAIBgZngQwBBAIwCwYJYIZIAYb9bAcBMA0GCSqGSIb3DQEBCwUA\nA4ICAQAXzvsWgBz+Bz0RdnEwvb4LyLU0pn/N0IfFiBowf0/Dm1wGc/Do7oVMY2mh\nXZXjDNJQa8j00DNqhCT3t+s8G0iP5kvN2n7Jd2E4/iEIUBO41P5F448rSYJ59Ib6\n1eoalhnd6ywFLerycvZTAz40y8S4F3/a+Z1jEMK/DMm/axFSgoR8n6c3nuZB9BfB\nwAQYK9FHaoq2e26MHvVY9gCDA/JYsq7pGdogP8HRtrYfctSLANEBfHU16r3J05qX\n3kId+ZOczgj5kjatVB+NdADVZKON/gnZruMvNYY2o1f4MXRJDMdTSlOLh0HCn2cQ\nLwQCqjFbqrXuvTPSegOOzr4EWj7PtspIHBldNE2K9i697cvaiIo2p61Ed2p8xMJb\n82Yosn0z4y25xUbI7GIN/TpVfHIqQ6Ku/qjTY6hc3hsXMrS+U0yy+GWqAXam4ToW\nd2UQ1KYT70kZjE4YtL8Pbzg0c1ugMZyZZd/BdHLiRu7hAWE6bTEm4XYRkA6Tl4KS\nFLFk43esaUeqGkH/wyW4N7OigizwJWeukcyIPbAvjSabnf7+Pu0VrFgoiovRDiyx\n3zEdmcif/sYQsfch28bZeUz2rtY/9TCA6TD8dC3JE3rYkrhLULy7Dc90G6e8Blqm\nyIjlgp2+VqsS9/wQD7yFylIz0scmbKvFoW2jNrbM1pD2T7m3XDCCBY0wggR1oAMC\nAQICEA6bGI750C3n79tQ4ghAGFowDQYJKoZIhvcNAQEMBQAwZTELMAkGA1UEBhMC\nVVMxFTATBgNVBAoTDERpZ2lDZXJ0IEluYzEZMBcGA1UECxMQd3d3LmRpZ2ljZXJ0\nLmNvbTEkMCIGA1UEAxMbRGlnaUNlcnQgQXNzdXJlZCBJRCBSb290IENBMB4XDTIy\nMDgwMTAwMDAwMFoXDTMxMTEwOTIzNTk1OVowYjELMAkGA1UEBhMCVVMxFTATBgNV\nBAoTDERpZ2lDZXJ0IEluYzEZMBcGA1UECxMQd3d3LmRpZ2ljZXJ0LmNvbTEhMB8G\nA1UEAxMYRGlnaUNlcnQgVHJ1c3RlZCBSb290IEc0MIICIjANBgkqhkiG9w0BAQEF\nAAOCAg8AMIICCgKCAgEAv+aQc2jeu+RdSjwwIjBpM+zCpyUuySE98orYWcLhKac9\nWKt2ms2uexuEDcQwH/MbpDgW61bGl20dq7J58soR0uRf1gU8Ug9SH8aeFaV+vp+p\nVxZZVXKvaJNwwrK6dZlqczKU0RBEEC7fgvMHhOZ0O21x4i0MG+4g1ckgHWMpLc7s\nXk7Ik/ghYZs06wXGXuxbGrzryc/NrDRAX7F6Zu53yEioZldXn1RYjgwrt0+nMNlW\n7sp7XeOtyU9e5TXnMcvak17cjo+A2raRmECQecN4x7axxLVqGDgDEI3Y1DekLgV9\niPWCPhCRcKtVgkEy19sEcypukQF8IUzUvK4bA3VdeGbZOjFEmjNAvwjXWkmkwuap\noGfdpCe8oU85tRFYF/ckXEaPZPfBaYh2mHY9WV1CdoeJl2l6SPDgohIbZpp0yt5L\nHucOY67m1O+SkjqePdwA5EUlibaaRBkrfsCUtNJhbesz2cXfSwQAzH0clcOP9yGy\nshG3u3/y1YxwLEFgqrFjGESVGnZifvaAsPvoZKYz0YkH4b235kOkGLimdwHhD5QM\nIR2yVCkliWzlDlJRR3S+Jqy2QXXeeqxfjT/JvNNBERJb5RBQ6zHFynIWIgnffEx1\nP2PsIV/EIFFrb7GrhotPwtZFX50g/KEexcCPorF+CiaZ9eRpL5gdLfXZqbId5RsC\nAwEAAaOCATowggE2MA8GA1UdEwEB/wQFMAMBAf8wHQYDVR0OBBYEFOzX44LScV1k\nTN8uZz/nupiuHA9PMB8GA1UdIwQYMBaAFEXroq/0ksuCMS1Ri6enIZ3zbcgPMA4G\nA1UdDwEB/wQEAwIBhjB5BggrBgEFBQcBAQRtMGswJAYIKwYBBQUHMAGGGGh0dHA6\nLy9vY3NwLmRpZ2ljZXJ0LmNvbTBDBggrBgEFBQcwAoY3aHR0cDovL2NhY2VydHMu\nZGlnaWNlcnQuY29tL0RpZ2lDZXJ0QXNzdXJlZElEUm9vdENBLmNydDBFBgNVHR8E\nPjA8MDqgOKA2hjRodHRwOi8vY3JsMy5kaWdpY2VydC5jb20vRGlnaUNlcnRBc3N1\ncmVkSURSb290Q0EuY3JsMBEGA1UdIAQKMAgwBgYEVR0gADANBgkqhkiG9w0BAQwF\nAAOCAQEAcKC/Q1xV5zhfoKN0Gz22Ftf3v1cHvZqsoYcs7IVeqRq7IviHGmlUIu2k\niHdtvRoU9BNKei8ttzjv9P+Aufih9/Jy3iS8UgPITtAq3votVs/59PesMHqai7Je\n1M/RQ0SbQyHrlnKhSLSZy51PpwYDE3cnRNTnf+hZqPC/Lwum6fI0POz3A8eHqNJM\nQBk1RmppVLC4oVaO7KTVPeix3P0c2PR3WlxUjG/voVA9/HYJaISfb8rbII01YBwC\nA8sgsKxYoA5AY8WYIsGyWfVVa88nq2x2zm8jLfR+cWojayL/ErhULSd+2DrZ8LaH\nlv1b0VysGMNNn3O3AamfV6peKOK5lDGCA3wwggN4AgEBMH0waTELMAkGA1UEBhMC\nVVMxFzAVBgNVBAoTDkRpZ2lDZXJ0LCBJbmMuMUEwPwYDVQQDEzhEaWdpQ2VydCBU\ncnVzdGVkIEc0IFRpbWVTdGFtcGluZyBSU0E0MDk2IFNIQTI1NiAyMDI1IENBMQIQ\nCE/cM09+RU7bww+P+ZIYNTANBglghkgBZQMEAgEFAKCB0TAaBgkqhkiG9w0BCQMx\nDQYLKoZIhvcNAQkQAQQwHAYJKoZIhvcNAQkFMQ8XDTI2MTAxOTEwNDU1NFowKwYL\nKoZIhvcNAQkQAgwxHDAaMBgwFgQUUdmr2gNJc9hPQmaspIJI5rNpxDkwLwYJKoZI\nhvcNAQkEMSIEICCo528Lz1vhTW62t+Hxtciexur4NMJuQjJi8N7kv/CHMDcGCyqG\nSIb3DQEJEAIvMSgwJjAkMCIEIC2gnaf0Ex+f5y22xebpyWVnVa8EPx6nQswNISDh\nQev8MA0GCSqGSIb3DQEBAQUABIICALWCrQ9Sfn5dWAYCLXVdq6gsNyYZctUyf2x2\n6Gqh4OxA1vzN5nE0B0I1rwIT/+Je9lJXsy3SCkqCjCx2i00V1oWWmWJOv5LgqBK2\nM1ICPPWGM32n229xATAa3jwiJki+jrKelgDGjDtkN/PhNccQZdpHQlIoHtZ9B2n8\nxqij4MUtnlqs4XpY2j/SNTMZdMe8dyLDN2fd4mr6BrKc2Vc9x/HjYidkCOkukfXe\nIJ8VUl1zVazLP9zL33MWlG46OMXhYCaKAhgrvQJBDGRSIhHU8Zr9CyY64l7UMJGx\nxi5Vioh88fFMr3xPgzsQZ/K5JGHZR6dvakUemvO95za9dDypeq+bYoqdld4+Ko3R\nLLGmLvYjWMoSF+sm5ZvmEUTqM8gT1l0soLg5gLfSc9hJBnWjtu37+FPE5+Txm5yr\n9SvAmYmIBYD32d62hv+MjEnA6+n+YOS220oKWOzShZWQNi/F8zVwAT9d3ndf04Ez\nTConckJHOTw20y5PvtQvOWy4FJb8Vxas1e93+uPz3WK/ijn7l1HV2Cln89pnMzpn\nfn8ry0IsqY7DkfMpTTc/ao/Zd4ngfUJ0XAWem6j0YXKtgNSaI5elchCTlADITiOW\nFQ+iZ1w2zxpOWf9bW1/qUR6Y00d72qH8qC/jLXvM+jHXdF2lXmztCyzDQU6nnA18\nqve5IJgj\n</xades:EncapsulatedTimeStamp>\n</xades:SignatureTimeStamp>\n</xades:UnsignedSignatureProperties>\n</xades:UnsignedProperties>\n</xades:QualifyingProperties>\n</Object>\n</Signature>\n</signatures>', "bridge.html": '<!DOCTYPE html>\n<html>\n<head><meta charset="utf-8"><title>AE MCP Bridge</title></head>\n<body>\n<script src="js/bridge-core.js"></script>\n<script>AEMCPBridge.start();</script>\n</body>\n</html>\n', "css/panel.css": ':root { --bg: #232323; --fg: #d6d6d6; --muted: #8a8a8a; --ok: #3fb950; --bad: #f85149; --warn: #d29922; --line: #3a3a3a; }\n* { box-sizing: border-box; }\nbody { margin: 0; padding: 10px; background: var(--bg); color: var(--fg); font: 12px -apple-system, "Segoe UI", sans-serif; }\nheader { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }\n#title { font-weight: 600; font-size: 13px; }\n.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--warn); flex: none; }\n.dot.ok { background: var(--ok); } .dot.bad { background: var(--bad); }\n.muted { color: var(--muted); }\n.row { display: flex; gap: 6px; margin-bottom: 10px; }\nbutton { background: #3a3a3a; color: var(--fg); border: 1px solid #4a4a4a; border-radius: 4px; padding: 4px 10px; cursor: pointer; font: inherit; }\nbutton:hover { background: #454545; }\n.label { text-transform: uppercase; font-size: 10px; letter-spacing: .05em; color: var(--muted); margin-bottom: 4px; }\nul { list-style: none; padding: 0; margin: 0; }\nli { border-top: 1px solid var(--line); padding: 4px 0; word-break: break-all; }\nli .t { color: var(--muted); margin-right: 6px; }\nli.err .s { color: var(--bad); } li.ok .s { color: var(--ok); }\nfooter { margin-top: 10px; font-size: 10px; }\n.banner { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #2d2a12; border: 1px solid #5c531c; border-radius: 4px; padding: 6px 8px; margin-bottom: 10px; }\n.banner[hidden], [hidden] { display: none; }\n.setting { align-items: center; }\n.setting label { color: var(--muted); }\nselect { background: #3a3a3a; color: var(--fg); border: 1px solid #4a4a4a; border-radius: 4px; padding: 3px 6px; font: inherit; flex: 1; }\n.small { font-size: 10px; margin: -6px 0 10px; }\n.grid { display: grid; grid-template-columns: auto 1fr; gap: 6px 8px; align-items: center; margin-bottom: 8px; }\n.grid label { color: var(--muted); }\n#approvals { border: 1px solid #5c531c; background: #2d2a12; border-radius: 4px; padding: 6px 8px; margin-bottom: 10px; }\n.approval { border-top: 1px solid #4a4520; padding: 6px 0; }\n.approval:first-child { border-top: 0; }\n.approval .what { font-weight: 600; margin-bottom: 4px; }\n.approval pre, li pre { max-height: 160px; overflow: auto; background: #181818; padding: 6px; border-radius: 3px; margin: 4px 0; white-space: pre-wrap; word-break: break-word; font: 11px Menlo, Consolas, monospace; }\n.approval .row { margin: 4px 0 0; }\nbutton.allow { background: #1f4d2b; border-color: #2e6b3d; }\nbutton.deny { background: #5a1f1f; border-color: #7a2c2c; }\nli { cursor: pointer; }\nli .c { color: var(--muted); }\n', "index.html": '<!DOCTYPE html>\n<html>\n<head>\n  <meta charset="utf-8">\n  <title>AE MCP</title>\n  <link rel="stylesheet" href="css/panel.css">\n</head>\n<body>\n  <header>\n    <span id="dot" class="dot"></span>\n    <div>\n      <div id="title">AE MCP</div>\n      <div id="sub" class="muted">checking\u2026</div>\n    </div>\n  </header>\n  <div id="update" class="banner" hidden>\n    <span id="updateText"></span>\n    <button id="updateBtn">Update</button>\n  </div>\n\n  <section id="approvals" hidden>\n    <div class="label">Waiting for your approval</div>\n    <div id="approvalList"></div>\n  </section>\n\n  <section class="row">\n    <button id="test">Test</button>\n    <button id="diag" title="Copies a report to paste into a bug report or a chat">Copy diagnostics</button>\n    <button id="openLog" title="Show the full activity log file">Open log</button>\n  </section>\n\n  <section class="grid">\n    <label for="perm">Permissions</label>\n    <select id="perm">\n      <option value="full">Full access</option>\n      <option value="ask">Ask before every change</option>\n      <option value="read-only">Read-only</option>\n    </select>\n    <label for="shell">Shell commands</label>\n    <select id="shell">\n      <option value="on">Allowed</option>\n      <option value="off">Blocked</option>\n    </select>\n    <label for="profile">AI tools</label>\n    <select id="profile">\n      <option value="core">Core (faster, recommended)</option>\n      <option value="full">Full (all tools)</option>\n    </select>\n  </section>\n  <div id="note" class="muted small" hidden></div>\n\n  <section>\n    <div class="label">Activity <span class="muted" id="activityHint">(click an entry for details)</span></div>\n    <ul id="log"><li class="muted">No calls yet</li></ul>\n  </section>\n  <footer class="muted" id="foot"></footer>\n  <script src="js/bridge-core.js"></script>\n  <script src="js/panel.js"></script>\n</body>\n</html>\n', "js/bridge-core.js": `/* AE MCP bridge: a tiny HTTP server inside After Effects (CEP + Node) that evaluates
  * ExtendScript sent by the ae-mcp server. Binds to 127.0.0.1 only and requires the
  * shared token from ~/.aemcp/config.json.
  *
@@ -129,22 +129,49 @@ var init_define_AEMCP_CEP_FILES = __esm({
     try { if (state.listening) fs.unlinkSync(instanceFile()); } catch (e) {}
   }
 
+  // CEP accepts scripts even while a dialog (Project Settings, a render...) blocks ExtendScript,
+  // and After Effects runs them whenever it is free again: possibly long after the AI gave up.
+  // So each job first sends this no-op, and the job itself is only sent once it has come back
+  // (AE is free right now) and only if the job is still wanted.
+  var READY_SCRIPT = "'aemcp-ready'";
+
+  // the client gave up on it (timeout or cancel), or its deadline has passed
+  function dead(job) { return job.cancelled || Date.now() >= job.deadline; }
+
+  function skip(job) {
+    addLog({ at: new Date().toISOString(), ms: 0, ok: false, skipped: true, size: job.script.length, label: job.label, preview: "not run: the AI gave up before After Effects was free" });
+  }
+
   // ExtendScript is single threaded: run one script at a time.
   function pump() {
     if (state.busy || !state.queue.length) return;
     var job = state.queue.shift();
-    if (job.cancelled) return pump();
+    if (dead(job)) { skip(job); return pump(); }
     state.busy = true;
-    var t0 = Date.now();
-    state.current = { startedAt: t0, label: job.label };
-    evalScript(job.script, function (result) {
-      state.busy = false;
-      state.current = null;
-      var ms = Date.now() - t0;
-      var ok = result !== "EvalScript error." && result.indexOf('{"ok":false') !== 0;
-      addLog({ at: new Date().toISOString(), ms: ms, ok: ok, size: job.script.length, label: job.label, preview: String(result).slice(0, 160) });
-      job.done(result);
-      pump();
+    // waiting: the no-op has not come back yet, so After Effects isn't taking scripts right now
+    state.current = { startedAt: Date.now(), label: job.label, waiting: true };
+    evalScript(READY_SCRIPT, function () {
+      if (dead(job)) {
+        state.busy = false;
+        state.current = null;
+        skip(job);
+        return pump();
+      }
+      state.current.waiting = false;
+      job.started = true;
+      var t0 = Date.now();
+      evalScript(job.script, function (result) {
+        state.busy = false;
+        state.current = null;
+        var ms = Date.now() - t0;
+        var ok = result !== "EvalScript error." && result.indexOf('{"ok":false') !== 0;
+        // a script AE has started can't be interrupted: say so if the client had given up meanwhile
+        var late = !!job.cancelled;
+        var preview = (late ? "ran after the AI gave up: " : "") + String(result).slice(0, 160);
+        addLog({ at: new Date().toISOString(), ms: ms, ok: ok, late: late || undefined, size: job.script.length, label: job.label, preview: preview });
+        job.done(result);
+        pump();
+      });
     });
   }
 
@@ -177,6 +204,8 @@ var init_define_AEMCP_CEP_FILES = __esm({
     return {
       ok: true, name: "aemcp-bridge", version: VERSION, host: hostInfo(), port: state.port, pid: process.pid,
       busy: state.busy, busyForMs: cur ? Date.now() - cur.startedAt : 0, busyWith: cur ? cur.label || null : null,
+      // AE has not accepted the no-op sent before the current job: a dialog is open, or AE is busy/starting
+      waitingForAE: !!(cur && cur.waiting), waitingForMs: cur && cur.waiting ? Date.now() - cur.startedAt : 0,
       queue: state.queue.length, pendingApprovals: state.pending.length, permissionMode: permissionMode(),
       startedAt: state.startedAt, lastActivated: state.lastActivated, authorized: authorized(req, token),
     };
@@ -185,28 +214,60 @@ var init_define_AEMCP_CEP_FILES = __esm({
   function handleEval(req, res, body) {
     if (!body || typeof body.script !== "string") return send(res, 400, { ok: false, error: "missing script" });
     var finished = false;
+    var timer = null;
+    var watch = null;
+    // answer the client once. From then on the job is unwanted: if it hasn't started it never will,
+    // and if it is running its log entry says it finished after the AI gave up.
+    function finish(status, obj) {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      clearInterval(watch);
+      job.cancelled = true;
+      send(res, status, obj);
+    }
     var job = {
       script: body.script,
       label: body.label || null,
-      done: function (result) {
-        if (finished) return;
-        finished = true;
-        clearTimeout(timer);
-        send(res, 200, { ok: true, result: result });
-      },
+      done: function (result) { finish(200, { ok: true, result: result }); },
     };
     var timeoutMs = Math.max(1000, Math.min(Number(body.timeoutMs) || 120000, 24 * 3600 * 1000));
-    var timer = null;
-    var startTimer = function () {
+    // optional (sent by newer servers): give up early if After Effects hasn't accepted any script for
+    // this long, i.e. it is blocked by a dialog. Never applies to a script that has started.
+    var startTimeoutMs = Number(body.startTimeoutMs) > 0 ? Math.max(500, Number(body.startTimeoutMs)) : 0;
+    function checkBlocked() {
+      if (finished || job.started) return clearInterval(watch);
+      var cur = state.current;
+      if (!cur || !cur.waiting) return; // idle, or queued behind a script that is running: keep waiting
+      var waited = Date.now() - cur.startedAt;
+      if (waited < startTimeoutMs) return;
+      finish(503, {
+        ok: false, blocked: true, waitingForMs: waited, waitingFor: cur.label || null,
+        queue: state.queue.filter(function (j) { return j !== job && !j.cancelled; }).length, startedAt: state.startedAt,
+        error: "After Effects is busy or showing a dialog: it has not accepted a script for " + Math.round(waited / 1000) + "s. " +
+          "Close any open dialog in After Effects and retry. The script did not run and will not run later.",
+      });
+    }
+    function enqueue() {
+      job.deadline = Date.now() + timeoutMs; // never start it after this
       timer = setTimeout(function () {
-        if (finished) return;
-        finished = true;
-        job.cancelled = true; // drop it if it has not started yet
-        send(res, 504, { ok: false, error: "Timed out after " + Math.round(timeoutMs / 1000) + "s waiting for After Effects (it may be busy, rendering, or showing a dialog)." });
+        finish(504, {
+          ok: false,
+          error: "Timed out after " + Math.round(timeoutMs / 1000) + "s waiting for After Effects (it may be busy, rendering, or showing a dialog). " +
+            (job.started
+              ? "The script had already started: it can't be interrupted and will finish on its own."
+              : "The script did not run and will not run later."),
+        });
       }, timeoutMs);
-    };
+      state.queue.push(job);
+      pump();
+      if (startTimeoutMs && !finished) {
+        watch = setInterval(checkBlocked, Math.min(250, startTimeoutMs));
+        checkBlocked();
+      }
+    }
     // client went away (or the AI app cancelled the request) before we answered: don't run it if still queued
-    res.on("close", function () { if (!finished) { finished = true; job.cancelled = true; clearTimeout(timer); dropPending(job); } });
+    res.on("close", function () { if (!finished) { finished = true; job.cancelled = true; clearTimeout(timer); clearInterval(watch); dropPending(job); } });
 
     if (body.approval && permissionMode() === "ask") {
       // hold the edit until the user allows or denies it in the AE MCP panel
@@ -218,23 +279,18 @@ var init_define_AEMCP_CEP_FILES = __esm({
         state.pending = state.pending.filter(function (x) { return x !== p; });
         if (finished) return;
         if (!allow) {
-          finished = true;
           addLog({ at: new Date().toISOString(), ms: 0, ok: false, label: p.tool, preview: "denied in the AE MCP panel" });
-          return send(res, 200, { ok: false, denied: true, error: "The user denied this change in After Effects (AE MCP panel)." });
+          return finish(200, { ok: false, denied: true, error: "The user denied this change in After Effects (AE MCP panel)." });
         }
-        startTimer();
-        state.queue.push(job);
-        pump();
+        enqueue();
       };
       state.pending.push(p);
       openPanel();
       // waiting for a person: allow up to 10 minutes before giving up
-      setTimeout(function () { if (!finished && state.pending.indexOf(p) >= 0) { state.pending = state.pending.filter(function (x) { return x !== p; }); finished = true; send(res, 200, { ok: false, denied: true, error: "No one approved this change in the AE MCP panel within 10 minutes." }); } }, 10 * 60 * 1000);
+      setTimeout(function () { if (!finished && state.pending.indexOf(p) >= 0) { state.pending = state.pending.filter(function (x) { return x !== p; }); finish(200, { ok: false, denied: true, error: "No one approved this change in the AE MCP panel within 10 minutes." }); } }, 10 * 60 * 1000);
       return;
     }
-    startTimer();
-    state.queue.push(job);
-    pump();
+    enqueue();
   }
 
   function dropPending(job) {
@@ -1062,7 +1118,7 @@ var require_babel_min = __commonJS({
       function C2(e10, a10) {
         return E("ArrayExpression", e10, a10);
       }
-      function P(e10, a10) {
+      function P4(e10, a10) {
         return E("AssignmentExpression", e10, a10);
       }
       function A(e10, a10) {
@@ -1101,7 +1157,7 @@ var require_babel_min = __commonJS({
       function L(e10, a10) {
         return E("LabeledStatement", e10, a10);
       }
-      function U(e10, a10) {
+      function U2(e10, a10) {
         return E("StringLiteral", e10, a10);
       }
       function q(e10, a10) {
@@ -2097,7 +2153,7 @@ var require_babel_min = __commonJS({
         for (var s10 = 0, d10 = i10.length - 1; s10 < r10.length; s10++, d10--) {
           var u10 = i10[d10], c10 = void 0;
           if (F(u10)) c10 = u10.name;
-          else if (U(u10)) c10 = u10.value;
+          else if (U2(u10)) c10 = u10.value;
           else if (ae(u10)) c10 = "this";
           else if (we(u10)) c10 = "super";
           else {
@@ -4043,14 +4099,14 @@ var require_babel_min = __commonJS({
       }
       function Lh(e10, a10) {
         var n10;
-        return void 0 === a10 && (a10 = e10.key), "method" === e10.kind ? Lh.increment() + "" : (n10 = F(a10) ? a10.name : U(a10) ? JSON.stringify(a10.value) : JSON.stringify(Mh(vf(a10))), e10.computed && (n10 = "[" + n10 + "]"), e10.static && (n10 = "static:" + n10), n10);
+        return void 0 === a10 && (a10 = e10.key), "method" === e10.kind ? Lh.increment() + "" : (n10 = F(a10) ? a10.name : U2(a10) ? JSON.stringify(a10.value) : JSON.stringify(Mh(vf(a10))), e10.computed && (n10 = "[" + n10 + "]"), e10.static && (n10 = "static:" + n10), n10);
       }
       function Uh(e10, a10) {
         if (Da(e10)) return e10;
         var n10, t10 = false;
         if (Wa(e10)) t10 = true, n10 = "ClassDeclaration";
         else if (Na(e10)) t10 = true, n10 = "FunctionDeclaration";
-        else if (P(e10)) return Xr(e10);
+        else if (P4(e10)) return Xr(e10);
         if (t10 && !e10.id && (n10 = false), !n10) {
           if (a10) return false;
           throw new Error("cannot turn " + e10.type + " to a statement");
@@ -4142,7 +4198,7 @@ var require_babel_min = __commonJS({
         for (var r10 = [].concat(e10), i10 = /* @__PURE__ */ Object.create(null); r10.length; ) {
           var o10 = r10.shift();
           if (o10) {
-            if (!t10 || !(P(o10) || ne(o10) || te(o10))) if (F(o10)) a10 ? (i10[o10.name] = i10[o10.name] || []).push(o10) : i10[o10.name] = o10;
+            if (!t10 || !(P4(o10) || ne(o10) || te(o10))) if (F(o10)) a10 ? (i10[o10.name] = i10[o10.name] || []).push(o10) : i10[o10.name] = o10;
             else if (!Ha(o10) || pe(o10)) {
               if (n10) {
                 if (j(o10)) {
@@ -4170,7 +4226,7 @@ var require_babel_min = __commonJS({
       function zh(e10, a10) {
         if ("id" in e10 && e10.id) return { name: e10.id.name, originalNode: e10.id };
         var n10, t10 = "";
-        if (Y(a10, { value: e10 }) ? n10 = Jh(a10) : X(e10) || Se(e10) ? (n10 = Jh(e10), "get" === e10.kind ? t10 = "get " : "set" === e10.kind && (t10 = "set ")) : ie(a10) && a10.init === e10 ? n10 = a10.id : P(a10, { operator: "=", right: e10 }) && (n10 = a10.left), !n10) return null;
+        if (Y(a10, { value: e10 }) ? n10 = Jh(a10) : X(e10) || Se(e10) ? (n10 = Jh(e10), "get" === e10.kind ? t10 = "get " : "set" === e10.kind && (t10 = "set ")) : ie(a10) && a10.init === e10 ? n10 = a10.id : P4(a10, { operator: "=", right: e10 }) && (n10 = a10.left), !n10) return null;
         var r10 = Ma(n10) ? (function(e11) {
           return W(e11) ? "null" : H(e11) ? "/" + e11.pattern + "/" + e11.flags : Pe(e11) ? e11.quasis.map(function(e12) {
             return e12.value.raw;
@@ -4905,7 +4961,7 @@ var require_babel_min = __commonJS({
         return !!e10 && ("ClassAccessorProperty" === e10.type && (null == a10 || S(e10, a10)));
       }, isAnyTypeAnnotation: Le, isArgumentPlaceholder: function(e10, a10) {
         return E("ArgumentPlaceholder", e10, a10);
-      }, isArrayExpression: C2, isArrayPattern: se, isArrayTypeAnnotation: Ue, isArrowFunctionExpression: de, isAssignmentExpression: P, isAssignmentPattern: oe, isAwaitExpression: _e, isBigIntLiteral: ke, isBigIntLiteralTypeAnnotation: function(e10, a10) {
+      }, isArrayExpression: C2, isArrayPattern: se, isArrayTypeAnnotation: Ue, isArrowFunctionExpression: de, isAssignmentExpression: P4, isAssignmentPattern: oe, isAwaitExpression: _e, isBigIntLiteral: ke, isBigIntLiteralTypeAnnotation: function(e10, a10) {
         return E("BigIntLiteralTypeAnnotation", e10, a10);
       }, isBinary: Aa, isBinaryExpression: function(e10, a10) {
         return E("BinaryExpression", e10, a10);
@@ -5420,7 +5476,7 @@ var require_babel_min = __commonJS({
             return false;
         }
         return null == a10 || S(e10, a10);
-      }, isStatement: Da, isStaticBlock: Me, isStringLiteral: U, isStringLiteralTypeAnnotation: function(e10, a10) {
+      }, isStatement: Da, isStaticBlock: Me, isStringLiteral: U2, isStringLiteralTypeAnnotation: function(e10, a10) {
         return E("StringLiteralTypeAnnotation", e10, a10);
       }, isStringTypeAnnotation: Je, isSuper: we, isSwitchCase: function(e10, a10) {
         return E("SwitchCase", e10, a10);
@@ -11636,7 +11692,7 @@ var require_babel_min = __commonJS({
       function Ib(e10, a10, n10) {
         return void 0 === n10 && (n10 = {}), kb(e10, a10, n10);
       }
-      var Bb = _, Nb = I, jb = Na, Ob = F, Fb = ta, Mb = K, Lb = ua, Ub = Da, qb = U, Wb = Mh, Vb = Xh, Hb = /^[_$A-Z0-9]+$/;
+      var Bb = _, Nb = I, jb = Na, Ob = F, Fb = ta, Mb = K, Lb = ua, Ub = Da, qb = U2, Wb = Mh, Vb = Xh, Hb = /^[_$A-Z0-9]+$/;
       function Gb(e10, a10, n10) {
         var t10 = n10.placeholderAllowlist, r10 = n10.placeholderPattern, i10 = n10.preserveComments, o10 = void 0 !== i10 && i10, s10 = n10.syntacticPlaceholders, d10 = (function(e11, a11, n11) {
           var t11 = (a11.plugins || []).slice();
@@ -11683,7 +11739,7 @@ var require_babel_min = __commonJS({
           }, isDuplicate: p10.has(r10) }), p10.add(r10);
         }
       }
-      var Jb = Ur, zb = vf, Xb = zr, Yb = Xr, $b = ai, Qb = Da, Zb = U, ex = ri, ax = _r;
+      var Jb = Ur, zb = vf, Xb = zr, Yb = Xr, $b = ai, Qb = Da, Zb = U2, ex = ri, ax = _r;
       function nx(e10, a10) {
         var n10 = zb(e10.ast);
         return a10 && (e10.placeholders.forEach(function(e11) {
@@ -12726,7 +12782,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
             }
             return true;
           }
-          return ME(e11) ? HE(e11.tag, "String.raw") && !this.hasBinding("String", { noGlobals: true }) && this.isPure(e11.quasi, a11) : _E2(e11) ? !e11.computed && CE(e11.object) && "Symbol" === e11.object.name && CE(e11.property) && "for" !== e11.property.name && !this.hasBinding("Symbol", { noGlobals: true }) : yE(e11) ? HE(e11.callee, "Symbol.for") && !this.hasBinding("Symbol", { noGlobals: true }) && 1 === e11.arguments.length && U(e11.arguments[0]) : jE(e11);
+          return ME(e11) ? HE(e11.tag, "String.raw") && !this.hasBinding("String", { noGlobals: true }) && this.isPure(e11.quasi, a11) : _E2(e11) ? !e11.computed && CE(e11.object) && "Symbol" === e11.object.name && CE(e11.property) && "for" !== e11.property.name && !this.hasBinding("Symbol", { noGlobals: true }) : yE(e11) ? HE(e11.callee, "Symbol.for") && !this.hasBinding("Symbol", { noGlobals: true }) && 1 === e11.arguments.length && U2(e11.arguments[0]) : jE(e11);
         }, a10.setData = function(e11, a11) {
           return this.data[e11] = a11;
         }, a10.getData = function(e11) {
@@ -14571,7 +14627,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
         };
         return f10.version = "3.0.2", AP = f10;
       })(), BP = oe, NP = F, jP = "";
-      function OP(e10) {
+      function OP2(e10) {
         var a10 = e10.name, n10 = this.tokenMap.find(e10, function(e11) {
           return e11.value === a10;
         });
@@ -15302,7 +15358,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
         this.word("with"), this.space(), this.tokenChar(40), this.print(e10.object), this.tokenChar(41), this.printBlock(e10.body);
       }, YieldExpression: function(e10) {
         e10.delegate ? (this.word("yield", true), this.tokenChar(42), e10.argument && (this.space(), this.print(e10.argument))) : e10.argument ? (this.word("yield", true), this.space(), this.print(e10.argument)) : this.word("yield");
-      }, _classMethodHead: dA, _functionHead: tP, _getRawIdentifier: OP, _interfaceish: $P, _methodHead: aP, _param: eP, _parameters: ZC, _params: QC, _predicate: nP, _printAttributes: wP, _printTemplate: jC, _shouldPrintArrowParamsParens: iP, _shouldPrintDecoratorsBeforeExport: WC, _tsPrintClassMemberModifiers: mP, _variance: QP }), gA = /* @__PURE__ */ new Map(), fA = 0, hA = 0, mA = Object.keys(pA).sort(); hA < mA.length; hA++) {
+      }, _classMethodHead: dA, _functionHead: tP, _getRawIdentifier: OP2, _interfaceish: $P, _methodHead: aP, _param: eP, _parameters: ZC, _params: QC, _predicate: nP, _printAttributes: wP, _printTemplate: jC, _shouldPrintArrowParamsParens: iP, _shouldPrintDecoratorsBeforeExport: WC, _tsPrintClassMemberModifiers: mP, _variance: QP }), gA = /* @__PURE__ */ new Map(), fA = 0, hA = 0, mA = Object.keys(pA).sort(); hA < mA.length; hA++) {
         var RA = mA[hA];
         RA.startsWith("_") || gA.set(RA, [pA[RA], fA++, void 0]);
       }
@@ -15490,7 +15546,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
           var e11 = this._noLineTerminatorAfterNode;
           return null !== e11 && (this._noLineTerminatorAfterNode = null), e11;
         }, a10.generate = function(e11) {
-          return this.format.preserveFormat && (this.tokenMap = new AA(e11, this._tokens, this._originalCode), this._boundGetRawIdentifier = OP.bind(this)), this.print(e11), this._maybeAddAuxComment(), this._buf.get();
+          return this.format.preserveFormat && (this.tokenMap = new AA(e11, this._tokens, this._originalCode), this._boundGetRawIdentifier = OP2.bind(this)), this.print(e11), this._maybeAddAuxComment(), this._buf.get();
         }, a10.indent = function(e11) {
           void 0 === e11 && (e11 = this._flags), 7 & e11 || (this._indent += this._indentRepeat);
         }, a10.dedent = function(e11) {
@@ -16066,7 +16122,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
       function tD() {
         if (this.removed) throw this.buildCodeFrameError("NodePath has been removed so is read-only.");
       }
-      var rD = Bi, iD = rf, oD = jr, sD = Ur, dD = Wr, uD = vf, cD = Xr, lD = P, pD = _, gD = fe, fD = Pa, hD = F, mD = Z, RD = we, yD = Si;
+      var rD = Bi, iD = rf, oD = jr, sD = Ur, dD = Wr, uD = vf, cD = Xr, lD = P4, pD = _, gD = fe, fD = Pa, hD = F, mD = Z, RD = we, yD = Si;
       function vD(e10, a10) {
         var n10;
         TD.call(this, e10, a10.length);
@@ -16531,7 +16587,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
         var n10 = a10.newTargetPaths;
         e10.get("meta").isIdentifier({ name: "new" }) && e10.get("property").isIdentifier({ name: "target" }) && n10.push(e10);
       } });
-      var Zk = On, eI = Qn, aI = A, nI = Pa, tI = F, rI = Ma, iI = U, oI = tn, sI = en, dI = Dh;
+      var Zk = On, eI = Qn, aI = A, nI = Pa, tI = F, rI = Ma, iI = U2, oI = tn, sI = en, dI = Dh;
       function uI(e10) {
         return e10.isProgram() ? e10 : (e10.parentPath.scope.getFunctionParent() || e10.parentPath.scope.getProgramParent()).path;
       }
@@ -22189,7 +22245,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
       }
       function TH(e10, a10, n10) {
         if (!(F(e10) && a10.hasUid(e10.name))) {
-          if (P(e10, { operator: "=" }) && F(e10.left) && a10.hasUid(e10.left.name)) return vf(e10);
+          if (P4(e10, { operator: "=" }) && F(e10.left) && a10.hasUid(e10.left.name)) return vf(e10);
           var t10 = ai(n10);
           return a10.push({ id: t10, kind: "let" }), jr("=", vf(t10), e10);
         }
@@ -22452,7 +22508,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
                       Xe2 = kH(Ze2);
                       var ta2 = rG(x10, "get_" + ke2), ra2 = rG(x10, "set_" + ke2);
                       VH(na2, He2, ta2, ra2, Ge2), ze2 = [ea2, ta2, ra2];
-                    } else _H(e10, r10), DH(e10.node.id, na2, vf(He2), P(He2) ? vf(He2.left) : vf(He2), Ze2, De2, Ge2), ze2 = [ea2];
+                    } else _H(e10, r10), DH(e10.node.id, na2, vf(He2), P4(He2) ? vf(He2.left) : vf(He2), Ze2, De2, Ge2), ze2 = [ea2];
                   } else if (0 === Je2) {
                     var ia2 = rG(x10, "init_" + ke2), oa2 = Ee2.get("value"), sa2 = Ge2 ? [] : [Si()];
                     oa2.node && sa2.push(oa2.node), oa2.replaceWith(Wr(vf(ia2), sa2)), ze2 = [ia2], Ke2 && (Xe2 = kH(He2));
@@ -25393,10 +25449,10 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
         var e10 = VK()();
         return e10.addRange(67648, 67669).addRange(67671, 67679), w2.characters = e10, w2;
       }
-      var P2, A2 = {};
+      var P22, A2 = {};
       function _2() {
-        if (P2) return A2;
-        P2 = 1;
+        if (P22) return A2;
+        P22 = 1;
         var e10 = VK()(783, 786, 815, 7673, 66045);
         return e10.addRange(788, 802).addRange(806, 812).addRange(818, 833).addRange(835, 836).addRange(838, 855).addRange(857, 861).addRange(863, 866).addRange(2387, 2388).addRange(6832, 6896).addRange(7618, 7671).addRange(7675, 7679).addRange(8204, 8205).addRange(8400, 8431).addRange(65024, 65039).addRange(65056, 65069).addRange(118528, 118573).addRange(118576, 118598).addRange(119079, 119080).addRange(119143, 119145).addRange(119163, 119170).addRange(119173, 119179).addRange(119210, 119213).addRange(119387, 119388).addRange(917760, 917999), A2.characters = e10, A2;
       }
@@ -25421,12 +25477,12 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
         var e10 = VK()();
         return e10.addRange(43392, 43469).addRange(43471, 43481).addRange(43486, 43487), F2.characters = e10, F2;
       }
-      var L2, U2 = {};
+      var L2, U22 = {};
       function q2() {
-        if (L2) return U2;
+        if (L2) return U22;
         L2 = 1;
         var e10 = VK()();
-        return e10.addRange(101888, 102801).addRange(102816, 102866), U2.characters = e10, U2;
+        return e10.addRange(101888, 102801).addRange(102816, 102866), U22.characters = e10, U22;
       }
       var W2, V2 = {};
       function H2() {
@@ -25771,10 +25827,10 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
         var e10 = VK()(124415);
         return e10.addRange(2404, 2405).addRange(124368, 124410), w4.characters = e10, w4;
       }
-      var P4, A4 = {};
+      var P42, A4 = {};
       function _4() {
-        if (P4) return A4;
-        P4 = 1;
+        if (P42) return A4;
+        P42 = 1;
         var e10 = VK()(8282, 8285, 11825, 11841);
         return e10.addRange(68736, 68786).addRange(68800, 68850).addRange(68858, 68863), A4.characters = e10, A4;
       }
@@ -26023,10 +26079,10 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
         var e10 = VK()();
         return e10.addRange(2404, 2405).addRange(2534, 2543).addRange(43008, 43052), w3.characters = e10, w3;
       }
-      var P3, A3 = {};
+      var P32, A3 = {};
       function _3() {
-        if (P3) return A3;
-        P3 = 1;
+        if (P32) return A3;
+        P32 = 1;
         var e10 = VK()(778, 1548, 1567, 1600, 1648, 7672, 7674);
         return e10.addRange(771, 772).addRange(775, 776).addRange(803, 805).addRange(813, 814).addRange(816, 817).addRange(1563, 1564).addRange(1611, 1621).addRange(1792, 1805).addRange(1807, 1866).addRange(1869, 1871).addRange(2144, 2154), A3.characters = e10, A3;
       }
@@ -28733,7 +28789,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
           e11.skip();
         }, YieldExpression: function(e11) {
           var a11, n11;
-          a11 = e11.parent, n11 = this.sentId, P(a11) && F(a11.left, { name: n11 }) || e11.replaceWith(jr("=", ai(this.sentId), e11.node));
+          a11 = e11.parent, n11 = this.sentId, P4(a11) && F(a11.left, { name: n11 }) || e11.replaceWith(jr("=", ai(this.sentId), e11.node));
         }, MetaProperty: function(e11) {
           a10(e11.node) && e11.replaceWith(ai(this.sentId));
         } };
@@ -28919,8 +28975,8 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
               else if (Pe(d12)) n12.push(vf(d12)), r12 = true;
               else if (Ma(d12)) n12.push(ri(String(d12.value)));
               else {
-                P(d12) && F(d12.left) ? n12.push(vf(d12.left)) : n12.push(vf(d12));
-                var u12 = P(d12) ? d12.right : d12;
+                P4(d12) && F(d12.left) ? n12.push(vf(d12.left)) : n12.push(vf(d12));
+                var u12 = P4(d12) ? d12.right : d12;
                 G(u12, { computed: false }) && F(u12.object, { name: "Symbol" }) || _(u12) && en(u12.callee, "Symbol.for") || (t12 = false);
               }
             }
@@ -29013,7 +29069,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
               var d12 = w10(s12, e12.scope);
               s12.forEach(function(e13) {
                 var a12 = e13.get("key"), n12 = a12.node;
-                P(a12.node) && (n12 = a12.node.left), o10 = ci(o10, vf(n12), e13.node.computed || Ma(a12.node));
+                P4(a12.node) && (n12 = a12.node.left), o10 = ci(o10, vf(n12), e13.node.computed || Ma(a12.node));
               });
               var u12 = e12.parentPath, c11 = m(C10(u12, a11, o10), 3), l11 = c11[0], p10 = c11[1], g11 = c11[2];
               v10 && (function(e13) {
@@ -30115,7 +30171,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
                     return false;
                   })(e12)) return;
                   var n12 = e12.static ? "static" : "instance", t13 = s10.methods[n12], i11 = "method" === e12.kind ? "value" : e12.kind, o11 = q(e12.key) || ke(e12.key) ? ri(String(e12.key.value)) : Dh(e12);
-                  t13.hasComputed = !U(o11);
+                  t13.hasComputed = !U2(o11);
                   var u13, c12 = null != a11 ? a11 : kh(e12);
                   if (!t13.hasComputed && t13.map.has(o11.value)) (u13 = t13.map.get(o11.value))[i11] = c12, "value" === i11 ? (u13.get = null, u13.set = null) : u13.value = null;
                   else {
@@ -30706,7 +30762,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
         return r10 || (f10 = n10 ? function(e11, a11) {
           throw a11.buildCodeFrameError(e11, "Cannot compile to CommonJS, since it would require top-level await.");
         } : t10), { buildFetch: f10, buildFetchAsync: function(e11, a11) {
-          return U(e11) ? gx.expression.ast(ope || (ope = R(["\n        Promise.resolve().then(() => ", ")\n      "])), t10(e11, a11)) : gx.expression.ast(spe || (spe = R(["\n        Promise.resolve(`${", "}`).then((s) => ", ")\n      "], ["\n        Promise.resolve(\\`\\${", "}\\`).then((s) => ", ")\n      "])), e11, t10(ai("s"), a11));
+          return U2(e11) ? gx.expression.ast(ope || (ope = R(["\n        Promise.resolve().then(() => ", ")\n      "])), t10(e11, a11)) : gx.expression.ast(spe || (spe = R(["\n        Promise.resolve(`${", "}`).then((s) => ", ")\n      "], ["\n        Promise.resolve(\\`\\${", "}\\`).then((s) => ", ")\n      "])), e11, t10(ai("s"), a11));
         }, needsAwait: !r10 };
       }
       var mpe, Rpe, ype, vpe, bpe, xpe = /* @__PURE__ */ new WeakMap();
@@ -31120,7 +31176,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
       }
       function ige(e10, a10, n10, t10) {
         var r10 = _(e10) ? e10.arguments[0] : e10.source;
-        if (U(r10) || Pe(r10) && 0 === r10.quasis.length) return a10 ? gx.expression.ast(_pe || (_pe = R(["\n        Promise.resolve().then(() => ", ")\n      "])), t10(r10)) : t10(r10);
+        if (U2(r10) || Pe(r10) && 0 === r10.quasis.length) return a10 ? gx.expression.ast(_pe || (_pe = R(["\n        Promise.resolve().then(() => ", ")\n      "])), t10(r10)) : t10(r10);
         var i10 = Pe(r10) ? ai("specifier") : Zi([Qi({ raw: "" }), Qi({ raw: "" })], [ai("specifier")]);
         return a10 ? gx.expression.ast(Dpe || (Dpe = R(["\n      (specifier =>\n        new Promise(r => r(", "))\n          .then(s => ", ")\n      )(", ")\n    "])), i10, t10(ai("s")), r10) : n10 ? gx.expression.ast(kpe || (kpe = R(["\n      (specifier =>\n        new Promise(r => r(", "))\n      )(", ")\n    "])), t10(i10), r10) : gx.expression.ast(Ipe || (Ipe = R(["\n      (specifier => ", ")(", ")\n    "])), t10(i10), r10);
       }
@@ -31627,7 +31683,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
                 if (pe(b11)) R11 = true;
                 else if (he(b11)) {
                   var x11 = Bge(b11.exported, u10);
-                  h11.push(x11), m11.push(ci(ai(s11), b11.local, U(b11.local)));
+                  h11.push(x11), m11.push(ci(ai(s11), b11.local, U2(b11.local)));
                 }
               }
               t11.push.apply(t11, y(jge(e11, ai(i11), h11, m11, R11 ? ai(s11) : null, u10)));
@@ -31788,11 +31844,11 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
         } } } };
       }, Gge = function(e10) {
         function a10(e11) {
-          return !Te(e11) && U(Dh(e11, e11.key), { value: "__proto__" });
+          return !Te(e11) && U2(Dh(e11, e11.key), { value: "__proto__" });
         }
         function n10(e11) {
           var a11 = e11;
-          return G(a11) && U(Dh(a11, a11.property), { value: "__proto__" });
+          return G(a11) && U2(Dh(a11, a11.property), { value: "__proto__" });
         }
         function t10(e11, a11, n11) {
           return Xr(Wr(n11.addHelper("defaults"), [a11, e11.right]));
@@ -31805,7 +31861,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
           }
         }, ExpressionStatement: function(e11, a11) {
           var r10 = a11.file, i10 = e11.node.expression;
-          P(i10, { operator: "=" }) && n10(i10.left) && e11.replaceWith(t10(i10, i10.left.object, r10));
+          P4(i10, { operator: "=" }) && n10(i10.left) && e11.replaceWith(t10(i10, i10.left.object, r10));
         }, ObjectExpression: function(e11, n11) {
           for (var t11, r10 = n11.file, i10 = e11.node, o10 = i10.properties, s10 = 0; s10 < o10.length; s10++) {
             var d10 = o10[s10];
@@ -31905,7 +31961,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
           for (var n11 = a11.arguments[0].properties, t11 = true, r10 = 0; r10 < n11.length; r10++) {
             var i10 = n11[r10];
             if (!Te(i10)) {
-              if (U(Dh(i10), { value: "displayName" })) {
+              if (U2(Dh(i10), { value: "displayName" })) {
                 t11 = false;
                 break;
               }
@@ -31937,7 +31993,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
             return !!n11;
           }), n11 && (G(n11) && (n11 = n11.property), F(n11) && a10(n11.name, r10)));
         } } };
-      }, zge = si, Xge = Wr, Yge = Vh, $ge = F, Qge = na, Zge = ta, efe = ra, afe = ia, nfe = sa, tfe = em, rfe = U, ife = Cn, ofe = ci, sfe = oi, dfe = gi, ufe = hi, cfe = im, lfe = Xi, pfe = ri, gfe = Si;
+      }, zge = si, Xge = Wr, Yge = Vh, $ge = F, Qge = na, Zge = ta, efe = ra, afe = ia, nfe = sa, tfe = em, rfe = U2, ife = Cn, ofe = ci, sfe = oi, dfe = gi, ufe = hi, cfe = im, lfe = Xi, pfe = ri, gfe = Si;
       function ffe(e10) {
         var a10 = { JSXNamespacedName: function(a11) {
           if (e10.throwIfNamespace) throw a11.buildCodeFrameError("Namespace tags are not supported by default. React's JSX doesn't support namespace tags. You can set `throwIfNamespace: false` to bypass this warning.");
@@ -32194,12 +32250,12 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
             if (sa(a11.node)) {
               var n11 = a11.node.argument;
               return z2(n11) && !n11.properties.some(function(e13) {
-                return Y(e13, { computed: false, shorthand: false }) && (F(e13.key, { name: "__proto__" }) || U(e13.key, { value: "__proto__" }));
+                return Y(e13, { computed: false, shorthand: false }) && (F(e13.key, { name: "__proto__" }) || U2(e13.key, { value: "__proto__" }));
               }) ? e12.push.apply(e12, y(n11.properties)) : e12.push(Xi(n11)), e12;
             }
             var t11, r11 = T10("key" !== a11.node.name.name ? a11.node.value || si(true) : a11.node.value);
             if ("key" === a11.node.name.name && null === r11) throw a11.buildCodeFrameError('Please provide an explicit key value. Using "key" as a shorthand for "key={true}" is not allowed.');
-            U(r11) && !na(a11.node.value) && (r11.value = r11.value.replace(/\n\s+/g, " "), null == (t11 = r11.extra) || delete t11.raw);
+            U2(r11) && !na(a11.node.value) && (r11.value = r11.value.replace(/\n\s+/g, " "), null == (t11 = r11.extra) || delete t11.raw);
             return ia(a11.node.name) ? a11.node.name = ri(a11.node.name.namespace.name + ":" + a11.node.name.name.name) : Cn(a11.node.name.name, false) ? a11.node.name.type = "Identifier" : a11.node.name = ri(a11.node.name.name), e12.push(Vh(hi(a11.node.name, r11), a11.node)), e12;
           }
           function P10(e12) {
@@ -32213,7 +32269,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
           }
           function A10(e12) {
             var a11, n11 = E10(e12.node.name, e12.node);
-            return F(n11) ? a11 = n11.name : U(n11) && (a11 = n11.value), im.isCompatTag(a11) ? ri(a11) : n11;
+            return F(n11) ? a11 = n11.name : U2(n11) && (a11 = n11.value), im.isCompatTag(a11) ? ri(a11) : n11;
           }
           function _10(e12, a11, n11) {
             var t11 = Tfe(e12, "runtime"), r11 = [], i11 = /* @__PURE__ */ Object.create(null);
@@ -32653,7 +32709,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
             var s10 = [], d10 = [];
             o10.get("body").forEach(function(e11) {
               var a11 = e11.node;
-              I(a11) && U(a11.expression) || null != (null == a11 ? void 0 : a11._blockHoist) ? s10.push(a11) : d10.push(a11);
+              I(a11) && U2(a11.expression) || null != (null == a11 ? void 0 : a11._blockHoist) ? s10.push(a11) : d10.push(a11);
             }), s10.length > 0 && (o10.node.body = d10);
             var u10 = (function(e11, a11) {
               var n11 = a11.node;
@@ -32820,13 +32876,13 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
             var n10 = ei(null, a10.params, a10.body, a10.generator, a10.async);
             n10.returnType = a10.returnType;
             var t10 = Dh(a10);
-            U(t10, { value: "__proto__" }) ? e11.replaceWith(hi(t10, n10, true)) : e11.replaceWith(hi(a10.key, n10, a10.computed));
+            U2(t10, { value: "__proto__" }) ? e11.replaceWith(hi(t10, n10, true)) : e11.replaceWith(hi(a10.key, n10, a10.computed));
           }
         }, ObjectProperty: function(e11) {
           var a10 = e11.node;
           if (a10.shorthand) {
             var n10 = Dh(a10);
-            U(n10, { value: "__proto__" }) ? e11.replaceWith(hi(n10, a10.value, true)) : a10.shorthand = false;
+            U2(n10, { value: "__proto__" }) ? e11.replaceWith(hi(n10, a10.value, true)) : a10.shorthand = false;
           }
         } } };
       }, she = function(e10, a10) {
@@ -32926,10 +32982,10 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
               var d10 = a11.value;
               if (d10.value.cooked && n11.push(ri(d10.value.cooked)), i11 < t11.length) {
                 var u10 = t11[i11++].node;
-                U(u10, { value: "" }) || n11.push(u10);
+                U2(u10, { value: "" }) || n11.push(u10);
               }
             }
-            U(n11[0]) || r10 && U(n11[1]) || n11.unshift(ri(""));
+            U2(n11[0]) || r10 && U2(n11[1]) || n11.unshift(ri(""));
             var c10, l10 = n11[0];
             if (r10) for (var p10 = 1; p10 < n11.length; p10++) l10 = Or("+", l10, n11[p10]);
             else n11.length > 1 && (c10 = true, l10 = n11.reduce(function(e12, a12) {
@@ -33106,7 +33162,7 @@ var e,t,r="function"==typeof Symbol?Symbol:{},n=r.iterator||"@@iterator",o=r.toS
         function r10(e11, a11, n11) {
           if (e11.isMemberExpression()) {
             var t11 = e11.node, r11 = t11.object, i10 = t11.property;
-            if (!F(r11) || (t11.computed ? !U(i10) : !F(i10))) return;
+            if (!F(r11) || (t11.computed ? !U2(i10) : !F(i10))) return;
             var o10 = e11.scope.getBindingIdentifier(r11.name), s10 = phe.get(o10);
             if (!s10) return;
             return s10.get(i10.computed ? i10.value : i10.name);
@@ -33877,7 +33933,7 @@ This problem is likely caused by another plugin injecting
         } }) };
       };
       function xme(e10) {
-        return F(e10) ? "name" === e10.name || "length" === e10.name : !!U(e10) && ("name" === e10.value || "length" === e10.value);
+        return F(e10) ? "name" === e10.name || "length" === e10.name : !!U2(e10) && ("name" === e10.value || "length" === e10.value);
       }
       function Sme(e10) {
         return (je(e10) || Oe(e10)) && e10.static && !!e10.value;
@@ -39100,7 +39156,7 @@ var require_core = __commonJS({
       errorsText(errors = this.errors, { separator = ", ", dataVar = "data" } = {}) {
         if (!errors || errors.length === 0)
           return "No errors";
-        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text, msg) => text + separator + msg);
+        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text2, msg) => text2 + separator + msg);
       }
       $dataMetaSchema(metaSchema, keywordsJsonPointers) {
         const rules = this.RULES.all;
@@ -46957,11 +47013,11 @@ function settle(inst, answer) {
 function isRecursiveSchema(inst) {
   return isRecursive(inst, /* @__PURE__ */ new Set(), true) !== NONE;
 }
-function bucketFor(state, inst) {
-  let bucket = state.buckets.get(inst);
+function bucketFor(state2, inst) {
+  let bucket = state2.buckets.get(inst);
   if (!bucket) {
     bucket = /* @__PURE__ */ new WeakMap();
-    state.buckets.set(inst, bucket);
+    state2.buckets.set(inst, bucket);
   }
   return bucket;
 }
@@ -47019,16 +47075,16 @@ var memo = {
         const input2 = payload.value;
         if (!isRef(input2))
           return base(payload, ctx);
-        let state = ctx[STATE];
-        if (!state) {
-          state = { buckets: /* @__PURE__ */ new WeakMap(), backEdges: void 0 };
-          ctx[STATE] = state;
+        let state2 = ctx[STATE];
+        if (!state2) {
+          state2 = { buckets: /* @__PURE__ */ new WeakMap(), backEdges: void 0 };
+          ctx[STATE] = state2;
         }
         let bucket;
         if (lastCtx === ctx) {
           bucket = lastBucket;
         } else {
-          bucket = bucketFor(state, inst);
+          bucket = bucketFor(state2, inst);
           lastCtx = ctx;
           lastBucket = bucket;
         }
@@ -47040,8 +47096,8 @@ var memo = {
               payload.issues.push(...cloneIssues(hit.issues));
           } else {
             payload.memo = true;
-            state.backEdges ?? (state.backEdges = /* @__PURE__ */ new WeakSet());
-            state.backEdges.add(hit.value);
+            state2.backEdges ?? (state2.backEdges = /* @__PURE__ */ new WeakSet());
+            state2.backEdges.add(hit.value);
           }
           return payload;
         }
@@ -50043,12 +50099,12 @@ init_define_AEMCP_CEP_FILES();
 function getArmenianPlural(count, one, many) {
   return Math.abs(count) === 1 ? one : many;
 }
-function withDefiniteArticle(word) {
-  if (!word)
+function withDefiniteArticle(word2) {
+  if (!word2)
     return "";
   const vowels = ["\u0561", "\u0565", "\u0568", "\u056B", "\u0578", "\u0578\u0582", "\u0585"];
-  const lastChar = word[word.length - 1];
-  return word + (vowels.includes(lastChar) ? "\u0576" : "\u0568");
+  const lastChar = word2[word2.length - 1];
+  return word2 + (vowels.includes(lastChar) ? "\u0576" : "\u0568");
 }
 var error24 = () => {
   const Sizable = {
@@ -51137,8 +51193,8 @@ function ko_default() {
 
 // node_modules/zod/v4/locales/lt.js
 init_define_AEMCP_CEP_FILES();
-var capitalizeFirstCharacter = (text) => {
-  return text.charAt(0).toUpperCase() + text.slice(1);
+var capitalizeFirstCharacter = (text2) => {
+  return text2.charAt(0).toUpperCase() + text2.slice(1);
 };
 function getUnitTypeFromNumber(number4) {
   const abs = Math.abs(number4);
@@ -57643,11 +57699,11 @@ function compactTypeUnion(schema) {
     if (keys.length !== 1 || keys[0] !== "type")
       return;
     const type = option.type;
-    for (const member of Array.isArray(type) ? type : [type]) {
-      if (typeof member !== "string")
+    for (const member2 of Array.isArray(type) ? type : [type]) {
+      if (typeof member2 !== "string")
         return;
-      if (!types.includes(member))
-        types.push(member);
+      if (!types.includes(member2))
+        types.push(member2);
     }
   }
   delete schema.anyOf;
@@ -57655,22 +57711,22 @@ function compactTypeUnion(schema) {
 }
 var FOLDABLE_KEYS = /* @__PURE__ */ new Set(["type", "properties", "required", "additionalProperties"]);
 var UNION_KEYS = ["oneOf", "anyOf"];
-function undeclaredConstraint(member) {
-  const extra = member.additionalProperties;
+function undeclaredConstraint(member2) {
+  const extra = member2.additionalProperties;
   if (extra === void 0 || extra === false || typeof extra !== "object" || extra === null)
     return null;
   return Object.keys(extra).length ? extra : null;
 }
 function foldObjects(members2) {
   const objects = [];
-  for (const member of members2) {
-    if (typeof member !== "object" || member.type !== "object")
+  for (const member2 of members2) {
+    if (typeof member2 !== "object" || member2.type !== "object")
       return null;
-    for (const key in member) {
+    for (const key in member2) {
       if (!FOLDABLE_KEYS.has(key))
         return null;
     }
-    objects.push(member);
+    objects.push(member2);
   }
   const properties = {};
   const required2 = /* @__PURE__ */ new Set();
@@ -64453,7 +64509,7 @@ async function readRequestBody(request2, maxBytes = DEFAULT_MAX_REQUEST_BODY_SIZ
   const reader = request2.body.getReader();
   const decoder = new TextDecoder();
   let received = 0;
-  let text = "";
+  let text2 = "";
   try {
     for (; ; ) {
       const { done, value: value2 } = await reader.read();
@@ -64464,12 +64520,12 @@ async function readRequestBody(request2, maxBytes = DEFAULT_MAX_REQUEST_BODY_SIZ
       if (received > maxBytes) {
         return { tooLarge: true };
       }
-      text += decoder.decode(value2, { stream: true });
+      text2 += decoder.decode(value2, { stream: true });
     }
   } finally {
     reader.releaseLock();
   }
-  return { tooLarge: false, text: text + decoder.decode() };
+  return { tooLarge: false, text: text2 + decoder.decode() };
 }
 
 // node_modules/@modelcontextprotocol/sdk/dist/esm/server/sseKeepAlive.js
@@ -65358,7 +65414,9 @@ function loadConfig() {
     changeReport: file2.changeReport,
     permissions: file2.permissions,
     instance: file2.instance,
-    scriptFolders: file2.scriptFolders
+    scriptFolders: file2.scriptFolders,
+    blockedAfterSeconds: file2.blockedAfterSeconds,
+    startupWaitSeconds: file2.startupWaitSeconds
   };
 }
 
@@ -65376,9 +65434,9 @@ var SIGNATURE_FILE = "META-INF/signatures.xml";
 function checkSignature(files) {
   const xml = files[SIGNATURE_FILE];
   if (xml === void 0) return { signed: false, ok: false, problems: ["not signed (no META-INF/signatures.xml)"] };
-  const text = typeof xml === "string" ? xml : Buffer.from(xml).toString("utf8");
+  const text2 = typeof xml === "string" ? xml : Buffer.from(xml).toString("utf8");
   const digests = /* @__PURE__ */ new Map();
-  const manifest = /<Manifest Id="PackageContents">([\s\S]*?)<\/Manifest>/.exec(text)?.[1] ?? "";
+  const manifest = /<Manifest Id="PackageContents">([\s\S]*?)<\/Manifest>/.exec(text2)?.[1] ?? "";
   for (const m of manifest.matchAll(/<Reference URI="([^"]+)">[\s\S]*?<DigestValue>([^<]+)<\/DigestValue>/g)) digests.set(m[1], m[2]);
   const problems = [];
   if (!digests.size) problems.push("signatures.xml lists no files");
@@ -65545,8 +65603,8 @@ async function ask(question, def = true) {
 var sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 var CODEX_START = "# >>> ae-mcp >>>";
 var CODEX_END = "# <<< ae-mcp <<<";
-function removeCodexBlock(text) {
-  return text.replace(new RegExp(`\\n?${CODEX_START}[\\s\\S]*?${CODEX_END}\\n?`, "g"), "\n");
+function removeCodexBlock(text2) {
+  return text2.replace(new RegExp(`\\n?${CODEX_START}[\\s\\S]*?${CODEX_END}\\n?`, "g"), "\n");
 }
 function codexBlock(nodePath, serverFile) {
   const q = (s) => JSON.stringify(s);
@@ -65591,7 +65649,7 @@ function ensureExtension(force = false) {
   const dir = extensionDir();
   const current2 = installedExtensionHash();
   const present = existsSync2(join4(dir, "CSXS", "manifest.xml"));
-  if (!force && current2 === "e7fd3866173c" && present) return { installed: false, updated: false };
+  if (!force && current2 === "d1b1a7ed414c" && present) return { installed: false, updated: false };
   const installedVersion = installedExtensionVersion();
   if (!force && present && installedVersion && compareVersions(installedVersion, VERSION) > 0) return { installed: false, updated: false };
   const updated = existsSync2(dir);
@@ -65602,7 +65660,7 @@ function ensureExtension(force = false) {
     writeFileSync3(p, content);
   }
   mkdirSync3(AEMCP_DIR, { recursive: true });
-  writeFileSync3(HASH_FILE, `${"e7fd3866173c"} ${VERSION}`);
+  writeFileSync3(HASH_FILE, `${"d1b1a7ed414c"} ${VERSION}`);
   return { installed: true, updated };
 }
 function installedExtensionSignature() {
@@ -65796,12 +65854,13 @@ The server is running locally at http://127.0.0.1:${port}/mcp (token in ~/.aemcp
 
 // src/cli/diagnostics.ts
 init_define_AEMCP_CEP_FILES();
-import { spawnSync as spawnSync3 } from "node:child_process";
+import { spawnSync as spawnSync4 } from "node:child_process";
 import { arch, release } from "node:os";
 import { join as join7 } from "node:path";
 
 // src/bridge.ts
 init_define_AEMCP_CEP_FILES();
+import { spawnSync as spawnSync3 } from "node:child_process";
 import { readdirSync as readdirSync3, readFileSync as readFileSync6 } from "node:fs";
 import { dirname as dirname4, join as join6 } from "node:path";
 var BridgeError = class extends Error {
@@ -65886,6 +65945,16 @@ async function resolvePort() {
   if (list.length === 1) return list[0].port;
   return [...list].sort((a, b) => Date.parse(b.lastActivated || b.startedAt || "0") - Date.parse(a.lastActivated || a.startedAt || "0"))[0].port;
 }
+function seconds(env, file2, def) {
+  const v = env !== void 0 && env !== "" ? Number(env) : file2;
+  return typeof v === "number" && Number.isFinite(v) && v >= 0 ? v * 1e3 : def;
+}
+function blockedAfterMs() {
+  return seconds(process.env.AEMCP_BLOCKED_AFTER_SECONDS, loadConfig().blockedAfterSeconds, 3e3);
+}
+function startupWaitMs() {
+  return seconds(process.env.AEMCP_STARTUP_WAIT_SECONDS, loadConfig().startupWaitSeconds, 15e3);
+}
 async function request(path, init = {}) {
   const cfg = loadConfig();
   const port = init.port ?? await resolvePort();
@@ -65920,33 +65989,87 @@ async function request(path, init = {}) {
   }
   const body = await res.json().catch(() => ({}));
   if (res.status === 401) throw new BridgeError("Bridge rejected the token. Re-run the installer so server and AE share ~/.aemcp/config.json, then restart AE.", "AUTH");
+  if (body.blocked) throw new BridgeError(explainBlocked(body), "BLOCKED");
   if (body.denied) throw new BridgeError(body.error || "The change was denied in After Effects.", "DENIED");
   if (!res.ok || body.ok === false) throw new BridgeError(body.error || `Bridge error HTTP ${res.status}`, "BRIDGE");
   return body;
 }
+var secs = (ms) => Math.max(1, Math.round((ms || 0) / 1e3));
+function explainBlocked(b) {
+  const facts = [`it has not accepted a script for ${secs(b.waitingForMs)}s`];
+  if (b.waitingFor) facts.push(`waiting to run ${b.waitingFor}`);
+  if (b.queue) facts.push(`${b.queue} more call${b.queue === 1 ? "" : "s"} queued`);
+  const up = b.startedAt ? Date.now() - Date.parse(b.startedAt) : NaN;
+  const starting = up >= 0 && up < 12e4 ? ` The AE MCP bridge started ${secs(up)}s ago, so After Effects may still be starting up.` : "";
+  return `After Effects is busy or showing a dialog (${facts.join("; ")}).${starting} Check After Effects: close any open dialog or settings window (Project Settings, Preferences, an error or alert, a startup prompt) and retry. This call did not run and will not run later.`;
+}
 async function explainTimeout(port, timeoutMs) {
-  const secs = Math.round(timeoutMs / 1e3);
+  const secs2 = Math.round(timeoutMs / 1e3);
   const h = await probe(port, 1500);
-  if (!h) return `After Effects did not respond within ${secs}s, and its bridge is not answering either. AE may be frozen or quitting.`;
-  if (h.pendingApprovals) return `Still waiting for approval in After Effects (AE MCP panel) after ${secs}s.`;
+  if (!h)
+    return `After Effects did not respond within ${secs2}s, and its bridge is not answering either. AE may still be starting (or showing a startup dialog), or it is frozen or quitting. Call ae_status to check: it waits for AE to finish starting.`;
+  if (h.pendingApprovals) return `Still waiting for approval in After Effects (AE MCP panel) after ${secs2}s.`;
   if (h.busy) {
     const busy = Math.round((h.busyForMs || 0) / 1e3);
     return `After Effects has been busy for ${busy}s${h.busyWith ? ` (running ${h.busyWith})` : ""}. Either a long script or render is still running (it can't be interrupted and will finish on its own), or AE is blocked by an open dialog or settings window: check After Effects and close any dialog. For long jobs pass a larger timeoutSeconds.`;
   }
-  return `After Effects did not finish within ${secs}s.`;
+  return `After Effects did not finish within ${secs2}s.`;
 }
 async function health(port) {
   return request("/health", { method: "GET", timeoutMs: 3e3, port });
 }
-async function evalRaw(script, timeoutMs = 12e4, opts = {}) {
+async function evalRaw(script2, timeoutMs = 12e4, opts = {}) {
   const extra = opts.approval ? 10 * 60 * 1e3 : 0;
   const body = await request("/eval", {
     method: "POST",
-    body: JSON.stringify({ script, timeoutMs, label: opts.label, approval: opts.approval }),
+    // startTimeoutMs: the bridge answers early (blocked) if After Effects doesn't take the script that soon
+    body: JSON.stringify({ script: script2, timeoutMs, startTimeoutMs: blockedAfterMs() || void 0, label: opts.label, approval: opts.approval }),
     timeoutMs: timeoutMs + 5e3 + extra,
     cancel: opts.cancel
   });
   return String(body.result ?? "");
+}
+function aeProcessRunning() {
+  try {
+    if (process.platform === "darwin") {
+      const r = spawnSync3("ps", ["-axo", "comm="], { encoding: "utf8", timeout: 3e3 });
+      if (r.status !== 0) return null;
+      return r.stdout.split("\n").some((l) => /\/Contents\/MacOS\/After Effects$/.test(l.trim()));
+    }
+    if (process.platform === "win32") {
+      const r = spawnSync3("tasklist", ["/FI", "IMAGENAME eq AfterFX.exe", "/NH"], { encoding: "utf8", timeout: 5e3 });
+      if (r.status !== 0) return null;
+      return r.stdout.toLowerCase().includes("afterfx.exe");
+    }
+  } catch {
+  }
+  return null;
+}
+async function waitForBridge(opts = {}) {
+  const deadline = Date.now() + (opts.waitMs ?? startupWaitMs());
+  const isRunning = opts.isAERunning ?? aeProcessRunning;
+  for (; ; ) {
+    if (opts.port === void 0) cache = null;
+    const port = opts.port ?? await resolvePort();
+    let err;
+    try {
+      return { port, health: await health(port) };
+    } catch (e) {
+      if (!(e instanceof BridgeError) || e.code === "AUTH") throw e;
+      err = e;
+    }
+    const running = isRunning();
+    if (err.code === "NOT_RUNNING" && running !== true)
+      throw new BridgeError((running === false ? "After Effects is not running. " : "") + NOT_RUNNING_HELP + setupHint(), "NOT_RUNNING");
+    if (Date.now() + (opts.intervalMs ?? 1e3) >= deadline) {
+      const waited = secs(opts.waitMs ?? startupWaitMs());
+      throw new BridgeError(
+        (err.code === "NOT_RUNNING" ? `After Effects is running, but its AE MCP bridge did not start within ${waited}s. ` : `After Effects is running, but its AE MCP bridge did not answer within ${waited}s. `) + "AE may still be starting, or be showing a startup dialog (crash recovery, missing fonts or plugins, an update or sign-in prompt): check After Effects, close any dialog, then call ae_status again. If AE has finished starting and this persists, open Window > Extensions > AE MCP to check the bridge, or restart After Effects." + setupHint(),
+        "STARTING"
+      );
+    }
+    await new Promise((r) => setTimeout(r, opts.intervalMs ?? 1e3));
+  }
 }
 
 // src/jsx.ts
@@ -66595,13 +66718,16 @@ aemcp = (function () {
     }
     walk(L, "", 0);
   }
-  function snapComp(c, budget) {
-    var o = { name: c.name, layers: {}, order: [] };
-    budget.time = c.time;
+  // light: layer attributes and order only, no properties (the slow part)
+  // time: compare at this time instead of the comp's current time (see snapshotAgain)
+  function snapComp(c, budget, light, time) {
+    var o = { name: c.name, layers: {}, order: [], time: time === undefined ? c.time : time };
+    if (light) o.light = true;
+    budget.time = o.time;
     for (var i = 1; i <= c.numLayers; i++) {
       var L = c.layer(i), k = layerKey(L);
       var e = { sig: layerSig(L), props: {}, groups: {} };
-      snapProps(L, e.props, e.groups, budget);
+      if (!light) snapProps(L, e.props, e.groups, budget);
       o.layers[k] = e; o.order.push(k);
     }
     if (budget.over) o.partial = true;
@@ -66636,8 +66762,9 @@ aemcp = (function () {
     return [enc(g("bitsPerChannel")), enc(g("workingSpace")), enc(g("linearBlending")), enc(g("linearizeWorkingSpace")), enc(g("compensateForSceneReferredProfiles")),
       enc(g("colorManagementSystem") === 1 ? "OCIO" : "Adobe"), enc(g("ocioConfigurationFile")), enc(g("workingColorSpace")), enc(g("displayColorSpace")), enc(g("expressionEngine")), enc(g("timeDisplayType"))].join(SEP);
   }
-  A.snapshot = function (scopeRefs) {
+  A.snapshot = function (scopeRefs, light) {
     var p = app.project, snap = { items: {}, comps: {}, project: projectSig(p) }, budget = { n: PROP_BUDGET, over: false };
+    if (light) snap.light = true;
     for (var i = 1; i <= p.numItems; i++) { var it = p.item(i); snap.items["i" + it.id] = itemSig(it); }
     var ids = {};
     // a call that names a comp is compared there only; otherwise the active comp is compared
@@ -66647,9 +66774,34 @@ aemcp = (function () {
       if (scopeRefs[r] === "*") { for (var ai = 1; ai <= p.numItems; ai++) if (p.item(ai) instanceof CompItem) ids["c" + p.item(ai).id] = true; continue; } // every comp
       try { ids["c" + A.findComp(scopeRefs[r]).id] = true; } catch (e) {}
     }
-    for (var id in ids) { if (!ids.hasOwnProperty(id)) continue; var c = p.itemByID(Number(id.substr(1))); if (c) snap.comps[id] = snapComp(c, budget); }
+    for (var id in ids) { if (!ids.hasOwnProperty(id)) continue; var c = p.itemByID(Number(id.substr(1))); if (c) snap.comps[id] = snapComp(c, budget, light); }
     return snap;
   };
+  // A new snapshot comparable with \`a\`: the same comps at the same times, as light as \`a\`
+  // (an undo doesn't move the time indicator, and the active comp may have changed meanwhile).
+  function snapshotAgain(a) {
+    var p = app.project, snap = { items: {}, comps: {}, project: projectSig(p) }, budget = { n: PROP_BUDGET, over: false };
+    if (a.light) snap.light = true;
+    for (var i = 1; i <= p.numItems; i++) { var it = p.item(i); snap.items["i" + it.id] = itemSig(it); }
+    for (var id in a.comps) { if (!a.comps.hasOwnProperty(id)) continue; var c = p.itemByID(Number(id.substr(1))); if (c) snap.comps[id] = snapComp(c, budget, a.light, a.comps[id].time); }
+    return snap;
+  }
+  // app.project.revision goes up with every edit (also undo/redo, and writing an unchanged value) and
+  // not on selection, viewer, time-indicator or preview changes or scripts that only read (AE 25/26).
+  // It does NOT move for some attributes: item comment/label/folder, work area, expression engine, and
+  // blend mode on some layers. So an unchanged revision only proves no property changed; items and layer attributes still
+  // have to be compared (cheap). null when this AE has no project.revision.
+  A.revision = function () {
+    try { var r = app.project.revision; return typeof r === "number" ? r : null; } catch (e) { return null; }
+  };
+  // The change report for a call that started with snapshot \`before\` and revision \`rev0\`.
+  function changesSince(before, rev0, scope) {
+    var rev1 = rev0 === null ? null : A.revision(), ch;
+    if (rev1 !== null && rev1 === rev0) { ch = A.diff(before, A.snapshot(scope, true)); ch.fast = true; return ch; }
+    // a light "before" (read-only check) has no properties to compare against: only say that something changed
+    if (before.light) return { items: [], layers: [], props: [], scope: [], fast: true, unlisted: true };
+    return A.diff(before, A.snapshot(scope));
+  }
   A.diff = function (a, b) {
     var ch = { items: [], layers: [], props: [], scope: [], partial: false }, MAX = 80, n = 0;
     function add(list, v) { if (n++ < MAX) list.push(v); else ch.truncated = true; }
@@ -66661,6 +66813,7 @@ aemcp = (function () {
     for (var id in b.items) {
       if (!b.items.hasOwnProperty(id)) continue;
       var xb = b.items[id], xa = a.items[id], fb = xb.split(SEP);
+      if (isSentinel(raw(fb[2])) || (xa !== undefined && isSentinel(raw(xa.split(SEP)[2])))) continue; // the rollback's own marker
       if (xa === undefined) {
         var extra = undefined; // reset explicitly: ES3 'var' keeps the previous iteration's value
         if (fb[1] === "comp") {
@@ -66679,13 +66832,14 @@ aemcp = (function () {
       for (var f = 2; f < fb.length; f++) if (fa[f] !== fb[f]) d.push(labels[f - 2] + " " + show(fa[f]) + " -> " + show(fb[f]));
       if (d.length) add(ch.items, ["~", fb[0], raw(fb[2]), d.join("; ")]);
     }
-    for (var id2 in a.items) if (a.items.hasOwnProperty(id2) && b.items[id2] === undefined) { var fr = a.items[id2].split(SEP); add(ch.items, ["-", fr[0], raw(fr[2])]); }
+    for (var id2 in a.items) if (a.items.hasOwnProperty(id2) && b.items[id2] === undefined) { var fr = a.items[id2].split(SEP); if (!isSentinel(raw(fr[2]))) add(ch.items, ["-", fr[0], raw(fr[2])]); }
     for (var cid in b.comps) {
       if (!b.comps.hasOwnProperty(cid)) continue;
       var cb = b.comps[cid], ca = a.comps[cid];
       if (!ca) continue; // comp entered the scope during the call (e.g. newly opened): reported as an item
       ch.scope.push(cb.name);
       if (ca.partial || cb.partial) ch.partial = true;
+      var noProps = ca.light || cb.light;
       for (var k in cb.layers) {
         if (!cb.layers.hasOwnProperty(k)) continue;
         var lb = cb.layers[k], la = ca.layers[k], lbs = lb.sig.split(SEP), lname = raw(lbs[0]);
@@ -66695,6 +66849,7 @@ aemcp = (function () {
           for (var g = 0; g < lbs.length; g++) if (las[g] !== lbs[g]) ld.push(LAYER_FIELDS[g] + " " + show(las[g]) + " -> " + show(lbs[g]));
           if (ld.length) add(ch.layers, ["~", cb.name, lname, ld.join("; ")]);
         }
+        if (noProps) continue;
         // added/removed groups (effects, masks, shape groups...): report only the outermost one
         var addedG = [], removedG = [];
         for (var gp in lb.groups) {
@@ -66741,6 +66896,91 @@ aemcp = (function () {
   };
 
   // ---------- runner ----------
+  function listed(ch) { return !!(ch && (ch.items.length || ch.layers.length || ch.props.length || ch.unlisted)); }
+  function allComps(scope) { for (var i = 0; scope && i < scope.length; i++) if (scope[i] === "*") return true; return false; }
+  // Guarded rollback (opts.rollback): undo what this call changed, in the same script as the call, so
+  // nothing else can land on the undo stack in between. Never undoes a second time.
+  // Whether to undo: null = undo; otherwise the rollback result without undoing.
+  function rollbackPlan(before, rev0, rev1, ch, scope, requested) {
+    if (rev0 !== null && rev1 !== null && rev1 !== rev0) return null; // the project changed (maybe only a value written unchanged)
+    if (!before || !ch || ch.error) return { undone: false, verified: false, problem: "unknown" }; // can't tell: leave it
+    if (listed(ch)) return null;
+    // Nothing listed. Without project.revision that proves nothing when part of the project wasn't
+    // compared (a comp out of scope, properties over the budget, a truncated list).
+    if (rev0 === null && (ch.partial || ch.truncated || !allComps(scope))) {
+      // atomic batch: undo anyway, the sentinel makes it safe; read-only check: say it couldn't be told
+      return requested ? null : { undone: false, verified: false, problem: "unknown" };
+    }
+    return { undone: false, verified: true }; // nothing changed: the undo stack is left alone
+  }
+  // The sentinel: a real edit made inside the call's still-open undo group, just before it closes, and
+  // only when the call is about to be undone. An undo group becomes an undo step only if something
+  // changed in it, and a value written unchanged moves app.project.revision without changing anything:
+  // without the sentinel, Edit > Undo could revert the user's previous step instead of this call. With
+  // it, the group is never empty, so Edit > Undo reverts this call together with the sentinel. It is two
+  // edits (add a folder, rename it): inside the group they are one undo step; if the call closed its
+  // group itself, they are two, the undo only reverts the rename, and the folder left behind shows it.
+  var SENTINEL = "__aemcp_rollback_";
+  function isSentinel(name) { return String(name).indexOf(SENTINEL) === 0; }
+  function addSentinel() {
+    var id = SENTINEL + new Date().getTime() + "_" + Math.floor(Math.random() * 1000000000);
+    var f = app.project.items.addFolder(id + "_new"), named = false;
+    try { f.name = id; named = String(f.name) === id; } catch (e) {}
+    if (!named) {
+      // without the rename the marker can't tell which undo step the Undo reverted: don't undo at all
+      try { f.remove(); } catch (e) {}
+      throw new Error("the undo marker couldn't be renamed");
+    }
+    return id;
+  }
+  function findSentinel(id) {
+    var p = app.project;
+    for (var i = 1; i <= p.numItems; i++) { var it = p.item(i); if (it instanceof FolderItem && String(it.name).indexOf(id) === 0) return it; }
+    return null;
+  }
+  // Edit > Undo once, then check: the sentinel must be gone (the undo reverted this call's group), and
+  // the project must be as before the call. Undo moves app.project.revision forward (it doesn't restore
+  // it), so the check compares a new snapshot with the one from before the call.
+  //
+  // With a light snapshot (read-only check: items and layer attributes only), a sentinel that is gone
+  // proves that the Undo reverted the undo step the sentinel was in, not that it was the call's only
+  // step: a script that ends its group and opens a new one leaves its first edits in a closed step of
+  // their own, and property values aren't compared to show it. That is reported as verified: "sentinel"
+  // (never as true). app.project.revision can't show it either: Undo moves it forward, it doesn't restore it.
+  function rollback(before, revS, id, st) {
+    try { app.executeCommand(16); } // Edit > Undo: this call's undo group, sentinel included
+    catch (e) { return failedRollback(id, e, false); }
+    st.ran = true;
+    var out = { undone: true, verified: true }, left = findSentinel(id);
+    if (left) {
+      // the undo didn't revert this call's group: never undo again, remove the sentinel by hand
+      out.verified = false;
+      var leftName = String(left.name);
+      if (revS !== null && A.revision() === revS) out.problem = "undo did nothing";
+      // only the marker's rename was reverted: the call's group had closed before the marker went in
+      else if (leftName !== id) out.problem = "not this call";
+      // the marker is untouched: without revision, AE may have undone nothing, or another step
+      else out.problem = revS === null ? "undo did nothing / not this call" : "not this call";
+      try { left.remove(); } catch (e) { out.leftover = leftName; }
+    }
+    if (!before) { if (out.verified) { out.verified = false; out.problem = "not checked"; } return out; }
+    try {
+      var d = A.diff(before, snapshotAgain(before));
+      if (listed(d)) { if (out.verified) { out.verified = false; out.problem = "not back"; } out.remaining = d; }
+      else if (out.verified && before.light) { out.verified = "sentinel"; out.note = "values were not compared"; }
+    } catch (e) { if (out.verified) { out.verified = false; out.problem = "not checked: " + (e.message || e); } }
+    return out;
+  }
+  // The rollback failed with \`e\`. \`ran\`: Edit > Undo had completed. Otherwise whether it undid anything is
+  // told by the sentinel (gone = the Undo reverted it). A sentinel still there is removed by hand.
+  function failedRollback(id, e, ran) {
+    var still = null;
+    try { still = id ? findSentinel(id) : null; } catch (e1) {}
+    var fail = { undone: ran || (!!id && !still), verified: false, problem: "failed: " + (e.message || e) };
+    if (ran && still) fail.problem = "not this call"; // the Undo ran but didn't revert this call's marker
+    if (still) { try { still.remove(); } catch (e2) { fail.leftover = String(still.name); } }
+    return fail;
+  }
   A.run = function (fn, args, opts) {
     opts = opts || {};
     var logs = [];
@@ -66750,21 +66990,45 @@ aemcp = (function () {
       logs.push(parts.join(" "));
     }
     var undo = opts.undoGroup !== false && opts.undoGroup !== "";
-    var res;
+    // rollback: "changes" = undo whatever the call changed (read-only mode);
+    // "requested" = only when the call returns { rollback: true } (atomic batch)
+    var res, before = null, rev0 = null, rev1 = null, back = false, plan = null, sentinel = null, revS = null;
     try {
       if (opts.suppressDialogs !== false) { try { app.beginSuppressDialogs(); } catch (e) {} }
-      if (undo) app.beginUndoGroup(opts.undoGroup || "AE MCP");
-      var before = null;
-      if (opts.report) { try { before = A.snapshot(opts.report); } catch (e) { before = null; } }
-      var r = fn(args || {}, log);
-      res = { ok: true, result: opts.raw ? r : A.serialize(r, opts.depth || 4), logs: logs };
-      if (before) { try { res.changes = A.diff(before, A.snapshot(opts.report)); } catch (e) { res.changes = { error: e.message }; } }
-    } catch (e) {
-      res = { ok: false, error: { message: e.message || String(e), name: e.name, line: e.line, user: !!e.aemcpUser }, logs: logs };
-      // a failed script may have changed things before it stopped: report those too
-      if (before) { try { res.changes = A.diff(before, A.snapshot(opts.report)); } catch (e2) {} }
+      try {
+        if (undo) app.beginUndoGroup(opts.undoGroup || "AE MCP");
+        rev0 = opts.report || opts.rollback ? A.revision() : null;
+        // checkOnly (read-only mode): with project.revision, no property snapshot at all
+        if (opts.report) { try { before = A.snapshot(opts.report, !!opts.checkOnly && rev0 !== null); } catch (e) { before = null; } }
+        try {
+          var r = fn(args || {}, log);
+          back = opts.rollback === "changes" || (opts.rollback === "requested" && !!r && r.rollback === true);
+          res = { ok: true, result: opts.raw ? r : A.serialize(r, opts.depth || 4), logs: logs };
+          if (before) { try { res.changes = changesSince(before, rev0, opts.report); } catch (e) { res.changes = { error: e.message }; } }
+        } catch (e) {
+          back = opts.rollback === "changes";
+          res = { ok: false, error: { message: e.message || String(e), name: e.name, line: e.line, user: !!e.aemcpUser }, logs: logs };
+          // a failed script may have changed things before it stopped: report those too
+          if (before) { try { res.changes = changesSince(before, rev0, opts.report); } catch (e2) {} }
+        }
+        rev1 = rev0 === null ? null : A.revision();
+        // to be undone: the sentinel goes in while this call's undo group is still open
+        if (back && undo) {
+          try { plan = rollbackPlan(before, rev0, rev1, res.changes, opts.report, opts.rollback === "requested"); } catch (e) { plan = { undone: false, verified: false, problem: "failed: " + (e.message || e) }; }
+          if (!plan) {
+            try { sentinel = addSentinel(); revS = A.revision(); }
+            catch (e) { plan = { undone: false, verified: false, problem: "failed: couldn't prepare the undo (" + (e.message || e) + ")" }; }
+          }
+        }
+      } finally {
+        if (undo) { try { app.endUndoGroup(); } catch (e) {} }
+      }
+      if (back) {
+        if (!undo) res.rollback = { undone: false, verified: false, problem: "no undo group" };
+        else if (plan) res.rollback = plan;
+        else { var st = { ran: false }; try { res.rollback = rollback(before, revS, sentinel, st); } catch (e) { res.rollback = failedRollback(sentinel, e, st.ran); } }
+      }
     } finally {
-      if (undo) { try { app.endUndoGroup(); } catch (e) {} }
       if (opts.suppressDialogs !== false) { try { app.endSuppressDialogs(false); } catch (e) {} }
     }
     return A.stringify(res);
@@ -66800,7 +67064,7 @@ function toJsLiteral(v) {
   return (JSON.stringify(v ?? null) ?? "null").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
 }
 function wrapBody(body, args, opts = {}) {
-  const runOpts = { undoGroup: opts.undoGroup === void 0 ? "AE MCP" : opts.undoGroup, depth: opts.depth, report: opts.report };
+  const runOpts = { undoGroup: opts.undoGroup === void 0 ? "AE MCP" : opts.undoGroup, depth: opts.depth, report: opts.report, checkOnly: opts.checkOnly || void 0, rollback: opts.rollback };
   return `(function(){
 if (typeof aemcp === 'undefined' || aemcp.version !== ${toJsLiteral(HELPER_VERSION)}) return ${toJsLiteral(NEED_HELPERS)};
 return aemcp.run(function(args, log){
@@ -66849,23 +67113,24 @@ async function ensureHelpers() {
   if (!r.startsWith("aemcp loaded")) throw new Error("Failed to load the aemcp helper library into After Effects: " + r);
 }
 async function runJsx(body, args = {}, opts = {}) {
-  const script = wrapBody(body, args, opts);
+  const script2 = wrapBody(body, args, opts);
   const ctx = callContext.getStore();
   opts = { ...opts, bridge: { label: ctx?.tool, cancel: ctx?.signal, ...opts.bridge } };
   if (opts.bridge?.approval) {
     const probe2 = await evalRaw(`(typeof aemcp !== 'undefined' && aemcp.version === ${toJsLiteral(HELPER_VERSION)}) ? 'ok' : 'no'`, 1e4, { cancel: opts.bridge.cancel });
     if (probe2 !== "ok") await ensureHelpers();
   }
-  let raw = await evalRaw(script, opts.timeoutMs, opts.bridge);
+  let raw = await evalRaw(script2, opts.timeoutMs, opts.bridge);
   if (raw === NEED_HELPERS) {
     await ensureHelpers();
-    raw = await evalRaw(script, opts.timeoutMs, opts.bridge);
+    raw = await evalRaw(script2, opts.timeoutMs, opts.bridge);
   }
   return parseResult(raw);
 }
 function formatChanges(ch) {
   if (!ch) return null;
   if (ch.error) return `Changes: (could not be determined: ${ch.error})`;
+  if (ch.unlisted) return "Changes: the project changed (not listed)";
   const lines = [];
   for (const [op, type, name, extra] of ch.items) {
     if (op === "+") {
@@ -66893,6 +67158,23 @@ function formatChanges(ch) {
   if (ch.truncated) notes.push("more changes not listed");
   return `Changes${notes.length ? ` (${notes.join("; ")})` : ""}:
 ${lines.join("\n")}`;
+}
+function rollbackProblem(rb, what) {
+  if (rb.verified) return "";
+  const check2 = "Check the project before going on (Edit > Undo and Edit > Redo still work step by step).";
+  const leftover = rb.leftover ? `
+A temporary folder "${rb.leftover}" (AE MCP's undo marker) couldn't be removed; it can be deleted.` : "";
+  if (!rb.undone)
+    return `It couldn't be checked whether ${what} changed the project${rb.problem && rb.problem !== "unknown" ? ` (${rb.problem})` : ""}, so nothing was undone. ${check2}${leftover}`;
+  const remaining = rb.remaining ? (formatChanges(rb.remaining) ?? "").replace(/^Changes[^\n]*:\n/, "") : "";
+  const notBack = `the project still isn't how it was before ${what}:
+${remaining}`;
+  if (rb.problem === "not this call" || rb.problem === "undo did nothing / not this call")
+    return `Edit > Undo was run once for ${what}, but the Undo did not revert ${what}'s changes as a whole ` + (rb.problem === "not this call" ? `(${what} may have opened or closed undo groups itself), ` : `(After Effects either undid nothing or undid a different step; this version of After Effects can't tell which), `) + `${remaining ? `and ${notBack}` : "so some of its changes may still be in the project."}
+The Undo was not repeated. ${check2}${leftover}`;
+  const why = rb.problem === "not back" ? notBack : rb.problem === "undo did nothing" ? "After Effects didn't undo anything." : `the result couldn't be checked (${rb.problem}).`;
+  return `The undo step of ${what} was undone once, but ${why}
+It was not undone again, so nothing else in the undo history was reverted. ${check2}${leftover}`;
 }
 
 // src/tools/profile.ts
@@ -66953,8 +67235,8 @@ function applyProfile(server, profile) {
         result = await callContext.run({ tool: name, signal: extra?.signal }, () => cb(args, extra));
         return result;
       } finally {
-        const text = result?.content?.find((c) => c.type === "text")?.text ?? "";
-        const changesAt = text.indexOf("\nChanges");
+        const text2 = result?.content?.find((c) => c.type === "text")?.text ?? "";
+        const changesAt = text2.indexOf("\nChanges");
         logActivity({
           at: new Date(t0).toISOString(),
           client: server.server.getClientVersion?.()?.name,
@@ -66962,8 +67244,8 @@ function applyProfile(server, profile) {
           args,
           ms: Date.now() - t0,
           ok: !!result && !result.isError,
-          summary: text.split("\n")[0].slice(0, 300) || (result ? void 0 : "no result (exception)"),
-          changes: changesAt >= 0 ? text.slice(changesAt).split("\n").filter((l) => /^[+~-] /.test(l)).length : void 0
+          summary: text2.split("\n")[0].slice(0, 300) || (result ? void 0 : "no result (exception)"),
+          changes: changesAt >= 0 ? text2.slice(changesAt).split("\n").filter((l) => /^[+~-] /.test(l)).length : void 0
         });
       }
     };
@@ -66994,7 +67276,7 @@ var CATEGORIES = {
 import { existsSync as existsSync5, readFileSync as readFileSync7 } from "node:fs";
 function debugMode() {
   return CSXS_VERSIONS.map((v) => {
-    const r = isWin ? spawnSync3("reg", ["query", `HKCU\\Software\\Adobe\\CSXS.${v}`, "/v", "PlayerDebugMode"], { encoding: "utf8" }) : isMac ? spawnSync3("defaults", ["read", `com.adobe.CSXS.${v}`, "PlayerDebugMode"], { encoding: "utf8" }) : null;
+    const r = isWin ? spawnSync4("reg", ["query", `HKCU\\Software\\Adobe\\CSXS.${v}`, "/v", "PlayerDebugMode"], { encoding: "utf8" }) : isMac ? spawnSync4("defaults", ["read", `com.adobe.CSXS.${v}`, "PlayerDebugMode"], { encoding: "utf8" }) : null;
     return `${v}:${r && r.status === 0 && /(^|\s)1\s*$/m.test(r.stdout) ? "on" : "off"}`;
   }).join(" ");
 }
@@ -67012,7 +67294,7 @@ async function diagnostics() {
   if (cfg) L.push(`config: ${JSON.stringify({ ...cfg, token: cfg.token ? `<set, ${cfg.token.length} chars>` : "MISSING" })}`);
   else L.push(`config: MISSING (${CONFIG_FILE})`);
   L.push(`installed server: ${existsSync5(INSTALLED_SERVER) ? INSTALLED_SERVER : "not installed (fine when using the .mcpb)"}`);
-  L.push(`extension: ${extensionDir()} \xB7 ${existsSync5(join7(extensionDir(), "CSXS", "manifest.xml")) ? `hash ${installedExtensionHash()} (bundled ${"e7fd3866173c"})` : "MISSING"}`);
+  L.push(`extension: ${extensionDir()} \xB7 ${existsSync5(join7(extensionDir(), "CSXS", "manifest.xml")) ? `hash ${installedExtensionHash()} (bundled ${"d1b1a7ed414c"})` : "MISSING"}`);
   const sig = installedExtensionSignature();
   L.push(`extension signature: ${sig.ok ? "valid" : sig.problems.join("; ")}`);
   L.push(`PlayerDebugMode: ${debugMode()}`);
@@ -67044,7 +67326,7 @@ async function diagnostics() {
 
 // src/cli/install.ts
 init_define_AEMCP_CEP_FILES();
-import { spawn as spawn2, spawnSync as spawnSync4 } from "node:child_process";
+import { spawn as spawn2, spawnSync as spawnSync5 } from "node:child_process";
 import { chmodSync, copyFileSync as copyFileSync2, existsSync as existsSync6, mkdirSync as mkdirSync5, readdirSync as readdirSync4, readFileSync as readFileSync8, writeFileSync as writeFileSync4 } from "node:fs";
 import { dirname as dirname5, join as join8 } from "node:path";
 import { fileURLToPath as fileURLToPath3 } from "node:url";
@@ -67057,25 +67339,25 @@ function mcpbInstalled() {
 }
 function claudeDesktopRunning() {
   if (isMac)
-    return (spawnSync4("ps", ["-axo", "comm="], { encoding: "utf8" }).stdout || "").split("\n").some((l) => l.trim().endsWith(".app/Contents/MacOS/Claude"));
-  if (isWin) return (spawnSync4("tasklist", ["/FI", "IMAGENAME eq claude.exe", "/NH"], { encoding: "utf8" }).stdout || "").toLowerCase().includes("claude.exe");
+    return (spawnSync5("ps", ["-axo", "comm="], { encoding: "utf8" }).stdout || "").split("\n").some((l) => l.trim().endsWith(".app/Contents/MacOS/Claude"));
+  if (isWin) return (spawnSync5("tasklist", ["/FI", "IMAGENAME eq claude.exe", "/NH"], { encoding: "utf8" }).stdout || "").toLowerCase().includes("claude.exe");
   return false;
 }
 async function quitClaudeDesktop() {
-  if (isMac) spawnSync4("osascript", ["-e", 'tell application "Claude" to quit']);
-  else if (isWin) spawnSync4("taskkill", ["/IM", "claude.exe", "/T"]);
+  if (isMac) spawnSync5("osascript", ["-e", 'tell application "Claude" to quit']);
+  else if (isWin) spawnSync5("taskkill", ["/IM", "claude.exe", "/T"]);
   for (let i = 0; i < 40; i++) {
     if (!claudeDesktopRunning()) return true;
     await sleep(500);
   }
   if (isWin) {
-    spawnSync4("taskkill", ["/IM", "claude.exe", "/T", "/F"]);
+    spawnSync5("taskkill", ["/IM", "claude.exe", "/T", "/F"]);
     await sleep(1e3);
   }
   return !claudeDesktopRunning();
 }
 function startClaudeDesktop() {
-  if (isMac) spawnSync4("open", ["-a", "Claude"]);
+  if (isMac) spawnSync5("open", ["-a", "Claude"]);
   else if (isWin && existsSync6(claudeDesktopExe())) spawn2(claudeDesktopExe(), [], { detached: true, stdio: "ignore" }).unref();
 }
 async function install(argv) {
@@ -67171,9 +67453,9 @@ After Effects MCP installer v${VERSION}`));
     try {
       const file2 = codexConfig();
       mkdirSync5(dirname5(file2), { recursive: true });
-      const text = existsSync6(file2) ? readFileSync8(file2, "utf8") : "";
+      const text2 = existsSync6(file2) ? readFileSync8(file2, "utf8") : "";
       if (existsSync6(file2) && !existsSync6(file2 + ".aemcp.bak")) copyFileSync2(file2, file2 + ".aemcp.bak");
-      const rest = removeCodexBlock(text).trim();
+      const rest = removeCodexBlock(text2).trim();
       writeFileSync4(file2, (rest ? rest + "\n\n" : "") + codexBlock(nodePath, INSTALLED_SERVER));
       ok("ChatGPT desktop / Codex");
       registered.push("ChatGPT desktop");
@@ -67201,14 +67483,14 @@ ${registered.includes("ChatGPT desktop") ? "  ChatGPT desktop app: restart it; a
 
 // src/cli/selftest.ts
 init_define_AEMCP_CEP_FILES();
-import { existsSync as existsSync10, mkdirSync as mkdirSync9, readFileSync as readFileSync12, statSync as statSync6, unlinkSync as unlinkSync4 } from "node:fs";
-import { join as join12 } from "node:path";
+import { existsSync as existsSync10, mkdirSync as mkdirSync9, readFileSync as readFileSync13, statSync as statSync6, unlinkSync as unlinkSync5 } from "node:fs";
+import { join as join13 } from "node:path";
 
 // src/cli/fulltest.ts
 init_define_AEMCP_CEP_FILES();
-import { existsSync as existsSync9, mkdirSync as mkdirSync8, readFileSync as readFileSync11, rmSync as rmSync2, statSync as statSync5, unlinkSync as unlinkSync3, writeFileSync as writeFileSync6 } from "node:fs";
+import { existsSync as existsSync9, mkdirSync as mkdirSync8, readFileSync as readFileSync12, rmSync as rmSync2, statSync as statSync5, unlinkSync as unlinkSync4, writeFileSync as writeFileSync7 } from "node:fs";
 import { homedir as homedir7 } from "node:os";
-import { basename as basename2, dirname as dirname7, join as join11 } from "node:path";
+import { basename as basename2, dirname as dirname7, join as join12 } from "node:path";
 
 // src/capabilities.ts
 init_define_AEMCP_CEP_FILES();
@@ -67231,6 +67513,7 @@ try {
   f.keyframeLabels = has(op, "setLabelAtKey");
   f.layerIds = has(t, "id");
   f.anyLayerTrackMatte = has(t, "setTrackMatte");
+  f.revision = (function () { try { return typeof app.project.revision === "number"; } catch (e) { return false; } })();
   f.expressionEngine = app.project.expressionEngine;
   f.scriptsCanWriteFiles = (function () { try { return app.preferences.getPrefAsLong("Main Pref Section", "Pref_SCRIPTING_FILE_NETWORK_SECURITY") === 1; } catch (e) { return null; } })();
 } finally { c.remove(); }
@@ -67246,7 +67529,8 @@ var FEATURE_NOTES = {
   missingFontsApi: "missing-font check in ae_project_health (AE 24.0+)",
   keyframeLabels: "keyframe color labels in ae_edit_keyframes (AE 22.6+)",
   layerIds: "stable layer ids for the change report (AE 22.0+; older versions match layers by index+name)",
-  anyLayerTrackMatte: "track matte to any layer in ae_set_layer_attributes (AE 23.0+)"
+  anyLayerTrackMatte: "track matte to any layer in ae_set_layer_attributes (AE 23.0+)",
+  revision: "fast read-only mode and change reports: property snapshots are skipped when nothing changed (app.project.revision)"
 };
 
 // src/transpile.ts
@@ -67286,6 +67570,18 @@ function transpileUserCode(code, enabled = true) {
   } catch (e) {
     return { source: plain, transpiled: false, syntaxError: cleanSyntaxError(String(e?.message || e)) };
   }
+}
+function withoutComments(code) {
+  const plain = PREFIX + code + "\n})";
+  let comments;
+  try {
+    comments = Babel.transform(plain, { ast: true, code: false, sourceType: "script", babelrc: false, configFile: false }).ast.comments;
+  } catch {
+    return code;
+  }
+  let out = plain;
+  for (const c of comments) out = out.slice(0, c.start) + out.slice(c.start, c.end).replace(/[^\n]/g, " ") + out.slice(c.end);
+  return out.slice(PREFIX.length, out.length - 3);
 }
 function reservedGlobalsHint(names) {
   if (!names?.length) return null;
@@ -67451,11 +67747,11 @@ var propPath = external_exports.union([external_exports.string(), external_expor
 var colorSchema = external_exports.union([external_exports.string(), external_exports.array(external_exports.number()).min(3).max(4)]).describe('Color as "#rrggbb" or [r,g,b] (0-1 or 0-255).');
 var anyValue = external_exports.any().describe("Value: number, array ([x,y] / [x,y,z] / color), string for text, or object for text style / shape path.");
 var MAX_RESULT_CHARS = 6e4;
-function capText(text) {
-  if (text.length <= MAX_RESULT_CHARS) return text;
-  return text.slice(0, MAX_RESULT_CHARS) + `
+function capText(text2) {
+  if (text2.length <= MAX_RESULT_CHARS) return text2;
+  return text2.slice(0, MAX_RESULT_CHARS) + `
 
-[Result truncated: ${text.length.toLocaleString("en-US")} characters, showing the first ${MAX_RESULT_CHARS.toLocaleString("en-US")}. Ask for less: use offset/limit, a smaller depth, a filter, or return only the fields you need from ae_run_script.]`;
+[Result truncated: ${text2.length.toLocaleString("en-US")} characters, showing the first ${MAX_RESULT_CHARS.toLocaleString("en-US")}. Ask for less: use offset/limit, a smaller depth, a filter, or return only the fields you need from ae_run_script.]`;
 }
 function formatResult(r, opts = {}) {
   const logs = r.logs?.length ? `
@@ -67472,10 +67768,10 @@ The call failed, but these changes were already made (one undo step reverts them
 ${changes2}` : "";
     return { isError: true, content: [{ type: "text", text: `${e.name && !e.user ? e.name + ": " : ""}${e.message}${where}${logs}${changed}` }] };
   }
-  const text = r.result === void 0 || r.result === null ? "OK (no return value)" : typeof r.result === "string" ? r.result : JSON.stringify(r.result);
+  const text2 = r.result === void 0 || r.result === null ? "OK (no return value)" : typeof r.result === "string" ? r.result : JSON.stringify(r.result);
   let changes = formatChanges(r.changes);
   if (opts.quietNoChanges && changes === "Changes: none") changes = null;
-  return { content: [{ type: "text", text: capText(text) + logs + (changes ? `
+  return { content: [{ type: "text", text: capText(text2) + logs + (changes ? `
 
 ${capText(changes)}` : "") }] };
 }
@@ -69781,6 +70077,76 @@ async function renderPng(body, args) {
   }
   return { info, data };
 }
+var UNDO_HISTORY = "changes the undo history outside AE MCP's control, so read-only mode couldn't reliably put the project back afterwards";
+var word = (name) => new RegExp(`\\b${name}\\b`);
+function member(obj, name, call) {
+  const o = obj ? `\\b${obj}\\s*` : "";
+  const dot = `${o}(?:\\?\\.|\\.)\\s*${name}${call ? "\\s*(?:\\?\\.\\s*)?\\(" : "\\b"}`;
+  const bracket = `${o}${obj ? "(?:\\?\\.\\s*)?" : ""}\\[\\s*["'\`]${name}["'\`]\\s*\\]`;
+  return new RegExp(`${dot}|${bracket}`);
+}
+var READ_ONLY_BLOCKED = [
+  { name: "beginUndoGroup", re: word("beginUndoGroup"), why: UNDO_HISTORY },
+  { name: "endUndoGroup", re: word("endUndoGroup"), why: UNDO_HISTORY },
+  { name: "executeCommand", re: word("executeCommand"), why: UNDO_HISTORY },
+  { name: "purge", re: word("purge"), why: UNDO_HISTORY },
+  { name: "scheduleTask", re: word("scheduleTask"), why: "runs code later, after the rollback, which read-only mode can't undo" },
+  { name: "newProject", re: word("newProject"), why: "replaces the open project, which read-only mode can't undo" },
+  { name: "app.open", re: member("app", "open", false), why: "replaces the open project, which read-only mode can't undo" },
+  { name: "openFast", re: word("openFast"), why: "replaces the open project, which read-only mode can't undo" },
+  { name: "project.close", re: member("project", "close", false), why: "closes the project, which read-only mode can't undo" },
+  { name: "quit", re: member(null, "quit", true), why: "quits After Effects, which read-only mode can't undo" },
+  { name: "save", re: member(null, "save", true), why: "writes the project to disk, which read-only mode can't undo" },
+  { name: "saveWithDialog", re: word("saveWithDialog"), why: "writes the project to disk, which read-only mode can't undo" },
+  { name: "render", re: member(null, "render", true), why: "renders files to disk (renderQueue.render), which read-only mode can't undo" },
+  { name: "savePrefAs*", re: /\bsavePrefAs\w*/, why: "changes After Effects preferences, which read-only mode can't undo (Edit > Undo doesn't revert them)" },
+  { name: "saveSetting", re: word("saveSetting"), why: "changes After Effects preferences, which read-only mode can't undo (Edit > Undo doesn't revert them)" },
+  { name: "saveToDisk", re: word("saveToDisk"), why: "changes After Effects preferences, which read-only mode can't undo (Edit > Undo doesn't revert them)" }
+];
+function decodeEscapes(code) {
+  return code.replace(/\\u\{([0-9a-fA-F]{1,6})\}|\\u([0-9a-fA-F]{4})/g, (m, a, b) => {
+    const cp = parseInt(a ?? b, 16);
+    return cp <= 1114111 ? String.fromCodePoint(cp) : m;
+  }).replace(/\\x([0-9a-fA-F]{2})/g, (_m, h) => String.fromCharCode(parseInt(h, 16))).replace(/\\([0-3][0-7]{0,2}|[4-7][0-7]?)/g, (_m, o) => String.fromCharCode(parseInt(o, 8)));
+}
+function readOnlyBlockedCalls(code, transpiled) {
+  const texts = [decodeEscapes(withoutComments(code))];
+  if (transpiled !== void 0) texts.push(decodeEscapes(transpiled));
+  return READ_ONLY_BLOCKED.filter((b) => texts.some((t) => b.re.test(t))).map((b) => b.name);
+}
+function readOnlyScriptRefusal(code, transpiled) {
+  const names = readOnlyBlockedCalls(code, transpiled);
+  if (!names.length) return null;
+  const why = /* @__PURE__ */ new Map();
+  for (const b of READ_ONLY_BLOCKED) if (names.includes(b.name)) why.set(b.why, [...why.get(b.why) ?? [], b.name]);
+  const reasons = [...why].map(([w, ns]) => `${ns.join(", ")}: ${w}.`);
+  return `Nothing ran. AE MCP is in read-only mode, and this script mentions ${names.join(", ")}.
+${reasons.join("\n")}
+Scripts that mention these names are refused (the check reads the code, so a name in a string counts too, and so does the same method name on another object, such as obj.save()). To run it on purpose, the user can switch to edit mode (Full access, or Ask before every change) in After Effects: Window > Extensions > AE MCP > Permissions.`;
+}
+var READ_ONLY_RUN_OPTIONS = { undoGroup: "AE MCP Script (read-only check)", report: ["*"], checkOnly: true, rollback: "changes" };
+function readOnlyRefusal(r) {
+  const rb = r.rollback;
+  if (!rb || !rb.undone && rb.verified) return null;
+  if (!rb.verified) return `${READ_ONLY_REFUSAL}
+${rollbackProblem(rb, "the script")}`;
+  const how = rb.verified === "sentinel" ? " (checked by AE MCP's undo marker; property values were not compared)" : "";
+  const ch = r.changes;
+  if (ch && !ch.unlisted && (ch.items.length || ch.layers.length || ch.props.length))
+    return `${READ_ONLY_REFUSAL}
+This script changed the project, so its changes were undone${how}:
+${formatChanges(ch)}`;
+  return `${READ_ONLY_REFUSAL}
+This script wrote to the project (perhaps only values that were already set), so its changes were undone${how}.`;
+}
+var READ_ONLY_STILL_RUNNING = "Read-only mode: if After Effects had already started the script, it can't be interrupted, and when it ends, the read-only rollback still runs inside After Effects in the same run (whatever the script changed is undone, once, as usual), but this reply can't show its result. Check the project (ae_status, ae_get_project_info) before going on.";
+async function runReadOnly(code, timeoutMs = 12e4) {
+  const t = transpileUserCode(code);
+  const refused = readOnlyScriptRefusal(code, t.source);
+  if (refused) return { refusal: refused };
+  const r = await runJsx(evalBody(t.source), {}, { ...READ_ONLY_RUN_OPTIONS, timeoutMs });
+  return { refusal: readOnlyRefusal(r), r };
+}
 function registerCoreTools(server) {
   server.registerTool(
     "ae_run_script",
@@ -69800,27 +70166,22 @@ function registerCoreTools(server) {
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true }
     },
     async ({ code, args, undoGroup, depth, timeoutSeconds, transpile, report }) => {
+      let readOnly2 = false;
       try {
         const perm = permissions();
         if (!perm.allowShell && usesShell(code)) return errorResult(SHELL_REFUSAL);
-        const readOnly = perm.mode === "read-only";
+        readOnly2 = perm.mode === "read-only";
         const t = transpileUserCode(code, transpile !== false);
+        const refused = readOnly2 ? readOnlyScriptRefusal(code, t.source) : null;
+        if (refused) return errorResult(refused);
         const r = await runJsx(evalBody(t.source), args ?? {}, {
-          // read-only mode needs a named undo group (to undo the script) and a report over every comp
-          undoGroup: readOnly ? "AE MCP Script (read-only check)" : undoGroup === "" ? false : undoGroup || "AE MCP Script",
+          ...readOnly2 ? READ_ONLY_RUN_OPTIONS : { undoGroup: undoGroup === "" ? false : undoGroup || "AE MCP Script", report: report === false ? void 0 : reportScope(args) },
           depth,
           timeoutMs: (timeoutSeconds ?? 120) * 1e3,
-          report: readOnly ? ["*"] : report === false ? void 0 : reportScope(args),
           bridge: perm.mode === "ask" ? { approval: { tool: "Run script", summary: approvalSummary("ae_run_script", { code }) } } : void 0
         });
-        if (readOnly && r.changes && formatChanges(r.changes) !== "Changes: none") {
-          await evalRaw("app.executeCommand(16); 'undone'", 3e4);
-          return errorResult(
-            `${READ_ONLY_REFUSAL}
-This script changed the project, so its changes were undone:
-${formatChanges(r.changes)}`
-          );
-        }
+        const refusal = readOnly2 ? readOnlyRefusal(r) : null;
+        if (refusal) return errorResult(refusal);
         if (!r.ok && r.error) {
           if (t.syntaxError && /does not have a value|syntax|expected|illegal|unterminated/i.test(r.error.message)) {
             return { isError: true, content: [{ type: "text", text: `Syntax error: ${t.syntaxError}` }] };
@@ -69838,7 +70199,9 @@ ${formatChanges(r.changes)}`
         }
         return formatResult(r, { quietNoChanges: true });
       } catch (e) {
-        return errorResult(e);
+        const out = errorResult(e);
+        if (readOnly2 && e instanceof BridgeError && (e.code === "TIMEOUT" || e.code === "CANCELLED")) out.content.push({ type: "text", text: READ_ONLY_STILL_RUNNING });
+        return out;
       }
     }
   );
@@ -69899,13 +70262,32 @@ ${source.slice(0, 1500)}` } } : void 0
           if (!m) return errorResult(`No running After Effects matches "${instance}". Running: ${list.map((i) => `${i.label} (port ${i.port})`).join(", ") || "none"}.`);
           selectInstance(m.port);
         }
-        const port = await resolvePort();
-        const h = await health(port);
-        const r = await runJsx(
-          "return { appVersion: app.version, buildName: app.buildName, language: String(app.isoLanguage), os: $.os, extendScriptVersion: $.version, memoryInUse: app.memoryInUse, isRenderEngine: app.isRenderEngine, project: aemcp.projectInfo(), canWriteFiles: (function(){ try { return app.preferences.getPrefAsLong('Main Pref Section', 'Pref_SCRIPTING_FILE_NETWORK_SECURITY') === 1; } catch (e) { return null; } })() };",
-          {},
-          { undoGroup: false, timeoutMs: 15e3 }
-        );
+        const deadline = Date.now() + startupWaitMs();
+        const conn = await waitForBridge();
+        const port = conn.port;
+        let h = conn.health;
+        const statusScript = "return { appVersion: app.version, buildName: app.buildName, language: String(app.isoLanguage), os: $.os, extendScriptVersion: $.version, memoryInUse: app.memoryInUse, isRenderEngine: app.isRenderEngine, project: aemcp.projectInfo(), canWriteFiles: (function(){ try { return app.preferences.getPrefAsLong('Main Pref Section', 'Pref_SCRIPTING_FILE_NETWORK_SECURITY') === 1; } catch (e) { return null; } })() };";
+        let r;
+        for (; ; ) {
+          try {
+            r = await runJsx(statusScript, {}, { undoGroup: false, timeoutMs: 15e3, bridge: { label: "ae_status" } });
+            break;
+          } catch (e) {
+            if (!(e instanceof BridgeError) || e.code !== "BLOCKED" && e.code !== "TIMEOUT") throw e;
+            const up = h.startedAt ? Date.now() - Date.parse(h.startedAt) : NaN;
+            if (e.code === "BLOCKED" && up >= 0 && up < 12e4 && Date.now() + 1e3 < deadline) {
+              while (Date.now() + 1e3 < deadline) {
+                await new Promise((res) => setTimeout(res, 1e3));
+                h = await health(port).catch(() => h);
+                if (!h.waitingForAE) break;
+              }
+              if (!h.waitingForAE) continue;
+            }
+            return errorResult(
+              `The AE MCP bridge answers (${aeLabel(h.host?.appVersion)}, bridge v${h.version} on port ${port}), but After Effects is not taking scripts. ${e.message}`
+            );
+          }
+        }
         const out = formatResult(r);
         const head = [`Connected to ${aeLabel(h.host?.appVersion)} (bridge v${h.version} on port ${port}, MCP server v${VERSION}).`];
         if (list.length > 1)
@@ -70147,8 +70529,88 @@ function scanScripts(root, origin, depth = 2, out = []) {
   }
   return out;
 }
+var batchable = new Map(ALL_JSX_TOOLS.filter((t) => !t.noUndo).map((t) => [t.name, t]));
+async function runBatch({ steps, atomic, name, checkpoint, verbose }, perm) {
+  const bodies = [];
+  const stepArgs = [];
+  const hints = [];
+  let edits = false;
+  for (const [i, s] of steps.entries()) {
+    if (s.tool === "ae_run_script") {
+      const code = String(s.args?.code ?? "");
+      if (!perm.allowShell && usesShell(code)) return errorResult(`Step ${i + 1}: ${SHELL_REFUSAL}`);
+      const t = transpileUserCode(code);
+      if (t.syntaxError && !t.transpiled) return errorResult(`Step ${i + 1} (ae_run_script) has a syntax error: ${t.syntaxError}`);
+      hints[i] = reservedGlobalsHint(t.reservedGlobals);
+      bodies.push(evalBody(t.source));
+      stepArgs.push(s.args?.args ?? {});
+      edits = true;
+      continue;
+    }
+    const tool = batchable.get(s.tool);
+    if (!tool) return errorResult(`Step ${i + 1}: "${s.tool}" can't be used in a batch (unknown, or it can't be part of an undo step such as open/save project or undo).`);
+    if (!tool.readOnly && !tool.tempItems) edits = true;
+    bodies.push(tool.jsx);
+    stepArgs.push(s.args ?? {});
+  }
+  if (edits && perm.mode === "read-only") return errorResult(READ_ONLY_REFUSAL);
+  let cp = "";
+  if (checkpoint) cp = `Checkpoint saved first: ${(await saveCheckpoint("before-batch")).file}
+`;
+  const isAtomic = atomic !== false;
+  const body = "var __steps = [\n" + bodies.map((b) => `function (args, log) {
+${b}
+}`).join(",\n") + `
+], __out = [], __failed = -1;
+for (var __i = 0; __i < __steps.length; __i++) {
+  try { __out.push({ ok: true, result: aemcp.serialize(__steps[__i](args.stepArgs[__i], log), 2) }); }
+  catch (e) { __out.push({ ok: false, error: e.message || String(e), line: e.aemcpUser ? undefined : e.line }); if (__failed < 0) __failed = __i; if (args.atomic) break; }
+}
+return { steps: __out, failed: __failed, rollback: args.atomic && __failed >= 0 };`;
+  const scope = [...new Set(steps.map((s) => s.args?.comp).filter((c) => c !== void 0 && c !== null))];
+  const showReport = loadConfig().changeReport !== false;
+  const r = await runJsx(body, { stepArgs, atomic: isAtomic }, {
+    undoGroup: name || "AE MCP Batch",
+    timeoutMs: 6e5,
+    depth: 6,
+    // an atomic batch always compares before/after: that is what makes its rollback safe
+    report: showReport || isAtomic ? scope.length ? scope : reportScope({}) : void 0,
+    rollback: isAtomic ? "requested" : void 0,
+    bridge: edits && perm.mode === "ask" ? { approval: { tool: `Batch (${steps.length} steps)`, summary: steps.map((s, i) => `${i + 1}. ${s.tool} ${approvalSummary(s.tool, s.args).slice(0, 300)}`).join("\n") } } : void 0
+  });
+  if (!r.ok) return formatResult(r);
+  const res = r.result;
+  const lines = res.steps.map((s, i) => {
+    if (!s.ok) return `${i + 1}. ${steps[i].tool}: FAILED: ${s.error}${s.line ? ` (line ${s.line})` : ""}${hints[i] ? `
+   Hint: ${hints[i]}` : ""}`;
+    const txt = s.result === void 0 || s.result === null ? "ok" : JSON.stringify(s.result);
+    return `${i + 1}. ${steps[i].tool}: ${verbose ? txt : txt.length > 160 ? txt.slice(0, 157) + "..." : txt}`;
+  });
+  const changes = showReport ? formatChanges(r.changes) : null;
+  if (res.failed >= 0 && isAtomic) {
+    const at = `Batch stopped at step ${res.failed + 1} of ${steps.length}`;
+    const rb = r.rollback ?? { undone: false, verified: false, problem: "no result" };
+    const ownGroups = !rb.verified && (/not this call/.test(rb.problem ?? "") || steps.some((s) => s.tool === "ae_run_script" && /\b(?:begin|end)UndoGroup\b/.test(String(s.args?.code ?? ""))));
+    const groupHint = ownGroups ? "\nHint: steps in a batch must not open or close undo groups themselves (beginUndoGroup / endUndoGroup): that splits the batch into several undo steps, and it can't be rolled back as one." : "";
+    const text2 = !rb.verified ? `${at}. ${rollbackProblem(rb, "the batch")}${groupHint}
+${lines.join("\n")}` + (changes && changes !== "Changes: none" ? `
+
+The batch made these changes:
+${changes}` : "") : rb.undone ? `${at} and was rolled back (nothing changed).
+${lines.join("\n")}` + (changes && changes !== "Changes: none" ? `
+
+Rolled back:
+${changes}` : "") : `${at}. It hadn't changed anything yet, so there was nothing to undo.
+${lines.join("\n")}`;
+    return { isError: true, content: [{ type: "text", text: cp + text2 }] };
+  }
+  const head = res.failed >= 0 ? `Batch finished with errors (atomic: false, successful steps were kept).` : `Batch done: ${steps.length} steps in one undo step.`;
+  return { content: [{ type: "text", text: `${cp}${head}
+${lines.join("\n")}${changes ? `
+
+${changes}` : ""}` }] };
+}
 function registerWorkflowTools(server) {
-  const batchable = new Map(ALL_JSX_TOOLS.filter((t) => !t.noUndo).map((t) => [t.name, t]));
   server.registerTool(
     "ae_batch",
     {
@@ -70164,83 +70626,9 @@ function registerWorkflowTools(server) {
       // steps can be ae_run_script
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true }
     },
-    async ({ steps, atomic, name, checkpoint, verbose }) => {
+    async (input2) => {
       try {
-        const perm = permissions();
-        const bodies = [];
-        const stepArgs = [];
-        const hints = [];
-        let edits = false;
-        for (const [i, s] of steps.entries()) {
-          if (s.tool === "ae_run_script") {
-            const code = String(s.args?.code ?? "");
-            if (!perm.allowShell && usesShell(code)) return errorResult(`Step ${i + 1}: ${SHELL_REFUSAL}`);
-            const t = transpileUserCode(code);
-            if (t.syntaxError && !t.transpiled) return errorResult(`Step ${i + 1} (ae_run_script) has a syntax error: ${t.syntaxError}`);
-            hints[i] = reservedGlobalsHint(t.reservedGlobals);
-            bodies.push(evalBody(t.source));
-            stepArgs.push(s.args?.args ?? {});
-            edits = true;
-            continue;
-          }
-          const tool = batchable.get(s.tool);
-          if (!tool) return errorResult(`Step ${i + 1}: "${s.tool}" can't be used in a batch (unknown, or it can't be part of an undo step such as open/save project or undo).`);
-          if (!tool.readOnly && !tool.tempItems) edits = true;
-          bodies.push(tool.jsx);
-          stepArgs.push(s.args ?? {});
-        }
-        if (edits && perm.mode === "read-only") return errorResult(READ_ONLY_REFUSAL);
-        let cp = "";
-        if (checkpoint) cp = `Checkpoint saved first: ${(await saveCheckpoint("before-batch")).file}
-`;
-        const isAtomic = atomic !== false;
-        const body = "var __steps = [\n" + bodies.map((b) => `function (args, log) {
-${b}
-}`).join(",\n") + `
-], __out = [], __failed = -1;
-for (var __i = 0; __i < __steps.length; __i++) {
-  try { __out.push({ ok: true, result: aemcp.serialize(__steps[__i](args.stepArgs[__i], log), 2) }); }
-  catch (e) { __out.push({ ok: false, error: e.message || String(e), line: e.aemcpUser ? undefined : e.line }); if (__failed < 0) __failed = __i; if (args.atomic) break; }
-}
-return { steps: __out, failed: __failed };`;
-        const scope = [...new Set(steps.map((s) => s.args?.comp).filter((c) => c !== void 0 && c !== null))];
-        const r = await runJsx(body, { stepArgs, atomic: isAtomic }, {
-          undoGroup: name || "AE MCP Batch",
-          timeoutMs: 6e5,
-          depth: 6,
-          report: loadConfig().changeReport === false ? void 0 : scope.length ? scope : reportScope({}),
-          bridge: edits && perm.mode === "ask" ? { approval: { tool: `Batch (${steps.length} steps)`, summary: steps.map((s, i) => `${i + 1}. ${s.tool} ${approvalSummary(s.tool, s.args).slice(0, 300)}`).join("\n") } } : void 0
-        });
-        if (!r.ok) return formatResult(r);
-        const res = r.result;
-        const lines = res.steps.map((s, i) => {
-          if (!s.ok) return `${i + 1}. ${steps[i].tool}: FAILED: ${s.error}${s.line ? ` (line ${s.line})` : ""}${hints[i] ? `
-   Hint: ${hints[i]}` : ""}`;
-          const txt = s.result === void 0 || s.result === null ? "ok" : JSON.stringify(s.result);
-          return `${i + 1}. ${steps[i].tool}: ${verbose ? txt : txt.length > 160 ? txt.slice(0, 157) + "..." : txt}`;
-        });
-        const changes = formatChanges(r.changes);
-        if (res.failed >= 0 && isAtomic) {
-          await evalRaw("app.executeCommand(16); 'undone'", 6e4);
-          return {
-            isError: true,
-            content: [
-              {
-                type: "text",
-                text: `${cp}Batch stopped at step ${res.failed + 1} of ${steps.length} and was rolled back (nothing changed).
-${lines.join("\n")}` + (changes && changes !== "Changes: none" ? `
-
-Rolled back:
-${changes}` : "")
-              }
-            ]
-          };
-        }
-        const head = res.failed >= 0 ? `Batch finished with errors (atomic: false, successful steps were kept).` : `Batch done: ${steps.length} steps in one undo step.`;
-        return { content: [{ type: "text", text: `${cp}${head}
-${lines.join("\n")}${changes ? `
-
-${changes}` : ""}` }] };
+        return await runBatch(input2, permissions());
       } catch (e) {
         return errorResult(e);
       }
@@ -70321,474 +70709,10 @@ The original project file was not changed.` }] };
   );
 }
 
-// src/cli/fulltest.ts
-var ALL = ALL_JSX_TOOLS;
-var C = "__aemcp_fulltest";
-var jsxOf = (tool) => ALL.find((t) => t.name === tool).jsx;
-var run2 = (body, args = {}) => runJsx(body, args, { undoGroup: false, timeoutMs: 12e4 });
-var PROJECT_STATE = "return { file: app.project.file ? app.project.file.fsName : null, dirty: app.project.dirty };";
-var projectState = async () => (await run2(PROJECT_STATE)).result;
-async function projectSafetyTests(tmpDir, before) {
-  const names = ["Save As refuses to overwrite", "restore checkpoint over a dirty project"];
-  if (before?.dirty !== false) {
-    for (const n of names) warn(`${n}: skipped (the open project has unsaved changes; save it to run this)`);
-    return names.map((step3) => ({ step: step3, ok: true, ms: 0, skipped: true }));
-  }
-  const dir = join11(tmpDir, `fulltest_project_${Date.now()}`);
-  mkdirSync8(dir, { recursive: true });
-  const scratch = join11(dir, "scratch.aep");
-  const existing = join11(dir, "existing.aep");
-  writeFileSync6(existing, "not a project: must not be overwritten");
-  const results = [];
-  const step2 = async (name, fn) => {
-    const t0 = Date.now();
-    let problem;
-    try {
-      problem = await fn();
-    } catch (e) {
-      problem = e?.message ?? String(e);
-    }
-    const ms = Date.now() - t0;
-    results.push({ step: name, ok: !problem, ms, error: problem ?? void 0 });
-    problem ? fail(`${name}: ${problem}`) : ok(`${name} (${ms} ms)`);
-  };
-  let checkpointDir;
-  let switched = false;
-  try {
-    const sw = await run2(
-      `if (String(app.project.file && app.project.file.fsName) !== String(args.file)) aemcp.fail("a different project is open now"); app.project.close(CloseOptions.DO_NOT_SAVE_CHANGES); app.newProject(); return true;`,
-      { file: before.file }
-    );
-    if (!sw.ok) throw new Error(`could not switch to a scratch project: ${sw.error?.message}`);
-    switched = true;
-    await step2(names[0], async () => {
-      const saved = await run2(jsxOf("ae_save_project"), { path: scratch });
-      if (!saved.ok) return `Save As to a new file failed: ${saved.error?.message}`;
-      const refused = await run2(jsxOf("ae_save_project"), { path: existing });
-      if (refused.ok) return "Save As overwrote an existing file without overwrite: true";
-      if (!/overwrite: true/.test(refused.error?.message ?? "")) return `refusal does not say to pass overwrite: true: ${refused.error?.message}`;
-      if (readFileSync11(existing, "utf8") !== "not a project: must not be overwritten") return "the existing file was changed";
-      const now = (await run2(PROJECT_STATE)).result;
-      return now.file === scratch ? null : `the open project moved to ${now.file}`;
-    });
-    await step2(names[1], async () => {
-      const cp = await saveCheckpoint("fulltest");
-      checkpointDir = dirname7(cp.file);
-      const dirty = await run2(`app.project.items.addFolder("__aemcp_fulltest_unsaved"); return app.project.dirty;`);
-      if (dirty.result !== true) return "could not make the scratch project dirty";
-      const refused = await restoreCheckpoint(scratch, cp).then(() => "restored over unsaved changes without discardChanges", (e) => /discardChanges: true/.test(e.message) ? null : e.message);
-      if (refused) return refused;
-      const first = await restoreCheckpoint(scratch, cp, true);
-      let now = (await run2(PROJECT_STATE)).result;
-      if (now.file !== first || now.dirty) return `after restore the open project is ${now.file}${now.dirty ? " (unsaved)" : ""}, not ${first}`;
-      const back = await run2(jsxOf("ae_open_project"), { path: scratch, discardChanges: true });
-      if (!back.ok) return `could not reopen the scratch project: ${back.error?.message}`;
-      await run2(`app.project.items.addFolder("__aemcp_fulltest_unsaved"); return true;`);
-      const second = await restoreCheckpoint(scratch, cp, true);
-      now = (await run2(PROJECT_STATE)).result;
-      if (second === first || !existsSync9(first)) return `second restore reused ${basename2(first)}`;
-      return now.file === second ? null : `after the second restore the open project is ${now.file}, not ${second}`;
-    });
-  } catch (e) {
-    const done = new Set(results.map((r) => r.step));
-    for (const n of names.filter((n2) => !done.has(n2))) {
-      results.push({ step: n, ok: false, ms: 0, error: e?.message ?? String(e) });
-      fail(`${n}: ${e?.message ?? e}`);
-    }
-  } finally {
-    if (switched) {
-      const r = before.file ? await run2(jsxOf("ae_open_project"), { path: before.file, discardChanges: true }) : await run2(jsxOf("ae_new_project"), { discardChanges: true });
-      if (!r.ok) {
-        results.push({ step: "reopen the original project", ok: false, ms: 0, error: r.error?.message });
-        fail(`Could not reopen ${before.file ?? "an empty project"}: ${r.error?.message}`);
-      }
-    }
-    rmSync2(dir, { recursive: true, force: true });
-    if (checkpointDir) rmSync2(checkpointDir, { recursive: true, force: true });
-  }
-  return results;
-}
-async function fullSelftest(before) {
-  console.log(bold(`
-Full self-test: every major tool against this After Effects (temporary comps, removed afterwards)
-`));
-  const caps = await runJsx(CAPABILITIES_JSX, {}, { undoGroup: "AE MCP self-test", timeoutMs: 6e4 });
-  if (!caps.ok) {
-    fail(`Could not read capabilities: ${caps.error?.message}`);
-    return 1;
-  }
-  const { appVersion, os, features } = caps.result;
-  console.log(`  After Effects ${appVersion} \xB7 ${os}`);
-  for (const [k, v] of Object.entries(features)) {
-    if (k === "expressionEngine" || k === "scriptsCanWriteFiles") continue;
-    (v ? ok : warn)(`${k}: ${v ? "yes" : "no"}${FEATURE_NOTES[k] ? `  (${FEATURE_NOTES[k]})` : ""}`);
-  }
-  console.log(`  expression engine: ${features.expressionEngine} \xB7 scripts can write files: ${features.scriptsCanWriteFiles}
-`);
-  const start = await runJsx("var m = 0; for (var i = 1; i <= app.project.numItems; i++) m = Math.max(m, app.project.item(i).id); return { maxId: m, rq: app.project.renderQueue.numItems };", {}, { undoGroup: false });
-  const { maxId, rq } = start.result;
-  const tmpDir = join11(homedir7(), ".aemcp", "tmp");
-  mkdirSync8(tmpDir, { recursive: true });
-  const frame = join11(tmpDir, `fulltest_${Date.now()}.png`);
-  const steps = [
-    { name: "create comp", tool: "ae_create_comp", args: { name: C, width: 1280, height: 720, duration: 4, frameRate: 25 } },
-    { name: "solid layer", tool: "ae_add_layer", args: { comp: C, type: "solid", name: "BG", color: "#20304a" } },
-    { name: "text layer", tool: "ae_add_layer", args: { comp: C, type: "text", name: "Title", text: "Full Self Test", fontSize: 72, font: "ArialMT" } },
-    { name: "shape layer", tool: "ae_add_shape", args: { comp: C, shape: "ellipse", size: [200, 200], fill: "#ffcc00", name: "Dot" } },
-    { name: "null + camera", tool: "ae_add_layer", args: { comp: C, type: "null", name: "Rig" } },
-    { name: "set property", tool: "ae_set_property", args: { comp: C, layer: "BG", path: "Transform/Opacity", value: 90 } },
-    { name: "keyframes + ease", tool: "ae_set_keyframes", args: { comp: C, layer: "Title", path: "Transform/Position", keyframes: [{ time: 0, value: [640, 800] }, { time: 1, value: [640, 360] }], easyEase: true } },
-    { name: "edit keyframes (tangents, label, move)", tool: "ae_edit_keyframes", args: { comp: C, layer: "Title", path: "Transform/Position", keys: [{ index: 2, label: 2, inSpatialTangent: [-50, 0], moveTo: 1.5 }] } },
-    { name: "copy keyframes", tool: "ae_copy_keyframes", args: { from: { comp: C, layer: "Title", path: "Transform/Position" }, to: [{ comp: C, layer: "Rig", path: "Transform/Position" }] } },
-    { name: "expression", tool: "ae_set_expression", args: { comp: C, layer: "Dot", path: "Transform/Rotation", expression: "time * 90" }, check: (r) => r.result?.error ? "expression error" : null },
-    { name: "list expressions", tool: "ae_get_expressions", args: { comp: C } },
-    { name: "apply effect + params", tool: "ae_apply_effect", args: { comp: C, layer: "Title", effect: "ADBE Drop Shadow", params: { "ADBE Drop Shadow-0004": 10 } } },
-    // Distance, by match name
-    { name: "inspect effect", tool: "ae_get_effect_params", args: { effect: "ADBE Glo2" } },
-    { name: "English names (any AE language)", tool: "ae_get_effect_params", args: { effect: "glow" } },
-    { name: "mask", tool: "ae_add_mask", args: { comp: C, layer: "BG", shape: "ellipse", feather: 50 } },
-    { name: "parent + blend", tool: "ae_set_layer_attributes", args: { comp: C, layer: "Dot", parent: "Rig", blendingMode: "SCREEN" } },
-    { name: "style text range", tool: "ae_style_text_range", args: { comp: C, layer: "Title", match: "Self", style: { fillColor: "#ff3b30" } }, needs: "perCharacterText" },
-    { name: "paragraph", tool: "ae_set_paragraph", args: { comp: C, layer: "Title", justification: "CENTER_JUSTIFY" } },
-    { name: "text animator", tool: "ae_add_text_animator", args: { comp: C, layer: "Title", properties: { opacity: 0 }, selector: { basedOn: "words", shape: "rampUp" } } },
-    { name: "layer bounds", tool: "ae_get_layer_bounds", args: { comp: C }, check: (r) => (r.result?.layers || []).some((l) => l.bounds) ? null : "no bounds measured" },
-    { name: "sample pixels", tool: "ae_sample_pixels", args: { comp: C, points: [[640, 360]] } },
-    { name: "comp map", tool: "ae_get_comp_map", args: { comp: C } },
-    { name: "find properties", tool: "ae_find_properties", args: { comp: C, onlyAnimated: true } },
-    { name: "precompose", tool: "ae_precompose", args: { comp: C, layers: ["Dot"], name: `${C}_pre` } },
-    { name: "time remap", tool: "ae_set_time_remap", args: { comp: C, layer: `${C}_pre`, freezeAt: 0.5 } },
-    { name: "essential graphics", tool: "ae_essential_graphics", args: { comp: C, add: [{ layer: "BG", path: "Transform/Opacity", name: "BG Opacity" }] }, needs: "essentialGraphics" },
-    { name: "render queue add", tool: "ae_add_to_render_queue", args: { comp: C, outputPath: join11(tmpDir, "fulltest.mov") } },
-    { name: "render settings", tool: "ae_set_render_settings", args: { renderSettings: { Quality: "Draft" } }, needs: "renderSettingsApi" },
-    { name: "project health", tool: "ae_project_health", args: {} },
-    { name: "camera", tool: "ae_set_camera", args: { comp: C, focalLength: 50, type: "two-node", depthOfField: true } },
-    { name: "light", tool: "ae_set_light", args: { comp: C, type: "SPOT", intensity: 120, castsShadows: true } },
-    { name: "3D material", tool: "ae_set_material", args: { comp: C, layers: ["BG"], castsShadows: "on", specular: 30 } },
-    { name: "check expression", tool: "ae_check_expression", args: { comp: C, layer: "BG", path: "Transform/Opacity", expression: "50 + 50 * Math.sin(time)" }, check: (r) => r.result?.ok ? null : `expression reported an error: ${r.result?.error}` },
-    { name: "replace in expressions (dry run)", tool: "ae_replace_in_expressions", args: { find: "time", replace: "time", comps: [C], dryRun: true } },
-    { name: "color settings", tool: "ae_color_settings", args: { listProfiles: true } },
-    { name: "system info", tool: "ae_system_info", args: {} },
-    { name: "frame preview", jsx: RENDER_FRAME_JSX, args: { comp: C, time: 1, outputPath: frame, tmpDir }, check: () => existsSync9(frame) && statSync5(frame).size > 0 ? null : "no PNG written" },
-    { name: "contact sheet", jsx: CONTACT_SHEET_JSX, args: { comp: C, frames: 4, tmpDir } },
-    {
-      name: "modern JavaScript",
-      jsx: evalBody(transpileUserCode("const names = [];\nfor (let i = 1; i <= app.project.numItems; i++) names.push(app.project.item(i).name);\nreturn names.filter((n) => n.startsWith('__aemcp_fulltest')).length ?? 0;").source),
-      args: {},
-      check: (r) => Number(r.result) >= 1 ? null : `unexpected result ${JSON.stringify(r.result)}`
-    },
-    {
-      name: "ES3 reserved word as a name",
-      jsx: evalBody(transpileUserCode("const int = 1; return int;").source),
-      args: {},
-      check: (r) => r.result === 1 ? null : `unexpected result ${JSON.stringify(r.result)}`
-    },
-    {
-      name: "keyword property names",
-      jsx: evalBody(transpileUserCode("const o = { default: 1, class: 2 }; o.default += o.class; return o.default;").source),
-      args: {},
-      check: (r) => r.result === 3 ? null : `unexpected result ${JSON.stringify(r.result)}`
-    }
-  ];
-  const results = await projectSafetyTests(tmpDir, before ?? await projectState());
-  for (const s of steps) {
-    if (s.needs && !features[s.needs]) {
-      results.push({ step: s.name, ok: true, ms: 0, skipped: true });
-      warn(`${s.name}: skipped (needs ${s.needs})`);
-      continue;
-    }
-    const t0 = Date.now();
-    let r;
-    try {
-      const body = s.jsx ?? ALL.find((t) => t.name === s.tool)?.jsx;
-      if (!body) throw new Error(`unknown tool ${s.tool}`);
-      r = await runJsx(body, s.args ?? {}, { undoGroup: "AE MCP self-test", timeoutMs: 12e4, report: [C] });
-    } catch (e) {
-      r = { ok: false, logs: [], error: { message: e.message } };
-    }
-    const problem = !r.ok ? r.error?.message ?? "failed" : s.check?.(r) ?? null;
-    const ms = Date.now() - t0;
-    results.push({ step: s.name, ok: !problem, ms, error: problem ?? void 0 });
-    problem ? fail(`${s.name}: ${problem}`) : ok(`${s.name} (${ms} ms)`);
-  }
-  await runJsx(
-    `var p = app.project, rq = p.renderQueue;
-for (var r = rq.numItems; r > args.rq; r--) rq.item(r).remove();
-for (var i = p.numItems; i >= 1; i--) { var it = p.item(i); if (it.id > args.maxId) it.remove(); }
-return p.numItems;`,
-    { maxId, rq },
-    { undoGroup: "AE MCP self-test cleanup" }
-  );
-  try {
-    unlinkSync3(frame);
-  } catch {
-  }
-  const failed = results.filter((r) => !r.ok);
-  const dir = join11(homedir7(), ".aemcp", "compat");
-  mkdirSync8(dir, { recursive: true });
-  const file2 = join11(dir, `after-effects-${appVersion.replace(/[^\w.]+/g, "_")}.json`);
-  writeFileSync6(file2, JSON.stringify({ at: (/* @__PURE__ */ new Date()).toISOString(), server: VERSION, appVersion, os, platform: process.platform, features, results }, null, 2));
-  console.log(
-    failed.length ? `
-${red(bold(`${failed.length} of ${results.length} steps failed`))} on After Effects ${appVersion}.` : `
-${green(bold(`All ${results.length} steps passed`))} on After Effects ${appVersion}.`
-  );
-  console.log(`Compatibility report: ${file2}
-`);
-  return failed.length ? 1 : 0;
-}
-
-// src/cli/selftest.ts
-async function selftest(full = false) {
-  let failures = 0;
-  const bad = (m) => {
-    failures++;
-    fail(m);
-  };
-  console.log(bold(`
-After Effects MCP self-test v${VERSION}`));
-  console.log(`  ${process.platform} \xB7 node ${process.version}
-`);
-  if (updateCheckEnabled()) {
-    const u = await checkForUpdate(true);
-    const msg = updateMessage(u);
-    if (msg) warn(msg);
-    else if (u?.latest) ok(`Up to date (latest release v${u.latest})`);
-  }
-  if (existsSync10(CONFIG_FILE) && loadConfig().token) ok(`Config ${CONFIG_FILE}`);
-  else bad(`No config at ${CONFIG_FILE}. Run the installer.`);
-  const hash2 = installedExtensionHash();
-  if (!existsSync10(join12(extensionDir(), "CSXS", "manifest.xml"))) bad(`After Effects extension missing at ${extensionDir()}. Run the installer.`);
-  else if (hash2 !== "e7fd3866173c" && compareVersions(installedExtensionVersion() ?? "0", VERSION) > 0)
-    warn(`A newer After Effects extension (v${installedExtensionVersion()}) is installed than this server (v${VERSION}): another copy of AE MCP is newer. Update this one (ae-mcp update, or the latest .mcpb).`);
-  else if (hash2 !== "e7fd3866173c") warn(`Extension at ${extensionDir()} is a different version (${hash2 ?? "unknown"} vs ${"e7fd3866173c"}). Re-run the installer.`);
-  else ok("After Effects extension installed");
-  if (bundledExtensionSigned) {
-    const sig = installedExtensionSignature();
-    if (sig.ok) ok("Extension signature valid (loads without PlayerDebugMode)");
-    else if (debugModeEnabled()) warn(`Extension signature: ${sig.problems.join("; ")}. It still loads because PlayerDebugMode is on; re-run the installer to fix.`);
-    else bad(`Extension signature: ${sig.problems.join("; ")}. After Effects will not load it. Re-run the installer.`);
-  } else if (debugModeEnabled()) ok("Unsigned extensions allowed (PlayerDebugMode)");
-  else bad(`This is an unsigned development build and PlayerDebugMode is off for some CSXS versions (${CSXS_VERSIONS.join(", ")}). Run the installer.`);
-  const desktop = readJson(claudeDesktopConfig(), null);
-  if (desktop?.mcpServers?.[SERVER_NAME]) {
-    const cmd = desktop.mcpServers[SERVER_NAME].command;
-    if (cmd && !existsSync10(cmd)) bad(`Claude Desktop points to a Node that no longer exists: ${cmd}. Re-run the installer.`);
-    else ok("Claude Desktop configured");
-  } else console.log("  - Claude Desktop config has no after-effects entry (fine if you use the .mcpb extension or another app)");
-  console.log("");
-  let h;
-  try {
-    h = await health();
-  } catch (e) {
-    bad(`Bridge not reachable on 127.0.0.1:${loadConfig().bridgePort}. Is After Effects running? (restart it after installing)`);
-    const statusFile = join12(AEMCP_DIR, "bridge-status.json");
-    if (existsSync10(statusFile)) {
-      const st = readJson(statusFile, {});
-      console.log(`    last bridge status: ${st.listening ? "listening" : "not listening"}${st.error ? " - " + st.error : ""} (${st.at})`);
-    }
-    return summary(failures);
-  }
-  ok(`Bridge running inside ${h.host?.appName ?? "AE"} ${h.host?.appVersion ?? ""} (bridge v${h.version})`);
-  if (h.authorized === false) {
-    bad("Bridge rejected our token: config mismatch. Re-run the installer and restart After Effects.");
-    return summary(failures);
-  }
-  const info = await runJsx(
-    "var w = null; try { w = app.preferences.getPrefAsLong('Main Pref Section', 'Pref_SCRIPTING_FILE_NETWORK_SECURITY') === 1; } catch (e) {} return { version: app.version, os: $.os, canWrite: w };",
-    {},
-    { undoGroup: false, timeoutMs: 15e3 }
-  ).catch((e) => ({ ok: false, error: { message: e.message } }));
-  if (!info.ok) return bad(`ExtendScript failed: ${info.error?.message}`), summary(failures);
-  ok(`ExtendScript works: After Effects ${info.result.version} on ${info.result.os}`);
-  if (info.result.canWrite === false)
-    warn("'Allow Scripts to Write Files and Access Network' is OFF. Previews still work; scripts that write files themselves (File.write, exports) or use the network need it: AE Settings > Scripting & Expressions.");
-  const tmpDir = join12(AEMCP_DIR, "tmp");
-  mkdirSync9(tmpDir, { recursive: true });
-  const png = join12(tmpDir, `selftest_${Date.now()}.png`);
-  const before = full ? await projectState() : void 0;
-  const job = await runJsx(
-    `var c = app.project.items.addComp("__aemcp_selftest", 640, 360, 1, 2, 30);
-var t = c.layers.addText("AE MCP OK");
-var p = t.property("ADBE Transform Group").property("ADBE Position");
-p.setValuesAtTimes([0, 1], [[100, 180], [540, 180]]);
-var fx = t.property("ADBE Effect Parade").addProperty("ADBE Drop Shadow");
-t.property("ADBE Transform Group").property("ADBE Opacity").expression = "50 + 50 * Math.sin(time)";
-var f = new File(args.png);
-var wrote = false;
-// saveFrameToPng works even when "Allow Scripts to Write Files" is off (confirmed on macOS and Windows)
-c.saveFrameToPng(1, f); var w = 0; while (!f.exists && w < 10000) { $.sleep(50); w += 50; } wrote = f.exists; $.sleep(100);
-var r = { keys: p.numKeys, effect: fx.matchName, exprError: t.property("ADBE Transform Group").property("ADBE Opacity").expressionError, wrote: wrote };
-c.remove();
-return r;`,
-    { png },
-    { undoGroup: "AE MCP self-test", timeoutMs: 6e4 }
-  );
-  if (!job.ok) bad(`Test job failed: ${job.error?.message}`);
-  else {
-    const r = job.result;
-    if (r.keys === 2 && r.effect === "ADBE Drop Shadow" && !r.exprError) ok("Created a comp, text layer, keyframes, effect and expression (then removed it)");
-    else bad(`Unexpected test result: ${JSON.stringify(r)}`);
-    {
-      for (let i = 0; i < 50 && !(existsSync10(png) && statSync6(png).size > 0); i++) await sleep(100);
-      if (existsSync10(png) && statSync6(png).size > 0) {
-        const sig = readFileSync12(png).subarray(1, 4).toString();
-        sig === "PNG" ? ok("Rendered a frame preview") : bad("Frame preview is not a valid PNG");
-        try {
-          unlinkSync4(png);
-        } catch {
-        }
-      } else bad(`Frame preview was not written to ${png}`);
-    }
-  }
-  if (full && !failures) {
-    failures += await fullSelftest(before);
-  }
-  return summary(failures);
-}
-async function summary(failures) {
-  if (!failures) {
-    console.log(`
-${green(bold("All checks passed. After Effects MCP is ready."))}
-`);
-    return 0;
-  }
-  console.log(`
-${red(bold(`${failures} problem(s) found.`))} See README > Troubleshooting.`);
-  console.log("If you report it, include everything below (it contains no secrets):\n");
-  console.log(await diagnostics());
-  return 1;
-}
-
-// src/cli/update-cmd.ts
+// src/cli/fulltest-regression.ts
 init_define_AEMCP_CEP_FILES();
-import { spawnSync as spawnSync5 } from "node:child_process";
-import { createHash as createHash4 } from "node:crypto";
-import { copyFileSync as copyFileSync4, existsSync as existsSync11, mkdirSync as mkdirSync10, renameSync as renameSync2, rmSync as rmSync3, writeFileSync as writeFileSync7 } from "node:fs";
-import { dirname as dirname8 } from "node:path";
-import { fileURLToPath as fileURLToPath4 } from "node:url";
-var SERVER_ASSET = "ae-mcp.mjs";
-async function get(url2) {
-  const res = await fetch(url2, { headers: { "user-agent": `ae-mcp/${VERSION}`, accept: "application/vnd.github+json" }, signal: AbortSignal.timeout(6e4) });
-  if (!res.ok) throw new Error(`${url2}: HTTP ${res.status}`);
-  return res;
-}
-async function expectedDigest(rel) {
-  const asset = rel.assets.find((a) => a.name === SERVER_ASSET);
-  const m = /^sha256:([0-9a-f]{64})$/i.exec(asset.digest ?? "");
-  if (m) return m[1].toLowerCase();
-  const side = rel.assets.find((a) => a.name === `${SERVER_ASSET}.sha256`);
-  if (!side) throw new Error("the release has no checksum for ae-mcp.mjs");
-  const hex3 = /[0-9a-f]{64}/i.exec(await (await get(side.browser_download_url)).text())?.[0];
-  if (!hex3) throw new Error("unreadable ae-mcp.mjs.sha256");
-  return hex3.toLowerCase();
-}
-async function runUpdate() {
-  const base = { from: VERSION, to: null, updated: false };
-  let rel;
-  try {
-    const api = process.env.AEMCP_RELEASES_API || `https://api.github.com/repos/${REPO}/releases/latest`;
-    rel = await (await get(api)).json();
-  } catch (e) {
-    return { ...base, ok: false, message: `Could not reach GitHub to check for updates (${e.message}).` };
-  }
-  const latest = rel.tag_name.replace(/^v/, "");
-  void checkForUpdate(true);
-  if (compareVersions(latest, VERSION) <= 0) return { ...base, ok: true, to: latest, message: `AE MCP is up to date (v${VERSION}).` };
-  if (!rel.assets.some((a) => a.name === SERVER_ASSET))
-    return { ...base, ok: false, to: latest, url: rel.html_url, message: `v${latest} can't be installed automatically. Download it from ${rel.html_url}` };
-  const tmp = INSTALLED_SERVER.replace(/\.mjs$/, ".download.mjs");
-  try {
-    const asset = rel.assets.find((a) => a.name === SERVER_ASSET);
-    const [body, want] = await Promise.all([get(asset.browser_download_url).then((r) => r.arrayBuffer()), expectedDigest(rel)]);
-    const bytes = Buffer.from(body);
-    const got = createHash4("sha256").update(bytes).digest("hex");
-    if (got !== want) throw new Error(`checksum mismatch (expected ${want.slice(0, 12)}\u2026, got ${got.slice(0, 12)}\u2026)`);
-    mkdirSync10(dirname8(INSTALLED_SERVER), { recursive: true });
-    writeFileSync7(tmp, bytes);
-    const v = spawnSync5(process.execPath, [tmp, "--version"], { encoding: "utf8", timeout: 3e4 });
-    if (v.status !== 0 || v.stdout.trim() !== latest) throw new Error(`the downloaded server did not start correctly (${(v.stderr || v.stdout).trim().slice(0, 200)})`);
-    if (existsSync11(INSTALLED_SERVER)) copyFileSync4(INSTALLED_SERVER, `${INSTALLED_SERVER}.previous`);
-    renameSync2(tmp, INSTALLED_SERVER);
-  } catch (e) {
-    rmSync3(tmp, { force: true });
-    return { ...base, ok: false, to: latest, url: rel.html_url, message: `Update to v${latest} failed: ${e.message}. Nothing was changed.` };
-  }
-  const setup = spawnSync5(process.execPath, [INSTALLED_SERVER, "setup"], { encoding: "utf8", timeout: 6e4, env: { ...process.env, AEMCP_NO_UPDATE_CHECK: "1" } });
-  let extension = false;
-  try {
-    extension = !!JSON.parse(setup.stdout).extensionInstalled;
-  } catch {
-  }
-  const running = fileURLToPath4(import.meta.url) !== INSTALLED_SERVER;
-  return {
-    ok: true,
-    from: VERSION,
-    to: latest,
-    updated: true,
-    url: rel.html_url,
-    restartAfterEffects: extension,
-    message: `Updated AE MCP from v${VERSION} to v${latest}. ` + (extension ? "Restart After Effects and your AI apps to use it." : "Restart your AI apps to use it.") + (running ? " (If you use the Claude Desktop extension (.mcpb), install the new AE-MCP.mcpb from the release page as well.)" : "")
-  };
-}
-async function updateCommand(args) {
-  const r = await runUpdate();
-  if (args.includes("--json")) console.log(JSON.stringify(r));
-  else {
-    console.log(bold(`
-AE MCP update`));
-    (r.ok ? ok : fail)(r.message);
-    if (!r.ok && r.url) warn(`Release page: ${r.url}`);
-  }
-  process.exitCode = r.ok ? 0 : 1;
-}
-
-// src/cli/uninstall.ts
-init_define_AEMCP_CEP_FILES();
-import { existsSync as existsSync12, readdirSync as readdirSync6, readFileSync as readFileSync13, rmSync as rmSync4, writeFileSync as writeFileSync8 } from "node:fs";
-import { join as join13 } from "node:path";
-function uninstall(argv) {
-  console.log(bold("\nAfter Effects MCP uninstaller\n"));
-  const keepConfig = argv.includes("--keep-config");
-  if (existsSync12(extensionDir())) {
-    rmSync4(extensionDir(), { recursive: true, force: true });
-    ok(`Removed the After Effects extension`);
-  }
-  if (existsSync12(AEMCP_DIR)) {
-    for (const name of readdirSync6(AEMCP_DIR))
-      if (name !== "node" && !(keepConfig && name === "config.json")) rmSync4(join13(AEMCP_DIR, name), { recursive: true, force: true });
-  }
-  ok(keepConfig ? "Removed the server (kept ~/.aemcp/config.json)" : `Removed ${AEMCP_DIR}`);
-  for (const [label, file2] of [["Claude Desktop", claudeDesktopConfig()], ["Cursor", cursorConfig()], ["Claude Code", claudeCodeConfig()]]) {
-    const data = readJson(file2, null);
-    if (data?.mcpServers?.[SERVER_NAME]) {
-      delete data.mcpServers[SERVER_NAME];
-      writeJsonWithBackup(file2, data);
-      ok(`Removed from ${label}`);
-    }
-  }
-  const claude = findClaudeCli();
-  if (claude) {
-    try {
-      run(claude, ["mcp", "remove", SERVER_NAME, "--scope", "user"]);
-      ok("Removed from Claude Code");
-    } catch {
-    }
-  }
-  if (existsSync12(codexConfig())) {
-    const t = readFileSync13(codexConfig(), "utf8");
-    const n = removeCodexBlock(t);
-    if (n !== t) {
-      writeFileSync8(codexConfig(), n.trimEnd() + "\n");
-      ok("Removed from Codex");
-    }
-  }
-  console.log("\nDone. Restart After Effects and your AI apps.");
-  console.log("If you installed the Claude Desktop extension (.mcpb), remove it in Claude Desktop > Settings > Extensions.");
-  warn("PlayerDebugMode, if an earlier version enabled it, was left as is (harmless; other extensions may rely on it).");
-}
-
-// src/server.ts
-init_define_AEMCP_CEP_FILES();
+import { readFileSync as readFileSync11, unlinkSync as unlinkSync3, writeFileSync as writeFileSync6 } from "node:fs";
+import { join as join11 } from "node:path";
 
 // node_modules/@modelcontextprotocol/sdk/dist/esm/server/mcp.js
 init_define_AEMCP_CEP_FILES();
@@ -78925,6 +78849,1584 @@ var EMPTY_COMPLETION_RESULT = {
   }
 };
 
+// node_modules/@modelcontextprotocol/sdk/dist/esm/client/index.js
+init_define_AEMCP_CEP_FILES();
+
+// node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/client.js
+init_define_AEMCP_CEP_FILES();
+var ExperimentalClientTasks = class {
+  constructor(_client) {
+    this._client = _client;
+  }
+  /**
+   * Calls a tool and returns an AsyncGenerator that yields response messages.
+   * The generator is guaranteed to end with either a 'result' or 'error' message.
+   *
+   * This method provides streaming access to tool execution, allowing you to
+   * observe intermediate task status updates for long-running tool calls.
+   * Automatically validates structured output if the tool has an outputSchema.
+   *
+   * @example
+   * ```typescript
+   * const stream = client.experimental.tasks.callToolStream({ name: 'myTool', arguments: {} });
+   * for await (const message of stream) {
+   *   switch (message.type) {
+   *     case 'taskCreated':
+   *       console.log('Tool execution started:', message.task.taskId);
+   *       break;
+   *     case 'taskStatus':
+   *       console.log('Tool status:', message.task.status);
+   *       break;
+   *     case 'result':
+   *       console.log('Tool result:', message.result);
+   *       break;
+   *     case 'error':
+   *       console.error('Tool error:', message.error);
+   *       break;
+   *   }
+   * }
+   * ```
+   *
+   * @param params - Tool call parameters (name and arguments)
+   * @param resultSchema - Zod schema for validating the result (defaults to CallToolResultSchema)
+   * @param options - Optional request options (timeout, signal, task creation params, etc.)
+   * @returns AsyncGenerator that yields ResponseMessage objects
+   *
+   * @experimental
+   */
+  async *callToolStream(params2, resultSchema = CallToolResultSchema, options) {
+    const clientInternal = this._client;
+    const optionsWithTask = {
+      ...options,
+      // We check if the tool is known to be a task during auto-configuration, but assume
+      // the caller knows what they're doing if they pass this explicitly
+      task: options?.task ?? (clientInternal.isToolTask(params2.name) ? {} : void 0)
+    };
+    const stream = clientInternal.requestStream({ method: "tools/call", params: params2 }, resultSchema, optionsWithTask);
+    const validator = clientInternal.getToolOutputValidator(params2.name);
+    for await (const message of stream) {
+      if (message.type === "result" && validator) {
+        const result = message.result;
+        if (!result.structuredContent && !result.isError) {
+          yield {
+            type: "error",
+            error: new McpError(ErrorCode.InvalidRequest, `Tool ${params2.name} has an output schema but did not return structured content`)
+          };
+          return;
+        }
+        if (result.structuredContent) {
+          try {
+            const validationResult = validator(result.structuredContent);
+            if (!validationResult.valid) {
+              yield {
+                type: "error",
+                error: new McpError(ErrorCode.InvalidParams, `Structured content does not match the tool's output schema: ${validationResult.errorMessage}`)
+              };
+              return;
+            }
+          } catch (error62) {
+            if (error62 instanceof McpError) {
+              yield { type: "error", error: error62 };
+              return;
+            }
+            yield {
+              type: "error",
+              error: new McpError(ErrorCode.InvalidParams, `Failed to validate structured content: ${error62 instanceof Error ? error62.message : String(error62)}`)
+            };
+            return;
+          }
+        }
+      }
+      yield message;
+    }
+  }
+  /**
+   * Gets the current status of a task.
+   *
+   * @param taskId - The task identifier
+   * @param options - Optional request options
+   * @returns The task status
+   *
+   * @experimental
+   */
+  async getTask(taskId, options) {
+    return this._client.getTask({ taskId }, options);
+  }
+  /**
+   * Retrieves the result of a completed task.
+   *
+   * @param taskId - The task identifier
+   * @param resultSchema - Zod schema for validating the result
+   * @param options - Optional request options
+   * @returns The task result
+   *
+   * @experimental
+   */
+  async getTaskResult(taskId, resultSchema, options) {
+    return this._client.getTaskResult({ taskId }, resultSchema, options);
+  }
+  /**
+   * Lists tasks with optional pagination.
+   *
+   * @param cursor - Optional pagination cursor
+   * @param options - Optional request options
+   * @returns List of tasks with optional next cursor
+   *
+   * @experimental
+   */
+  async listTasks(cursor, options) {
+    return this._client.listTasks(cursor ? { cursor } : void 0, options);
+  }
+  /**
+   * Cancels a running task.
+   *
+   * @param taskId - The task identifier
+   * @param options - Optional request options
+   *
+   * @experimental
+   */
+  async cancelTask(taskId, options) {
+    return this._client.cancelTask({ taskId }, options);
+  }
+  /**
+   * Sends a request and returns an AsyncGenerator that yields response messages.
+   * The generator is guaranteed to end with either a 'result' or 'error' message.
+   *
+   * This method provides streaming access to request processing, allowing you to
+   * observe intermediate task status updates for task-augmented requests.
+   *
+   * @param request - The request to send
+   * @param resultSchema - Zod schema for validating the result
+   * @param options - Optional request options (timeout, signal, task creation params, etc.)
+   * @returns AsyncGenerator that yields ResponseMessage objects
+   *
+   * @experimental
+   */
+  requestStream(request2, resultSchema, options) {
+    return this._client.requestStream(request2, resultSchema, options);
+  }
+};
+
+// node_modules/@modelcontextprotocol/sdk/dist/esm/client/index.js
+function applyElicitationDefaults(schema, data) {
+  if (!schema || data === null || typeof data !== "object")
+    return;
+  if (schema.type === "object" && schema.properties && typeof schema.properties === "object") {
+    const obj = data;
+    const props = schema.properties;
+    for (const key of Object.keys(props)) {
+      const propSchema = props[key];
+      if (obj[key] === void 0 && Object.prototype.hasOwnProperty.call(propSchema, "default")) {
+        obj[key] = propSchema.default;
+      }
+      if (obj[key] !== void 0) {
+        applyElicitationDefaults(propSchema, obj[key]);
+      }
+    }
+  }
+  if (Array.isArray(schema.anyOf)) {
+    for (const sub of schema.anyOf) {
+      if (typeof sub !== "boolean") {
+        applyElicitationDefaults(sub, data);
+      }
+    }
+  }
+  if (Array.isArray(schema.oneOf)) {
+    for (const sub of schema.oneOf) {
+      if (typeof sub !== "boolean") {
+        applyElicitationDefaults(sub, data);
+      }
+    }
+  }
+}
+function getSupportedElicitationModes(capabilities) {
+  if (!capabilities) {
+    return { supportsFormMode: false, supportsUrlMode: false };
+  }
+  const hasFormCapability = capabilities.form !== void 0;
+  const hasUrlCapability = capabilities.url !== void 0;
+  const supportsFormMode = hasFormCapability || !hasFormCapability && !hasUrlCapability;
+  const supportsUrlMode = hasUrlCapability;
+  return { supportsFormMode, supportsUrlMode };
+}
+var Client = class extends Protocol {
+  /**
+   * Initializes this client with the given name and version information.
+   */
+  constructor(_clientInfo, options) {
+    super(options);
+    this._clientInfo = _clientInfo;
+    this._cachedToolOutputValidators = /* @__PURE__ */ new Map();
+    this._cachedKnownTaskTools = /* @__PURE__ */ new Set();
+    this._cachedRequiredTaskTools = /* @__PURE__ */ new Set();
+    this._listChangedDebounceTimers = /* @__PURE__ */ new Map();
+    this._capabilities = options?.capabilities ?? {};
+    this._jsonSchemaValidator = options?.jsonSchemaValidator ?? new AjvJsonSchemaValidator();
+    if (options?.listChanged) {
+      this._pendingListChangedConfig = options.listChanged;
+    }
+  }
+  /**
+   * Set up handlers for list changed notifications based on config and server capabilities.
+   * This should only be called after initialization when server capabilities are known.
+   * Handlers are silently skipped if the server doesn't advertise the corresponding listChanged capability.
+   * @internal
+   */
+  _setupListChangedHandlers(config2) {
+    if (config2.tools && this._serverCapabilities?.tools?.listChanged) {
+      this._setupListChangedHandler("tools", ToolListChangedNotificationSchema, config2.tools, async () => {
+        const result = await this.listTools();
+        return result.tools;
+      });
+    }
+    if (config2.prompts && this._serverCapabilities?.prompts?.listChanged) {
+      this._setupListChangedHandler("prompts", PromptListChangedNotificationSchema, config2.prompts, async () => {
+        const result = await this.listPrompts();
+        return result.prompts;
+      });
+    }
+    if (config2.resources && this._serverCapabilities?.resources?.listChanged) {
+      this._setupListChangedHandler("resources", ResourceListChangedNotificationSchema, config2.resources, async () => {
+        const result = await this.listResources();
+        return result.resources;
+      });
+    }
+  }
+  /**
+   * Access experimental features.
+   *
+   * WARNING: These APIs are experimental and may change without notice.
+   *
+   * @experimental
+   */
+  get experimental() {
+    if (!this._experimental) {
+      this._experimental = {
+        tasks: new ExperimentalClientTasks(this)
+      };
+    }
+    return this._experimental;
+  }
+  /**
+   * Registers new capabilities. This can only be called before connecting to a transport.
+   *
+   * The new capabilities will be merged with any existing capabilities previously given (e.g., at initialization).
+   */
+  registerCapabilities(capabilities) {
+    if (this.transport) {
+      throw new Error("Cannot register capabilities after connecting to transport");
+    }
+    this._capabilities = mergeCapabilities(this._capabilities, capabilities);
+  }
+  /**
+   * Override request handler registration to enforce client-side validation for elicitation.
+   */
+  setRequestHandler(requestSchema, handler) {
+    const shape = getObjectShape(requestSchema);
+    const methodSchema = shape?.method;
+    if (!methodSchema) {
+      throw new Error("Schema is missing a method literal");
+    }
+    const methodValue = getLiteralValue(methodSchema);
+    if (typeof methodValue !== "string") {
+      throw new Error("Schema method literal must be a string");
+    }
+    const method = methodValue;
+    if (method === "elicitation/create") {
+      const wrappedHandler = async (request2, extra) => {
+        const validatedRequest = safeParse3(ElicitRequestSchema, request2);
+        if (!validatedRequest.success) {
+          const errorMessage = validatedRequest.error instanceof Error ? validatedRequest.error.message : String(validatedRequest.error);
+          throw new McpError(ErrorCode.InvalidParams, `Invalid elicitation request: ${errorMessage}`);
+        }
+        const { params: params2 } = validatedRequest.data;
+        params2.mode = params2.mode ?? "form";
+        const { supportsFormMode, supportsUrlMode } = getSupportedElicitationModes(this._capabilities.elicitation);
+        if (params2.mode === "form" && !supportsFormMode) {
+          throw new McpError(ErrorCode.InvalidParams, "Client does not support form-mode elicitation requests");
+        }
+        if (params2.mode === "url" && !supportsUrlMode) {
+          throw new McpError(ErrorCode.InvalidParams, "Client does not support URL-mode elicitation requests");
+        }
+        const result = await Promise.resolve(handler(request2, extra));
+        if (params2.task) {
+          const taskValidationResult = safeParse3(CreateTaskResultSchema, result);
+          if (!taskValidationResult.success) {
+            const errorMessage = taskValidationResult.error instanceof Error ? taskValidationResult.error.message : String(taskValidationResult.error);
+            throw new McpError(ErrorCode.InvalidParams, `Invalid task creation result: ${errorMessage}`);
+          }
+          return taskValidationResult.data;
+        }
+        const validationResult = safeParse3(ElicitResultSchema, result);
+        if (!validationResult.success) {
+          const errorMessage = validationResult.error instanceof Error ? validationResult.error.message : String(validationResult.error);
+          throw new McpError(ErrorCode.InvalidParams, `Invalid elicitation result: ${errorMessage}`);
+        }
+        const validatedResult = validationResult.data;
+        const requestedSchema = params2.mode === "form" ? params2.requestedSchema : void 0;
+        if (params2.mode === "form" && validatedResult.action === "accept" && validatedResult.content && requestedSchema) {
+          if (this._capabilities.elicitation?.form?.applyDefaults) {
+            try {
+              applyElicitationDefaults(requestedSchema, validatedResult.content);
+            } catch {
+            }
+          }
+        }
+        return validatedResult;
+      };
+      return super.setRequestHandler(requestSchema, wrappedHandler);
+    }
+    if (method === "sampling/createMessage") {
+      const wrappedHandler = async (request2, extra) => {
+        const validatedRequest = safeParse3(CreateMessageRequestSchema, request2);
+        if (!validatedRequest.success) {
+          const errorMessage = validatedRequest.error instanceof Error ? validatedRequest.error.message : String(validatedRequest.error);
+          throw new McpError(ErrorCode.InvalidParams, `Invalid sampling request: ${errorMessage}`);
+        }
+        const { params: params2 } = validatedRequest.data;
+        const result = await Promise.resolve(handler(request2, extra));
+        if (params2.task) {
+          const taskValidationResult = safeParse3(CreateTaskResultSchema, result);
+          if (!taskValidationResult.success) {
+            const errorMessage = taskValidationResult.error instanceof Error ? taskValidationResult.error.message : String(taskValidationResult.error);
+            throw new McpError(ErrorCode.InvalidParams, `Invalid task creation result: ${errorMessage}`);
+          }
+          return taskValidationResult.data;
+        }
+        const hasTools = params2.tools || params2.toolChoice;
+        const resultSchema = hasTools ? CreateMessageResultWithToolsSchema : CreateMessageResultSchema;
+        const validationResult = safeParse3(resultSchema, result);
+        if (!validationResult.success) {
+          const errorMessage = validationResult.error instanceof Error ? validationResult.error.message : String(validationResult.error);
+          throw new McpError(ErrorCode.InvalidParams, `Invalid sampling result: ${errorMessage}`);
+        }
+        return validationResult.data;
+      };
+      return super.setRequestHandler(requestSchema, wrappedHandler);
+    }
+    return super.setRequestHandler(requestSchema, handler);
+  }
+  assertCapability(capability, method) {
+    if (!this._serverCapabilities?.[capability]) {
+      throw new Error(`Server does not support ${capability} (required for ${method})`);
+    }
+  }
+  async connect(transport, options) {
+    await super.connect(transport);
+    if (transport.sessionId !== void 0) {
+      return;
+    }
+    try {
+      const result = await this.request({
+        method: "initialize",
+        params: {
+          protocolVersion: LATEST_PROTOCOL_VERSION,
+          capabilities: this._capabilities,
+          clientInfo: this._clientInfo
+        }
+      }, InitializeResultSchema, options);
+      if (result === void 0) {
+        throw new Error(`Server sent invalid initialize result: ${result}`);
+      }
+      if (!SUPPORTED_PROTOCOL_VERSIONS.includes(result.protocolVersion)) {
+        throw new Error(`Server's protocol version is not supported: ${result.protocolVersion}`);
+      }
+      this._serverCapabilities = result.capabilities;
+      this._serverVersion = result.serverInfo;
+      if (transport.setProtocolVersion) {
+        transport.setProtocolVersion(result.protocolVersion);
+      }
+      this._instructions = result.instructions;
+      await this.notification({
+        method: "notifications/initialized"
+      });
+      if (this._pendingListChangedConfig) {
+        this._setupListChangedHandlers(this._pendingListChangedConfig);
+        this._pendingListChangedConfig = void 0;
+      }
+    } catch (error62) {
+      void this.close();
+      throw error62;
+    }
+  }
+  /**
+   * After initialization has completed, this will be populated with the server's reported capabilities.
+   */
+  getServerCapabilities() {
+    return this._serverCapabilities;
+  }
+  /**
+   * After initialization has completed, this will be populated with information about the server's name and version.
+   */
+  getServerVersion() {
+    return this._serverVersion;
+  }
+  /**
+   * After initialization has completed, this may be populated with information about the server's instructions.
+   */
+  getInstructions() {
+    return this._instructions;
+  }
+  assertCapabilityForMethod(method) {
+    switch (method) {
+      case "logging/setLevel":
+        if (!this._serverCapabilities?.logging) {
+          throw new Error(`Server does not support logging (required for ${method})`);
+        }
+        break;
+      case "prompts/get":
+      case "prompts/list":
+        if (!this._serverCapabilities?.prompts) {
+          throw new Error(`Server does not support prompts (required for ${method})`);
+        }
+        break;
+      case "resources/list":
+      case "resources/templates/list":
+      case "resources/read":
+      case "resources/subscribe":
+      case "resources/unsubscribe":
+        if (!this._serverCapabilities?.resources) {
+          throw new Error(`Server does not support resources (required for ${method})`);
+        }
+        if (method === "resources/subscribe" && !this._serverCapabilities.resources.subscribe) {
+          throw new Error(`Server does not support resource subscriptions (required for ${method})`);
+        }
+        break;
+      case "tools/call":
+      case "tools/list":
+        if (!this._serverCapabilities?.tools) {
+          throw new Error(`Server does not support tools (required for ${method})`);
+        }
+        break;
+      case "completion/complete":
+        if (!this._serverCapabilities?.completions) {
+          throw new Error(`Server does not support completions (required for ${method})`);
+        }
+        break;
+      case "initialize":
+        break;
+      case "ping":
+        break;
+    }
+  }
+  assertNotificationCapability(method) {
+    switch (method) {
+      case "notifications/roots/list_changed":
+        if (!this._capabilities.roots?.listChanged) {
+          throw new Error(`Client does not support roots list changed notifications (required for ${method})`);
+        }
+        break;
+      case "notifications/initialized":
+        break;
+      case "notifications/cancelled":
+        break;
+      case "notifications/progress":
+        break;
+    }
+  }
+  assertRequestHandlerCapability(method) {
+    if (!this._capabilities) {
+      return;
+    }
+    switch (method) {
+      case "sampling/createMessage":
+        if (!this._capabilities.sampling) {
+          throw new Error(`Client does not support sampling capability (required for ${method})`);
+        }
+        break;
+      case "elicitation/create":
+        if (!this._capabilities.elicitation) {
+          throw new Error(`Client does not support elicitation capability (required for ${method})`);
+        }
+        break;
+      case "roots/list":
+        if (!this._capabilities.roots) {
+          throw new Error(`Client does not support roots capability (required for ${method})`);
+        }
+        break;
+      case "tasks/get":
+      case "tasks/list":
+      case "tasks/result":
+      case "tasks/cancel":
+        if (!this._capabilities.tasks) {
+          throw new Error(`Client does not support tasks capability (required for ${method})`);
+        }
+        break;
+      case "ping":
+        break;
+    }
+  }
+  assertTaskCapability(method) {
+    assertToolsCallTaskCapability(this._serverCapabilities?.tasks?.requests, method, "Server");
+  }
+  assertTaskHandlerCapability(method) {
+    if (!this._capabilities) {
+      return;
+    }
+    assertClientRequestTaskCapability(this._capabilities.tasks?.requests, method, "Client");
+  }
+  async ping(options) {
+    return this.request({ method: "ping" }, EmptyResultSchema, options);
+  }
+  async complete(params2, options) {
+    return this.request({ method: "completion/complete", params: params2 }, CompleteResultSchema, options);
+  }
+  async setLoggingLevel(level, options) {
+    return this.request({ method: "logging/setLevel", params: { level } }, EmptyResultSchema, options);
+  }
+  async getPrompt(params2, options) {
+    return this.request({ method: "prompts/get", params: params2 }, GetPromptResultSchema, options);
+  }
+  async listPrompts(params2, options) {
+    return this.request({ method: "prompts/list", params: params2 }, ListPromptsResultSchema, options);
+  }
+  async listResources(params2, options) {
+    return this.request({ method: "resources/list", params: params2 }, ListResourcesResultSchema, options);
+  }
+  async listResourceTemplates(params2, options) {
+    return this.request({ method: "resources/templates/list", params: params2 }, ListResourceTemplatesResultSchema, options);
+  }
+  async readResource(params2, options) {
+    return this.request({ method: "resources/read", params: params2 }, ReadResourceResultSchema, options);
+  }
+  async subscribeResource(params2, options) {
+    return this.request({ method: "resources/subscribe", params: params2 }, EmptyResultSchema, options);
+  }
+  async unsubscribeResource(params2, options) {
+    return this.request({ method: "resources/unsubscribe", params: params2 }, EmptyResultSchema, options);
+  }
+  /**
+   * Calls a tool and waits for the result. Automatically validates structured output if the tool has an outputSchema.
+   *
+   * For task-based execution with streaming behavior, use client.experimental.tasks.callToolStream() instead.
+   */
+  async callTool(params2, resultSchema = CallToolResultSchema, options) {
+    if (this.isToolTaskRequired(params2.name)) {
+      throw new McpError(ErrorCode.InvalidRequest, `Tool "${params2.name}" requires task-based execution. Use client.experimental.tasks.callToolStream() instead.`);
+    }
+    const result = await this.request({ method: "tools/call", params: params2 }, resultSchema, options);
+    const validator = this.getToolOutputValidator(params2.name);
+    if (validator) {
+      if (!result.structuredContent && !result.isError) {
+        throw new McpError(ErrorCode.InvalidRequest, `Tool ${params2.name} has an output schema but did not return structured content`);
+      }
+      if (result.structuredContent) {
+        try {
+          const validationResult = validator(result.structuredContent);
+          if (!validationResult.valid) {
+            throw new McpError(ErrorCode.InvalidParams, `Structured content does not match the tool's output schema: ${validationResult.errorMessage}`);
+          }
+        } catch (error62) {
+          if (error62 instanceof McpError) {
+            throw error62;
+          }
+          throw new McpError(ErrorCode.InvalidParams, `Failed to validate structured content: ${error62 instanceof Error ? error62.message : String(error62)}`);
+        }
+      }
+    }
+    return result;
+  }
+  isToolTask(toolName) {
+    if (!this._serverCapabilities?.tasks?.requests?.tools?.call) {
+      return false;
+    }
+    return this._cachedKnownTaskTools.has(toolName);
+  }
+  /**
+   * Check if a tool requires task-based execution.
+   * Unlike isToolTask which includes 'optional' tools, this only checks for 'required'.
+   */
+  isToolTaskRequired(toolName) {
+    return this._cachedRequiredTaskTools.has(toolName);
+  }
+  /**
+   * Cache validators for tool output schemas.
+   * Called after listTools() to pre-compile validators for better performance.
+   */
+  cacheToolMetadata(tools) {
+    this._cachedToolOutputValidators.clear();
+    this._cachedKnownTaskTools.clear();
+    this._cachedRequiredTaskTools.clear();
+    for (const tool of tools) {
+      if (tool.outputSchema) {
+        const toolValidator = this._jsonSchemaValidator.getValidator(tool.outputSchema);
+        this._cachedToolOutputValidators.set(tool.name, toolValidator);
+      }
+      const taskSupport = tool.execution?.taskSupport;
+      if (taskSupport === "required" || taskSupport === "optional") {
+        this._cachedKnownTaskTools.add(tool.name);
+      }
+      if (taskSupport === "required") {
+        this._cachedRequiredTaskTools.add(tool.name);
+      }
+    }
+  }
+  /**
+   * Get cached validator for a tool
+   */
+  getToolOutputValidator(toolName) {
+    return this._cachedToolOutputValidators.get(toolName);
+  }
+  async listTools(params2, options) {
+    const result = await this.request({ method: "tools/list", params: params2 }, ListToolsResultSchema, options);
+    this.cacheToolMetadata(result.tools);
+    return result;
+  }
+  /**
+   * Set up a single list changed handler.
+   * @internal
+   */
+  _setupListChangedHandler(listType, notificationSchema, options, fetcher) {
+    const parseResult2 = ListChangedOptionsBaseSchema.safeParse(options);
+    if (!parseResult2.success) {
+      throw new Error(`Invalid ${listType} listChanged options: ${parseResult2.error.message}`);
+    }
+    if (typeof options.onChanged !== "function") {
+      throw new Error(`Invalid ${listType} listChanged options: onChanged must be a function`);
+    }
+    const { autoRefresh, debounceMs } = parseResult2.data;
+    const { onChanged } = options;
+    const refresh = async () => {
+      if (!autoRefresh) {
+        onChanged(null, null);
+        return;
+      }
+      try {
+        const items = await fetcher();
+        onChanged(null, items);
+      } catch (e) {
+        const error62 = e instanceof Error ? e : new Error(String(e));
+        onChanged(error62, null);
+      }
+    };
+    const handler = () => {
+      if (debounceMs) {
+        const existingTimer = this._listChangedDebounceTimers.get(listType);
+        if (existingTimer) {
+          clearTimeout(existingTimer);
+        }
+        const timer = setTimeout(refresh, debounceMs);
+        this._listChangedDebounceTimers.set(listType, timer);
+      } else {
+        refresh();
+      }
+    };
+    this.setNotificationHandler(notificationSchema, handler);
+  }
+  async sendRootsListChanged() {
+    return this.notification({ method: "notifications/roots/list_changed" });
+  }
+};
+
+// node_modules/@modelcontextprotocol/sdk/dist/esm/inMemory.js
+init_define_AEMCP_CEP_FILES();
+var InMemoryTransport = class _InMemoryTransport {
+  constructor() {
+    this._messageQueue = [];
+  }
+  /**
+   * Creates a pair of linked in-memory transports that can communicate with each other. One should be passed to a Client and one to a Server.
+   */
+  static createLinkedPair() {
+    const clientTransport = new _InMemoryTransport();
+    const serverTransport = new _InMemoryTransport();
+    clientTransport._otherTransport = serverTransport;
+    serverTransport._otherTransport = clientTransport;
+    return [clientTransport, serverTransport];
+  }
+  async start() {
+    while (this._messageQueue.length > 0) {
+      const queuedMessage = this._messageQueue.shift();
+      this.onmessage?.(queuedMessage.message, queuedMessage.extra);
+    }
+  }
+  async close() {
+    const other = this._otherTransport;
+    this._otherTransport = void 0;
+    await other?.close();
+    this.onclose?.();
+  }
+  /**
+   * Sends a message with optional auth info.
+   * This is useful for testing authentication scenarios.
+   */
+  async send(message, options) {
+    if (!this._otherTransport) {
+      throw new Error("Not connected");
+    }
+    if (this._otherTransport.onmessage) {
+      this._otherTransport.onmessage(message, { authInfo: options?.authInfo });
+    } else {
+      this._otherTransport._messageQueue.push({ message, extra: { authInfo: options?.authInfo } });
+    }
+  }
+};
+
+// src/cli/fulltest-regression.ts
+var P = "__aemcp_fulltest_134";
+async function connect() {
+  const server = new McpServer({ name: "selftest", version: VERSION });
+  registerCoreTools(server);
+  registerJsxTools(server, ALL_JSX_TOOLS);
+  const [a, b] = InMemoryTransport.createLinkedPair();
+  const client = new Client({ name: "selftest", version: VERSION });
+  await Promise.all([server.connect(b), client.connect(a)]);
+  return async (name, args) => {
+    const r = await client.callTool({ name, arguments: args }, void 0, { timeout: 3e5 });
+    return { isError: !!r.isError, text: (r.content || []).map((c) => c.text ?? "").join("\n") };
+  };
+}
+async function peek(code) {
+  const r = await runJsx(code, {}, { undoGroup: false });
+  if (!r.ok) throw new Error(`verifier script failed: ${r.error?.message}`);
+  return r.result;
+}
+var countNamed = (name) => peek(`var n = 0; for (var i = 1; i <= app.project.numItems; i++) if (app.project.item(i).name === ${JSON.stringify(name)}) n++; return n;`);
+var NAMES = [
+  "T1 reserved words as names (int, short, byte, default, class)",
+  "T1 reserved words: error line numbers still match the user's code",
+  "T2 an editing script still reports its changes",
+  "T4b ae_render_frame refuses to overwrite an existing outputPath"
+];
+async function regressionSteps(tmpDir, say) {
+  const mode = permissions().mode;
+  if (mode !== "full") {
+    for (const n of NAMES) warn(`${n}: skipped (permissions mode is "${mode}"; these cases need "full")`);
+    return NAMES.map((step3) => ({ step: step3, ok: true, ms: 0, skipped: true }));
+  }
+  const out = [];
+  const step2 = async (name, fn) => {
+    const t0 = Date.now();
+    let problem;
+    try {
+      problem = await fn();
+    } catch (e) {
+      problem = e?.message ?? String(e);
+    }
+    const ms = Date.now() - t0;
+    out.push({ step: name, ok: !problem, ms, error: problem ?? void 0 });
+    say(!problem, problem ? `${name}: ${problem}` : `${name} (${ms} ms)`);
+  };
+  let call;
+  try {
+    call = await connect();
+  } catch (e) {
+    const error62 = `couldn't start the in-process tool server: ${e?.message ?? e}`;
+    say(false, `1.3.4 regression cases: ${error62}`);
+    return [{ step: "1.3.4 regression cases", ok: false, ms: 0, error: error62 }];
+  }
+  await step2(NAMES[0], async () => {
+    const code = "const int = 1; function short() { return 2; } const f = (byte) => byte; const o = {}; o.default = 4; const g = { class: 5 }; return [int, short(), f(3), o.default, g.class];";
+    const r = await call("ae_run_script", { code, report: false });
+    if (r.isError) return `ae_run_script failed: ${r.text.slice(0, 300)}`;
+    return r.text.trim() === "[1,2,3,4,5]" ? null : `expected [1,2,3,4,5], got ${r.text.slice(0, 200)}`;
+  });
+  await step2(NAMES[1], async () => {
+    const r = await call("ae_run_script", { code: "const int = 1;\nconst short = 2;\nthrow new Error('boom ' + (int + short));", report: false });
+    return r.isError && /boom 3/.test(r.text) && /\(line 3\)|>\s*3 \|/.test(r.text) ? null : `expected an error 'boom 3' on line 3, got: ${r.text.slice(0, 300)}`;
+  });
+  await step2(NAMES[2], async () => {
+    const name = `${P}_reported`;
+    const rev0 = await peek("return app.project.revision === undefined ? null : app.project.revision;");
+    const r = await call("ae_run_script", { code: `app.project.items.addFolder(${JSON.stringify(name)}); return 1;` });
+    const made = await countNamed(name);
+    const rev1 = await peek("return app.project.revision === undefined ? null : app.project.revision;");
+    if (r.isError || made !== 1) return `edit did not run (found ${made}): ${r.text.slice(0, 200)}`;
+    return /^Changes( \([^)]*\))?:\s*\n\+ folder /m.test(r.text) && !/Changes: none/.test(r.text) ? null : `the edit wasn't reported (revision ${rev0} -> ${rev1}, items ${await peek("return app.project.numItems;")}): ${JSON.stringify(r.text.slice(0, 300))}`;
+  });
+  await step2(NAMES[3], async () => {
+    const comp = `${P}_frame`;
+    const made = await runJsx(`app.project.items.addComp(args.name, 320, 180, 1, 1, 25); return true;`, { name: comp }, { undoGroup: "AE MCP self-test" });
+    if (!made.ok) return `couldn't create the test comp: ${made.error?.message}`;
+    const file2 = join11(tmpDir, `${P}_frame.png`);
+    const keep = "DO-NOT-OVERWRITE";
+    writeFileSync6(file2, keep);
+    try {
+      const r = await call("ae_render_frame", { comp, time: 0, outputPath: file2 });
+      if (!r.isError) return `outputPath over an existing file was not refused: ${r.text.slice(0, 200)}`;
+      if (!/overwrite: true/.test(r.text)) return `refusal does not say to pass overwrite: true: ${r.text.slice(0, 200)}`;
+      return readFileSync11(file2, "utf8") === keep ? null : "the existing file was changed";
+    } finally {
+      try {
+        unlinkSync3(file2);
+      } catch {
+      }
+    }
+  });
+  return out;
+}
+
+// src/cli/fulltest-revision.ts
+init_define_AEMCP_CEP_FILES();
+var P2 = "__aemcp_fulltest_rev";
+var COMPS = 30;
+var LAYERS = 12;
+var READ_ONLY = { ...READ_ONLY_RUN_OPTIONS, rollback: void 0, timeoutMs: 3e5 };
+var user = (code) => evalBody(`(function(args, log){${code}
+})`);
+var findComp = `var c = null; for (var i = 1; i <= app.project.numItems; i++) if (app.project.item(i).name === "${P2}") c = app.project.item(i);`;
+var U = `${P2}_undo`;
+var UNDO = 16;
+var REDO = 2035;
+async function sentinelsLeft() {
+  const r = await runJsx(
+    `var n = []; for (var i = 1; i <= app.project.numItems; i++) if (String(app.project.item(i).name).indexOf("__aemcp_rollback_") === 0) n.push(app.project.item(i).name); return n.join(", ");`,
+    {},
+    { undoGroup: false }
+  );
+  if (!r.ok) throw new Error(`couldn't list the project items: ${r.error?.message}`);
+  return String(r.result ?? "");
+}
+async function revisionSteps(features, say) {
+  const fast = !!features.revision;
+  const out = [];
+  let note;
+  const step2 = async (name, fn, bench2) => {
+    const t0 = Date.now();
+    let problem;
+    try {
+      problem = await fn();
+    } catch (e) {
+      problem = e.message;
+    }
+    const ms = Date.now() - t0;
+    out.push({ step: name, ok: !problem, ms, error: problem ?? void 0, bench: bench2, note });
+    note = void 0;
+    say(!problem, problem ? `${name}: ${problem}` : `${name} (${ms} ms)${bench2 ? ": " + Object.entries(bench2).map(([k2, v]) => `${k2} ${v} ms`).join(", ") : ""}`);
+  };
+  const check2 = (r) => r.ok ? null : `script failed: ${r.error?.message}`;
+  await step2(`build ${COMPS} comps x ${LAYERS} layers`, async () => {
+    const r = await runJsx(
+      `for (var k = 0; k < args.comps; k++) {
+  var c = app.project.items.addComp(k ? "${P2}_" + k : "${P2}", 1280, 720, 1, 4, 25);
+  for (var j = 0; j < args.layers; j++) {
+    var L = c.layers.addShape(); L.name = "S" + j;
+    L.property("ADBE Root Vectors Group").addProperty("ADBE Vector Shape - Ellipse");
+    L.property("ADBE Effect Parade").addProperty("ADBE Gaussian Blur 2");
+    L.property("ADBE Transform Group").property("ADBE Position").setValueAtTime(1, [j, j]);
+  }
+}
+return app.project.numItems;`,
+      { comps: COMPS, layers: LAYERS },
+      { undoGroup: "AE MCP self-test", timeoutMs: 3e5 }
+    );
+    return check2(r);
+  });
+  await step2("read-only check: a script that only reads", async () => {
+    const r = await runJsx(user("var n = 0; for (var i = 1; i <= app.project.numItems; i++) n += app.project.item(i).name.length; return n;"), {}, READ_ONLY);
+    if (!r.ok) return check2(r);
+    if (formatChanges(r.changes) !== "Changes: none") return `reported ${formatChanges(r.changes)}`;
+    return fast && !r.changes?.fast ? "app.project.revision is available but the fast path wasn't used" : null;
+  });
+  await step2("read-only check: catches a property edit", async () => {
+    const r = await runJsx(user(`${findComp} c.layer(1).property("ADBE Transform Group").property("ADBE Opacity").setValue(40); return 1;`), {}, READ_ONLY);
+    if (!r.ok) return check2(r);
+    const text2 = formatChanges(r.changes);
+    if (fast) return r.changes?.unlisted ? null : `expected "the project changed (not listed)", got ${text2}`;
+    return /Opacity: 100 -> 40/.test(text2 ?? "") ? null : `the edit wasn't listed: ${text2}`;
+  });
+  await step2("read-only check: catches a label and comment change", async () => {
+    const r = await runJsx(user(`${findComp} c.label = 5; c.comment = "x"; return 1;`), {}, READ_ONLY);
+    if (!r.ok) return check2(r);
+    const text2 = formatChanges(r.changes) ?? "";
+    return /label/.test(text2) && /comment/.test(text2) ? null : `not reported: ${text2}`;
+  });
+  let k = 0;
+  const undoSafe = (name, script2, opts = {}) => step2(`read-only undo keeps the user's last edit: ${name}`, async () => {
+    const comp = `${U}_${++k}`;
+    const findLayer = `var c = null; for (var i = 1; i <= app.project.numItems; i++) if (app.project.item(i).name === "${comp}") c = app.project.item(i); var L = c && c.layer(1);`;
+    const edit = async (code, label) => {
+      const r2 = await runJsx(code, {}, { undoGroup: `AE MCP self-test: ${label}` });
+      if (!r2.ok) throw new Error(`${label} failed: ${r2.error?.message}`);
+    };
+    const state2 = async () => {
+      const r2 = await runJsx(`${findLayer} return L ? [L.name, L.opacity.value, L.rotation.value].join(" | ") : "the test comp is gone";`, {}, { undoGroup: false });
+      if (!r2.ok) throw new Error(`couldn't read the test layer: ${r2.error?.message}`);
+      return String(r2.result);
+    };
+    await edit(`app.project.items.addComp("${comp}", 320, 180, 1, 4, 25).layers.addSolid([1, 0, 0], "solid", 320, 180, 1); return 1;`, "make comp");
+    await edit(`${findLayer} L.name = "user rename 1"; return 1;`, "user rename");
+    if (opts.userUndoes) {
+      await edit(`${findLayer} L.name = "user rename 2"; return 1;`, "user rename");
+      await evalRaw(`app.executeCommand(${UNDO}); 1`, 3e4);
+    }
+    const before = await state2();
+    if (!before.startsWith("user rename 1 |")) return `setup didn't leave the user's rename: ${before}`;
+    const { refusal, r } = await runReadOnly(`${findLayer}
+${script2}
+return L ? L.name : null;`, 3e5);
+    const after = await state2();
+    const left = await sentinelsLeft();
+    if (left) return `the rollback's temporary folder was left in the project: ${left}`;
+    if (opts.refused) {
+      if (r) return `not refused: the script ran (layer name ${r.result}); ${refusal ? `then: ${refusal}` : "no refusal"}; before: ${before}; after: ${after}`;
+      if (!/^Nothing ran\./.test(refusal ?? "")) return `unexpected reply: ${refusal}`;
+      return after === before ? null : `refused, but the layer changed: before ${before}; after ${after}`;
+    }
+    if (!r) return `refused, but the script doesn't call the undo stack: ${refusal}`;
+    if (opts.unclosed) {
+      note = `the script saw layer name ${r.result}; before: ${before}; after: ${after}; rollback: ${JSON.stringify(r.rollback)}; reply: ${refusal ?? "(none)"}`;
+      say(true, `  ${name}: ${note}`);
+      if (!after.startsWith("user rename 1 |")) return `the user's rename was reverted: before ${before}; after ${after}`;
+      if (after === before) return null;
+      return refusal && /not undone again|not repeated|nothing was undone|still isn't/.test(refusal) ? null : `the project isn't back and the reply doesn't say so: ${refusal}`;
+    }
+    if (opts.assembled) {
+      note = `the script saw layer name ${r.result}; before: ${before}; after: ${after}; rollback: ${JSON.stringify(r.rollback)}; reply: ${refusal ?? "(none)"}`;
+      say(true, `  ${name}: ${note}`);
+      if (after === before) return null;
+      if (after !== before.replace(/^user rename 1/, "solid")) return `the project isn't back and more than the script's own Undo changed it: before ${before}; after ${after}`;
+      return refusal && /not undone again|not repeated|nothing was undone/.test(refusal) ? null : `the project isn't back and the reply doesn't say so: ${refusal}`;
+    }
+    if (after !== before) return `before the script: ${before}; after the ${refusal ? "refusal and Undo" : "script (not refused)"}: ${after} (the user's rename must survive)`;
+    if (opts.unchanged) {
+      note = `revision moved: ${!!r.rollback?.undone}; rollback: ${JSON.stringify(r.rollback)}; reply: ${refusal ?? "(none)"}`;
+      say(true, `  ${name}: ${note}`);
+      if (r.rollback && !r.rollback.verified) return `the rollback wasn't verified: ${refusal}`;
+    }
+    return null;
+  });
+  const stress = process.env.AEMCP_SELFTEST_UNDO_STRESS === "1";
+  const stressSkip = (name) => warn(`read-only undo keeps the user's last edit: ${name}: skipped (undo-stress case; can crash After Effects; run with AEMCP_SELFTEST_UNDO_STRESS=1)`);
+  await undoSafe("script calls Edit > Undo", `app.executeCommand(${UNDO});`, { refused: true });
+  if (stress) await undoSafe("script calls Edit > Redo", `app.executeCommand(${REDO});`, { userUndoes: true, refused: true });
+  else stressSkip("script calls Edit > Redo");
+  await undoSafe("script sets a property to its current value", "L.opacity.setValue(L.opacity.value);", { unchanged: true });
+  await undoSafe("script ends the undo group early, then edits", "app.endUndoGroup(); L.opacity.setValue(33);", { refused: true });
+  await undoSafe("script edits, ends the undo group, edits again", "L.opacity.setValue(33); app.endUndoGroup(); L.rotation.setValue(10);", { refused: true });
+  await undoSafe("script only ends the undo group early", "app.endUndoGroup();", { refused: true });
+  if (stress) await undoSafe("script calls Edit > Undo by an assembled name", `app["execute" + "Command"](${UNDO});`, { assembled: true });
+  else stressSkip("script calls Edit > Undo by an assembled name");
+  if (stress) await undoSafe("script edits, then opens an undo group by an assembled name and never closes it", `L.opacity.setValue(33); app["begin" + "UndoGroup"]("x");`, { unclosed: true });
+  else stressSkip("script edits, then opens an undo group by an assembled name and never closes it");
+  const bench = {};
+  await step2(
+    `read-only query on ${COMPS + 1}+ comps: fast path vs full snapshot`,
+    async () => {
+      const query = user("var n = 0; for (var i = 1; i <= app.project.numItems; i++) n += app.project.item(i).name.length; return n;");
+      const time3 = async (opts) => {
+        const xs = [];
+        for (let i = 0; i < 3; i++) {
+          const t0 = Date.now();
+          const r = await runJsx(query, {}, opts);
+          if (!r.ok) throw new Error(`query failed: ${r.error?.message}`);
+          xs.push(Date.now() - t0);
+        }
+        return xs.sort((a, b) => a - b)[1];
+      };
+      bench.fullSnapshot = await time3({ ...READ_ONLY, checkOnly: false });
+      bench.readOnly = await time3(READ_ONLY);
+      bench.noReport = await time3({ undoGroup: false });
+      return null;
+    },
+    bench
+  );
+  return out;
+}
+
+// src/cli/fulltest-rollback.ts
+init_define_AEMCP_CEP_FILES();
+var P3 = "__aemcp_fulltest_rb";
+var OP = `var c = null; for (var i = 1; i <= app.project.numItems; i++) if (app.project.item(i).name === "${P3}") c = app.project.item(i);
+var op = c.layer(1).property("ADBE Transform Group").property("ADBE Opacity");`;
+var FULL = { mode: "full", allowShell: false };
+async function state() {
+  const r = await runJsx(`${OP} return { opacity: op.value, revision: aemcp.revision() };`, {}, { undoGroup: false });
+  if (!r.ok) throw new Error(`couldn't read the test comp: ${r.error?.message}`);
+  return r.result;
+}
+async function manualEdit(value2) {
+  const r = await runJsx(`${OP} op.setValue(args.value); return 1;`, { value: value2 }, { undoGroup: "AE MCP self-test: manual edit" });
+  if (!r.ok) throw new Error(`manual edit failed: ${r.error?.message}`);
+}
+var text = (r) => r.content[0]?.text ?? "";
+var script = (code) => ({ tool: "ae_run_script", args: { code } });
+var readOnly = async (code) => (await runReadOnly(code)).refusal;
+async function rollbackSteps(say) {
+  const out = [];
+  const step2 = async (name, fn) => {
+    const t0 = Date.now();
+    let problem;
+    try {
+      problem = await fn();
+    } catch (e) {
+      problem = e.message;
+    }
+    const ms = Date.now() - t0;
+    out.push({ step: name, ok: !problem, ms, error: problem ?? void 0 });
+    say(!problem, problem ? `${name}: ${problem}` : `${name} (${ms} ms)`);
+  };
+  const skipStress = async (name, _fn) => warn(`${name}: skipped (undo-stress case; can crash After Effects; run with AEMCP_SELFTEST_UNDO_STRESS=1)`);
+  const clean = async (problem) => problem ?? (await sentinelsLeft() ? `the rollback's temporary folder was left: ${await sentinelsLeft()}` : null);
+  await step2("rollback: set up", async () => {
+    const r = await runJsx(`var c = app.project.items.addComp("${P3}", 640, 360, 1, 4, 25); c.layers.addSolid([0.2, 0.4, 0.6], "${P3} solid", 64, 64, 1); return 1;`, {}, { undoGroup: "AE MCP self-test" });
+    return r.ok ? null : `couldn't create the test comp: ${r.error?.message}`;
+  });
+  await step2("rollback: manual edit, then an atomic batch that fails at step 1: the manual edit survives", async () => {
+    await manualEdit(37);
+    const before = await state();
+    const r = await runBatch({ steps: [script('throw new Error("fails before changing anything")'), script(`${OP} op.setValue(5);`)] }, FULL);
+    const after = await state();
+    if (!/nothing to undo/.test(text(r))) return `unexpected reply: ${text(r)}`;
+    if (after.opacity !== 37) return `the manual edit was reverted: Opacity is ${after.opacity}, expected 37`;
+    if (before.revision !== null && after.revision !== before.revision) return `the undo stack was touched (revision ${before.revision} -> ${after.revision})`;
+    return null;
+  });
+  await step2("rollback: atomic batch that edits, then fails at step 2: rolled back once, the manual edit survives", async () => {
+    await manualEdit(41);
+    const r = await runBatch({ steps: [script(`${OP} op.setValue(5);`), script('throw new Error("fails after an edit")')], name: "AE MCP self-test batch" }, FULL);
+    const after = await state();
+    if (!/was rolled back \(nothing changed\)/.test(text(r))) return `unexpected reply: ${text(r)}`;
+    return clean(after.opacity === 41 ? null : `Opacity is ${after.opacity}, expected 41 (5 = not rolled back, 100/37 = undone twice)`);
+  });
+  await step2("rollback: read-only script that writes Opacity's current value: the manual edit survives", async () => {
+    await manualEdit(39);
+    const refusal = await readOnly(`${OP} op.setValue(op.value); return 1;`);
+    const after = await state();
+    if (after.opacity !== 39) return `the manual edit was reverted: Opacity is ${after.opacity}, expected 39`;
+    if (refusal && !/its changes were undone/.test(refusal)) return `unexpected reply: ${refusal}`;
+    return clean(null);
+  });
+  await step2("rollback: atomic batch that writes Opacity's current value, then fails: the manual edit survives", async () => {
+    await manualEdit(40);
+    const r = await runBatch({ steps: [script(`${OP} op.setValue(op.value);`), script('throw new Error("fails after a no-op write")')] }, FULL);
+    const after = await state();
+    if (after.opacity !== 40) return `the manual edit was reverted: Opacity is ${after.opacity}, expected 40`;
+    if (!/was rolled back \(nothing changed\)|nothing to undo/.test(text(r))) return `unexpected reply: ${text(r)}`;
+    return clean(null);
+  });
+  await step2("rollback: read-only script that edits is reverted exactly once", async () => {
+    await manualEdit(43);
+    const refusal = await readOnly(`${OP} op.setValue(80); return 1;`);
+    const after = await state();
+    if (!refusal || !/its changes were undone/.test(refusal)) return `unexpected reply: ${refusal}`;
+    return clean(after.opacity === 43 ? null : `Opacity is ${after.opacity}, expected 43 (80 = not reverted, 41 = undone twice)`);
+  });
+  await step2("rollback: read-only script that only reads leaves the undo stack alone", async () => {
+    await manualEdit(47);
+    const before = await state();
+    const refusal = await readOnly(`${OP} return op.value;`);
+    const after = await state();
+    if (refusal) return `refused a script that only reads: ${refusal}`;
+    if (after.opacity !== 47) return `Opacity is ${after.opacity}, expected 47`;
+    return before.revision !== null && after.revision !== before.revision ? `revision moved ${before.revision} -> ${after.revision}` : null;
+  });
+  await step2("rollback: read-only script that closes its own undo group: refused, nothing ran", async () => {
+    await manualEdit(53);
+    const refusal = await readOnly(`${OP} op.setValue(80); app.endUndoGroup(); op.setValue(90); return 1;`);
+    const after = await state();
+    if (!refusal || !/^Nothing ran\./.test(refusal)) return `unexpected reply: ${refusal}`;
+    return after.opacity === 53 ? null : `Opacity is ${after.opacity}, expected 53 (nothing ran)`;
+  });
+  await (process.env.AEMCP_SELFTEST_UNDO_STRESS === "1" ? step2 : skipStress)("rollback: read-only script that closes its own undo group by an assembled name: reported, not undone again", async () => {
+    await manualEdit(59);
+    const refusal = await readOnly(`${OP} op.setValue(80); app["end" + "UndoGroup"](); op.setValue(90); return 1;`);
+    const after = await state();
+    if (!refusal || !/did not revert the script's changes as a whole/.test(refusal) || !/The Undo was not repeated/.test(refusal)) return `unexpected reply: ${refusal}`;
+    return clean(after.opacity === 90 ? null : `Opacity is ${after.opacity}, expected 90 (only the sentinel's rename undone)`);
+  });
+  await (process.env.AEMCP_SELFTEST_UNDO_STRESS === "1" ? step2 : skipStress)("rollback: read-only script that splits its undo group (assembled end + begin): reported honestly, never claims values were compared", async () => {
+    await manualEdit(61);
+    const { refusal, r } = await runReadOnly(`${OP} op.setValue(80); app["end" + "UndoGroup"](); app["begin" + "UndoGroup"]("x"); return 1;`);
+    const after = await state();
+    if (!r) return `refused before it ran: ${refusal}`;
+    say(true, `  split undo group: Opacity ${after.opacity} (61 = back, 80 = the closed step stayed); rollback: ${JSON.stringify(r.rollback)}; reply: ${refusal ?? "(none)"}`);
+    const rb = r.rollback;
+    if (!rb || !refusal) return `no rollback reported: ${refusal}`;
+    if (rb.verified === true && after.opacity !== 61) return `claims verified, but Opacity is ${after.opacity} (expected 61): ${refusal}`;
+    if (rb.verified === "sentinel" && !/property values were not compared/.test(refusal)) return `reply doesn't say values were not compared: ${refusal}`;
+    if (!rb.verified && !/not repeated|not undone again|nothing was undone/.test(refusal)) return `unverified, and the reply doesn't say so: ${refusal}`;
+    if (after.opacity !== 80 && after.opacity !== 61) return `Opacity is ${after.opacity}, expected 80 (closed step left) or 61 (back); anything else = more than the script was undone`;
+    return clean(null);
+  });
+  await step2("rollback: the undo marker leaves the Project panel selection and the active item alone", async () => {
+    const ui = async () => {
+      const r = await runJsx(
+        `var s = app.project.selection, ids = []; for (var i = 0; i < s.length; i++) ids.push(s[i].id);
+return { selection: s.length, ids: ids.join(","), active: app.project.activeItem ? app.project.activeItem.id : null };`,
+        {},
+        { undoGroup: false }
+      );
+      if (!r.ok) throw new Error(`couldn't read the selection: ${r.error?.message}`);
+      return r.result;
+    };
+    const set2 = await runJsx(`${OP} try { c.openInViewer(); } catch (e) {} try { c.selected = true; } catch (e) {} return 1;`, {}, { undoGroup: false });
+    if (!set2.ok) return `couldn't select the test comp: ${set2.error?.message}`;
+    await manualEdit(67);
+    const before = await ui();
+    const refusal = await readOnly(`${OP} op.setValue(80); return 1;`);
+    const after = await ui();
+    const st = await state();
+    say(true, `  selection ${before.selection} [${before.ids}] -> ${after.selection} [${after.ids}]; active item ${before.active} -> ${after.active}`);
+    if (!refusal || !/its changes were undone/.test(refusal)) return `unexpected reply: ${refusal}`;
+    if (st.opacity !== 67) return `Opacity is ${st.opacity}, expected 67`;
+    if (before.selection !== after.selection || before.ids !== after.ids) return `the rollback changed the Project panel selection: ${before.selection} [${before.ids}] -> ${after.selection} [${after.ids}]`;
+    if (before.active !== after.active) return `the rollback changed the active item: ${before.active} -> ${after.active}`;
+    return clean(null);
+  });
+  return out;
+}
+
+// src/cli/fulltest.ts
+var ALL = ALL_JSX_TOOLS;
+var C = "__aemcp_fulltest";
+var jsxOf = (tool) => ALL.find((t) => t.name === tool).jsx;
+var run2 = (body, args = {}) => runJsx(body, args, { undoGroup: false, timeoutMs: 12e4 });
+var PROJECT_STATE = "return { file: app.project.file ? app.project.file.fsName : null, dirty: app.project.dirty };";
+var projectState = async () => (await run2(PROJECT_STATE)).result;
+async function projectSafetyTests(tmpDir, before) {
+  const names = ["Save As refuses to overwrite", "restore checkpoint over a dirty project"];
+  if (before?.dirty !== false) {
+    for (const n of names) warn(`${n}: skipped (the open project has unsaved changes; save it to run this)`);
+    return names.map((step3) => ({ step: step3, ok: true, ms: 0, skipped: true }));
+  }
+  const dir = join12(tmpDir, `fulltest_project_${Date.now()}`);
+  mkdirSync8(dir, { recursive: true });
+  const scratch = join12(dir, "scratch.aep");
+  const existing = join12(dir, "existing.aep");
+  writeFileSync7(existing, "not a project: must not be overwritten");
+  const results = [];
+  const step2 = async (name, fn) => {
+    const t0 = Date.now();
+    let problem;
+    try {
+      problem = await fn();
+    } catch (e) {
+      problem = e?.message ?? String(e);
+    }
+    const ms = Date.now() - t0;
+    results.push({ step: name, ok: !problem, ms, error: problem ?? void 0 });
+    problem ? fail(`${name}: ${problem}`) : ok(`${name} (${ms} ms)`);
+  };
+  let checkpointDir;
+  let switched = false;
+  try {
+    const sw = await run2(
+      `if (String(app.project.file && app.project.file.fsName) !== String(args.file)) aemcp.fail("a different project is open now"); app.project.close(CloseOptions.DO_NOT_SAVE_CHANGES); app.newProject(); return true;`,
+      { file: before.file }
+    );
+    if (!sw.ok) throw new Error(`could not switch to a scratch project: ${sw.error?.message}`);
+    switched = true;
+    await step2(names[0], async () => {
+      const saved = await run2(jsxOf("ae_save_project"), { path: scratch });
+      if (!saved.ok) return `Save As to a new file failed: ${saved.error?.message}`;
+      const refused = await run2(jsxOf("ae_save_project"), { path: existing });
+      if (refused.ok) return "Save As overwrote an existing file without overwrite: true";
+      if (!/overwrite: true/.test(refused.error?.message ?? "")) return `refusal does not say to pass overwrite: true: ${refused.error?.message}`;
+      if (readFileSync12(existing, "utf8") !== "not a project: must not be overwritten") return "the existing file was changed";
+      const now = (await run2(PROJECT_STATE)).result;
+      return now.file === scratch ? null : `the open project moved to ${now.file}`;
+    });
+    await step2(names[1], async () => {
+      const cp = await saveCheckpoint("fulltest");
+      checkpointDir = dirname7(cp.file);
+      const dirty = await run2(`app.project.items.addFolder("__aemcp_fulltest_unsaved"); return app.project.dirty;`);
+      if (dirty.result !== true) return "could not make the scratch project dirty";
+      const refused = await restoreCheckpoint(scratch, cp).then(() => "restored over unsaved changes without discardChanges", (e) => /discardChanges: true/.test(e.message) ? null : e.message);
+      if (refused) return refused;
+      const first = await restoreCheckpoint(scratch, cp, true);
+      let now = (await run2(PROJECT_STATE)).result;
+      if (now.file !== first || now.dirty) return `after restore the open project is ${now.file}${now.dirty ? " (unsaved)" : ""}, not ${first}`;
+      const back = await run2(jsxOf("ae_open_project"), { path: scratch, discardChanges: true });
+      if (!back.ok) return `could not reopen the scratch project: ${back.error?.message}`;
+      await run2(`app.project.items.addFolder("__aemcp_fulltest_unsaved"); return true;`);
+      const second = await restoreCheckpoint(scratch, cp, true);
+      now = (await run2(PROJECT_STATE)).result;
+      if (second === first || !existsSync9(first)) return `second restore reused ${basename2(first)}`;
+      return now.file === second ? null : `after the second restore the open project is ${now.file}, not ${second}`;
+    });
+  } catch (e) {
+    const done = new Set(results.map((r) => r.step));
+    for (const n of names.filter((n2) => !done.has(n2))) {
+      results.push({ step: n, ok: false, ms: 0, error: e?.message ?? String(e) });
+      fail(`${n}: ${e?.message ?? e}`);
+    }
+  } finally {
+    if (switched) {
+      const r = before.file ? await run2(jsxOf("ae_open_project"), { path: before.file, discardChanges: true }) : await run2(jsxOf("ae_new_project"), { discardChanges: true });
+      if (!r.ok) {
+        results.push({ step: "reopen the original project", ok: false, ms: 0, error: r.error?.message });
+        fail(`Could not reopen ${before.file ?? "an empty project"}: ${r.error?.message}`);
+      }
+    }
+    rmSync2(dir, { recursive: true, force: true });
+    if (checkpointDir) rmSync2(checkpointDir, { recursive: true, force: true });
+  }
+  return results;
+}
+async function fullSelftest(before) {
+  console.log(bold(`
+Full self-test: every major tool against this After Effects (temporary comps, removed afterwards)
+`));
+  const caps = await runJsx(CAPABILITIES_JSX, {}, { undoGroup: "AE MCP self-test", timeoutMs: 6e4 });
+  if (!caps.ok) {
+    fail(`Could not read capabilities: ${caps.error?.message}`);
+    return 1;
+  }
+  const { appVersion, os, features } = caps.result;
+  console.log(`  After Effects ${appVersion} \xB7 ${os}`);
+  for (const [k, v] of Object.entries(features)) {
+    if (k === "expressionEngine" || k === "scriptsCanWriteFiles") continue;
+    (v ? ok : warn)(`${k}: ${v ? "yes" : "no"}${FEATURE_NOTES[k] ? `  (${FEATURE_NOTES[k]})` : ""}`);
+  }
+  console.log(`  expression engine: ${features.expressionEngine} \xB7 scripts can write files: ${features.scriptsCanWriteFiles}
+`);
+  const start = await runJsx("var m = 0; for (var i = 1; i <= app.project.numItems; i++) m = Math.max(m, app.project.item(i).id); return { maxId: m, rq: app.project.renderQueue.numItems };", {}, { undoGroup: false });
+  const { maxId, rq } = start.result;
+  const tmpDir = join12(homedir7(), ".aemcp", "tmp");
+  mkdirSync8(tmpDir, { recursive: true });
+  const frame = join12(tmpDir, `fulltest_${Date.now()}.png`);
+  const steps = [
+    { name: "create comp", tool: "ae_create_comp", args: { name: C, width: 1280, height: 720, duration: 4, frameRate: 25 } },
+    { name: "solid layer", tool: "ae_add_layer", args: { comp: C, type: "solid", name: "BG", color: "#20304a" } },
+    { name: "text layer", tool: "ae_add_layer", args: { comp: C, type: "text", name: "Title", text: "Full Self Test", fontSize: 72, font: "ArialMT" } },
+    { name: "shape layer", tool: "ae_add_shape", args: { comp: C, shape: "ellipse", size: [200, 200], fill: "#ffcc00", name: "Dot" } },
+    { name: "null + camera", tool: "ae_add_layer", args: { comp: C, type: "null", name: "Rig" } },
+    { name: "set property", tool: "ae_set_property", args: { comp: C, layer: "BG", path: "Transform/Opacity", value: 90 } },
+    { name: "keyframes + ease", tool: "ae_set_keyframes", args: { comp: C, layer: "Title", path: "Transform/Position", keyframes: [{ time: 0, value: [640, 800] }, { time: 1, value: [640, 360] }], easyEase: true } },
+    { name: "edit keyframes (tangents, label, move)", tool: "ae_edit_keyframes", args: { comp: C, layer: "Title", path: "Transform/Position", keys: [{ index: 2, label: 2, inSpatialTangent: [-50, 0], moveTo: 1.5 }] } },
+    { name: "copy keyframes", tool: "ae_copy_keyframes", args: { from: { comp: C, layer: "Title", path: "Transform/Position" }, to: [{ comp: C, layer: "Rig", path: "Transform/Position" }] } },
+    { name: "expression", tool: "ae_set_expression", args: { comp: C, layer: "Dot", path: "Transform/Rotation", expression: "time * 90" }, check: (r) => r.result?.error ? "expression error" : null },
+    { name: "list expressions", tool: "ae_get_expressions", args: { comp: C } },
+    { name: "apply effect + params", tool: "ae_apply_effect", args: { comp: C, layer: "Title", effect: "ADBE Drop Shadow", params: { "ADBE Drop Shadow-0004": 10 } } },
+    // Distance, by match name
+    { name: "inspect effect", tool: "ae_get_effect_params", args: { effect: "ADBE Glo2" } },
+    { name: "English names (any AE language)", tool: "ae_get_effect_params", args: { effect: "glow" } },
+    { name: "mask", tool: "ae_add_mask", args: { comp: C, layer: "BG", shape: "ellipse", feather: 50 } },
+    { name: "parent + blend", tool: "ae_set_layer_attributes", args: { comp: C, layer: "Dot", parent: "Rig", blendingMode: "SCREEN" } },
+    { name: "style text range", tool: "ae_style_text_range", args: { comp: C, layer: "Title", match: "Self", style: { fillColor: "#ff3b30" } }, needs: "perCharacterText" },
+    { name: "paragraph", tool: "ae_set_paragraph", args: { comp: C, layer: "Title", justification: "CENTER_JUSTIFY" } },
+    { name: "text animator", tool: "ae_add_text_animator", args: { comp: C, layer: "Title", properties: { opacity: 0 }, selector: { basedOn: "words", shape: "rampUp" } } },
+    { name: "layer bounds", tool: "ae_get_layer_bounds", args: { comp: C }, check: (r) => (r.result?.layers || []).some((l) => l.bounds) ? null : "no bounds measured" },
+    { name: "sample pixels", tool: "ae_sample_pixels", args: { comp: C, points: [[640, 360]] } },
+    { name: "comp map", tool: "ae_get_comp_map", args: { comp: C } },
+    { name: "find properties", tool: "ae_find_properties", args: { comp: C, onlyAnimated: true } },
+    { name: "precompose", tool: "ae_precompose", args: { comp: C, layers: ["Dot"], name: `${C}_pre` } },
+    { name: "time remap", tool: "ae_set_time_remap", args: { comp: C, layer: `${C}_pre`, freezeAt: 0.5 } },
+    { name: "essential graphics", tool: "ae_essential_graphics", args: { comp: C, add: [{ layer: "BG", path: "Transform/Opacity", name: "BG Opacity" }] }, needs: "essentialGraphics" },
+    { name: "render queue add", tool: "ae_add_to_render_queue", args: { comp: C, outputPath: join12(tmpDir, "fulltest.mov") } },
+    { name: "render settings", tool: "ae_set_render_settings", args: { renderSettings: { Quality: "Draft" } }, needs: "renderSettingsApi" },
+    { name: "project health", tool: "ae_project_health", args: {} },
+    { name: "camera", tool: "ae_set_camera", args: { comp: C, focalLength: 50, type: "two-node", depthOfField: true } },
+    { name: "light", tool: "ae_set_light", args: { comp: C, type: "SPOT", intensity: 120, castsShadows: true } },
+    { name: "3D material", tool: "ae_set_material", args: { comp: C, layers: ["BG"], castsShadows: "on", specular: 30 } },
+    { name: "check expression", tool: "ae_check_expression", args: { comp: C, layer: "BG", path: "Transform/Opacity", expression: "50 + 50 * Math.sin(time)" }, check: (r) => r.result?.ok ? null : `expression reported an error: ${r.result?.error}` },
+    { name: "replace in expressions (dry run)", tool: "ae_replace_in_expressions", args: { find: "time", replace: "time", comps: [C], dryRun: true } },
+    { name: "color settings", tool: "ae_color_settings", args: { listProfiles: true } },
+    { name: "system info", tool: "ae_system_info", args: {} },
+    { name: "frame preview", jsx: RENDER_FRAME_JSX, args: { comp: C, time: 1, outputPath: frame, tmpDir }, check: () => existsSync9(frame) && statSync5(frame).size > 0 ? null : "no PNG written" },
+    { name: "contact sheet", jsx: CONTACT_SHEET_JSX, args: { comp: C, frames: 4, tmpDir } },
+    {
+      name: "modern JavaScript",
+      jsx: evalBody(transpileUserCode("const names = [];\nfor (let i = 1; i <= app.project.numItems; i++) names.push(app.project.item(i).name);\nreturn names.filter((n) => n.startsWith('__aemcp_fulltest')).length ?? 0;").source),
+      args: {},
+      check: (r) => Number(r.result) >= 1 ? null : `unexpected result ${JSON.stringify(r.result)}`
+    }
+  ];
+  const results = await projectSafetyTests(tmpDir, before ?? await projectState());
+  for (const s of steps) {
+    if (s.needs && !features[s.needs]) {
+      results.push({ step: s.name, ok: true, ms: 0, skipped: true });
+      warn(`${s.name}: skipped (needs ${s.needs})`);
+      continue;
+    }
+    const t0 = Date.now();
+    let r;
+    try {
+      const body = s.jsx ?? ALL.find((t) => t.name === s.tool)?.jsx;
+      if (!body) throw new Error(`unknown tool ${s.tool}`);
+      r = await runJsx(body, s.args ?? {}, { undoGroup: "AE MCP self-test", timeoutMs: 12e4, report: [C] });
+    } catch (e) {
+      r = { ok: false, logs: [], error: { message: e.message } };
+    }
+    const problem = !r.ok ? r.error?.message ?? "failed" : s.check?.(r) ?? null;
+    const ms = Date.now() - t0;
+    results.push({ step: s.name, ok: !problem, ms, error: problem ?? void 0 });
+    problem ? fail(`${s.name}: ${problem}`) : ok(`${s.name} (${ms} ms)`);
+  }
+  results.push(...await revisionSteps(features, (good, line) => (good ? ok : fail)(line)));
+  results.push(...await rollbackSteps((good, line) => (good ? ok : fail)(line)));
+  results.push(...await regressionSteps(tmpDir, (good, line) => (good ? ok : fail)(line)));
+  await runJsx(
+    `var p = app.project, rq = p.renderQueue;
+for (var r = rq.numItems; r > args.rq; r--) rq.item(r).remove();
+for (var i = p.numItems; i >= 1; i--) { var it = p.item(i); if (it.id > args.maxId) it.remove(); }
+return p.numItems;`,
+    { maxId, rq },
+    { undoGroup: "AE MCP self-test cleanup" }
+  );
+  try {
+    unlinkSync4(frame);
+  } catch {
+  }
+  const failed = results.filter((r) => !r.ok);
+  const dir = join12(homedir7(), ".aemcp", "compat");
+  mkdirSync8(dir, { recursive: true });
+  const file2 = join12(dir, `after-effects-${appVersion.replace(/[^\w.]+/g, "_")}.json`);
+  writeFileSync7(file2, JSON.stringify({ at: (/* @__PURE__ */ new Date()).toISOString(), server: VERSION, appVersion, os, platform: process.platform, features, results }, null, 2));
+  console.log(
+    failed.length ? `
+${red(bold(`${failed.length} of ${results.length} steps failed`))} on After Effects ${appVersion}.` : `
+${green(bold(`All ${results.length} steps passed`))} on After Effects ${appVersion}.`
+  );
+  console.log(`Compatibility report: ${file2}
+`);
+  return failed.length ? 1 : 0;
+}
+
+// src/cli/selftest.ts
+async function selftest(full = false) {
+  let failures = 0;
+  const bad = (m) => {
+    failures++;
+    fail(m);
+  };
+  console.log(bold(`
+After Effects MCP self-test v${VERSION}`));
+  console.log(`  ${process.platform} \xB7 node ${process.version}
+`);
+  if (updateCheckEnabled()) {
+    const u = await checkForUpdate(true);
+    const msg = updateMessage(u);
+    if (msg) warn(msg);
+    else if (u?.latest) ok(`Up to date (latest release v${u.latest})`);
+  }
+  if (existsSync10(CONFIG_FILE) && loadConfig().token) ok(`Config ${CONFIG_FILE}`);
+  else bad(`No config at ${CONFIG_FILE}. Run the installer.`);
+  const hash2 = installedExtensionHash();
+  if (!existsSync10(join13(extensionDir(), "CSXS", "manifest.xml"))) bad(`After Effects extension missing at ${extensionDir()}. Run the installer.`);
+  else if (hash2 !== "d1b1a7ed414c" && compareVersions(installedExtensionVersion() ?? "0", VERSION) > 0)
+    warn(`A newer After Effects extension (v${installedExtensionVersion()}) is installed than this server (v${VERSION}): another copy of AE MCP is newer. Update this one (ae-mcp update, or the latest .mcpb).`);
+  else if (hash2 !== "d1b1a7ed414c") warn(`Extension at ${extensionDir()} is a different version (${hash2 ?? "unknown"} vs ${"d1b1a7ed414c"}). Re-run the installer.`);
+  else ok("After Effects extension installed");
+  if (bundledExtensionSigned) {
+    const sig = installedExtensionSignature();
+    if (sig.ok) ok("Extension signature valid (loads without PlayerDebugMode)");
+    else if (debugModeEnabled()) warn(`Extension signature: ${sig.problems.join("; ")}. It still loads because PlayerDebugMode is on; re-run the installer to fix.`);
+    else bad(`Extension signature: ${sig.problems.join("; ")}. After Effects will not load it. Re-run the installer.`);
+  } else if (debugModeEnabled()) ok("Unsigned extensions allowed (PlayerDebugMode)");
+  else bad(`This is an unsigned development build and PlayerDebugMode is off for some CSXS versions (${CSXS_VERSIONS.join(", ")}). Run the installer.`);
+  const desktop = readJson(claudeDesktopConfig(), null);
+  if (desktop?.mcpServers?.[SERVER_NAME]) {
+    const cmd = desktop.mcpServers[SERVER_NAME].command;
+    if (cmd && !existsSync10(cmd)) bad(`Claude Desktop points to a Node that no longer exists: ${cmd}. Re-run the installer.`);
+    else ok("Claude Desktop configured");
+  } else console.log("  - Claude Desktop config has no after-effects entry (fine if you use the .mcpb extension or another app)");
+  console.log("");
+  let h;
+  try {
+    h = await health();
+  } catch (e) {
+    bad(`Bridge not reachable on 127.0.0.1:${loadConfig().bridgePort}. Is After Effects running? (restart it after installing)`);
+    const statusFile = join13(AEMCP_DIR, "bridge-status.json");
+    if (existsSync10(statusFile)) {
+      const st = readJson(statusFile, {});
+      console.log(`    last bridge status: ${st.listening ? "listening" : "not listening"}${st.error ? " - " + st.error : ""} (${st.at})`);
+    }
+    return summary(failures);
+  }
+  ok(`Bridge running inside ${h.host?.appName ?? "AE"} ${h.host?.appVersion ?? ""} (bridge v${h.version})`);
+  if (h.authorized === false) {
+    bad("Bridge rejected our token: config mismatch. Re-run the installer and restart After Effects.");
+    return summary(failures);
+  }
+  const info = await runJsx(
+    "var w = null; try { w = app.preferences.getPrefAsLong('Main Pref Section', 'Pref_SCRIPTING_FILE_NETWORK_SECURITY') === 1; } catch (e) {} return { version: app.version, os: $.os, canWrite: w };",
+    {},
+    { undoGroup: false, timeoutMs: 15e3 }
+  ).catch((e) => ({ ok: false, error: { message: e.message } }));
+  if (!info.ok) return bad(`ExtendScript failed: ${info.error?.message}`), summary(failures);
+  ok(`ExtendScript works: After Effects ${info.result.version} on ${info.result.os}`);
+  if (info.result.canWrite === false)
+    warn("'Allow Scripts to Write Files and Access Network' is OFF. Previews still work; scripts that write files themselves (File.write, exports) or use the network need it: AE Settings > Scripting & Expressions.");
+  const tmpDir = join13(AEMCP_DIR, "tmp");
+  mkdirSync9(tmpDir, { recursive: true });
+  const png = join13(tmpDir, `selftest_${Date.now()}.png`);
+  const before = full ? await projectState() : void 0;
+  const job = await runJsx(
+    `var c = app.project.items.addComp("__aemcp_selftest", 640, 360, 1, 2, 30);
+var t = c.layers.addText("AE MCP OK");
+var p = t.property("ADBE Transform Group").property("ADBE Position");
+p.setValuesAtTimes([0, 1], [[100, 180], [540, 180]]);
+var fx = t.property("ADBE Effect Parade").addProperty("ADBE Drop Shadow");
+t.property("ADBE Transform Group").property("ADBE Opacity").expression = "50 + 50 * Math.sin(time)";
+var f = new File(args.png);
+var wrote = false;
+// saveFrameToPng works even when "Allow Scripts to Write Files" is off (confirmed on macOS and Windows)
+c.saveFrameToPng(1, f); var w = 0; while (!f.exists && w < 10000) { $.sleep(50); w += 50; } wrote = f.exists; $.sleep(100);
+var r = { keys: p.numKeys, effect: fx.matchName, exprError: t.property("ADBE Transform Group").property("ADBE Opacity").expressionError, wrote: wrote };
+c.remove();
+return r;`,
+    { png },
+    { undoGroup: "AE MCP self-test", timeoutMs: 6e4 }
+  );
+  if (!job.ok) bad(`Test job failed: ${job.error?.message}`);
+  else {
+    const r = job.result;
+    if (r.keys === 2 && r.effect === "ADBE Drop Shadow" && !r.exprError) ok("Created a comp, text layer, keyframes, effect and expression (then removed it)");
+    else bad(`Unexpected test result: ${JSON.stringify(r)}`);
+    {
+      for (let i = 0; i < 50 && !(existsSync10(png) && statSync6(png).size > 0); i++) await sleep(100);
+      if (existsSync10(png) && statSync6(png).size > 0) {
+        const sig = readFileSync13(png).subarray(1, 4).toString();
+        sig === "PNG" ? ok("Rendered a frame preview") : bad("Frame preview is not a valid PNG");
+        try {
+          unlinkSync5(png);
+        } catch {
+        }
+      } else bad(`Frame preview was not written to ${png}`);
+    }
+  }
+  if (full && !failures) {
+    failures += await fullSelftest(before);
+  }
+  return summary(failures);
+}
+async function summary(failures) {
+  if (!failures) {
+    console.log(`
+${green(bold("All checks passed. After Effects MCP is ready."))}
+`);
+    return 0;
+  }
+  console.log(`
+${red(bold(`${failures} problem(s) found.`))} See README > Troubleshooting.`);
+  console.log("If you report it, include everything below (it contains no secrets):\n");
+  console.log(await diagnostics());
+  return 1;
+}
+
+// src/cli/update-cmd.ts
+init_define_AEMCP_CEP_FILES();
+import { spawnSync as spawnSync6 } from "node:child_process";
+import { createHash as createHash4 } from "node:crypto";
+import { copyFileSync as copyFileSync4, existsSync as existsSync11, mkdirSync as mkdirSync10, renameSync as renameSync2, rmSync as rmSync3, writeFileSync as writeFileSync8 } from "node:fs";
+import { dirname as dirname8 } from "node:path";
+import { fileURLToPath as fileURLToPath4 } from "node:url";
+var SERVER_ASSET = "ae-mcp.mjs";
+async function get(url2) {
+  const res = await fetch(url2, { headers: { "user-agent": `ae-mcp/${VERSION}`, accept: "application/vnd.github+json" }, signal: AbortSignal.timeout(6e4) });
+  if (!res.ok) throw new Error(`${url2}: HTTP ${res.status}`);
+  return res;
+}
+async function expectedDigest(rel) {
+  const asset = rel.assets.find((a) => a.name === SERVER_ASSET);
+  const m = /^sha256:([0-9a-f]{64})$/i.exec(asset.digest ?? "");
+  if (m) return m[1].toLowerCase();
+  const side = rel.assets.find((a) => a.name === `${SERVER_ASSET}.sha256`);
+  if (!side) throw new Error("the release has no checksum for ae-mcp.mjs");
+  const hex3 = /[0-9a-f]{64}/i.exec(await (await get(side.browser_download_url)).text())?.[0];
+  if (!hex3) throw new Error("unreadable ae-mcp.mjs.sha256");
+  return hex3.toLowerCase();
+}
+async function runUpdate() {
+  const base = { from: VERSION, to: null, updated: false };
+  let rel;
+  try {
+    const api = process.env.AEMCP_RELEASES_API || `https://api.github.com/repos/${REPO}/releases/latest`;
+    rel = await (await get(api)).json();
+  } catch (e) {
+    return { ...base, ok: false, message: `Could not reach GitHub to check for updates (${e.message}).` };
+  }
+  const latest = rel.tag_name.replace(/^v/, "");
+  void checkForUpdate(true);
+  if (compareVersions(latest, VERSION) <= 0) return { ...base, ok: true, to: latest, message: `AE MCP is up to date (v${VERSION}).` };
+  if (!rel.assets.some((a) => a.name === SERVER_ASSET))
+    return { ...base, ok: false, to: latest, url: rel.html_url, message: `v${latest} can't be installed automatically. Download it from ${rel.html_url}` };
+  const tmp = INSTALLED_SERVER.replace(/\.mjs$/, ".download.mjs");
+  try {
+    const asset = rel.assets.find((a) => a.name === SERVER_ASSET);
+    const [body, want] = await Promise.all([get(asset.browser_download_url).then((r) => r.arrayBuffer()), expectedDigest(rel)]);
+    const bytes = Buffer.from(body);
+    const got = createHash4("sha256").update(bytes).digest("hex");
+    if (got !== want) throw new Error(`checksum mismatch (expected ${want.slice(0, 12)}\u2026, got ${got.slice(0, 12)}\u2026)`);
+    mkdirSync10(dirname8(INSTALLED_SERVER), { recursive: true });
+    writeFileSync8(tmp, bytes);
+    const v = spawnSync6(process.execPath, [tmp, "--version"], { encoding: "utf8", timeout: 3e4 });
+    if (v.status !== 0 || v.stdout.trim() !== latest) throw new Error(`the downloaded server did not start correctly (${(v.stderr || v.stdout).trim().slice(0, 200)})`);
+    if (existsSync11(INSTALLED_SERVER)) copyFileSync4(INSTALLED_SERVER, `${INSTALLED_SERVER}.previous`);
+    renameSync2(tmp, INSTALLED_SERVER);
+  } catch (e) {
+    rmSync3(tmp, { force: true });
+    return { ...base, ok: false, to: latest, url: rel.html_url, message: `Update to v${latest} failed: ${e.message}. Nothing was changed.` };
+  }
+  const setup = spawnSync6(process.execPath, [INSTALLED_SERVER, "setup"], { encoding: "utf8", timeout: 6e4, env: { ...process.env, AEMCP_NO_UPDATE_CHECK: "1" } });
+  let extension = false;
+  try {
+    extension = !!JSON.parse(setup.stdout).extensionInstalled;
+  } catch {
+  }
+  const running = fileURLToPath4(import.meta.url) !== INSTALLED_SERVER;
+  return {
+    ok: true,
+    from: VERSION,
+    to: latest,
+    updated: true,
+    url: rel.html_url,
+    restartAfterEffects: extension,
+    message: `Updated AE MCP from v${VERSION} to v${latest}. ` + (extension ? "Restart After Effects and your AI apps to use it." : "Restart your AI apps to use it.") + (running ? " (If you use the Claude Desktop extension (.mcpb), install the new AE-MCP.mcpb from the release page as well.)" : "")
+  };
+}
+async function updateCommand(args) {
+  const r = await runUpdate();
+  if (args.includes("--json")) console.log(JSON.stringify(r));
+  else {
+    console.log(bold(`
+AE MCP update`));
+    (r.ok ? ok : fail)(r.message);
+    if (!r.ok && r.url) warn(`Release page: ${r.url}`);
+  }
+  process.exitCode = r.ok ? 0 : 1;
+}
+
+// src/cli/uninstall.ts
+init_define_AEMCP_CEP_FILES();
+import { existsSync as existsSync12, readdirSync as readdirSync6, readFileSync as readFileSync14, rmSync as rmSync4, writeFileSync as writeFileSync9 } from "node:fs";
+import { join as join14 } from "node:path";
+function uninstall(argv) {
+  console.log(bold("\nAfter Effects MCP uninstaller\n"));
+  const keepConfig = argv.includes("--keep-config");
+  if (existsSync12(extensionDir())) {
+    rmSync4(extensionDir(), { recursive: true, force: true });
+    ok(`Removed the After Effects extension`);
+  }
+  if (existsSync12(AEMCP_DIR)) {
+    for (const name of readdirSync6(AEMCP_DIR))
+      if (name !== "node" && !(keepConfig && name === "config.json")) rmSync4(join14(AEMCP_DIR, name), { recursive: true, force: true });
+  }
+  ok(keepConfig ? "Removed the server (kept ~/.aemcp/config.json)" : `Removed ${AEMCP_DIR}`);
+  for (const [label, file2] of [["Claude Desktop", claudeDesktopConfig()], ["Cursor", cursorConfig()], ["Claude Code", claudeCodeConfig()]]) {
+    const data = readJson(file2, null);
+    if (data?.mcpServers?.[SERVER_NAME]) {
+      delete data.mcpServers[SERVER_NAME];
+      writeJsonWithBackup(file2, data);
+      ok(`Removed from ${label}`);
+    }
+  }
+  const claude = findClaudeCli();
+  if (claude) {
+    try {
+      run(claude, ["mcp", "remove", SERVER_NAME, "--scope", "user"]);
+      ok("Removed from Claude Code");
+    } catch {
+    }
+  }
+  if (existsSync12(codexConfig())) {
+    const t = readFileSync14(codexConfig(), "utf8");
+    const n = removeCodexBlock(t);
+    if (n !== t) {
+      writeFileSync9(codexConfig(), n.trimEnd() + "\n");
+      ok("Removed from Codex");
+    }
+  }
+  console.log("\nDone. Restart After Effects and your AI apps.");
+  console.log("If you installed the Claude Desktop extension (.mcpb), remove it in Claude Desktop > Settings > Extensions.");
+  warn("PlayerDebugMode, if an earlier version enabled it, was left as is (harmless; other extensions may rely on it).");
+}
+
+// src/server.ts
+init_define_AEMCP_CEP_FILES();
+
 // src/docs.ts
 init_define_AEMCP_CEP_FILES();
 var INSTRUCTIONS = `This server controls a running Adobe After Effects instance through ExtendScript.
@@ -79058,11 +80560,11 @@ init_define_AEMCP_CEP_FILES();
 import { spawn as spawn3 } from "node:child_process";
 import { createWriteStream, existsSync as existsSync13, mkdirSync as mkdirSync11 } from "node:fs";
 import { homedir as homedir8 } from "node:os";
-import { dirname as dirname9, join as join14 } from "node:path";
+import { dirname as dirname9, join as join15 } from "node:path";
 var jobs = /* @__PURE__ */ new Map();
-var LOG_DIR = join14(homedir8(), ".aemcp", "renders");
+var LOG_DIR = join15(homedir8(), ".aemcp", "renders");
 function aerenderPath(appPackage) {
-  const candidates = process.platform === "win32" ? [join14(appPackage, "aerender.exe"), join14(dirname9(appPackage), "aerender.exe"), join14(appPackage, "Support Files", "aerender.exe")] : [join14(dirname9(appPackage), "aerender"), join14(appPackage, "..", "aerender")];
+  const candidates = process.platform === "win32" ? [join15(appPackage, "aerender.exe"), join15(dirname9(appPackage), "aerender.exe"), join15(appPackage, "Support Files", "aerender.exe")] : [join15(dirname9(appPackage), "aerender"), join15(appPackage, "..", "aerender")];
   return candidates.find((p) => existsSync13(p)) ?? null;
 }
 function view(j) {
@@ -79144,7 +80646,7 @@ return { project: p.file.fsName, comp: name, frames: frames, app: Folder.appPack
         if (args.output) mkdirSync11(dirname9(args.output), { recursive: true });
         mkdirSync11(LOG_DIR, { recursive: true });
         const id = `r${Date.now().toString(36)}`;
-        const logPath = join14(LOG_DIR, `${id}.log`);
+        const logPath = join15(LOG_DIR, `${id}.log`);
         const logStream = createWriteStream(logPath);
         const job = {
           id,
@@ -79161,9 +80663,9 @@ return { project: p.file.fsName, comp: name, frames: frames, app: Folder.appPack
         const proc = spawn3(bin, cli, { stdio: ["ignore", "pipe", "pipe"] });
         job.proc = proc;
         const onData = (d) => {
-          const text = d.toString();
-          logStream.write(text);
-          for (const line of text.split(/\r?\n/)) {
+          const text2 = d.toString();
+          logStream.write(text2);
+          for (const line of text2.split(/\r?\n/)) {
             if (!line.trim()) continue;
             const m = line.match(/PROGRESS:.*\((\d+)\)/);
             if (m) job.frameRendered = Math.max(job.frameRendered, Number(m[1]));
@@ -79271,9 +80773,9 @@ function registerOnDemandTools(server, catalog) {
         if (only && cat.toLowerCase() !== only.toLowerCase()) continue;
         (groups[cat] ||= []).push(`${t.name}${t.direct ? "" : "*"}: ${firstSentence(t.config.description)}`);
       }
-      const text = Object.entries(groups).map(([cat, lines]) => `## ${cat}
+      const text2 = Object.entries(groups).map(([cat, lines]) => `## ${cat}
 ${lines.join("\n")}`).join("\n\n") + "\n\n* = not loaded in this chat: run it with ae_call (use ae_tools {describe: [...]} for its parameters).";
-      return { content: [{ type: "text", text }] };
+      return { content: [{ type: "text", text: text2 }] };
     }
   );
   server.registerTool(
