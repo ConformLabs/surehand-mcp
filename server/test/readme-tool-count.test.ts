@@ -6,6 +6,7 @@ import { registerRenderJobs } from "../src/tools/renderjobs.js";
 import { registerWorkflowTools } from "../src/tools/workflow.js";
 import { registerProveTools } from "../src/tools/prove.js";
 import { registerHistoryTools } from "../src/tools/history.js";
+import { registerPreflightTools } from "../src/tools/preflight.js";
 import { registerOnDemandTools } from "../src/tools/ondemand.js";
 import { registerJsxTools } from "../src/tools/registry.js";
 import { ALL_JSX_TOOLS } from "../src/tools/all.js";
@@ -26,6 +27,7 @@ function registeredTools(): Set<string> {
   registerWorkflowTools(stub);
   registerProveTools(stub);
   registerHistoryTools(stub);
+  registerPreflightTools(stub);
   stub.registerTool("ae_get_scripting_guide", {}, async () => ({}));
   registerOnDemandTools(stub, catalog);
   return names;

@@ -6,7 +6,7 @@ import { z } from "zod";
 import type { JsxTool } from "./registry.js";
 import { formatXray, SECTIONS, type XData } from "./xray-analyze.js";
 
-const XRAY_JSX = `
+export const XRAY_JSX = `
 var P = app.project, t0 = new Date().getTime();
 var secs = args.sections && args.sections.length ? args.sections : ["render", "expressions", "missing", "footage", "weight"], want = {};
 for (var s = 0; s < secs.length; s++) want["k:" + secs[s]] = true;
@@ -82,7 +82,8 @@ function layer(L) {
   try { if (L.parent) o.par = L.parent.index; } catch (e) {}
   try { src = L.source; } catch (e) {}
   if (src) o.src = src.id;
-  if (L instanceof AVLayer) {
+  // TextLayer and ShapeLayer are not AVLayer subclasses in After Effects
+  if (L instanceof AVLayer || L instanceof TextLayer || L instanceof ShapeLayer) {
     try { if (L.adjustmentLayer) { o.adj = 1; o.inP = r4(L.inPoint); o.outP = r4(L.outPoint); } } catch (e) {}
     if (has("weight")) {
       try { if (L.collapseTransformation) o.cl = 1; } catch (e) {}
@@ -140,7 +141,19 @@ if (has("missing")) {
     var mf = app.fonts.missingOrSubstitutedFonts, fl = [];
     for (var m = 0; m < mf.length; m++) fl.push({ ps: mf[m].postScriptName, family: mf[m].familyName, style: mf[m].styleName, sub: mf[m].isSubstitute });
     D.fonts = { missing: fl };
-    try { var uf = P.usedFonts; if (uf) { D.fonts.used = []; for (var u = 0; u < uf.length; u++) D.fonts.used.push({ ps: uf[u].font.postScriptName, layers: uf[u].usedAt ? uf[u].usedAt.length : 0 }); } } catch (e) {}
+    try {
+      var uf = P.usedFonts;
+      if (uf) {
+        D.fonts.used = [];
+        for (var u = 0; u < uf.length; u++) {
+          var ua = uf[u].usedAt, ue = { ps: uf[u].font.postScriptName, layers: ua ? ua.length : 0 }, ids = [];
+          // the text layers that use it (style runs and Source Text keyframes included), when this AE says so
+          for (var w = 0; ua && w < ua.length; w++) { try { if (typeof ua[w].layerID === "number") ids.push(ua[w].layerID); } catch (e) {} }
+          if (ua && ua.length && ids.length === ua.length) ue.ids = ids;
+          D.fonts.used.push(ue);
+        }
+      }
+    } catch (e) {}
   } catch (e) {}
 }
 

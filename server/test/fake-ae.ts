@@ -225,6 +225,28 @@ export interface FakeLayerSpec {
   frameBlend?: "FRAME_MIX" | "PIXEL_MOTION";
   inPoint?: number;
   outPoint?: number;
+  // geometry and text, for Preflight (defaults: anchor [0,0], position [960,540], rotation 0, opacity 100)
+  anchor?: number[];
+  position?: number[];
+  rotation?: number;
+  opacity?: number;
+  startTime?: number;
+  /** animated values by match name ("ADBE Position", "ADBE Opacity", "ADBE Text Document"...): value at a time */
+  anim?: Record<string, (t: number) => unknown>;
+  /** sourceRectAtTime [left, top, width, height] (default: text [0,-50,400,60], others the source size) */
+  rect?: number[] | ((t: number) => number[]);
+  /** text layers: the text (default: the layer name), font size (default 50), paragraph box overflow */
+  text?: string;
+  fontSize?: number;
+  boxOverflow?: boolean;
+  /** characters the text's font has no glyph for (the font gets hasGlyphsFor, as in AE 25.1+) */
+  glyphsMissing?: string;
+  /** per-character fonts (style runs, AE 24+ characterRange): the font of character i, and what it lacks */
+  charFonts?: { font: string; missing?: string }[];
+  /** auto-orient along the path */
+  autoOrient?: boolean;
+  /** reading threeDLayer throws */
+  threeDThrows?: boolean;
 }
 export interface FakeCompSpec {
   name: string;
@@ -257,6 +279,8 @@ export interface FakeProjectSpec {
   installedEffects?: { matchName: string; displayName: string }[];
   /** null: an After Effects without the font API */
   fonts?: { postScriptName: string; familyName: string; styleName: string; isSubstitute: boolean }[] | null;
+  /** app.project.usedFonts: a font and the layers (by name) that use it; noIds: usedAt entries without layerID */
+  usedFonts?: { ps: string; layers: string[]; noIds?: boolean }[];
   activeComp?: string;
 }
 
@@ -271,8 +295,9 @@ export function fakeProject(spec: FakeProjectSpec) {
   class PlaceholderSource extends FootageSource {}
   class Layer {}
   class AVLayer extends Layer {}
-  class TextLayer extends AVLayer {}
-  class ShapeLayer extends AVLayer {}
+  // as in After Effects: text and shape layers are NOT AVLayer subclasses (instanceof AVLayer is false)
+  class TextLayer extends Layer {}
+  class ShapeLayer extends Layer {}
   class CameraLayer extends Layer {}
   class LightLayer extends Layer {}
   class PropertyBase {}
@@ -282,6 +307,7 @@ export function fakeProject(spec: FakeProjectSpec) {
     PropertyType, PropertyValueType, BlendingMode, TrackMatteType,
     AlphaMode: { IGNORE: 5412, STRAIGHT: 5413, PREMULTIPLIED: 5414 },
     RQItemStatus: { QUEUED: 3015, UNQUEUED: 3013, DONE: 3019 },
+    AutoOrientType: { NO_AUTO_ORIENT: 4212, ALONG_PATH: 4213 },
     FrameBlendingType: { NO_FRAME_BLEND: 4012, FRAME_MIX: 4013, PIXEL_MOTION: 4014 },
   };
   const writes: string[] = [];
@@ -294,8 +320,18 @@ export function fakeProject(spec: FakeProjectSpec) {
         return true;
       },
     });
-  const prop = (name: string, matchName: string, extra: Record<string, unknown> = {}) =>
-    watch(Object.assign(new PropertyBase(), { name, matchName, propertyType: PropertyType.PROPERTY, canSetExpression: true, expression: "", expressionError: "", expressionEnabled: true, ...extra }), name);
+  const prop = (name: string, matchName: string, extra: Record<string, unknown> = {}, anim?: (t: number) => unknown) =>
+    watch(
+      Object.assign(new PropertyBase(), {
+        name, matchName, propertyType: PropertyType.PROPERTY, canSetExpression: true, expression: "", expressionError: "", expressionEnabled: true, numKeys: anim ? 2 : 0,
+        valueAtTime(this: any, t: number) {
+          calls.push("valueAtTime");
+          return anim ? anim(t) : this.value;
+        },
+        ...extra,
+      }),
+      name,
+    );
   const group = (name: string, matchName: string, children: any[], extra: Record<string, unknown> = {}): any => {
     const g: any = Object.assign(new PropertyBase(), { name, matchName, propertyType: PropertyType.NAMED_GROUP, children, ...extra });
     Object.defineProperty(g, "numProperties", { get: () => g.children.length });
@@ -322,7 +358,7 @@ export function fakeProject(spec: FakeProjectSpec) {
     const it: any = Object.assign(new CompItem(), {
       id: nextId++, name: c.name, width: c.width ?? 1920, height: c.height ?? 1080, pixelAspect: 1, frameRate: c.fps ?? 25, duration: c.duration ?? 10,
       motionBlur: !!c.motionBlur, shutterAngle: 180, shutterPhase: -90, motionBlurSamplesPerFrame: c.samples ?? 16, motionBlurAdaptiveSampleLimit: 128,
-      frameBlending: true, renderer: c.renderer ?? "ADBE Advanced 3d", usedIn: [], layers: [] as any[], time: 0,
+      frameBlending: true, renderer: c.renderer ?? "ADBE Advanced 3d", usedIn: [], layers: [] as any[], time: 0, frameDuration: 1 / (c.fps ?? 25), displayStartTime: 0,
     });
     Object.defineProperty(it, "numLayers", { get: () => it.layers.length });
     it.layer = (k: number | string) => (typeof k === "number" ? it.layers[k - 1] : it.layers.find((l: any) => l.name === k)) ?? null;
@@ -338,10 +374,22 @@ export function fakeProject(spec: FakeProjectSpec) {
       const Cls = type === "text" ? TextLayer : type === "shape" ? ShapeLayer : type === "camera" ? CameraLayer : AVLayer;
       const source = ls.source ? byName(ls.source) : undefined;
       if (source && !source.usedIn.includes(comp)) source.usedIn.push(comp);
-      const transform = group("Transform", "ADBE Transform Group", [prop("Opacity", "ADBE Opacity", { value: 100 }), prop("Scale", "ADBE Scale", { value: ls.scale ?? [100, 100, 100] }), prop("Position", "ADBE Position", { value: [960, 540] })]);
+      const an = ls.anim ?? {};
+      const transform = group("Transform", "ADBE Transform Group", [
+        prop("Anchor Point", "ADBE Anchor Point", { value: ls.anchor ?? [0, 0, 0] }, an["ADBE Anchor Point"]),
+        prop("Position", "ADBE Position", { value: ls.position ?? [960, 540, 0] }, an["ADBE Position"]),
+        prop("Scale", "ADBE Scale", { value: ls.scale ?? [100, 100, 100] }, an["ADBE Scale"]),
+        prop("Z Rotation", "ADBE Rotate Z", { value: ls.rotation ?? 0 }, an["ADBE Rotate Z"]),
+        prop("Opacity", "ADBE Opacity", { value: ls.opacity ?? 100 }, an["ADBE Opacity"]),
+      ]);
       const children: any[] = [transform];
       if (type !== "camera") children.push(group("Effects", "ADBE Effect Parade", effectGroups(ls)));
-      if (type === "text") children.push(group("Text", "ADBE Text Properties", [prop("Source Text", "ADBE Text Document", { value: { font: ls.font ?? "ArialMT", text: ls.name } })]));
+      const fontObj = (ps: string, missing: string) => ({ postScriptName: ps, hasGlyphsFor: (ch: string) => !missing.includes(ch) });
+      const doc = (text: string) => ({ font: ls.font ?? "ArialMT", text, fontSize: ls.fontSize ?? 50, boxText: ls.boxOverflow !== undefined, boxOverflow: ls.boxOverflow,
+        ...(ls.glyphsMissing !== undefined ? { fontObject: fontObj(ls.font ?? "ArialMT", ls.glyphsMissing) } : {}),
+        ...(ls.charFonts ? { characterRange: (i: number) => ({ font: ls.charFonts![i].font, fontObject: fontObj(ls.charFonts![i].font, ls.charFonts![i].missing ?? "") }) } : {}) });
+      const textAnim = an["ADBE Text Document"];
+      if (type === "text") children.push(group("Text", "ADBE Text Properties", [prop("Source Text", "ADBE Text Document", { value: doc(ls.text ?? ls.name) }, textAnim && ((t: number) => doc(String(textAnim(t)))))]));
       for (const [path, e] of Object.entries(ls.expressions ?? {})) {
         const segs = path.split("/");
         let g: any = { children };
@@ -359,8 +407,26 @@ export function fakeProject(spec: FakeProjectSpec) {
         index: li + 1, id: 1000 + nextId++, name: ls.name, enabled: ls.enabled !== false, shy: !!ls.shy, guideLayer: !!ls.guide, isTrackMatte: !!ls.isTrackMatte,
         nullLayer: type === "null", adjustmentLayer: type === "adjustment", source: source ?? null, collapseTransformation: !!ls.collapse, timeRemapEnabled: !!ls.timeRemap,
         frameBlendingType: ls.frameBlend ? (globals.FrameBlendingType as any)[ls.frameBlend] : (globals.FrameBlendingType as any).NO_FRAME_BLEND,
-        motionBlur: !!ls.motionBlur, threeDLayer: !!ls.threeD, inPoint: ls.inPoint ?? 0, outPoint: ls.outPoint ?? comp.duration, parent: null, children,
+        motionBlur: !!ls.motionBlur, inPoint: ls.inPoint ?? 0, outPoint: ls.outPoint ?? comp.duration, parent: null, children,
+        startTime: ls.startTime ?? 0, stretch: 100,
+        sourceRectAtTime: (t: number) => {
+          calls.push("sourceRectAtTime");
+          const r = typeof ls.rect === "function" ? ls.rect(t) : (ls.rect ?? (type === "text" ? [0, -50, 400, 60] : [0, 0, source?.width ?? 100, source?.height ?? 100]));
+          return { left: r[0], top: r[1], width: r[2], height: r[3] };
+        },
       });
+      Object.defineProperty(L, "threeDLayer", {
+        get: () => {
+          if (ls.threeDThrows) throw new Error("threeDLayer can't be read");
+          return !!ls.threeD;
+        },
+        enumerable: true,
+        configurable: true,
+      });
+      L.autoOrient = ls.autoOrient ? (globals.AutoOrientType as any).ALONG_PATH : (globals.AutoOrientType as any).NO_AUTO_ORIENT;
+      L.blendingMode = BlendingMode.NORMAL;
+      L.trackMatteType = TrackMatteType.NO_TRACK_MATTE;
+      L.audioEnabled = false;
       Object.defineProperty(L, "numProperties", { get: () => L.children.length });
       L.property = (k: number | string) => (typeof k === "number" ? L.children[k - 1] : L.children.find((x: any) => x.name === k || x.matchName === k)) ?? null;
       comp.layers.push(watch(L, ls.name));
@@ -394,6 +460,11 @@ export function fakeProject(spec: FakeProjectSpec) {
     executeCommand: () => calls.push("executeCommand"),
   };
   if (spec.fonts !== null) app.fonts = { missingOrSubstitutedFonts: spec.fonts ?? [] };
+  if (spec.usedFonts) {
+    const layerId = (n: string) => comps.flatMap((c) => c.layers).find((l: any) => l.name === n)?.id;
+    project.usedFonts = spec.usedFonts.map((u) => ({ font: { postScriptName: u.ps }, usedAt: u.layers.map((n) => (u.noIds ? { layerTimeD: {} } : { layerID: layerId(n), layerTimeD: {} })) }));
+    writes.length = 0;
+  }
   const names = Object.keys(globals);
   const values = names.map((n) => globals[n]);
   const aemcp = new Function("$", "app", ...names, "var aemcp;\n" + helperSource + "\nreturn aemcp;")({ global: { ...globals } }, app, ...values);

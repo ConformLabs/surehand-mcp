@@ -11,7 +11,7 @@
 
 Surehand MCP connects **Claude** (Desktop / Code), **ChatGPT** (desktop app or web), Cursor, Codex, or any MCP client to **Adobe® After Effects®**.
 The AI can run any script inside After Effects (modern JavaScript, converted for AE's ExtendScript engine automatically),
-read information back, and use up to 97 ready-made tools for projects, comps, layers, keyframes (Graph Editor level),
+read information back, and use up to 98 ready-made tools for projects, comps, layers, keyframes (Graph Editor level),
 text styling and animators, footage, effects, shapes, masks, 3D cameras/lights/materials, audio, color management,
 Essential Graphics and rendering (including background renders with aerender). Batch edits run many steps as one
 undo step, checkpoints keep safety copies of the project, structural changes can be proven not to change the render,
@@ -154,7 +154,7 @@ To rotate the token, delete `token` from `~/.aemcp/config.json` and re-run the i
 | `ae_get_scripting_guide` | ExtendScript cheat sheet for the model (also an MCP resource `aemcp://docs/extendscript`). |
 
 **Tool profiles.** Every tool description is sent to the AI in every chat, so by default only a **core set of
-29 tools** is loaded (about 9k tokens instead of 27k for all 97), and **every other tool stays available on demand**:
+29 tools** is loaded (about 9k tokens instead of 27k for all 98), and **every other tool stays available on demand**:
 `ae_tools` lists all tools by category (or gives full parameter details of chosen ones), and `ae_call` runs any tool by
 name with the same validation, permissions, change report and activity log. Loading everything up front is optional:
 switch to **Full** in After Effects (**Window > Extensions > Surehand MCP > AI tools**), in Claude Desktop's
@@ -212,6 +212,7 @@ unknown effect name gets suggestions.
 - **Footage:** `ae_set_footage_interpretation` (conform frame rate, alpha, fields, pulldown, loop, pixel aspect),
   `ae_set_proxy`, `ae_relink_footage` (find missing files by name in a folder tree, keeps sequences)
 - **Essential Graphics:** `ae_essential_graphics` (add properties as controllers, template name), `ae_export_mogrt`
+- **Checks:** `ae_preflight` (check the delivered comp and its render against your own delivery spec; see Preflight below)
 - **Project:** `ae_project_health` (missing footage/fonts/effects, expression errors, unused footage, empty comps/folders,
   duplicate comp names); `ae_project_xray` (explains an inherited project: what the render queue pulls in, what
   every expression depends on and which links are fragile, what is missing, footage specs, what makes it heavy)
@@ -235,6 +236,47 @@ hidden on shy or disabled layers, high motion blur samples, the 3D renderer, fra
 You get a plain-language answer; the AI gets precise locations (comp > layer > property). Big projects are read
 within a time budget and say so when the answer is partial; `comps` and `sections` narrow it down.
 
+### Preflight
+
+Before you deliver, ask the AI to preflight the comp (`ae_preflight`). It checks the project, and optionally the
+rendered file, against **your delivery spec**: a small JSON file with the numbers from your client's or
+broadcaster's delivery document (or the same thing inline in the chat). Nothing is built in: there are no house
+presets, every section of the spec is optional, and a check only runs when its section is there. The AI can help you
+write the spec (`action: "schema"` gives it the fields).
+
+In the project, for the delivered comp (`comp` in the spec, otherwise the active comp):
+
+- **Video:** comp size, frame rate, pixel aspect ratio and duration (exact, with a tolerance in frames, or a range).
+- **Project:** bit depth, working color space, missing footage, fonts and effects, expression errors, disabled layers
+  that still carry effects (the same collector as Project X-ray, limited to the delivered comp and its precomps).
+- **Safe areas over time:** every visible text layer, and any layer you name (wildcards like `Logo*`), on every frame
+  (or every Nth frame) where it is visible: its box after position, scale, rotation, anchor point and parents, and through
+  the precomps it sits in, against title-safe, action-safe or the frame. Problems come back as time ranges, for example
+  "Title: outside title-safe 00:00:02:03–00:00:03:10 (2.12s–3.40s), 46 px past it on the right at most". Layers that are off,
+  transparent (opacity 0) or outside their in/out points are not visible and are not checked. 3D layers are reported
+  as not checked (check them with `ae_get_layer_bounds`, which projects through the camera); auto-orient, and effects
+  that move or scale the pixels outside the transform (Transform, Offset, layer styles, text animators), are flagged as
+  a warning that the bounds may be off. A `layersMustBeIn` name that matches no layer is a warning, not a pass.
+- **Text:** smallest cap height (estimated as 0.7 x the font size x the layer's scale, since real fonts vary from about
+  0.65 to 0.75), reading speed (characters per second while the text is visible, spaces included, line breaks not),
+  shortest time on screen, paragraph text that overflows its box (After Effects 24.6 or later), and characters the font
+  has no glyph for (After Effects 25.1 or later); on older versions the report says the check isn't available.
+
+On a rendered file (`target: "file"` or `"both"`): codec, container, bit depth, chroma subsampling, alpha, field order,
+color tags, legal range, black and frozen frames, loudness and true peak, and a flash check. File checks need ffmpeg:
+the one on your system, or a one-time download. The flash check is a **pre-check** to catch obvious problems early; it
+is not a certified PSE / Harding test.
+
+The report starts with the verdict: **FAIL (n)** when anything failed; otherwise **INCOMPLETE (n checks not run)**
+when a check the spec asks for couldn't run or ran on incomplete data (no ffmpeg, an RGB file for legal range, a check
+that needs a newer After Effects, a file that couldn't be read to the end), so a check that didn't run is never a pass;
+otherwise **WARNINGS (n)** or **PASS**. Then the checks that were requested but not run and why, the findings grouped by
+check (failures first, then warnings, by time), with timecode in the comp's frame rate and seconds, where the problem is
+(comp > layer) and a short fix, then what this run doesn't cover (a section not in the spec, a file check on a project
+target). For files it also shows what ffprobe found and up to four frames at the worst problems. Preflight changes
+nothing in the project and leaves no undo step, so it also runs in read-only mode. Long comps are checked within a
+time budget (`timeBudgetSeconds`, default 120 s); a partial check says so.
+
 ### Change report
 
 Every call that edits the project ends with a **Changes** list, computed by After Effects itself (a snapshot before
@@ -253,6 +295,48 @@ Project items are always compared; layers, properties, keyframes, expressions, e
 active comp and any comp named in the call. If a script fails halfway, the report lists what it had already changed.
 `ae_undo` reports what was reverted. On very large comps (tens of thousands of properties) this adds up to about a
 second per edit; turn it off with `"changeReport": false` in `~/.aemcp/config.json`, or per script with `report: false`.
+
+### Preflight: rendered files
+
+Preflight also checks the rendered file itself against the same delivery spec, with ffprobe and one ffmpeg pass over
+the picture and sound. Each check runs only when its section is in the spec; a requested check that can't run is listed
+with the reason (no ffmpeg, an RGB file for legal range, a value ffmpeg didn't report...) and makes the verdict
+INCOMPLETE. A file with no audio stream fails when the spec asks for audio (usually Audio Output was off in the output
+module). Every decoded frame is counted against the picture's own duration: a truncated or damaged file fails ("only
+2.8 s of 8 s could be decoded") instead of passing on the part that was read, and decoding errors are a warning.
+Durations (and black / frozen at the end) are the picture's, not the container's; sound that runs longer or shorter
+than the picture by more than a frame is a warning.
+
+| Spec section | What is measured in the file |
+|---|---|
+| `video` | container (file extension), codec, frame size, pixel aspect, frame rate (`30000/1001` is 29.97, not 30), duration (± `durationToleranceFrames`), bit depth, chroma subsampling, alpha, field order, and the signalled color primaries / transfer / matrix / range (a tag that isn't there is a warning) |
+| `audio` | sample rate, channels, `required`; loudness per ITU-R BS.1770 / EBU R128 (ffmpeg `ebur128`): integrated, loudness range, true peak, highest short-term (3 s) loudness |
+| `legalRange` | every pixel of every frame, in the file's own bit depth scaled to 8-bit (a 10-bit 941 is 235.25: out of 16-235); a frame fails when more than `maxOutOfRangePercent` of its pixels are outside the luma / chroma range. Reported as time ranges, with the worst frame and its code values. YUV files only |
+| `black`, `frozen` | ffmpeg `blackdetect` / `freezedetect`: runs longer than `maxSeconds` (black allowed at the start / end per `allowAtStart` / `allowAtEnd`; a black run isn't reported again as frozen) |
+| `flash` | a **pre-check, not a certified PSE / Harding test**: the picture as a 32x18 grid, relative luminance per cell; a transition is a change of at least `minLuminanceChange` where the darker state is below 0.8, a flash is a pair of opposing transitions over at least `minAreaFraction` of the screen; more than `maxFlashesPerSecond` in any second fails. Saturated red flashes (R/(R+G+B) >= 0.8, change of (R-G-B)x320 > 20) are checked too unless `redFlash` is false (definitions after ITU-R BT.1702 / WCAG 2.x) |
+
+Times in the findings are seconds in the file. Up to four JPEG frames (960 px wide at most) from the most important
+failing times are written to `~/.aemcp/tmp`, shown in the report and deleted right after (also when the check is
+cancelled; leftovers older than a day are swept). A one-minute 1080p ProRes 422 HQ file with every check takes about 4 s on
+an Apple Silicon Mac (legal range marks the out-of-range pixels and measures that mask averaged down to a small grid,
+which is exact and much faster than full statistics on every frame).
+
+**ffmpeg.** Surehand MCP uses, in this order: `"ffmpegPath"` / `"ffprobePath"` in `~/.aemcp/config.json`, a private
+copy in `~/.aemcp/ffmpeg`, then the PATH (plus `/opt/homebrew/bin` and `/usr/local/bin` on a Mac). If there is none, it
+can download FFmpeg 9.0.2 once into `~/.aemcp/ffmpeg`, only after you allow it (in "ask" permission mode you also
+approve it in the Surehand MCP panel; in read-only mode it never downloads). The download is a pinned build checked
+against a SHA-256 written in the source, and must start and report the expected version before it is used; anything
+else is refused and nothing is installed:
+
+- macOS (Apple Silicon and Intel): Martin Riedl's static release builds ([ffmpeg.martin-riedl.de](https://ffmpeg.martin-riedl.de)),
+  `ffmpeg.zip` + `ffprobe.zip`, about 60 MB. These are GPL v3 builds (they include x264 / x265).
+- Windows x64 (and Windows on Arm, which runs x64 programs): [BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds)
+  `ffmpeg-n9.0.2-...-win64-lgpl-shared-9.0.zip` from a month-end release (those are kept), about 77 MB. LGPL v2.1+.
+
+Surehand MCP doesn't ship or redistribute FFmpeg: it downloads the publisher's own file on your machine and runs it as a
+separate program, so FFmpeg's licence (the GPL / LGPL terms above, with its source available from ffmpeg.org) applies to
+that copy and not to Surehand MCP. `~/.aemcp/ffmpeg/SOURCE.json` records what was installed and from where. To use your
+own FFmpeg instead, install it (`brew install ffmpeg`, `winget install ffmpeg`) or set `"ffmpegPath"`.
 
 ### Proven edits
 
