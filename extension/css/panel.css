@@ -2,6 +2,8 @@
 * { box-sizing: border-box; }
 body { margin: 0; padding: 10px; background: var(--bg); color: var(--fg); font: 12px -apple-system, "Segoe UI", sans-serif; }
 header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+header .mark { width: 28px; height: 28px; flex: none; }
+header .dot { margin-left: auto; }
 #title { font-weight: 600; font-size: 13px; }
 .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--warn); flex: none; }
 .dot.ok { background: var(--ok); } .dot.bad { background: var(--bad); }
