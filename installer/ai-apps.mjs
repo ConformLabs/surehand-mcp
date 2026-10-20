@@ -4,8 +4,9 @@
 //   nsisApps()              the Windows Setup's ai-apps.nsh: AI_APPS_FOR_EACH calls a macro once per app
 //                           (N, id, name) in the list's order; package-win-installer.mjs writes it at build time
 //   macDistribution(xml)    the Mac Installer's distribution.xml from installer/mac/pkg/distribution.xml: one choice
-//                           per app (found on this Mac: ticked; not found: a greyed "(not found on this Mac)" line),
-//                           the optional cloudflared choice, the hidden last step that writes the summary
+//                           per app (found on this Mac: ticked; not found: greyed out, the description says why),
+//                           the optional cloudflared choice, the hidden last step that writes the summary; the
+//                           titles are short (macTitles) because Installer's Package Name column cuts them off
 //   macComponents()         the payload-free component packages those choices install (id, file, postinstall args)
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -20,9 +21,26 @@ export function loadAiApps(file = join(HERE, "ai-apps.json")) {
   for (const a of def.apps) {
     if (!/^[a-z][a-z0-9-]*$/.test(a.id ?? "")) throw new Error(`${file}: bad app id ${JSON.stringify(a.id)}`);
     if (typeof a.name !== "string" || !a.name || /["$\\<>&]/.test(a.name)) throw new Error(`${file}: ${a.id}: the name must be plain text`);
+    if (a.macName !== undefined && (typeof a.macName !== "string" || !a.macName || /["$\\<>&]/.test(a.macName))) throw new Error(`${file}: ${a.id}: the macName must be plain text`);
     if (!Array.isArray(a.mac) || !a.mac.length) throw new Error(`${file}: ${a.id}: "mac" lists no paths`);
   }
   return def;
+}
+
+/**
+ * The Mac Installer's Custom Install list has a fixed Package Name column (about 250 px at the system font) that cuts
+ * longer titles off, so its titles stay within this many characters; the description pane under the list says the
+ * rest (not found on this Mac, the cloudflared download). The Windows Setup keeps the full names.
+ */
+export const MAC_TITLE_MAX = 30;
+
+/** The Mac Installer's choice titles: { main, apps: { <id>: title }, tunnel }. */
+export function macTitles(def = loadAiApps()) {
+  return {
+    main: "Surehand MCP",
+    apps: Object.fromEntries(def.apps.map((a) => [a.id, `Connect ${a.macName ?? a.name}`])),
+    tunnel: def.web.macTitle ?? def.web.title,
+  };
 }
 
 /** The Windows Setup's list (an NSIS header). */
@@ -60,19 +78,20 @@ export function macDistribution(template, { version, componentPkg, def = loadAiA
   const comps = macComponents(def);
   const comp = (choice) => comps.find((c) => c.choice === choice);
   const outline = ["main", ...def.apps.flatMap((a) => [`app-${a.id}`, `app-${a.id}-missing`]), "tunnel", "summary"].map((c) => `        <line choice="${c}"/>`);
+  const titles = macTitles(def);
   const choices = [
-    `    <choice id="main" title="Surehand MCP" description="${xml("The Surehand MCP server, its private Node.js and the After Effects panel, for your Mac account only.")}" enabled="false" selected="true">`,
+    `    <choice id="main" title="${xml(titles.main)}" description="${xml("The Surehand MCP server, its private Node.js and the After Effects panel, for your Mac account only.")}" enabled="false" selected="true">`,
     `        <pkg-ref id="${PKG_ID}"/>`,
     "    </choice>",
     ...def.apps.flatMap((a) => [
       // found on this Mac: ticked (the user can untick it)
-      `    <choice id="app-${a.id}" title="${xml(`Connect ${a.name}`)}" description="${xml(MAC_NOTE)}" visible="found('${a.id}')" start_selected="found('${a.id}')">`,
+      `    <choice id="app-${a.id}" title="${xml(titles.apps[a.id])}" description="${xml(MAC_NOTE)}" visible="found('${a.id}')" start_selected="found('${a.id}')">`,
       `        <pkg-ref id="${comp(`app-${a.id}`).id}"/>`,
       "    </choice>",
-      // not found: shown greyed out, nothing to install
-      `    <choice id="app-${a.id}-missing" title="${xml(`Connect ${a.name} (not found on this Mac)`)}" description="${xml(`${a.name} was not found on this Mac. Install it, then run this installer again. ${MAC_NOTE}`)}" visible="!found('${a.id}')" enabled="false" selected="false"/>`,
+      // not found: shown greyed out, nothing to install; the description says why
+      `    <choice id="app-${a.id}-missing" title="${xml(titles.apps[a.id])}" description="${xml(`${a.name} was not found on this Mac. Install it, then run this installer again. ${MAC_NOTE}`)}" visible="!found('${a.id}')" enabled="false" selected="false"/>`,
     ]),
-    `    <choice id="tunnel" title="${xml(`${def.web.title} (downloads cloudflared, 20 MB)`)}" description="${xml("Downloads Cloudflare's cloudflared into ~/.surehand/bin for the secure link ChatGPT on the web uses. You can also do this later in the Surehand panel.")}" start_selected="${def.web.default ? "true" : "false"}">`,
+    `    <choice id="tunnel" title="${xml(titles.tunnel)}" description="${xml("Downloads Cloudflare's cloudflared (20 MB) into ~/.surehand/bin for the secure link ChatGPT on the web uses. You can also do this later in the Surehand panel.")}" start_selected="${def.web.default ? "true" : "false"}">`,
     `        <pkg-ref id="${comp("tunnel").id}"/>`,
     "    </choice>",
     // the last step: what happened, at the top of ~/.surehand/ae/install.log
