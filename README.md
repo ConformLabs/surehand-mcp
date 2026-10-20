@@ -87,7 +87,7 @@ The installer:
   Copilot's Agent mode), **Windsurf / Devin Desktop** (`~/.config/devin/mcp_config.json`, `%APPDATA%\devin` on Windows,
   and Windsurf's `~/.codeium/windsurf/mcp_config.json` while that folder is there) and **LM Studio** (`~/.lmstudio/mcp.json`)
   if they are installed, under the name `surehand-ae`. Before a config file is changed, a timestamped backup is made next to it
-  (`*.surehand-<time>.bak`, the newest five are kept); the very first original also stays as `*.surehand.bak`. If Claude Desktop is open it offers to restart it,
+  (`*.surehand-<time>.bak`, the newest three are kept); the very first original also stays as `*.surehand.bak`. If Claude Desktop is open it offers to restart it,
   because a running Claude Desktop overwrites its config file
 - writes the Surehand skills (see "Skills" below) for the AI apps that read skill files, and the zips to upload in
   Claude Desktop chat
@@ -550,7 +550,7 @@ checkedAt, notes?}` (installs nothing). Errors come as `{error}`. The panel runs
   everything Surehand can, including `config.json`; Surehand's permissions are guardrails against mistakes, not a
   sandbox against such a program.
 - Settings files of AI apps are only changed when they can be read (a file with a mistake in it is left as it is and
-  reported), with a timestamped backup first (the newest five are kept) and an atomic write.
+  reported), with a timestamped backup first (the newest three are kept) and an atomic write.
 
 ## Development
 

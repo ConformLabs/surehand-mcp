@@ -89,7 +89,7 @@ export function claudeDesktopRunning(): boolean {
 //
 // These files belong to the AI apps. They are only changed when they can be read: one that is there
 // but can't be parsed (half-written, a typo...) is left alone and the problem reported, never
-// replaced with just our entry. Every change makes a timestamped backup first (the newest five are
+// replaced with just our entry. Every change makes a timestamped backup first (the newest three are
 // kept) and is written atomically. Cursor and VS Code accept comments and trailing commas. VS Code
 // keeps its servers under "servers" (with type "stdio"), the others under "mcpServers".
 

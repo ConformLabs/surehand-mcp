@@ -137,7 +137,7 @@ export function readJson<T = any>(file: string, fallback: T): T {
   }
 }
 
-/** A timestamped backup (the newest five are kept) before every change of a settings file. */
+/** A timestamped backup (the newest three are kept) before every change of a settings file. */
 export function backupBeforeWrite(file: string) {
   backupFile(file);
 }

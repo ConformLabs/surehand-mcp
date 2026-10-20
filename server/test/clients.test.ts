@@ -258,7 +258,7 @@ describe("AI app settings files are never lost (unreadable, BOM, comments)", () 
     expect(readFileSync(util.cursorConfig() + ".surehand.bak", "utf8")).toMatch(/\/\/ my servers/); // the original, comments and all
   });
 
-  it("every change is backed up first (timestamped, the newest five kept) and written atomically", () => {
+  it("every change is backed up first (timestamped, the newest three kept) and written atomically", () => {
     put(util.cursorConfig(), { mcpServers: { other: FOREIGN } });
     for (let i = 0; i < 4; i++) {
       clients.connectClient("cursor", ENTRY());
@@ -266,7 +266,7 @@ describe("AI app settings files are never lost (unreadable, BOM, comments)", () 
     }
     const dir = dirname(util.cursorConfig());
     const names = readdirSync(dir);
-    expect(names.filter((n) => /^mcp\.json\.surehand-\d{8}-\d{6}-\d{3}(-\d+)?\.bak$/.test(n))).toHaveLength(5);
+    expect(names.filter((n) => /^mcp\.json\.surehand-\d{8}-\d{6}-\d{3}(-\d+)?\.bak$/.test(n))).toHaveLength(3);
     expect(names.filter((n) => n.endsWith(".tmp"))).toEqual([]);
     expect(json(util.cursorConfig()).mcpServers).toEqual({ other: FOREIGN });
   });
