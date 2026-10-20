@@ -8,8 +8,14 @@ const pkg = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), 
 // Embed the After Effects (CEP) extension so the single-file server can install/update it itself.
 // The files include the extension's signature (scripts/sign-extension.mjs), so they are written
 // byte for byte as signed.
+// Text files go in as strings, binary ones (the panel's fonts) as base64.
 const cepFiles = readCepFiles(pkg.version);
-const cepHash = createHash("sha1").update(JSON.stringify(cepFiles)).digest("hex").slice(0, 12);
+const cepText = {}, cepBinary = {};
+for (const [rel, content] of Object.entries(cepFiles)) {
+  if (typeof content === "string") cepText[rel] = content;
+  else cepBinary[rel] = content.toString("base64");
+}
+const cepHash = createHash("sha1").update(JSON.stringify(cepText)).update(JSON.stringify(cepBinary)).digest("hex").slice(0, 12);
 
 await build({
   entryPoints: ["src/index.ts"],
@@ -23,7 +29,8 @@ await build({
   alias: { "@babel/standalone": "@babel/standalone/babel.min.js" },
   define: {
     __AEMCP_VERSION__: JSON.stringify(pkg.version),
-    __AEMCP_CEP_FILES__: JSON.stringify(cepFiles),
+    __AEMCP_CEP_FILES__: JSON.stringify(cepText),
+    __AEMCP_CEP_BINARY__: JSON.stringify(cepBinary),
     __AEMCP_CEP_HASH__: JSON.stringify(cepHash),
   },
   banner: {

@@ -250,8 +250,10 @@
 
   // ---------- header: status, pause ----------
   function status() {
-    if (S.connecting) return { kind: "idle", tile: "gray", text: "Connecting to After Effects\u2026", short: "Connecting", connecting: true };
-    if (!isPausedNow() && !S.pending.length && UI.workingView(S.health, S.busySince ? Date.now() - S.busySince : null)) return { kind: "ready", tile: "green", text: "Working\u2026", short: "Working" };
+    if (S.connecting) return { kind: "idle", tile: "gray", glyph: "pending", text: "Connecting to After Effects\u2026", short: "Connecting", connecting: true };
+    var w = !isPausedNow() && !S.pending.length && UI.workingView(S.health, S.busySince ? Date.now() - S.busySince : null);
+    if (w && w.waiting) return { kind: "ready", tile: "green", glyph: "waiting", text: "Waiting for After Effects", short: "Waiting" };
+    if (w) return { kind: "ready", tile: "green", glyph: "verified", text: "Working\u2026", short: "Working" };
     return UI.statusFor({
       bridgeError: S.bridgeError, paused: isPausedNow(), pendingCount: S.pending.length,
       client: UI.lastClient(S.activity), everConnected: S.activity.length > 0, apps: S.apps,
@@ -278,19 +280,17 @@
   function renderHeader() {
     var st = status();
     $("status").className = "status " + st.kind;
+    $("statusGlyph").className = "g g-sm g-" + st.glyph;
     $("statusText").textContent = S.layout === "narrow" ? st.short : st.text;
     $("status").title = st.text;
-    $("tile").setAttribute("class", "tile " + st.tile);
     var paused = isPausedNow();
     $("pause").hidden = paused;
     $("resume").hidden = !paused;
-    var note = $("pausedNote");
-    note.hidden = !paused;
-    if (paused) {
-      var n = S.paused && S.paused.refused || 0;
-      note.textContent = "Nothing runs in After Effects. AI calls are refused at once, so the AI stops instead of waiting." +
-        (n ? " " + n + " refused so far." : "");
-    }
+    $("pausedNote").hidden = !paused;
+    var n = paused && S.paused && S.paused.refused || 0;
+    $("pausedCount").hidden = !n;
+    $("pausedN").textContent = n ? String(n) : "";
+    renderModeDesc();
     var host = AEMCPBridge.hostInfo();
     $("hostLabel").textContent = UI.aeLabel(host.appVersion);
     var upd = S.update && S.update.latest && UI.cmpVersions(S.update.latest, AEMCPBridge.VERSION) > 0;
@@ -316,12 +316,17 @@
   $("resume").onclick = function () { setPaused(false); };
 
   // ---------- mode switch (config permissions.mode) ----------
-  var MODE_ICONS = {
-    full: function (ink) { return '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M6.8 1 2.5 6.8h3L5 11l4.5-6H6.4z" fill="' + ink + '"></path></svg>'; },
-    ask: function (ink) { return '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="' + ink + '" stroke-width="1.4" aria-hidden="true"><path d="M3.5 6.5V3.2a.9.9 0 0 1 1.8 0v2.6M5.3 5.4V2.4a.9.9 0 0 1 1.8 0v3M7.1 5.4V3a.9.9 0 0 1 1.8 0v3.8c0 2-1.4 3.7-3.3 3.7-1.4 0-2.2-.7-2.9-1.9L1.9 7a.9.9 0 0 1 1.6-.9"></path></svg>'; },
-    "read-only": function (ink) { return '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="' + ink + '" stroke-width="1.4" aria-hidden="true"><path d="M1 6s2-3.6 5-3.6S11 6 11 6 9 9.6 6 9.6 1 6 1 6z"></path><circle cx="6" cy="6" r="1.5"></circle></svg>'; },
-  };
   var shownModes = "";
+  /**
+   * The mode's one line under the switch. While paused the block is dimmed and says when it applies;
+   * while an approval waits the card says enough, so the line goes.
+   */
+  function renderModeDesc() {
+    var paused = isPausedNow(), def = UI.MODES.filter(function (m) { return m.id === UI.modeOf(S.cfg); })[0];
+    $("modeBox").className = "modes" + (paused ? " dim" : "");
+    $("modeDesc").textContent = paused ? "Applies when you resume." : def.desc;
+    $("modeDesc").hidden = !paused && !$("ask").hidden;
+  }
   function renderModes() {
     var mode = UI.modeOf(S.cfg), key = mode + S.layout;
     if (key === shownModes) return;
@@ -331,9 +336,7 @@
     UI.MODES.forEach(function (m) {
       var on = m.id === mode;
       var label = S.layout === "default" ? m.label : m.short;
-      var b = el("button", { type: "button", role: "radio", "aria-checked": on ? "true" : "false", "aria-label": m.label, tabindex: on ? "0" : "-1", "data-mode": m.id });
-      b.innerHTML = MODE_ICONS[m.id](on ? "#14161A" : "#C9C6BF") + "<span></span>";
-      b.lastChild.textContent = label;
+      var b = el("button", { type: "button", role: "radio", "aria-checked": on ? "true" : "false", "aria-label": m.label, tabindex: on ? "0" : "-1", "data-mode": m.id, text: label });
       b.onclick = function () { setMode(m.id); };
       b.onkeydown = function (e) {
         var i = UI.MODES.indexOf(m), d = e.keyCode === 39 || e.keyCode === 40 ? 1 : e.keyCode === 37 || e.keyCode === 38 ? -1 : 0;
@@ -346,8 +349,7 @@
       };
       box.appendChild(b);
     });
-    var def = UI.MODES.filter(function (m) { return m.id === mode; })[0];
-    $("modeDesc").textContent = S.layout === "narrow" ? def.narrow : def.desc;
+    renderModeDesc();
   }
   function setMode(id) {
     if (UI.modeOf(S.cfg) === id) return;
@@ -388,17 +390,22 @@
     if (Date.now() < goneUntil) {
       $("ask").hidden = true;
       $("askGone").hidden = false;
+      renderModeDesc();
       return;
     }
     $("askGone").hidden = true;
     $("ask").hidden = !p;
+    renderModeDesc();
     if (!p) { shownAsk = null; return; }
     var waiting = S.pending.filter(function (x) { return !S.answering[x.id]; }).length;
-    $("askTime").textContent = UI.countdown(p.deadline || new Date(Date.parse(p.at) + 600000).toISOString(), Date.now());
-    $("askHint").textContent = "Esc denies" + (waiting > 1 ? " \u00b7 " + (waiting - 1) + " more after this" : "");
+    var left = UI.countdownView(p.deadline || new Date(Date.parse(p.at) + 600000).toISOString(), Date.now());
+    $("askTime").textContent = left.text;
+    $("askTime").className = "time num" + (left.urgent ? " urgent" : "");
+    $("askHint").textContent = "Esc denies \u00b7 no key allows" + (waiting > 1 ? " \u00b7 " + (waiting - 1) + " more after this" : "");
     if (shownAsk === p.id) return;
     shownAsk = p.id;
     askOpen = false;
+    askFull = false;
     armedAt = Date.now();
     setArmed(false);
     clearTimeout(armTimer);
@@ -411,17 +418,26 @@
     var chips = $("askChips");
     chips.innerHTML = "";
     v.chips.forEach(function (c) { chips.appendChild(el("span", { cls: "chip" + (c.danger ? " danger" : ""), text: c.text })); });
-    $("askShow").textContent = /script/i.test(p.tool) ? "Show the script" : "Show the details";
-    $("askShow").setAttribute("aria-expanded", "false");
-    $("askCode").textContent = v.code;
-    $("askCode").hidden = true;
+    askView = v;
+    askIsScript = /script/i.test(p.tool);
+    drawPreview();
     pollPending(); // tell the bridge which request is on screen
   }
+  /** The script (or the call's details): opened by itself, capped, when a chip is a danger chip (UI.previewView). */
+  var askView = null, askIsScript = false, askFull = false;
+  function drawPreview() {
+    var pv = UI.previewView(askView, askIsScript, { open: askOpen, full: askFull });
+    $("askCode").textContent = pv.text;
+    $("askCode").hidden = !pv.open;
+    $("askShow").hidden = !pv.toggle;
+    $("askShow").textContent = pv.toggle || "";
+    $("askShow").setAttribute("aria-expanded", (pv.danger ? askFull : askOpen) ? "true" : "false");
+  }
   $("askShow").onclick = function () {
-    askOpen = !askOpen;
-    $("askCode").hidden = !askOpen;
-    $("askShow").setAttribute("aria-expanded", askOpen ? "true" : "false");
-    $("askShow").textContent = (askOpen ? "Hide" : "Show") + (/script/.test($("askShow").textContent) ? " the script" : " the details");
+    if (!askView) return;
+    if (UI.previewView(askView, askIsScript, {}).danger) askFull = !askFull;
+    else askOpen = !askOpen;
+    drawPreview();
   };
   function answer(allow) {
     var p = currentAsk();
@@ -481,11 +497,17 @@
     var box = $("setup");
     box.hidden = !(st.kind === "idle" && !st.connecting) && st.kind !== "problem";
     if (box.hidden) return;
+    // the main action is green; "Connect another AI app" next to apps that are set up is not
+    var setBtn = function (text, main, onclick) {
+      $("setupBtn").hidden = false;
+      $("setupBtn").textContent = text;
+      $("setupBtn").className = "btn small" + (main ? " main" : "");
+      $("setupBtn").onclick = onclick;
+    };
+    $("setupLabel").textContent = st.kind === "problem" ? "Problem" : "Next";
     if (st.kind === "problem") {
       $("setupText").textContent = st.text + ".";
-      $("setupBtn").hidden = false;
-      $("setupBtn").textContent = "Test the connection";
-      $("setupBtn").onclick = function () { openScreen("test"); };
+      setBtn("Test the connection", true, function () { openScreen("test"); });
       $("setupHint").textContent = "It finds what\u2019s wrong and how to fix it.";
       return;
     }
@@ -498,25 +520,19 @@
       var names = configured.map(function (c) { return c.name; });
       $("setupText").textContent = (names.length > 2 ? names.slice(0, 2).join(", ") + " and others are" : names.join(" and ") + (names.length > 1 ? " are" : " is")) +
         " set up. Open " + (names.length > 1 ? "one" : "it") + " (or restart it), then ask it something about your After Effects project, like \u201cWhat\u2019s in my project?\u201d";
-      $("setupBtn").hidden = true;
-      $("setupHint").textContent = "It shows as connected here as soon as the app has started. Other apps: \u2630 \u203a Connect an AI app.";
+      setBtn("Connect another AI app", false, function () { openScreen("connect"); });
+      $("setupHint").textContent = "It shows as connected here as soon as the app has started.";
     } else if (pick) {
       $("setupText").textContent = pick.name + " isn\u2019t set up yet.";
-      $("setupBtn").hidden = false;
-      $("setupBtn").textContent = "Set it up";
-      $("setupBtn").onclick = function () { connectClient(pick, true); };
+      setBtn("Set it up", true, function () { connectClient(pick, true); });
       $("setupHint").textContent = "Then restart " + pick.name + ". Other apps: \u2630 \u203a Connect an AI app.";
     } else if (S.activity.length) {
       $("setupText").textContent = "Open your AI app, then ask it something about your After Effects project.";
-      $("setupBtn").hidden = false;
-      $("setupBtn").textContent = "Connect an AI app";
-      $("setupBtn").onclick = function () { openScreen("connect"); };
+      setBtn("Connect an AI app", true, function () { openScreen("connect"); });
       $("setupHint").textContent = "It shows as connected here as soon as the app has started.";
     } else {
       $("setupText").textContent = "No AI app has used Surehand yet.";
-      $("setupBtn").hidden = false;
-      $("setupBtn").textContent = "Connect an AI app";
-      $("setupBtn").onclick = function () { openScreen("connect"); };
+      setBtn("Connect an AI app", true, function () { openScreen("connect"); });
       $("setupHint").textContent = "Set one up, then restart that app.";
     }
   }
@@ -605,14 +621,12 @@
   }
 
   // ---------- feed ----------
-  var ICONS = {
-    change: '<svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M5 1 9 5 5 9 1 5z" fill="#3DD68C"></path></svg>',
-    problem: '<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="#FF8A80" stroke-width="1.6" aria-hidden="true"><path d="M5 1.8v4M5 7.8v.4"></path></svg>',
-    blocked: '<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="#F2C97A" stroke-width="1.5" aria-hidden="true"><circle cx="5" cy="5" r="3.6"></circle><path d="M2.5 7.5l5-5"></path></svg>',
-    proof: '<svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="#3DD68C" stroke-width="1.7" aria-hidden="true"><path d="m2 5.8 2.2 2.2L9 3"></path></svg>',
-    read: '<svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="#8E8B85" stroke-width="1.2" aria-hidden="true"><path d="M1 5.5S3 2 5.5 2 10 5.5 10 5.5 8 9 5.5 9 1 5.5 1 5.5z"></path><circle cx="5.5" cy="5.5" r="1.4"></circle></svg>',
-    render: '<svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2.5 1.5v7L8.5 5z" fill="#14161A"></path></svg>',
-  };
+  // each row: a 12px status square, the title, the status word (CHANGED, PASSED, ...) and the time; below,
+  // what it did (the change list in the machine-output box for the newest change) and its actions
+  var PLAY = '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 1v10l9-5z" fill="#F2EFE8"></path></svg>';
+  function glyph(name, label) {
+    return el("span", { cls: "g g-" + name, role: label ? "img" : null, "aria-label": label || null, "aria-hidden": label ? null : "true" });
+  }
   var shownWorking = "";
   function renderWorking() {
     var w = UI.workingView(S.health, S.busySince ? Date.now() - S.busySince : null), box = $("working");
@@ -622,9 +636,11 @@
     box.hidden = !w;
     box.innerHTML = "";
     if (!w) return;
+    // waiting for After Effects: the amber note with its label; working: a quiet row with a pulsing square
     box.className = "working" + (w.waiting ? " waiting" : "");
-    box.appendChild(el("div", { cls: "row1" }, [el("span", { cls: "wtitle" }, [el("span", { cls: "spin", "aria-hidden": "true" }), el("span", { text: w.text })]),
-      el("span", { cls: "time num", text: w.time })]));
+    var head = w.waiting ? el("span", { cls: "wtitle" }, [el("span", { cls: "label", text: w.text })])
+      : el("span", { cls: "wtitle" }, [el("span", { cls: "g g-pending pulse", "aria-hidden": "true" }), el("span", { cls: "ttl", text: w.text })]);
+    box.appendChild(el("div", { cls: "row1" }, [head, el("span", { cls: "time num", text: w.time })]));
     if (w.line) box.appendChild(el("div", { cls: "line", text: w.line }));
   }
   $("allActivity").onclick = function () { openScreen("history"); };
@@ -634,7 +650,7 @@
     var running = {};
     S.renders.forEach(function (r) { running[r.id] = true; });
     var items = UI.feedItems(S.activity, { limit: Math.max(1, limit - S.renders.length), undone: S.undone, runningRenders: running, current: S.current });
-    var key = JSON.stringify([S.layout, S.renders, S.activity.length, S.apps, items.map(function (i) { return [i.at, i.title, i.line, i.undoable, !!S.open[UI.entryKey(i.entry)]]; })]);
+    var key = JSON.stringify([S.layout, S.renders, S.activity.length, S.apps, items.map(function (i) { return [i.at, i.title, i.line, i.undoable, i.undoBlocked, !!S.open[UI.entryKey(i.entry)]]; })]);
     if (!force && key === shownFeed) return;
     shownFeed = key;
     var feed = $("feed");
@@ -642,47 +658,77 @@
     S.renders.forEach(function (r) { feed.appendChild(renderItem(r)); });
     items.forEach(function (it, k) { feed.appendChild(feedItem(it, k === 0)); });
     if (!items.length && !S.renders.length) feed.appendChild(el("div", { cls: "empty", text: S.apps && S.apps.length
-      ? UI.appsText(S.apps) + (S.apps.length > 1 ? " are" : " is") + " connected. Ask it something about your After Effects project, like \u201cWhat\u2019s in my project?\u201d What it does shows up here."
+      ? UI.appsText(S.apps) + (S.apps.length > 1 ? " are" : " is") + " connected. Ask it something about your After Effects project, like “What’s in my project?” What it does shows up here."
       : "What the AI does in After Effects shows up here." }));
     var shownEntries = items.reduce(function (n, i) { return n + (i.count || 1); }, 0);
     $("allActivity").hidden = S.layout === "narrow" || S.activity.length <= shownEntries;
   }
+  /** A background render: play glyph, "Background render · Main", a 4px bar, "frame 126 of 300 · 1:12 left". */
   function renderItem(r) {
     var pct = r.pct === null || r.pct === undefined ? null : r.pct;
     var label = pct === null ? "frame " + (r.frame || 0) : pct + "%";
     var bar = el("div", { cls: "bar" + (pct === null ? " indet" : ""), "aria-hidden": "true" }, [el("div", { style: "width:" + (pct || 0) + "%" })]);
-    var title = "Rendering " + (r.comp || "in the background");
+    var title = "Background render · " + (r.comp || "in the background");
+    var sub = [r.frames ? "frame " + (r.frame || 0) + " of " + r.frames : "frame " + (r.frame || 0), r.left].filter(Boolean).join(" · ");
     var body = el("div", { cls: "body" }, [
-      el("div", { cls: "row1" }, [el("span", { cls: "title", text: title }), el("span", { cls: "pct num", text: label })]),
+      el("div", { cls: "row1" }, [el("span", { cls: "tline" }, [el("span", { cls: "title", text: title })]), el("span", { cls: "pct num", text: label })]),
       bar,
+      el("div", { cls: "rsub mono-s num", text: sub }),
     ]);
-    var side = el("span", { cls: "side-act pct num", text: label + (r.left && S.layout === "wide" ? " \u00b7 " + r.left : "") });
-    var ico = el("span", { cls: "ico render", html: ICONS.render });
+    var side = el("span", { cls: "side-act pct num", text: label + (r.left && S.layout === "wide" ? " · " + r.left : "") });
+    var ico = el("span", { html: PLAY, "aria-hidden": "true" }).firstChild;
     return el("div", { cls: "item render", role: "listitem", "aria-label": title + ", " + label }, [ico, body, side]);
+  }
+  /** The change list in the machine-output box: "Title › Opacity" then "<s>100</s> → 0" (at most 2, then "+N more"). */
+  function changeReport(list) {
+    var box = el("div", { cls: "report" });
+    list.slice(0, 2).forEach(function (l) {
+      var c = UI.changeParts(l);
+      box.appendChild(el("span", { text: c.path }));
+      if (c.from !== undefined) box.appendChild(el("span", {}, [el("s", { text: c.from }), " → " + c.to]));
+    });
+    if (list.length > 2) box.appendChild(el("span", { cls: "muted", text: "+" + (list.length - 2) + " more" }));
+    return box;
+  }
+  /** One line for a change: "Title › Opacity <s>100</s> → 0 · +1" (the first change, then how many more). */
+  function changeInline(list) {
+    var c = UI.changeParts(list[0]), out = [c.path];
+    if (c.from !== undefined) out.push(" ", el("s", { text: c.from }), " \u2192 " + c.to);
+    if (list.length > 1) out.push(" \u00b7 +" + (list.length - 1));
+    return out;
   }
   function feedItem(it, first) {
     var k = UI.entryKey(it.entry), open = !!S.open[k];
-    var cls = "item " + it.kind + (first && it.kind === "change" ? " top-change" : "");
+    var st = UI.statusOf(it);
+    var cls = "item " + it.kind + (it.undoable ? " can-undo" : "");
     var time = UI.hhmm(it.at);
+    var list = it.entry.changeList || it.entry.changeLines;
+    // the software's own words (file names, change lists, what was read) are mono
+    var monoLine = it.kind === "read" || it.kind === "proof" || it.kind === "change";
     var title = el("span", { cls: "title", text: it.title });
-    var inline = el("span", { cls: "inline", text: (it.line ? " \u00b7 " + it.line : "") + " \u00b7 " + time });
-    var row1 = el("div", { cls: "row1" }, [el("span", { style: "min-width:0;overflow:hidden;text-overflow:ellipsis" }, [title, inline]), el("span", { cls: "time", text: time })]);
+    var lineKids = list && list.length && it.kind === "change" ? changeInline(list) : [it.line];
+    var inline = el("span", { cls: "inline" + (monoLine ? " time" : " muted") }, it.line ? [" "].concat(lineKids) : []);
+    var meta = el("span", { cls: "meta" }, [st.word ? el("span", { cls: "st st-" + st.glyph, text: st.word }) : null, el("span", { cls: "time num", text: time })]);
+    var row1 = el("div", { cls: "row1" }, [el("span", { cls: "tline" }, [title, inline]), meta]);
     var body = el("div", { cls: "body" }, [row1]);
     var details = it.kind === "read" && !it.group ? null : function () { toggleDetails(k); };
-    body.appendChild(el("div", { cls: "line", text: it.line }));
+    if (first && it.kind === "change" && list && list.length) body.appendChild(changeReport(list));
+    else body.appendChild(el("div", { cls: "line" + (monoLine ? " mono" : "") }, it.line ? lineKids : []));
     var acts = el("div", { cls: "acts" });
     var side = el("div", { cls: "side-act" });
     if (it.undoable) {
-      acts.appendChild(button("link green", "Undo", function () { undo(it); }, { "aria-label": "Undo " + it.title }));
-      side.appendChild(button("link green", "Undo", function () { undo(it); }, { "aria-label": "Undo " + it.title }));
+      acts.appendChild(button("btn small", "Undo", function () { undo(it); }, { "aria-label": "Undo " + it.title }));
+      side.appendChild(button("btn small", "Undo", function () { undo(it); }, { "aria-label": "Undo " + it.title }));
     }
     if (it.kind === "change" || it.kind === "problem") {
-      if (first) acts.appendChild(button("link", open ? "Hide details" : "Details", details, { "aria-expanded": open ? "true" : "false" }));
+      if (first) acts.appendChild(button("link under", open ? "Hide details" : "Details", details, { "aria-expanded": open ? "true" : "false" }));
       // the two-column layout has room for "Show" on problems (the boards show it there only)
-      if (!it.undoable && it.kind === "problem") side.appendChild(button("link wide-only", open ? "Hide" : "Show", details, { "aria-expanded": open ? "true" : "false", "aria-label": "Show " + it.title }));
+      if (!it.undoable && it.kind === "problem") side.appendChild(button("btn small wide-only", open ? "Hide" : "Show", details, { "aria-expanded": open ? "true" : "false", "aria-label": "Show " + it.title }));
     }
     if (acts.children.length) body.appendChild(acts);
-    var node = el("div", { cls: cls + (details ? " clickable" : ""), role: "listitem" }, [el("span", { cls: "ico " + it.kind, html: ICONS[it.kind] }), body, side]);
+    // Undo isn't possible any more: say why, instead of a button that can't work
+    if (it.undoBlocked) body.appendChild(el("div", { cls: "noundo", text: "Can’t undo here: the project changed since. Use Edit › Undo in After Effects." }));
+    var node = el("div", { cls: cls + (details ? " clickable" : ""), role: "listitem" }, [glyph(st.glyph, st.word || "Read only"), body, side]);
     if (details) {
       node.title = open ? "Click to hide what happened" : "Click for what happened";
       node.onclick = function (ev) { if (ev.target.tagName !== "BUTTON" && !(window.getSelection && String(window.getSelection()))) details(); };
@@ -754,7 +800,8 @@
     document.body.removeChild(ta);
     return ok;
   }
-  function copyDiagnostics() {
+  /** done(ok): the menu's row shows COPIED itself; otherwise (After Effects' flyout) a toast says so. */
+  function copyDiagnostics(done) {
     var p = P();
     var lines = ["### Surehand MCP diagnostics", "time: " + new Date().toISOString()];
     var host = AEMCPBridge.hostInfo();
@@ -776,7 +823,9 @@
       lines.push(err ? "bridge eval: ERROR " + err.message : String(r));
       lines.push("recent activity:");
       S.activity.slice(0, 15).reverse().forEach(function (e) { lines.push("  " + e.at + " " + (e.ok ? "ok " : "ERR") + " " + e.ms + "ms " + e.tool + " " + (e.summary || "").slice(0, 120)); });
-      if (copyText(lines.join("\n"))) toast("Diagnostics copied: paste them in a bug report or a chat");
+      var ok = copyText(lines.join("\n"));
+      if (ok && done) return done(true);
+      if (ok) toast("Diagnostics copied: paste them in a bug report or a chat");
       else toast("Could not copy to the clipboard.", true);
     });
   }
@@ -797,7 +846,7 @@
       item("hdrTools", "Tools the AI sees", { disabled: true }) + item("toolsCore", "Core (faster)", { check: !all }) + item("toolsAll", "All tools", { check: all }) + sep +
       item("connect", "Connect an AI app\u2026") + item("checkpoints", "Checkpoints\u2026") + item("history", "Activity history\u2026") + sep +
       item("test", "Test the connection") + item("diag", "Copy diagnostics") + sep +
-      item("update", "Check for updates\u2026") + item("about", "About & help\u2026") +
+      item("update", "Check for updates\u2026") + item("about", "About and help\u2026") +
       "</Menu>";
   }
   var shownMenu = "";
@@ -846,11 +895,13 @@
     test: { title: "Connection test", render: screenTest },
     chatgpt: { title: "ChatGPT on the web", render: screenChatgpt, parent: "connect" },
     update: { title: "Updates", render: screenUpdate },
-    about: { title: "About & help", render: screenAbout },
+    about: { title: "About and help", render: screenAbout },
   };
   var lastFocus = null, screenToken = 0;
-  function openScreen(id, from) {
+  function openScreen(id, from, backTo) {
     if (!S.screen) lastFocus = document.activeElement;
+    // Back goes here instead of the screen's parent (ChatGPT on the web opened from the menu goes back to it)
+    S.backTo = backTo || null;
     // Back from a screen opened in the menu goes to the menu; sub-screens keep their parent
     if (from !== undefined) S.from = from;
     else if (id === "menu" || !S.screen) S.from = null;
@@ -867,6 +918,7 @@
   function closeScreen() {
     S.screen = null;
     S.from = null;
+    S.backTo = null;
     screenToken++;
     $("screen").hidden = true;
     if (lastFocus && lastFocus.focus) try { lastFocus.focus(); } catch (e) {}
@@ -880,11 +932,12 @@
   function redrawLater() {
     var token = screenToken, id = S.screen;
     var from = S.from;
-    return function () { if (id && token === screenToken && S.screen === id) openScreen(id, from); };
+    var backTo = S.backTo;
+    return function () { if (id && token === screenToken && S.screen === id) openScreen(id, from, backTo); };
   }
   /** Back (and Esc): a sub-screen goes back to the screen it came from. */
   function goBack() {
-    var parent = S.screen && SCREENS[S.screen] && SCREENS[S.screen].parent || (S.screen !== "menu" && S.from);
+    var parent = S.backTo || S.screen && SCREENS[S.screen] && SCREENS[S.screen].parent || (S.screen !== "menu" && S.from);
     if (parent) openScreen(parent);
     else closeScreen();
   }
@@ -913,13 +966,13 @@
         var state, btn = null;
         if (web) {
           state = c.note || (c.configured ? "Running" : "Not running");
-          btn = button(c.configured ? "secondary pill sm" : "primary pill sm", c.configured ? "Open" : "Start", function () { openScreen("chatgpt"); },
+          btn = button("btn small", c.configured ? "Open" : "Start", function () { openScreen("chatgpt"); },
             { "aria-label": (c.configured ? "Open " : "Start ") + c.name });
         } else {
           state = c.configured ? (inUse ? "Connected \u00b7 in use now" : "Connected" + (c.note ? " \u00b7 " + shortNote(c.note) : ""))
             : c.installed === false ? "Not installed" : "Not connected" + (c.note ? " \u00b7 " + shortNote(c.note) : "");
           if (c.configured) btn = button("link", "Remove", function () { disconnectClient(c); }, { "aria-label": "Remove " + c.name });
-          else if (c.installed !== false) btn = button("primary pill sm", "Set up", function () { connectClient(c); }, { "aria-label": "Set up " + c.name });
+          else if (c.installed !== false) btn = button("btn small", "Set up", function () { connectClient(c); }, { "aria-label": "Set up " + c.name });
         }
         list.appendChild(el("div", { cls: "client" + (c.configured ? "" : " unset") }, [
           el("span", { cls: "cdot", "aria-hidden": "true" }),
@@ -1049,7 +1102,7 @@
       body.innerHTML = "";
       if (err) return message(body, "After Effects isn\u2019t answering: " + err.message);
       if (!project) return message(body, "Save your project first: checkpoints are copies of a saved project.");
-      action.appendChild(button("primary pill sm", "Save one now", function (ev) { saveCheckpoint(project, token, ev && ev.target); }));
+      action.appendChild(button("btn small main", "Save one now", function (ev) { saveCheckpoint(project, token, ev && ev.target); }));
       var intro = el("div", { cls: "intro" }, ["Safety copies of ", el("span", { cls: "ink", text: path.basename(project) }),
         ". Opening one makes a new file next to your project; your project is never overwritten."]);
       body.appendChild(intro);
@@ -1071,17 +1124,17 @@
     var acts = el("div", { cls: "cp-acts" });
     var out = el("div", { cls: "diffout", hidden: true });
     var canCompare = fromCli && (cp.history || cp.hasHistory || cp.canCompare || cp.snapshot);
-    if (canCompare) acts.appendChild(button("btn-green-outline", "Compare with now", function () {
+    if (canCompare) acts.appendChild(button("btn small", "Compare with now", function () {
       out.hidden = false;
       out.textContent = "Comparing\u2026";
       runCli(["checkpoint-diff", cp.id, "--project", project], still(token, function (err, json, text) {
         drawDiff(out, err ? err.friendly : (json && (json.text || json.message || json.error)) || text || "No differences.");
       }), { since: "1.4.0", text: true, timeout: 120000, asPanel: true });
     }));
-    acts.appendChild(button("btn-plain", "Open a copy", function () { openCheckpoint(project, cp); }));
+    acts.appendChild(button("btn small", "Open a copy", function () { openCheckpoint(project, cp); }));
     if (fromCli && !canCompare) acts.appendChild(el("span", { cls: "muted2", text: "no history snapshot" }));
     return el("div", { cls: "cp" }, [
-      el("div", { cls: "cp-row" }, [el("span", { cls: "ink", style: "font-weight:600", text: cp.label || cp.id }), el("span", { cls: "muted2", text: UI.whenLabel(cp.at, Date.now()) })]),
+      el("div", { cls: "cp-row" }, [el("span", { cls: "ink", style: "font-weight:600", text: cp.label || cp.id }), el("span", { cls: "muted2 num", text: UI.whenLabel(cp.at, Date.now()) })]),
       acts, out,
     ]);
   }
@@ -1172,7 +1225,7 @@
       filters.appendChild(b);
     });
     body.appendChild(el("div", { cls: "hsearch" }, [el("label", { "for": "hsearch", cls: "sr", text: "Search the history" }), search, filters]));
-    var list = el("div", { cls: "list", style: "gap:0" });
+    var list = el("div", { cls: "list" });
     body.appendChild(list);
     body.appendChild(el("div", { cls: "sfoot" }, [el("span", { text: "Click an entry for what changed" }), button("link green", "Open log file", openLogFile)]));
     var open = {};
@@ -1190,13 +1243,15 @@
         if (d !== day) { day = d; list.appendChild(el("div", { cls: "day", text: d })); }
         var k = UI.entryKey(x.e);
         var sub = [x.item.line, manyApps ? UI.clientName(x.e.client) : null].filter(Boolean).join(" \u00b7 ");
-        var row = el("button", { type: "button", cls: "hrow" + (x.item.kind === "problem" ? " bad" : x.item.kind === "blocked" ? " blocked" : ""), "aria-expanded": open[k] ? "true" : "false" }, [
-          el("span", { cls: "htime", text: UI.hhmm(x.e.at) }),
+        var st = UI.statusOf(x.item);
+        var row = el("button", { type: "button", cls: "hrow " + x.item.kind + (x.item.kind === "problem" ? " bad" : ""), "aria-expanded": open[k] ? "true" : "false" }, [
+          el("span", { cls: "g g-" + st.glyph, role: "img", "aria-label": st.word || "Read only" }),
+          el("span", { cls: "htime num", text: UI.hhmm(x.e.at) }),
           el("span", { cls: "hmain" }, [el("span", { cls: "htitle", text: x.item.title }), sub ? el("span", { cls: "hline", text: sub }) : null]),
         ]);
         row.onclick = function () { if (open[k]) delete open[k]; else open[k] = true; draw(); };
         list.appendChild(row);
-        if (open[k]) list.appendChild(el("pre", { cls: "details", style: "margin:0 6px 6px 50px", text: UI.entryDetails(x.e) }));
+        if (open[k]) list.appendChild(el("pre", { cls: "details", text: UI.entryDetails(x.e) }));
       });
       if (!shown) list.appendChild(el("div", { cls: "empty", text: all.length ? "Nothing matches." : "No activity yet." }));
     }
@@ -1211,11 +1266,9 @@
   }
 
   // Connection test
-  var CHECK = '<svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#3DD68C" stroke-width="2" aria-hidden="true"><path d="m3 7.4 2.6 2.6L11 4.4"></path></svg>';
-  var CROSS = '<svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#FF8A80" stroke-width="2" aria-hidden="true"><path d="m3.5 3.5 7 7M10.5 3.5l-7 7"></path></svg>';
   function screenTest(body, action, token) {
     action.innerHTML = "";
-    var again = button("secondary pill sm", "Run again", function () { openScreen("test"); });
+    var again = button("btn", "Run again", function () { openScreen("test"); });
     again.disabled = true;
     action.appendChild(again);
     loading(body, "Testing\u2026");
@@ -1245,32 +1298,67 @@
     again.disabled = false;
     body.innerHTML = "";
     var passed = checks.filter(function (c) { return c.ok; }).length, failed = checks.length - passed;
-    // as on the board: green while it basically works (a check or two to fix), red when it doesn't
-    var broken = !passed || (checks[0] && !checks[0].ok);
-    body.appendChild(el("div", { cls: "summary" + (broken ? " bad" : "") }, [
-      el("span", { cls: "badge", html: broken ? '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#14161A" stroke-width="2" aria-hidden="true"><path d="M7 3v5M7 10.5v.5"></path></svg>' : '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#14161A" stroke-width="2" aria-hidden="true"><path d="m3 7.4 2.6 2.6L11 4.4"></path></svg>' }),
-      el("div", {}, [el("div", { cls: "big", text: passed + " of " + checks.length + " checks passed" }),
-        el("div", { cls: "sub", text: failed ? (failed === 1 ? "One thing to fix below" : failed + " things to fix below") : "Everything works" })]),
+    // "8 of 9 checks passed" (numbers in mono), then "1 to fix · checked 14:06"
+    body.appendChild(el("div", { cls: "tsum" }, [
+      el("div", { cls: "tsum-title" }, [el("span", { cls: "mono", text: String(passed) }), " of ", el("span", { cls: "mono", text: String(checks.length) }), " checks passed"]),
+      el("span", { cls: "mono-s num", text: (failed ? failed + " to fix" : "Nothing to fix") + " · checked " + UI.hhmm(new Date().toISOString()) }),
     ]));
-    var list = el("div", { cls: "list", style: "gap:2px" });
-    checks.forEach(function (c) {
-      // the server's message says what was checked and what was found; its name ("update", "config"...) is a small label
-      var name = c.name || c.label || c.title || c.id;
-      var text = tilde(c.message || name);
-      name = CHECK_NAMES[name] || (c.message ? null : name);
-      var fixId = c.fix && (c.fix.connect || c.fix.client);
-      var fix = fixId ? button("primary pill sm", "Fix", function () { connectClient({ id: fixId, name: c.fix.name || name }); },
-        { title: c.fix.label || null, "aria-label": c.fix.label || "Fix: " + text }) : null;
-      list.appendChild(el("div", { cls: "check" + (c.ok ? "" : " bad") }, [
-        el("span", { html: c.ok ? CHECK : CROSS }),
-        el("span", { cls: "ctext" }, [c.message && name ? el("span", { cls: "clabel", text: name }) : null, el("span", { cls: "cmain", text: text })]),
-        fix,
-      ]));
-    });
+    // failing checks first, open, with what to do; the passing ones one line each
+    var list = el("div", { cls: "tlist" });
+    checks.filter(function (c) { return !c.ok; }).forEach(function (c) { list.appendChild(failedCheck(c)); });
+    checks.filter(function (c) { return c.ok; }).forEach(function (c) { list.appendChild(passedCheck(c)); });
     body.appendChild(list);
     if (note) message(body, note);
   }
-
+  /**
+   * A check as { label, text }: the server's message says what was checked and what was found; a known name
+   * ("update", "config"...) is the label, and "Claude Desktop: its settings ..." gives its own.
+   */
+  function checkText(c) {
+    var name = c.name || c.label || c.title || c.id;
+    var text = tilde(c.message || "");
+    var label = CHECK_NAMES[name] || null;
+    if (!label && text) {
+      var m = /^([^:.]{2,40}):\s+(.+)$/.exec(text);
+      if (m) { label = m[1]; text = m[2].charAt(0).toUpperCase() + m[2].slice(1); }
+    }
+    if (!text) text = tilde(name);
+    return { label: label, text: text };
+  }
+  /** Versions, years and paths in mono (what the software says or measures). */
+  function withMono(text) {
+    var out = [], re = /(~[\\/][^\s,;]+|\b\d+(?:\.\d+)+\b|\b(?:19|20)\d\d\b)/g, at = 0, m;
+    while ((m = re.exec(text))) {
+      if (m.index > at) out.push(text.slice(at, m.index));
+      out.push(el("span", { cls: "mono", text: m[1] }));
+      at = m.index + m[1].length;
+    }
+    if (at < text.length) out.push(text.slice(at));
+    return out;
+  }
+  function passedCheck(c) {
+    var t = checkText(c), text = t.text.replace(/\.$/, "");
+    return el("div", { cls: "check", title: (t.label ? t.label + ": " : "") + t.text }, [
+      el("span", { cls: "g g-verified", role: "img", "aria-label": "Passed" }),
+      el("span", { cls: "ctext" }, (t.label ? [el("span", { cls: "clabel-s", text: t.label + " · " })] : []).concat(withMono(text))),
+      el("span", { cls: "st st-verified", text: "Passed" }),
+    ]);
+  }
+  function failedCheck(c) {
+    var t = checkText(c);
+    var fixId = c.fix && (c.fix.connect || c.fix.client);
+    var label = c.fix && c.fix.label;
+    var fix = fixId ? button("btn small main", label || "Fix", function () { connectClient({ id: fixId, name: c.fix.name || t.label || fixId }); },
+      { "aria-label": label || "Fix: " + t.text }) : null;
+    return el("div", { cls: "check bad" }, [
+      el("span", { cls: "g g-failed", role: "img", "aria-label": "Failed" }),
+      el("div", { cls: "cbody" }, [
+        el("div", { cls: "chead" }, [el("span", { cls: "clabel", text: t.label || t.text }), el("span", { cls: "st st-failed", text: "Failed" })]),
+        t.label ? el("span", { cls: "cmain" }, withMono(t.text)) : null,
+        fix,
+      ]),
+    ]);
+  }
   // Updates
   function screenUpdate(body, action, token) {
     var cached = readJson(P().updateCheck);
@@ -1294,7 +1382,7 @@
       card.appendChild(el("div", { cls: "upd-head" }, [el("span", { cls: "v", text: latest + " is ready" }), el("span", { cls: "have", text: "you have " + current })]));
       var notes = u.notes || u.highlights;
       if (notes && notes.length) card.appendChild(el("ul", {}, notes.slice(0, 5).map(function (n) { return el("li", { text: n }); })));
-      var b = button("primary big", updating ? "Updating\u2026" : rt ? "Update now" : "Download", function () {
+      var b = button("btn main big", updating ? "Updating\u2026" : rt ? "Update now" : "Download", function () {
         if (!rt) return openUrl(u.url || REPO_URL + "/releases/latest");
         runUpdate(body, latest);
       });
@@ -1312,10 +1400,10 @@
       toast(autoOn ? "Surehand won\u2019t look for updates by itself." : "Surehand looks for updates once a day.");
       drawUpdate(body, u, checking, note);
     }, { title: "Click to turn " + (autoOn ? "off" : "on"), "aria-label": "Check automatically: " + (autoOn ? "once a day" : "off") + ". Click to turn " + (autoOn ? "off" : "on") });
-    if (!autoOn) autoBtn.style.color = "#A9A69F";
+    if (!autoOn) autoBtn.style.color = "#A6A49D";
     body.appendChild(el("div", { cls: "kv" }, [
       el("div", {}, [el("span", { text: "Check automatically" }), autoBtn]),
-      el("div", {}, [el("span", { text: "Last checked" }), el("span", { style: "color:#A9A69F", text: u && u.checkedAt ? UI.whenLabel(u.checkedAt, Date.now()) : "not yet" })]),
+      el("div", {}, [el("span", { text: "Last checked" }), el("span", { cls: "mono-s num", text: u && u.checkedAt ? UI.whenLabel(u.checkedAt, Date.now()) : "not yet" })]),
       button("link green", "See all release notes", function () { openUrl(REPO_URL + "/releases"); }),
     ]));
     if (note) { body.appendChild(el("div", { style: "height:10px" })); message(body, note); }
@@ -1336,15 +1424,16 @@
 
   // The panel's own menu (the same as After Effects' ☰ flyout, which many people never open)
   function screenMenu(body) {
-    var upd = S.update && S.update.latest && UI.cmpVersions(S.update.latest, AEMCPBridge.VERSION) > 0;
+    var current = AEMCPBridge.VERSION;
+    var upd = S.update && S.update.latest && UI.cmpVersions(S.update.latest, current) > 0;
     function row(id, label, sub, opts) {
       opts = opts || {};
-      var b = button("mrow" + (opts.accent ? " accent" : ""), "", function () { if (id === "diag") copyDiagnostics(); else openScreen(id, "menu"); });
-      b.appendChild(el("span", { cls: "mtext" }, [el("span", { cls: "mlabel", text: label }), sub ? el("span", { cls: "msub", text: sub }) : null]));
-      b.appendChild(el("span", { cls: "chev", text: id === "diag" ? "" : "\u203a", "aria-hidden": "true" }));
+      var b = button("mrow", "", function () { if (opts.onclick) opts.onclick(b); else openScreen(id, "menu"); });
+      b.appendChild(el("span", { cls: "mtext" }, [el("span", { cls: "mlabel", text: label }), sub ? el("span", { cls: "msub" + (opts.mono ? " mono-s" : "") }, typeof sub === "string" ? [sub] : sub) : null]));
+      b.appendChild(el("span", { cls: "chev", text: opts.onclick && !opts.chevron ? "" : "›", "aria-hidden": "true" }));
       return b;
     }
-    function group(title, kids) { return el("div", { cls: "mgroup" }, [el("div", { cls: "eyebrow", text: title })].concat(kids)); }
+    function group(title, kids) { return el("div", { cls: "mgroup" }, [el("div", { cls: "label", text: title })].concat(kids)); }
     function choice(label, sub, options, current, onPick) {
       var seg = el("div", { cls: "mini-seg", role: "radiogroup", "aria-label": label });
       options.forEach(function (o) {
@@ -1355,28 +1444,43 @@
     }
     var shell = !(S.cfg.permissions && S.cfg.permissions.allowShell === false);
     var all = S.cfg.toolProfile === "full";
+    // the subtitles come from what the panel already knows: the AI apps it loaded, the checkpoint index
+    var clients = S.clients && S.clients.list || [];
+    var web = clients.filter(function (c) { return c.action === "start"; })[0];
+    var cps = S.current && S.current.project ? readIndex(S.current.project).length : 0;
     body.appendChild(group("Work", [
-      row("connect", "Connect an AI app", "Claude, ChatGPT, Cursor and others"),
-      row("checkpoints", "Checkpoints", "Safety copies of this project"),
+      row("connect", "Connect an AI app", UI.connectedClientsText(clients) || "Claude, ChatGPT, Cursor and others"),
+      row("chatgpt", "ChatGPT on the web", web ? (web.configured ? "Running" : web.note || "Off") : "A secure link ChatGPT can reach",
+        { chevron: true, onclick: function () { openScreen("chatgpt", "menu", "menu"); } }),
+      row("checkpoints", "Checkpoints", cps ? ["Safety copies of this project · ", el("span", { cls: "mono", text: String(cps) })] : "Safety copies of this project"),
       row("history", "Activity history", "Everything the AI did, searchable"),
     ]));
     body.appendChild(group("Settings", [
-      choice("Tools the AI sees", all ? "All tools: more to choose from, a bigger prompt" : "Core: faster; the rest stay one call away", [["core", "Core"], ["all", "All"]], all ? "all" : "core",
+      choice("Tools the AI sees", all ? "All: more to choose from, a bigger prompt." : "Core: faster. The AI can still ask for the rest.", [["core", "Core"], ["all", "All"]], all ? "all" : "core",
         function (v) { onMenu(v === "all" ? "toolsAll" : "toolsCore"); openScreen("menu"); }),
-      choice("Shell commands in scripts", shell ? "Scripts may run programs on this computer" : "Scripts can\u2019t run programs", [["yes", "Allowed"], ["no", "Off"]], shell ? "yes" : "no",
+      choice("Shell commands in scripts", shell ? "Scripts may run programs on this computer" : "Scripts can’t run programs", [["yes", "Allowed"], ["no", "Off"]], shell ? "yes" : "no",
         function (v) { onMenu(v === "yes" ? "shellYes" : "shellNo"); openScreen("menu"); }),
     ]));
+    var copiedTimer = null;
     body.appendChild(group("Help", [
-      row("test", "Test the connection", "Finds what\u2019s wrong and how to fix it"),
-      row("diag", "Copy diagnostics", "For a bug report or a chat"),
-      row("update", "Updates", "Version " + AEMCPBridge.VERSION + (upd ? " \u00b7 " + S.update.latest + " is ready" : ""), { accent: upd }),
-      row("about", "About & help", null),
+      row("test", "Test the connection", null),
+      row("diag", "Copy diagnostics", null, { onclick: function (b) {
+        copyDiagnostics(function () {
+          // "COPIED" in the row for 2 s instead of a toast
+          var chev = b.lastChild;
+          chev.className = "st st-verified";
+          chev.textContent = "Copied";
+          clearTimeout(copiedTimer);
+          copiedTimer = setTimeout(function () { chev.className = "chev"; chev.textContent = ""; }, 2000);
+        });
+      } }),
+      row("update", "Updates", upd ? [el("span", { cls: "ink", text: S.update.latest + " is ready" }), " · you have " + current] : "You have " + current, { mono: true }),
+      row("about", "About and help", null),
     ]));
   }
-
-  // About & help
+  // About and help
   function screenAbout(body) {
-    var logo = '<svg width="64" height="64" viewBox="0 0 200 200" role="img" aria-label="Surehand MCP"><rect width="200" height="200" rx="46" fill="#3DD68C"></rect><g transform="translate(28 28) scale(0.72)"><path d="M150 62 C128 18 50.5 50.5 78.8 78.8 L121.2 121.2 C149.5 149.5 72 182 50 138" fill="none" stroke="#14161A" stroke-width="20" stroke-linecap="round"></path><line x1="57.6" y1="57.6" x2="142.4" y2="142.4" stroke="#14161A" stroke-width="8" stroke-linecap="round"></line><circle cx="57.6" cy="57.6" r="12" fill="#14161A"></circle><circle cx="142.4" cy="142.4" r="12" fill="#14161A"></circle><rect x="87" y="87" width="26" height="26" fill="#3DD68C" stroke="#14161A" stroke-width="8"></rect></g></svg>';
+    var logo = '<svg width="64" height="64" viewBox="0 0 200 200" role="img" aria-label="Surehand MCP"><rect width="200" height="200" fill="#3DD68C"></rect><g transform="translate(28 28) scale(0.72)"><path d="M150 62 C128 18 50.5 50.5 78.8 78.8 L121.2 121.2 C149.5 149.5 72 182 50 138" fill="none" stroke="#14161A" stroke-width="20" stroke-linecap="round"></path><line x1="57.6" y1="57.6" x2="142.4" y2="142.4" stroke="#14161A" stroke-width="8" stroke-linecap="round"></line><circle cx="57.6" cy="57.6" r="12" fill="#14161A"></circle><circle cx="142.4" cy="142.4" r="12" fill="#14161A"></circle><rect x="87" y="87" width="26" height="26" fill="#3DD68C" stroke="#14161A" stroke-width="8"></rect></g></svg>';
     body.appendChild(el("div", { cls: "about" }, [el("span", { html: logo }),
       el("div", {}, [el("div", { cls: "t", text: "Surehand MCP" }), el("div", { cls: "s", text: "for Adobe\u00ae After Effects\u00ae \u00b7 version " + AEMCPBridge.VERSION })])]));
     var links = el("div", { cls: "links" });
