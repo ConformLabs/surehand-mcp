@@ -151,6 +151,33 @@ describe("X-ray view data", () => {
   });
 });
 
+describe("the result's size, for wide projects", () => {
+  // what the view draws: every child a node lists, and every node on a path, must be in the result
+  const complete = (v: ReturnType<typeof xrayView>) => {
+    for (const n of Object.values(v.nodes)) for (const c of n.children ?? []) expect(v.nodes[c.key], `${n.key} lists ${c.key}`).toBeDefined();
+    for (const list of Object.values(v.paths)) for (const p of list!) for (const k of p) expect(v.nodes[k]).toBeDefined();
+    for (const r of v.roots) expect(v.nodes[r]).toBeDefined();
+  };
+
+  for (const [scenes, per] of [[60, 40], [300, 100]])
+    it(`${scenes} precomps of ${per} stills each: the result stays small and every node it lists is in it`, () => {
+      const v = xrayView(fx.wideProject(scenes, per));
+      complete(v);
+      expect(JSON.stringify(v).length).toBeLessThan(100_000);
+      // the rest loads node by node
+      const scene = xrayNodeView(v.run, "c105");
+      if (typeof scene === "string") throw new Error(scene);
+      expect(scene.children).toHaveLength(per);
+      expect(v.chips.find((c) => c.tag === "missing")!.count).toBe(scenes * Math.ceil(per / 3));
+    });
+
+  it("the projects the view was made with keep their first levels", () => {
+    for (const d of [fx.mockupProject(), fx.bigProject(), fx.emptyQueueProject()]) complete(xrayView(d));
+    const v = xrayView(fx.mockupProject());
+    expect(v.nodes.c1.children!.map((c) => c.key)).toEqual(["c2", "c3", "c5"]);
+  });
+});
+
 describe("ae_project_xray with a view", () => {
   it("returns the report text exactly as before, the view's data in _meta, and the nodes load through ae_view_xray_node", async () => {
     fake.data = fx.mockupProject();
