@@ -3,11 +3,12 @@ import helperTemplate from "./aemcp.jsxinc";
 import { VERSION } from "./config.js";
 import { evalRaw, type EvalOptions } from "./bridge.js";
 import { callContext } from "./context.js";
+import { WRITE_ACCESS_REFUSAL } from "./permissions.js";
 
 export const NEED_HELPERS = "__AEMCP_NEED_HELPERS__";
-/** Version + content hash, so AE reloads the helpers whenever their source changes. */
-export const HELPER_VERSION = `${VERSION}-${createHash("sha1").update(helperTemplate).digest("hex").slice(0, 10)}`;
-export const helperSource = helperTemplate.replace("__AEMCP_VERSION__", HELPER_VERSION);
+/** Version + content hash, so AE reloads the helpers whenever their source (or a text put into it) changes. */
+export const HELPER_VERSION = `${VERSION}-${createHash("sha1").update(helperTemplate).update(WRITE_ACCESS_REFUSAL).digest("hex").slice(0, 10)}`;
+export const helperSource = helperTemplate.replace("__AEMCP_VERSION__", HELPER_VERSION).replace("__WRITE_ACCESS_REFUSAL__", () => toJsLiteral(WRITE_ACCESS_REFUSAL));
 
 export interface RunOptions {
   /** Report what changed: comps (refs) to compare layer by layer besides the active comp. */
@@ -86,6 +87,8 @@ export interface RunResult {
   rollback?: Rollback;
   logs: string[];
   error?: { message: string; name?: string; line?: number; user?: boolean };
+  /** false: the call failed while "Allow Scripts to Write Files and Access Network" is off (formatResult says so) */
+  writeAccess?: false;
 }
 
 /** JSON.stringify that is also a valid ES3 literal (U+2028/2029 are illegal in ES3 strings). */

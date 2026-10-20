@@ -278,6 +278,35 @@ describe("Conform Labs style: status words, glyphs and texts", () => {
     expect(UI.refusal("Surehand MCP is in read-only mode, so tools that change the project are disabled.")).toBe("Read-only mode. Switch to Full or Ask to allow it.");
     expect(UI.refusal("Shell commands (system.callSystem) are blocked in the Surehand MCP permissions.")).toBe("Shell commands are off in the menu.");
     expect(UI.refusal("Layer not found")).toBeNull();
+    // a tool refused before an ExtendScript write while "Allow Scripts to Write Files" is off
+    const refused = "Nothing ran. After Effects doesn't allow scripts to write files, and this call needs to create the folder /out. Ask the user to turn on ...";
+    expect(UI.refusal(refused)).toBe("Writing files is off in After Effects. Turn it on in Scripting & Expressions.");
+    expect(UI.describeEntry(e({ tool: "ae_export_frames", ok: false, summary: refused }))).toMatchObject({ kind: "blocked", line: "Writing files is off in After Effects. Turn it on in Scripting & Expressions." });
+    expect(UI.statusOf({ kind: "blocked" }).word).toBe("Not run");
+  });
+
+  it('"Allow Scripts to Write Files and Access Network": the notice row and the Test row, with where to turn it on', () => {
+    expect(UI.writeAccessView(null, "darwin")).toBeNull();
+    expect(UI.writeAccessView({ scriptsCanWriteFiles: null }, "darwin")).toBeNull(); // not known yet (no job ran, or an older bridge)
+    expect(UI.writeAccessView({}, "darwin")).toBeNull();
+    expect(UI.writeAccessView({ scriptsCanWriteFiles: true }, "darwin")).toBeNull();
+    // the waiting row's style (amber label, one line under it)
+    expect(UI.writeAccessView({ scriptsCanWriteFiles: false }, "darwin")).toEqual({
+      text: "Scripts can’t write files", time: "", waiting: true, notice: true,
+      line: "Turn on Allow Scripts to Write Files and Access Network in After Effects › Settings › Scripting & Expressions.",
+    });
+    expect(UI.writeAccessView({ scriptsCanWriteFiles: false }, "win32").line).toBe(
+      "Turn on Allow Scripts to Write Files and Access Network in Edit › Preferences › Scripting & Expressions.",
+    );
+    // while the AI works, the working row wins (the panel shows workingView first)
+    expect(UI.workingView({ busy: true, busyWith: "ae_create_comp", scriptsCanWriteFiles: false })).toMatchObject({ text: "Working · Create comp" });
+
+    expect(UI.writeAccessCheck(null, "darwin")).toBeNull();
+    expect(UI.writeAccessCheck(true, "darwin")).toEqual({ ok: true, name: "scripting-prefs", message: "Scripts may write files and use the network" });
+    expect(UI.writeAccessCheck(false, "win32")).toEqual({
+      ok: false, name: "scripting-prefs",
+      message: "Allow Scripts to Write Files and Access Network is off. Turn it on in Edit › Preferences › Scripting & Expressions.",
+    });
   });
 
   it("the header's status square: verified, amber while waiting or paused, dotted with no AI app, crossed for a broken setting", () => {

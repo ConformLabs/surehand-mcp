@@ -216,6 +216,7 @@
     if (/No one approved this change/i.test(s)) return "No answer within 10 minutes.";
     if (/read-only mode/i.test(s) && !/can.t undo|couldn.t reliably/i.test(s)) return "Read-only mode. Switch to Full or Ask to allow it.";
     if (/Shell commands .*(disabled|blocked)/i.test(s)) return "Shell commands are off in the menu.";
+    if (/^Nothing ran\. After Effects doesn.t allow scripts to write files/.test(s)) return "Writing files is off in After Effects. Turn it on in Scripting & Expressions.";
     return null;
   }
   /** A failure's first line for people: the known ones in plain words (with the fix), others cut to their first sentence. */
@@ -331,6 +332,28 @@
         line: "It\u2019s busy or showing a dialog. " + toolName(h.busyWith) + " runs when it\u2019s free." };
     }
     return { text: "Working \u00b7 " + toolName(h.busyWith), time: secsText(h.busyForMs), line: "", waiting: false };
+  }
+
+  // ---------- "Allow Scripts to Write Files and Access Network" ----------
+  /** Where the setting is: "After Effects › Settings › Scripting & Expressions" (Windows: Edit › Preferences). */
+  function writeAccessWhere(platform) {
+    return platform === "win32" ? "Edit \u203a Preferences \u203a Scripting & Expressions" : "After Effects \u203a Settings \u203a Scripting & Expressions";
+  }
+  /**
+   * The notice in the row above the feed (styled as the waiting row) while nothing else is shown there and the
+   * bridge knows the setting is off (h.scriptsCanWriteFiles: read before each job, bridge 1.4+), else null.
+   */
+  function writeAccessView(h, platform) {
+    if (!h || h.scriptsCanWriteFiles !== false) return null;
+    return { text: "Scripts can\u2019t write files", time: "", waiting: true, notice: true,
+      line: "Turn on Allow Scripts to Write Files and Access Network in " + writeAccessWhere(platform) + "." };
+  }
+  /** The Test screen's row for the setting (canWrite: true / false), or null when it isn't known. */
+  function writeAccessCheck(canWrite, platform) {
+    if (canWrite === true) return { ok: true, name: "scripting-prefs", message: "Scripts may write files and use the network" };
+    if (canWrite === false) return { ok: false, name: "scripting-prefs",
+      message: "Allow Scripts to Write Files and Access Network is off. Turn it on in " + writeAccessWhere(platform) + "." };
+    return null;
   }
 
   // ---------- background renders ----------
@@ -481,7 +504,7 @@
 
   var api = {
     layoutFor: layoutFor, MODES: MODES, connectedApps: connectedApps, appsText: appsText, connectedClientsText: connectedClientsText, modeOf: modeOf, clientName: clientName, lastClient: lastClient, statusFor: statusFor,
-    toolName: toolName, describeEntry: describeEntry, statusOf: statusOf, changeParts: changeParts, refusal: refusal, readableError: readableError, workingView: workingView, entryDetails: entryDetails, feedItems: feedItems, entryKey: entryKey, canUndo: canUndo,
+    toolName: toolName, describeEntry: describeEntry, statusOf: statusOf, changeParts: changeParts, refusal: refusal, readableError: readableError, workingView: workingView, writeAccessView: writeAccessView, writeAccessCheck: writeAccessCheck, writeAccessWhere: writeAccessWhere, entryDetails: entryDetails, feedItems: feedItems, entryKey: entryKey, canUndo: canUndo,
     renderIdOf: renderIdOf, renderStartInfo: renderStartInfo, renderProgress: renderProgress, timeLeft: timeLeft,
     riskChips: riskChips, approvalView: approvalView, countdown: countdown, countdownView: countdownView, previewView: previewView,
     hhmm: hhmm, dayLabel: dayLabel, whenLabel: whenLabel, parseCliJson: parseCliJson, cmpVersions: cmpVersions, aeLabel: aeLabel,

@@ -48,10 +48,11 @@ export interface Fake {
  * revision: false = an AE without app.project.revision; undoWorks: false = Edit > Undo does nothing;
  * otherComp: a second comp; bigComp: the layer has more properties than a snapshot reads (partial);
  * mask: the layer has one mask; renameFails: renaming a folder silently keeps its name; throwAfterUndo: the first look at the project's
- * items after Edit > Undo throws (once).
+ * items after Edit > Undo throws (once); writeAccess: "Allow Scripts to Write Files and Access Network" (fakeWriteAccess;
+ * default: app has no preferences, so the setting can't be told).
  */
 export function fakeAE(
-  opts: { revision?: boolean; undoWorks?: boolean; otherComp?: boolean; bigComp?: boolean; mask?: boolean; renameFails?: boolean; throwAfterUndo?: boolean } = {},
+  opts: { revision?: boolean; undoWorks?: boolean; otherComp?: boolean; bigComp?: boolean; mask?: boolean; renameFails?: boolean; throwAfterUndo?: boolean; writeAccess?: boolean | "unreadable" } = {},
 ): Fake {
   const reads = { n: 0 };
   const undos = { n: 0 };
@@ -159,7 +160,7 @@ export function fakeAE(
   const same = (a: State, b: State) => JSON.stringify(a) === JSON.stringify(b);
   const stack: { name: string; before: State; moved: boolean }[] = [];
   let group: { name: string; before: State; rev: number } | null = null;
-  const app = {
+  const app: any = {
     project,
     beginSuppressDialogs() {},
     endSuppressDialogs() {},
@@ -181,6 +182,7 @@ export function fakeAE(
       if (step.moved) revision++;
     },
   };
+  if (opts.writeAccess !== undefined) app.preferences = fakeWriteAccess(opts.writeAccess).preferences;
   function edit(f: () => void) {
     const before = state(), rev = revision;
     f();
@@ -191,9 +193,62 @@ export function fakeAE(
   return { app, comp, layer, opacity, mask, other, reads, edit, undoStack: () => stack.map((s) => s.name), undos, folders: () => folders.map((f) => f.name) };
 }
 
+/**
+ * After Effects' "Allow Scripts to Write Files and Access Network" (Settings > Scripting & Expressions): on,
+ * off, or "unreadable" (off, but the preference can't be read, so only a test write tells). `preferences`
+ * goes on app; File and Folder are the ExtendScript globals: with the setting off they can't write
+ * (open("w") fails, remove() and create() return false). `files`: what is on "disk".
+ */
+export function fakeWriteAccess(state: boolean | "unreadable", files = new Set<string>()) {
+  const on = state === true;
+  const preferences = {
+    getPrefAsLong(section: string, key: string) {
+      if (state !== "unreadable" && section === "Main Pref Section" && key === "Pref_SCRIPTING_FILE_NETWORK_SECURITY") return on ? 1 : 0;
+      throw new Error(`After Effects error: preference "${key}" in section "${section}" could not be found`);
+    },
+  };
+  class File {
+    constructor(public fsName: string) {}
+    get exists() {
+      return files.has(this.fsName);
+    }
+    get parent() {
+      return new Folder(this.fsName.replace(/\/[^/]*$/, ""));
+    }
+    open(mode: string) {
+      if (mode !== "w") return this.exists;
+      if (!on) return false;
+      files.add(this.fsName);
+      return true;
+    }
+    write() {
+      return on;
+    }
+    close() {
+      return true;
+    }
+    remove() {
+      if (!on || !this.exists) return false;
+      files.delete(this.fsName);
+      return true;
+    }
+  }
+  class Folder {
+    static temp = new Folder("/tmp");
+    constructor(public fsName: string) {}
+    get exists() {
+      return this.fsName === "/tmp" || [...files].some((f) => f.startsWith(this.fsName + "/"));
+    }
+    create() {
+      return on;
+    }
+  }
+  return { preferences, File, Folder, files };
+}
+
 /** The real helper library (aemcp.jsxinc), loaded into the fake After Effects. */
-export function loadHelpers(f: Fake): any {
-  const globals = { CompItem, FolderItem, FootageItem, SolidSource, PlaceholderSource, AVLayer, PropertyType, PropertyValueType, BlendingMode, TrackMatteType, MaskMode, MaskFeatherFalloff, MaskMotionBlur };
+export function loadHelpers(f: Fake, extra: Record<string, unknown> = {}): any {
+  const globals = { ...extra, CompItem, FolderItem, FootageItem, SolidSource, PlaceholderSource, AVLayer, PropertyType, PropertyValueType, BlendingMode, TrackMatteType, MaskMode, MaskFeatherFalloff, MaskMotionBlur };
   const names = Object.keys(globals);
   const $ = { global: { ...globals } };
   return new Function("$", "app", ...names, "var aemcp;\n" + helperSource + "\nreturn aemcp;")($, f.app, ...names.map((n) => (globals as any)[n]));

@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { health } from "../bridge.js";
 import { loadConfig, VERSION } from "../config.js";
 import { runJsx } from "../jsx.js";
+import { WRITE_ACCESS_WHERE } from "../permissions.js";
 import { appFile, configPath, legacyDir, migrationPending } from "../paths.js";
 import { migrationLog } from "../migrate.js";
 import { diagnostics } from "./diagnostics.js";
@@ -116,7 +117,7 @@ export async function quickChecks(print: boolean, beforeJob?: () => Promise<void
   }
 
   const info = await runJsx(
-    "var w = null; try { w = app.preferences.getPrefAsLong('Main Pref Section', 'Pref_SCRIPTING_FILE_NETWORK_SECURITY') === 1; } catch (e) {} return { version: app.version, os: $.os, canWrite: w };",
+    "return { version: app.version, os: $.os, canWrite: aemcp.canWriteFiles(true) };",
     {},
     { undoGroup: false, timeoutMs: 15000 },
   ).catch((e) => ({ ok: false, error: { message: e.message } }) as any);
@@ -126,11 +127,13 @@ export async function quickChecks(print: boolean, beforeJob?: () => Promise<void
   }
   pass("extendscript", `ExtendScript works: After Effects ${info.result.version} on ${info.result.os}`);
   if (info.result.canWrite === false)
-    note(
+    bad(
       "scripting-prefs",
-      "'Allow Scripts to Write Files and Access Network' is OFF. Previews still work; scripts that write files themselves (File.write, exports) or use the network need it.",
-      "AE Settings > Scripting & Expressions.",
+      "'Allow Scripts to Write Files and Access Network' is off: scripts can't write files, use the network or run shell commands, " +
+        "and exporting frames into a new folder or replacing a file is refused. Previews and edits still work.",
+      `Turn it on in ${WRITE_ACCESS_WHERE}.`,
     );
+  else if (info.result.canWrite === true) pass("scripting-prefs", "Scripts may write files and use the network");
 
   // --- functional test in a temporary comp ---
   await beforeJob?.();

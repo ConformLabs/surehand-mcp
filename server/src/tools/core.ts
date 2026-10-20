@@ -9,16 +9,18 @@ import { checkForUpdate, updateMessage } from "../update.js";
 import { VERSION } from "../config.js";
 import { codeExcerpt, ensureHelpers, errorHint, evalBody, formatChanges, rollbackProblem, runJsx, type RunOptions, type RunResult } from "../jsx.js";
 import { reservedGlobalsHint, transpileUserCode, withoutComments } from "../transpile.js";
-import { approvalSummary, permissions, READ_ONLY_REFUSAL, scriptFileApproval, SHELL_REFUSAL, usesShell } from "../permissions.js";
+import { approvalSummary, permissions, READ_ONLY_REFUSAL, scriptFileApproval, SHELL_REFUSAL, usesShell, WRITE_ACCESS_WHERE } from "../permissions.js";
 import { compRef, errorResult, formatResult, layerRef, reportScope } from "./registry.js";
 import { appFile } from "../paths.js";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-// A preview never replaces an existing file at outputPath unless overwrite is true
+// A preview never replaces an existing file at outputPath unless overwrite is true. Replacing it removes
+// the old file from ExtendScript, which needs "Allow Scripts to Write Files and Access Network".
 const OUTPUT_GUARD_JSX = `
 if (args.outputPath && !args.overwrite && new File(args.outputPath).exists)
-  aemcp.fail("A file already exists at " + new File(args.outputPath).fsName + ". Nothing was rendered. To replace it, pass overwrite: true (or choose another outputPath).");`;
+  aemcp.fail("A file already exists at " + new File(args.outputPath).fsName + ". Nothing was rendered. To replace it, pass overwrite: true (or choose another outputPath).");
+if (args.outputPath && new File(args.outputPath).exists) aemcp.needWriteAccess("replace the existing file " + new File(args.outputPath).fsName);`;
 
 // ExtendScript bodies of the preview tools (exported so tests can check them)
 export const RENDER_FRAME_JSX = `${OUTPUT_GUARD_JSX}
@@ -319,6 +321,13 @@ export async function runReadOnly(code: string, timeoutMs = 120_000): Promise<{ 
   return { refusal: readOnlyRefusal(r), r };
 }
 
+/** What ae_status adds while "Allow Scripts to Write Files and Access Network" is off. */
+export const WRITE_ACCESS_STATUS =
+  "Note: 'Allow Scripts to Write Files and Access Network' is OFF in After Effects. Edits, frame previews and most tools still work, " +
+  "but scripts can't write files themselves (File.write, creating folders, replacing or deleting files), use the network or run shell commands, " +
+  "and ae_export_frames, ae_render_frame and ae_render_contact_sheet refuse to create a folder or replace an existing file. " +
+  `If that is needed, ask the user to turn it on: ${WRITE_ACCESS_WHERE}.`;
+
 export function registerCoreTools(server: McpServer) {
   server.registerTool(
     "ae_run_script",
@@ -461,7 +470,7 @@ export function registerCoreTools(server: McpServer) {
         const statusScript =
           "return { appVersion: app.version, buildName: app.buildName, language: String(app.isoLanguage), os: $.os, extendScriptVersion: $.version, " +
           "memoryInUse: app.memoryInUse, isRenderEngine: app.isRenderEngine, project: aemcp.projectInfo(), " +
-          "canWriteFiles: (function(){ try { return app.preferences.getPrefAsLong('Main Pref Section', 'Pref_SCRIPTING_FILE_NETWORK_SECURITY') === 1; } catch (e) { return null; } })() };";
+          "canWriteFiles: aemcp.canWriteFiles(true) };";
         let r;
         for (;;) {
           try {
@@ -498,14 +507,7 @@ export function registerCoreTools(server: McpServer) {
               `${perm.allowShell ? "" : "; shell commands disabled"}.`,
           );
         out.content.unshift({ type: "text", text: head.join("\n") });
-        if (r.ok && (r.result as any)?.canWriteFiles === false)
-          out.content.push({
-            type: "text",
-            text:
-              "Note: 'Allow Scripts to Write Files and Access Network' is OFF in After Effects. Frame previews and the built-in tools still work, " +
-              "but your own scripts can't write files (File.write, exporting data) or use the network. If you need that, ask the user to enable it: " +
-              "After Effects > Settings > Scripting & Expressions (Windows: Edit > Preferences > Scripting & Expressions).",
-          });
+        if (r.ok && (r.result as any)?.canWriteFiles === false) out.content.push({ type: "text", text: WRITE_ACCESS_STATUS });
         const upd = updateMessage(await checkForUpdate());
         if (upd) out.content.push({ type: "text", text: `${upd}\nTell the user about this update.` });
         if (lastSetup?.extensionUpdated || (h.version && h.version !== VERSION))

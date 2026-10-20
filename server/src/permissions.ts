@@ -49,6 +49,23 @@ export const SHELL_REFUSAL =
   "Shell commands (system.callSystem) are disabled in the Surehand MCP permissions. The user can allow them in the " +
   "Surehand panel in After Effects: \u2630 menu \u203a Shell commands in scripts \u203a Allowed (or \"allowShell\": true in ~/.surehand/ae/config.json).";
 
+/** Where After Effects' own setting is, on Mac and Windows. */
+export const WRITE_ACCESS_WHERE =
+  "After Effects > Settings > Scripting & Expressions (Windows: Edit > Preferences > Scripting & Expressions)";
+
+/**
+ * A call that has to write files from ExtendScript while "Allow Scripts to Write Files and Access Network"
+ * is off, refused before it changes anything (aemcp.needWriteAccess). {what}: what it needed to do.
+ */
+export const WRITE_ACCESS_REFUSAL =
+  "Nothing ran. After Effects doesn't allow scripts to write files, and this call needs to {what}. " +
+  `Ask the user to turn on 'Allow Scripts to Write Files and Access Network' in ${WRITE_ACCESS_WHERE}, then try again.`;
+
+/** Added to a failed call while the setting is off: a save, an export or a script's own File writes may fail because of it. */
+export const WRITE_ACCESS_HINT =
+  "Note: 'Allow Scripts to Write Files and Access Network' is off in After Effects. If this call failed because it writes files, " +
+  `uses the network or runs a shell command, ask the user to turn it on in ${WRITE_ACCESS_WHERE}.`;
+
 /**
  * What the approval prompt in After Effects shows for a tool call: the script, or the call's
  * arguments. Sent in full: the bridge checks all of it for risks, and shortens only what is shown

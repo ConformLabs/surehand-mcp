@@ -673,3 +673,92 @@ describe("config.json in the bridge: torn reads never reset it", () => {
     }
   });
 });
+
+// "Allow Scripts to Write Files and Access Network": the bridge reads it in the no-op it sends before every job
+// (never a script of its own, never on a timer), /health reports it, and ae_status says what it means.
+describe("Allow Scripts to Write Files and Access Network", () => {
+  const ae = {
+    on: false,
+    ran: [] as string[],
+    evalScript(script: string, cb: (r: string) => void) {
+      ae.ran.push(script);
+      let r = "result:" + script;
+      if (script.includes("'aemcp-ready:'") && script.includes("Pref_SCRIPTING_FILE_NETWORK_SECURITY")) r = "aemcp-ready:" + (ae.on ? 1 : 0);
+      // ae_status' own script (the helper library reads the same preference)
+      else if (script.includes("canWriteFiles: aemcp.canWriteFiles(true)"))
+        r = JSON.stringify({ ok: true, result: { appVersion: "26.5", os: "Macintosh OS 26.0", canWriteFiles: ae.on }, logs: [] });
+      setTimeout(() => cb(r), 5);
+    },
+  };
+  let bridge: any;
+  beforeAll(async () => {
+    writeFileSync(join(home, ".aemcp", "config.json"), JSON.stringify({ token, bridgePort: basePort, httpPort: basePort + 1 }));
+    bridge = loadBridge("26.5", 20, (s, cb) => ae.evalScript(s, cb));
+    bridge.start();
+    await waitFor(() => bridge.state.listening);
+  });
+  afterAll(() => bridge?.state.server.close());
+  const health = async () => (await req(bridge.state.port, "/health")).body;
+
+  it("is unknown until a job ran, then follows the setting; /health itself runs no script", async () => {
+    expect((await health()).scriptsCanWriteFiles).toBeNull();
+    for (let i = 0; i < 3; i++) await health();
+    expect(ae.ran).toEqual([]);
+    await req(bridge.state.port, "/eval", { script: "job 1" });
+    expect((await health()).scriptsCanWriteFiles).toBe(false);
+    // the no-op and the job: nothing else
+    expect(ae.ran).toHaveLength(2);
+    expect(ae.ran[1]).toBe("job 1");
+    ae.on = true;
+    expect((await health()).scriptsCanWriteFiles).toBe(false); // not read again until the next job
+    await req(bridge.state.port, "/eval", { script: "job 2", fromPanel: true }, undefined, asUI(bridge));
+    expect((await health()).scriptsCanWriteFiles).toBe(true);
+  });
+
+  it("an answer it can't read leaves the last known state", async () => {
+    const before = (await health()).scriptsCanWriteFiles;
+    const orig = ae.evalScript;
+    ae.evalScript = (s, cb) => (s.includes("'aemcp-ready:'") ? void setTimeout(() => cb("aemcp-ready:?"), 5) : orig(s, cb));
+    try {
+      await req(bridge.state.port, "/eval", { script: "job 3" });
+      expect((await health()).scriptsCanWriteFiles).toBe(before);
+    } finally {
+      ae.evalScript = orig;
+    }
+  });
+
+  it("ae_status reports it, and what it means while it is off", async () => {
+    process.env.AEMCP_CONFIG = join(home, ".aemcp", "config.json");
+    process.env.AEMCP_NO_UPDATE_CHECK = "1";
+    const prevPort = process.env.SUREHAND_AE_BRIDGE_PORT;
+    process.env.SUREHAND_AE_BRIDGE_PORT = String(bridge.state.port); // this bridge, no discovery
+    try {
+      const { registerCoreTools, WRITE_ACCESS_STATUS } = await import("../src/tools/core.js");
+      let handler: any;
+      registerCoreTools({ registerTool: (name: string, _def: unknown, h: unknown) => void (name === "ae_status" && (handler = h)) } as any);
+      const status = async () => {
+        const r = await handler({});
+        return { isError: !!r.isError, text: r.content.map((c: any) => c.text).join("\n") };
+      };
+      ae.on = false;
+      const off = await status();
+      expect(off.isError).toBe(false);
+      expect(off.text).toMatch(/"canWriteFiles":false/);
+      expect(off.text).toContain(WRITE_ACCESS_STATUS);
+      expect(WRITE_ACCESS_STATUS).toBe(
+        "Note: 'Allow Scripts to Write Files and Access Network' is OFF in After Effects. Edits, frame previews and most tools still work, " +
+          "but scripts can't write files themselves (File.write, creating folders, replacing or deleting files), use the network or run shell commands, " +
+          "and ae_export_frames, ae_render_frame and ae_render_contact_sheet refuse to create a folder or replace an existing file. " +
+          "If that is needed, ask the user to turn it on: After Effects > Settings > Scripting & Expressions (Windows: Edit > Preferences > Scripting & Expressions).",
+      );
+      ae.on = true;
+      const on = await status();
+      expect(on.text).toMatch(/"canWriteFiles":true/);
+      expect(on.text).not.toContain("Allow Scripts to Write Files");
+    } finally {
+      if (prevPort === undefined) delete process.env.SUREHAND_AE_BRIDGE_PORT;
+      else process.env.SUREHAND_AE_BRIDGE_PORT = prevPort;
+      delete process.env.AEMCP_NO_UPDATE_CHECK;
+    }
+  });
+});

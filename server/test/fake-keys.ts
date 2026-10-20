@@ -8,6 +8,7 @@
 // - setValue on a property with keyframes throws; roving can't be set on the first or last key
 // - comp.layers.addText adds the new layer at the top (index 1); moveToEnd moves it to the bottom
 import { helperSource } from "../src/jsx.js";
+import { fakeWriteAccess } from "./fake-ae.js";
 
 export const PVT = { NO_VALUE: 6412, ThreeD_SPATIAL: 6413, ThreeD: 6414, TwoD_SPATIAL: 6415, TwoD: 6416, OneD: 6417, COLOR: 6418, CUSTOM_VALUE: 6419, MARKER: 6420, LAYER_INDEX: 6421, MASK_INDEX: 6422, SHAPE: 6423, TEXT_DOCUMENT: 6424 };
 export const KIT = { LINEAR: 6612, BEZIER: 6613, HOLD: 6614 };
@@ -211,9 +212,21 @@ export interface LayerSpec {
   positionExpression?: string;
 }
 
-export function fakeKeysAE(opts: { fps?: number; layers: LayerSpec[]; files?: string[]; footage?: { name: string; width: number; height: number; fps: number; duration: number }[] }) {
+/**
+ * writeAccess: "Allow Scripts to Write Files and Access Network" (default on); off, File can't remove and a
+ * folder can't be created. dirs: folders that exist (default: every folder).
+ */
+export function fakeKeysAE(opts: {
+  fps?: number;
+  layers: LayerSpec[];
+  files?: string[];
+  footage?: { name: string; width: number; height: number; fps: number; duration: number }[];
+  writeAccess?: boolean;
+  dirs?: string[];
+}) {
   const log: string[] = [];
   const files = new Set(opts.files ?? []);
+  const on = opts.writeAccess !== false;
   const saved: { comp: string; t: number; path: string; enabled: string[]; res: number[] }[] = [];
   class File {
     fsName: string;
@@ -225,9 +238,10 @@ export function fakeKeysAE(opts: { fps?: number; layers: LayerSpec[]; files?: st
     }
     get parent() {
       const dir = this.fsName.replace(/\/[^/]*$/, "");
-      return { exists: true, create: () => true, fsName: dir };
+      return { exists: !opts.dirs || opts.dirs.includes(dir), create: () => on, fsName: dir };
     }
     remove() {
+      if (!on) return false;
       files.delete(this.fsName);
       return true;
     }
@@ -318,7 +332,7 @@ export function fakeKeysAE(opts: { fps?: number; layers: LayerSpec[]; files?: st
     activeItem: comp,
     items: { addComp: (n: string, w: number, h: number, par: number, d: number, f: number) => mkComp(n, w, h, par, d, f) },
   };
-  const app: any = { project, beginSuppressDialogs() {}, endSuppressDialogs() {}, beginUndoGroup() {}, endUndoGroup() {}, effects: [] };
+  const app: any = { project, beginSuppressDialogs() {}, endSuppressDialogs() {}, beginUndoGroup() {}, endUndoGroup() {}, effects: [], preferences: fakeWriteAccess(on).preferences };
   const globals: Record<string, unknown> = {
     Item, CompItem, FootageItem, Layer, AVLayer, TextLayer, ShapeLayer, CameraLayer, LightLayer, PropertyBase, KeyframeEase, File,
     PropertyType: PT, PropertyValueType: PVT, KeyframeInterpolationType: KIT, TrackMatteType: { NO_TRACK_MATTE: 5012 },

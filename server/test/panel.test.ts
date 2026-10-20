@@ -29,6 +29,8 @@ let cliAnswer: ((cmd: string) => unknown) | null = null;
 let cliDelay = 20;
 // the bridge can't answer while After Effects runs a long script: /health then gets no answer
 let healthDown = false;
+// "Allow Scripts to Write Files and Access Network" as the bridge reports it (null: not known yet)
+let writeAccess: boolean | null = null;
 let ownBridgeStarts = 0;
 
 const waitFor = async (cond: () => boolean, ms = 4000) => {
@@ -49,7 +51,7 @@ beforeAll(async () => {
     const url = req.url || "";
     const secret = req.headers["x-surehand-panel"] as string | undefined;
     if (url === "/health" && healthDown) return void req.socket.destroy();
-    if (url === "/health") return json({ ok: true, authorized: true, port: 1, pid: 4242, busy: false, queue: 0, pendingApprovals: pending.length, permissionMode: "ask", paused });
+    if (url === "/health") return json({ ok: true, authorized: true, port: 1, pid: 4242, busy: false, queue: 0, pendingApprovals: pending.length, permissionMode: "ask", paused, scriptsCanWriteFiles: writeAccess });
     if (url.startsWith("/pending")) {
       heartbeats.push(url);
       return json({ ok: true, pending, paused });
@@ -431,6 +433,41 @@ describe("Surehand panel: ☰ menu", () => {
     const j = cli.findIndex((c) => c.slice(2).join(" ") === "clients --json");
     expect(cliEnv[j].SUREHAND_AE_PANEL_SECRET).toBeUndefined();
     $("back").click();
+  });
+
+  it('"Allow Scripts to Write Files" off: a notice in the working row, and a Write access row on the Test screen', async () => {
+    const notice = () => ($("working").hidden ? "" : $("working").textContent);
+    writeAccess = null; // not known yet: nothing
+    panel().refresh();
+    await new Promise((r) => setTimeout(r, 100));
+    expect(notice()).toBe("");
+    writeAccess = false;
+    panel().refresh();
+    const where = process.platform === "win32" ? "Edit › Preferences › Scripting & Expressions" : "After Effects › Settings › Scripting & Expressions";
+    await waitFor(() => /Scripts can’t write files/.test(notice()));
+    expect($("working").querySelector(".label").textContent).toBe("Scripts can’t write files");
+    expect($("working").querySelector(".line").textContent).toBe(`Turn on Allow Scripts to Write Files and Access Network in ${where}.`);
+    expect($("working").className).toBe("working waiting"); // the existing amber note style
+    expect($("statusText").textContent).not.toMatch(/Waiting/); // the header is not affected
+    writeAccess = true;
+    panel().refresh();
+    await waitFor(() => notice() === "");
+
+    cliAnswer = (cmd) =>
+      cmd === "test --json"
+        ? { checks: [{ ok: true, name: "bridge", message: "Bridge running" }, { ok: false, name: "scripting-prefs", message: "'Allow Scripts to Write Files and Access Network' is off. Turn it on in After Effects > Settings > Scripting & Expressions." }] }
+        : undefined;
+    try {
+      panel().menu("test");
+      await waitFor(() => /1 of 2 checks passed/.test($("screenBody").textContent));
+      const bad = doc().querySelector("#screenBody .check.bad") as any;
+      expect(bad.querySelector(".clabel").textContent).toBe("Write access");
+      expect(bad.textContent).toMatch(/is off\. Turn it on in After Effects > Settings > Scripting & Expressions/);
+      $("back").click();
+    } finally {
+      cliAnswer = null;
+      writeAccess = null;
+    }
   });
 
   it("Activity history: search and filters", async () => {
