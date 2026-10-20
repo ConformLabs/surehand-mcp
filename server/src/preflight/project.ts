@@ -31,8 +31,12 @@ export interface PItem {
   w: string;
   /** a text layer */
   t?: 1;
-  /** indexes of the layersMustBeIn patterns its name matches (delivered comp only) */
+  /** indexes of the layersMustBeIn patterns its name matches (delivered comp only, unless the pattern is in PArgs.deep) */
   m?: number[];
+  /** the index of the layer in the delivered comp it is (or is seen through, when nested) */
+  ti?: number;
+  /** nested: in a precomp */
+  nst?: 1;
   /** the global sample indexes where the layer is visible (enabled, active, opacity > 0, nesting visible too) */
   i: number[];
   /** the time budget ran out while reading this item */
@@ -82,6 +86,8 @@ export interface PArgs {
   bounds: boolean;
   /** layersMustBeIn patterns as regular expressions */
   patterns: string[];
+  /** indexes of patterns that also match layers inside precomps (any depth); the others match in the delivered comp only */
+  deep?: number[];
   glyphs: boolean;
   timeBudgetSeconds: number;
 }
@@ -254,7 +260,10 @@ function textInfo(o, L, times) {
   if (miss.length) { o.gm = miss; for (var g = 0; g < missF.length; g++) if (missF[g] !== o.f) { o.gmf = missF; break; } }
 }
 function item(ctx, L, isText, m) {
-  var o = { n: L.name, w: ctx.path + " > " + L.index + ": " + L.name, i: [] };
+  var o = { n: L.name, w: ctx.path + " > " + L.index + ": " + L.name, i: [] }, top = L;
+  for (var xt = ctx; xt.via; xt = xt.up) top = xt.via;
+  o.ti = top.index;
+  if (ctx.up) o.nst = 1;
   if (isText) o.t = 1;
   if (m.length) o.m = m;
   D.items.push(o);
@@ -294,23 +303,24 @@ function item(ctx, L, isText, m) {
     o.lv.push(level(e2[0], e2[1].times, o.i));
   }
 }
-var pats = [], plist = args.patterns || [], pmSeen = {};
+var pats = [], plist = args.patterns || [], pmSeen = {}, deep = {}, anyDeep = false;
 D.pm = [];
 for (var q = 0; q < plist.length; q++) pats.push(new RegExp(plist[q]));
+for (var q4 = 0; args.deep && q4 < args.deep.length; q4++) { deep["p" + args.deep[q4]] = true; anyDeep = true; }
 function scan(ctx, depth) {
   var comp = ctx.comp;
   for (var j = 1; j <= comp.numLayers; j++) {
     if (D.partial) return;
     if (over()) { D.partial = { reason: "time budget (" + Math.round(budget / 1000) + " s) used up" }; return; }
     var L = comp.layer(j);
-    if (depth === 0) { for (var q3 = 0; q3 < pats.length; q3++) if (!pmSeen[q3] && pats[q3].test(L.name)) { pmSeen[q3] = true; D.pm.push(q3); } }
+    for (var q3 = 0; q3 < pats.length; q3++) if (!pmSeen[q3] && (depth === 0 || deep["p" + q3]) && pats[q3].test(L.name)) { pmSeen[q3] = true; D.pm.push(q3); }
     if (!shown(L)) continue;
     var isText = L instanceof TextLayer, m = [];
-    if (depth === 0 && !L.nullLayer) { for (var q2 = 0; q2 < pats.length; q2++) if (pats[q2].test(L.name)) m.push(q2); }
+    if (!L.nullLayer) { for (var q2 = 0; q2 < pats.length; q2++) if ((depth === 0 || deep["p" + q2]) && pats[q2].test(L.name)) m.push(q2); }
     if ((isText && args.textAll) || m.length) item(ctx, L, isText && args.textAll, m);
     var src = null;
     try { src = L.source; } catch (e) {}
-    if (args.textAll && src instanceof CompItem && depth < 8) {
+    if ((args.textAll || anyDeep) && src instanceof CompItem && depth < 8) {
       var ch = child(ctx, L);
       if (ch.any) scan(ch, depth + 1);
     }
@@ -627,7 +637,7 @@ export function checkItems(spec: Spec, d: PData): ProjectResult {
   const { w: W, h: H } = d.comp, tOf = (i: number) => Math.round(i * d.step * d.comp.fd * 1e6) / 1e6;
   const at = (i0: number, i1: number): number | [number, number] => (i0 === i1 ? tOf(i0) : [tOf(i0), tOf(i1)]);
   const sa = spec.safeAreas, tx = spec.text;
-  const textArea: Area | undefined = sa ? (sa.textMustBeIn ?? "title") : undefined;
+  const textArea: Area | undefined = sa && sa.textMustBeIn !== "none" ? (sa.textMustBeIn ?? "title") : undefined;
   const textMargins = textArea ? areaMargins(spec, textArea) : null;
   if (textArea && !textMargins) {
     // asked for explicitly: not run; the default (title) with no title margin: the spec only checks other layers

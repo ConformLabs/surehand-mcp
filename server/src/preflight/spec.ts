@@ -10,7 +10,7 @@ import { z } from "zod";
 const range = z.object({ min: z.number().optional(), max: z.number().optional() }).strict();
 const num = z.number();
 /** a fraction of the frame per side (0.05 = 5% in from each edge), or separate x / y fractions */
-const margin = z.union([num.min(0).max(0.5), z.object({ x: num.min(0).max(0.5), y: num.min(0).max(0.5) }).strict()]);
+export const margin = z.union([num.min(0).max(0.5), z.object({ x: num.min(0).max(0.5), y: num.min(0).max(0.5) }).strict()]);
 
 export const specSchema = z
   .object({
@@ -44,7 +44,10 @@ export const specSchema = z
       .object({
         action: margin.optional().describe("action-safe margin per side"),
         title: margin.optional().describe("title-safe margin per side"),
-        textMustBeIn: z.enum(["title", "action", "frame"]).optional().describe("every visible text layer must stay inside this area on every checked frame (default: title)"),
+        textMustBeIn: z
+          .enum(["title", "action", "frame", "none"])
+          .optional()
+          .describe('every visible text layer must stay inside this area on every checked frame (default: title; "none": only the layers in layersMustBeIn)'),
         layersMustBeIn: z
           .array(z.object({ layer: z.string().describe("layer name (exact), or a pattern with * wildcards"), area: z.enum(["title", "action", "frame"]) }).strict())
           .optional()

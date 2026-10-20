@@ -155,6 +155,7 @@ const EXPECTED: Record<string, Hints> = {
   ae_project_history: E, // never changes the project, but writes (and prunes) its snapshot files under ~/.surehand/ae/history
   ae_list_scripts: R,
   // checks
+  ae_reformat: D, // a new comp (and precomp copies) in one undo step; checkpoint: true saves the project (overwrites the .aep) first
   ae_preflight: [false, false, true, true], // never changes the project; may download ffmpeg (with consent) and writes temporary thumbnails
   ae_tools: R,
   ae_call: SCRIPT, // runs any tool, including ae_run_script

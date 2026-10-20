@@ -17,7 +17,7 @@
 
 Surehand MCP connects **Claude** (Desktop / Code), **ChatGPT** (desktop app or web), Cursor, Codex, VS Code (GitHub Copilot), Windsurf / Devin Desktop, LM Studio, or any MCP client to **Adobe® After Effects®**.
 The AI can run any script inside After Effects (modern JavaScript, converted for AE's ExtendScript engine automatically),
-read information back, and use up to 106 ready-made tools for projects, comps, layers, keyframes (Graph Editor level),
+read information back, and use up to 107 ready-made tools for projects, comps, layers, keyframes (Graph Editor level),
 text styling and animators, footage, effects, shapes, masks, 3D cameras/lights/materials, audio, color management,
 Essential Graphics and rendering (including background renders with aerender). Batch edits run many steps as one
 undo step, checkpoints keep safety copies of the project, structural changes can be proven not to change the render,
@@ -194,7 +194,7 @@ To rotate the token, delete `token` from `~/.surehand/ae/config.json` and re-run
 | `ae_get_scripting_guide` | ExtendScript cheat sheet for the model (also an MCP resource `aemcp://docs/extendscript`). |
 
 **Tool profiles.** Every tool description is sent to the AI in every chat, so by default only a **core set of
-29 tools** is loaded (about 9k tokens instead of 33k for all 106), and **every other tool stays available on demand**:
+29 tools** is loaded (about 9k tokens instead of 33k for all 107), and **every other tool stays available on demand**:
 `ae_tools` lists all tools by category (or gives full parameter details of chosen ones), and `ae_call` runs any tool by
 name with the same validation, permissions, change report and activity log. Loading everything up front is optional:
 switch to **All tools** in the Surehand panel in After Effects (**☰ › Tools the AI sees › All tools**), in Claude Desktop's
@@ -268,6 +268,8 @@ unknown effect name gets suggestions.
   `ae_set_proxy`, `ae_relink_footage` (find missing files by name in a folder tree, keeps sequences)
 - **Essential Graphics:** `ae_essential_graphics` (add properties as controllers, template name), `ae_export_mogrt`
 - **Checks:** `ae_preflight` (check the delivered comp and its render against your own delivery spec; see Preflight below)
+- **Reformat:** `ae_reformat` (the comp at another size or aspect ratio, laid out by your own rules and checked on every
+  frame; see Reformat below)
 - **Project:** `ae_project_health` (missing footage/fonts/effects, expression errors, unused footage, empty comps/folders,
   duplicate comp names); `ae_project_xray` (explains an inherited project: what the render queue pulls in, what
   every expression depends on and which links are fragile, what is missing, footage specs, what makes it heavy)
@@ -331,6 +333,30 @@ check (failures first, then warnings, by time), with timecode in the comp's fram
 target). For files it also shows what ffprobe found and up to four frames at the worst problems. Preflight changes
 nothing in the project and leaves no undo step, so it also runs in read-only mode. Long comps are checked within a
 time budget (`timeBudgetSeconds`, default 120 s); a partial check says so.
+
+### Reformat
+
+`ae_reformat` makes the comp at another size (16:9 to 9:16, 1:1, 4:5 or any size) by **rules you set**, then checks
+the result on every frame. Nothing is guessed for you: no presets and no "smart crop".
+
+- **Rules:** background layers that must cover or fit the new frame; layers that must stay inside title-safe,
+  action-safe or the frame (with your margins); layers pinned to an edge or corner with a margin in px; which layers
+  may scale and how far (a range in % of their size); a minimum text cap height; layers to switch off. Layers are
+  named exactly or with wildcards (`Logo*`). A layer no rule names keeps its offset from the frame centre, as After
+  Effects' own Composition Settings resize does with the centre anchor.
+- **The edit:** a duplicate of the comp (the source is never changed), in one undo step, with an optional checkpoint
+  first and the Changes list. Position and Scale keys are mapped by the same move and scale, with spatial tangents and
+  ease speeds scaled too, so the motion keeps its shape. Parented layers are moved in their parent's space, a track
+  matte moves with its layer, 3D layers move with the frame centre. Precomps are reused unless a rule names a layer
+  inside a full-frame precomp: then that precomp is duplicated and reformatted too, and the report says why
+  (`precomps: "reuse"` or `"duplicate"` to choose).
+- **The check:** Preflight's project checks on the new comp (your safe-area rules and cap height, on every frame or
+  every Nth), plus cover / fit and pins, plus the plan against what After Effects actually made. The verdict is
+  Preflight's: PASS, FAIL (n), INCOMPLETE or WARNINGS (n).
+- **When a rule can't be met** (a title too wide for 9:16 without going below the minimum cap height, a pin that
+  conflicts with title-safe), the layer keeps the best attempt and the report says FAIL, with the reason and what you
+  could decide: a shorter text, a line break, a smaller minimum, another scale limit. The AI doesn't pick one for you.
+- `dryRun: true` shows the plan and the predicted result without changing anything.
 
 ### Change report
 
