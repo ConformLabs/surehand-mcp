@@ -197,7 +197,7 @@ describe("the X-ray view in a fake AI app (jsdom)", () => {
         setTimeout(() => {
           if (m.method === "ui/initialize")
             reply({ jsonrpc: "2.0", id: m.id, result: { protocolVersion: "2026-01-26", hostInfo: { name: "fake", version: "1" }, hostCapabilities: { serverTools: {}, message: {} }, hostContext: { theme: "dark" } } });
-          else if (m.method === "ui/notifications/initialized") reply({ jsonrpc: "2.0", method: "ui/notifications/tool-result", params: { content: [{ type: "text", text: "Project X-ray" }], _meta: { "surehand/view": view } } });
+          else if (m.method === "ui/notifications/initialized") reply({ jsonrpc: "2.0", method: "ui/notifications/tool-result", params: view?.content ? view : { content: [{ type: "text", text: "Project X-ray" }], _meta: { "surehand/view": view } } });
           else if (m.method === "tools/call") reply({ jsonrpc: "2.0", id: m.id, result: onCall(m.params.name, m.params.arguments) ?? { content: [{ type: "text", text: "ok" }] } });
           else if (m.method === "ui/message") reply({ jsonrpc: "2.0", id: m.id, result: {} });
         }, m.method === "tools/call" ? delay : 0);
@@ -320,6 +320,17 @@ describe("the X-ray view in a fake AI app (jsdom)", () => {
     expect(names(doc)).not.toContain("Endcard_old");
     (doc.querySelector('[data-k="n:g:unused"] .car') as any).click();
     await until(() => names(doc).includes("Endcard_old"));
+  });
+
+  it("a result without the tree is readable text (a script error is not an AE error); AE not reachable is an error line", async () => {
+    const t = await host({ isError: true, content: [{ type: "text", text: "Error: No composition named \"Mian\" (line 3)" }] }, server([]));
+    await t.until(() => t.doc.querySelector(".txtres"));
+    expect(t.doc.querySelector(".vh .t")!.textContent).toBe("X-ray");
+    expect(t.doc.querySelector(".txtres")!.textContent).toBe('Error: No composition named "Mian" (line 3)');
+    expect(t.doc.querySelector(".err")).toBeNull();
+    const e = await host({ isError: true, content: [{ type: "text", text: "Cannot reach After Effects." }], _meta: { "surehand/error": "NOT_RUNNING" } }, server([]));
+    await e.until(() => e.doc.querySelector(".err.note"));
+    expect(e.doc.querySelector(".err.note")!.textContent).toBe("After Effects isn't open. Open it, then try again.");
   });
 
   it("no problems: one neutral chip and a plain message", async () => {

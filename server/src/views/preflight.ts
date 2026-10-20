@@ -2,7 +2,7 @@
 // check. Opening a row fetches that frame with the problem marked (ae_view_frame); Show in AE moves After
 // Effects there (ae_view_reveal); Ask the AI to fix this writes the request into the chat; Run again re-runs
 // ae_preflight with the same arguments. Nothing here edits the project.
-import { el, errorText, sentence, startView, tile, viewData, type ToolResult, type View } from "./shared.js";
+import { el, errorText, sentence, startView, textResult, tile, viewData, type ToolResult, type View } from "./shared.js";
 import type { FrameView, PreflightFinding, PreflightView } from "./types.js";
 
 interface Frame {
@@ -256,9 +256,8 @@ function show(d: PreflightView) {
 function onResult(r: ToolResult) {
   const d = viewData<PreflightView>(r);
   if (d) return show(d);
-  // an error, or an older Surehand without view data: the text says it
-  const text = r.content?.find((c) => c.type === "text")?.text;
-  root.replaceChildren(el("div", { class: "v" }, el("div", { class: "vh" }, tile(), el("div", { class: "grow" }, el("div", { class: "t" }, "Preflight"))), el("div", { class: "err note" }, errorText(r._meta?.["surehand/error"] as string | undefined, text))));
+  // not a report (the spec's schema, how to write a spec, a missing argument) or AE not reachable: the text itself
+  root.replaceChildren(textResult("Preflight", r));
 }
 
 startView("Preflight", { onInput: (a) => (state.args = a), onResult })

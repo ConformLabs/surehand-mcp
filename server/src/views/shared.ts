@@ -53,6 +53,35 @@ export function errorText(code: string | undefined, text: string | undefined): s
 
 export type ToolResult = { content?: { type: string; text?: string; data?: string; mimeType?: string }[]; _meta?: Record<string, unknown>; isError?: boolean };
 
+/**
+ * A result without view data (a schema, a how-to, a capture, a list, guidance about a missing argument) as
+ * readable text: the view's header, the text muted and wrapping, the first lines only until "Show all". Only an
+ * error that says After Effects can't be reached or is busy (VIEW_ERROR_KEY) is shown in the error style.
+ */
+export function textResult(title: string, r: ToolResult): HTMLElement {
+  const text = (r.content ?? []).filter((c) => c.type === "text" && c.text).map((c) => c.text!).join("\n\n").trim();
+  const head = el("div", { class: "vh" }, tile(), el("div", { class: "grow" }, el("div", { class: "t" }, title)));
+  const code = r._meta?.[VIEW_ERROR_KEY] as string | undefined;
+  if (code) return el("div", { class: "v" }, head, el("div", { class: "err note" }, errorText(code, text)));
+  const body = el("div", { class: "txtres collapsed" }, text || "(no text)");
+  const v = el("div", { class: "v" }, head, body);
+  // "Show all" only when the text is longer than the collapsed box (about six lines)
+  const lines = text.split("\n").length, long = lines > 6 || text.length > 480;
+  if (long) {
+    const btn = el("button", { class: "btn sm", "data-k": "text-all", "aria-expanded": "false" }, "Show all");
+    btn.addEventListener("click", () => {
+      const open = body.classList.toggle("collapsed") === false;
+      btn.textContent = open ? "Show less" : "Show all";
+      btn.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+    v.append(el("div", { class: "foot" }, el("span", { class: "grow" }), btn));
+  } else body.classList.remove("collapsed");
+  return v;
+}
+
+/** The name of the tool whose result this view shows, when the AI app says it. */
+export const toolName = (app: App) => (app.getHostContext() as { toolInfo?: { tool?: { name?: string } } } | undefined)?.toolInfo?.tool?.name;
+
 /** The view data a result carries (types.ts), if any. */
 export const viewData = <T>(r: ToolResult | undefined): T | undefined => r?._meta?.[VIEW_META_KEY] as T | undefined;
 
@@ -73,10 +102,10 @@ export interface View {
  * Connect to the AI app. onInput gets the tool call's arguments, onResult its result (once; fresh data needs a
  * tool call from the view).
  */
-export async function startView(name: string, h: { onInput?: (args: Record<string, unknown>) => void; onResult: (r: ToolResult) => void }): Promise<View> {
+export async function startView(name: string, h: { onInput?: (args: Record<string, unknown>) => void; onResult: (r: ToolResult, app: App) => void }): Promise<View> {
   const app = new App({ name: `Surehand ${name}`, version: "1" });
   app.ontoolinput = (p) => h.onInput?.((p.arguments ?? {}) as Record<string, unknown>);
-  app.ontoolresult = (p) => h.onResult(p as ToolResult);
+  app.ontoolresult = (p) => h.onResult(p as ToolResult, app);
   app.onhostcontextchanged = (c) => applyTheme(c.theme);
   const view: View = {
     app,

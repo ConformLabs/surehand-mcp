@@ -77,3 +77,8 @@ button:disabled { cursor: default; opacity: 0.6; }
 
 /* a short message when After Effects can't be reached or is busy */
 .err { font: 11px/16px var(--font-mono); color: var(--refused); }
+.err.note { padding: 8px 14px; }
+
+/* a result that isn't a report (a schema, a how-to, a list): readable text, the first lines until "Show all" */
+.txtres { padding: 10px 14px; font: 12px/18px var(--font-mono); color: var(--ink-muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+.txtres.collapsed { max-height: 118px; overflow: hidden; }

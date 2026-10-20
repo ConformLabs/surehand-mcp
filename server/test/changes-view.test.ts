@@ -198,7 +198,7 @@ describe("ae_prove_identical with a view", () => {
 });
 
 describe("the changes view in a fake AI app (jsdom)", () => {
-  async function host(view: unknown, onCall: (name: string, args: any) => any = () => undefined, toolResult?: any) {
+  async function host(view: unknown, onCall: (name: string, args: any) => any = () => undefined, toolResult?: any, tool?: string) {
     const { JSDOM } = await import("jsdom");
     const sent: any[] = [];
     let win: any;
@@ -212,7 +212,7 @@ describe("the changes view in a fake AI app (jsdom)", () => {
         };
         setTimeout(() => {
           if (m.method === "ui/initialize")
-            reply({ jsonrpc: "2.0", id: m.id, result: { protocolVersion: "2026-01-26", hostInfo: { name: "fake", version: "1" }, hostCapabilities: { serverTools: {} }, hostContext: { theme: "dark" } } });
+            reply({ jsonrpc: "2.0", id: m.id, result: { protocolVersion: "2026-01-26", hostInfo: { name: "fake", version: "1" }, hostCapabilities: { serverTools: {} }, hostContext: { theme: "dark", ...(tool ? { toolInfo: { tool: { name: tool, inputSchema: { type: "object" } } } } : {}) } } });
           else if (m.method === "ui/notifications/initialized")
             reply({ jsonrpc: "2.0", method: "ui/notifications/tool-result", params: toolResult ?? { content: [{ type: "text", text: "Verdict" }], _meta: { "surehand/view": view } } });
           else if (m.method === "tools/call") reply({ jsonrpc: "2.0", id: m.id, result: onCall(m.params.name, m.params.arguments) ?? { content: [{ type: "text", text: "ok" }] } });
@@ -309,9 +309,31 @@ describe("the changes view in a fake AI app (jsdom)", () => {
     expect(calls[0]).toEqual(["ae_view_reveal", { comp: "Endcard", layer: 4 }]);
   });
 
-  it("capture (no view data) shows its first line", async () => {
-    const { doc, until } = await host(undefined, undefined, { content: [{ type: "text", text: "Captured proof 1: ...\nmore" }] });
-    await until(() => doc.querySelector(".mut.note"));
-    expect(doc.querySelector(".mut.note")!.textContent).toBe("Captured proof 1: ...");
+  it("results that aren't a comparison or a diff (capture, snapshot, list, guidance) are readable text, never an error", async () => {
+    const cap = await host(undefined, undefined, { content: [{ type: "text", text: "Captured proof 1: ...\nmore" }] }, "ae_prove_identical");
+    await cap.until(() => cap.doc.querySelector(".txtres"));
+    expect(cap.doc.querySelector(".vh .t")!.textContent).toBe("Proof");
+    expect(cap.doc.querySelector(".txtres")!.textContent).toBe("Captured proof 1: ...\nmore");
+    expect(cap.doc.querySelector(".err")).toBeNull();
+    expect(cap.doc.querySelector('[data-k="text-all"]')).toBeNull(); // short: all of it, no button
+    // a long list: the first lines, then Show all
+    const list = Array.from({ length: 30 }, (_, i) => `2026101${i}  snapshot "v${i}"  revision ${i}, 12 comps, 400 layers`).join("\n");
+    const h = await host(undefined, undefined, { content: [{ type: "text", text: `History of /Jobs/Spot.aep (newest first):\n${list}` }] }, "ae_project_history");
+    await h.until(() => h.doc.querySelector(".txtres"));
+    expect(h.doc.querySelector(".vh .t")!.textContent).toBe("Project history");
+    expect(h.doc.querySelector(".txtres")!.classList.contains("collapsed")).toBe(true);
+    (h.doc.querySelector('[data-k="text-all"]') as any).click();
+    expect(h.doc.querySelector(".txtres")!.classList.contains("collapsed")).toBe(false);
+    expect(h.doc.querySelector('[data-k="text-all"]')!.textContent).toBe("Show less");
+    // guidance returned as an error (no snapshot to compare with) is still just text
+    const g = await host(undefined, undefined, { isError: true, content: [{ type: "text", text: 'from: There are no snapshots of this project yet. Take one with ae_project_history {action: "snapshot", label: "..."}.' }] });
+    await g.until(() => g.doc.querySelector(".txtres"));
+    expect(g.doc.querySelector(".err")).toBeNull();
+    expect(g.doc.querySelector(".vh .t")!.textContent).toBe("Surehand");
+    // After Effects not reachable: the short message, in the error style
+    const e = await host(undefined, undefined, { isError: true, content: [{ type: "text", text: "Cannot reach After Effects. Make sure ..." }], _meta: { "surehand/error": "NOT_RUNNING" } });
+    await e.until(() => e.doc.querySelector(".err.note"));
+    expect(e.doc.querySelector(".err.note")!.textContent).toBe("After Effects isn't open. Open it, then try again.");
+    expect(e.doc.querySelector(".txtres")).toBeNull();
   });
 });

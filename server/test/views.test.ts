@@ -439,6 +439,30 @@ describe("the Preflight view in a fake AI app (jsdom)", () => {
     expect(calls.at(-1)).toEqual(["ae_preflight", fixtureArgs]);
   });
 
+  it("a result that isn't a report (the schema, guidance) is readable text under the Preflight header, never an error line", async () => {
+    const { SCHEMA_GUIDANCE } = await import("../src/tools/preflight.js");
+    const schema = `${SCHEMA_GUIDANCE}\n\nJSON schema:\n{"type":"object","properties":{}}`;
+    const { doc, until } = await host({ content: [{ type: "text", text: schema }] });
+    await until(() => doc.querySelector(".txtres"));
+    expect(doc.querySelector(".vh .t")!.textContent).toBe("Preflight");
+    expect(doc.querySelector(".verdict")).toBeNull();
+    expect(doc.querySelector(".err")).toBeNull();
+    const body = doc.querySelector(".txtres")!;
+    expect(body.textContent).toBe(schema); // all of it, wrapping (only shown in part until Show all)
+    expect(body.classList.contains("collapsed")).toBe(true);
+    (doc.querySelector('[data-k="text-all"]') as any).click();
+    expect(body.classList.contains("collapsed")).toBe(false);
+    // the no-spec guidance comes back as an error result: still text
+    const g = await host({ isError: true, content: [{ type: "text", text: 'Pass the delivery spec: a path to its JSON file or the spec object. action: "schema" describes its fields.' }] });
+    await g.until(() => g.doc.querySelector(".txtres"));
+    expect(g.doc.querySelector(".err")).toBeNull();
+    expect(g.doc.querySelector('[data-k="text-all"]')).toBeNull();
+    // only After Effects not reachable / busy is an error line
+    const e = await host({ isError: true, content: [{ type: "text", text: "busy" }], _meta: { "surehand/error": "BLOCKED" } });
+    await e.until(() => e.doc.querySelector(".err.note"));
+    expect(e.doc.querySelector(".err.note")!.textContent).toBe("After Effects is busy. Try again in a moment.");
+  });
+
   it("Show all lists every passed check", async () => {
     const { doc, until } = await host(result);
     await until(() => doc.querySelector('[data-k="all"]'));

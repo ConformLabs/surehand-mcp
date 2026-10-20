@@ -2,7 +2,7 @@
 // renders" tree from the render queue down to the footage with its tags, and the selected node's problems:
 // what's wrong, the expression with the fragile part marked, Show in AE and Ask the AI to …. Nodes beyond
 // the result's first levels, and every node's problems, come from ae_view_xray_node (this run's kept analysis).
-import { el, errorText, startView, tile, viewData, type ToolResult, type View } from "./shared.js";
+import { el, startView, textResult, tile, viewData, type ToolResult, type View } from "./shared.js";
 import type { XrayNode, XrayNodeView, XrayProblem, XrayTag, XrayView } from "./types.js";
 
 const CHIP: Record<XrayTag, { one: string; many: string; cls: string }> = {
@@ -298,10 +298,8 @@ function show(d: XrayView) {
 function onResult(r: ToolResult) {
   const d = viewData<XrayView>(r);
   if (d) return show(d);
-  const text = r.content?.find((c) => c.type === "text")?.text;
-  root.replaceChildren(
-    el("div", { class: "v" }, el("div", { class: "vh" }, tile(), el("div", { class: "grow" }, el("div", { class: "t" }, "X-ray"))), el("div", { class: "err note" }, errorText(r._meta?.["surehand/error"] as string | undefined, text))),
-  );
+  // a result without the tree (a script error, an older Surehand) or AE not reachable: the text itself
+  root.replaceChildren(textResult("X-ray", r));
 }
 
 startView("X-ray", { onResult })

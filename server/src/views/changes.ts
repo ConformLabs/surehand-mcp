@@ -2,7 +2,8 @@
 // proof's verdict, before / after / difference ×50 at a compared frame (fetched on demand: ae_view_proof_frame),
 // a slider through the compared frames, then what changed in the project. Show in AE only navigates
 // (ae_view_reveal); there is no Undo here (undo stays in After Effects, or goes through the chat).
-import { el, errorText, startView, tile, viewData, type ToolResult, type View } from "./shared.js";
+import { el, startView, textResult, tile, toolName, viewData, type ToolResult, type View } from "./shared.js";
+import type { App } from "@modelcontextprotocol/ext-apps";
 import { prettyChange } from "./format.js";
 import type { ChangesView, ProofFrame, ViewChange } from "./types.js";
 
@@ -179,13 +180,13 @@ function show(d: ChangesView) {
   if (d.proof?.frames.length) void loadFrames(state.at);
 }
 
-function onResult(r: ToolResult) {
+const TITLES: Record<string, string> = { ae_prove_identical: "Proof", ae_project_history: "Project history" };
+
+function onResult(r: ToolResult, app: App) {
   const d = viewData<ChangesView>(r);
   if (d) return show(d);
-  // capture, snapshot and list have no view of their own, and an error has only its text: say it in one line
-  const text = r.content?.find((c) => c.type === "text")?.text;
-  const line = r.isError ? el("div", { class: "err note" }, errorText(r._meta?.["surehand/error"] as string | undefined, text)) : el("div", { class: "mut note" }, (text ?? "").split("\n")[0]);
-  root.replaceChildren(el("div", { class: "v" }, el("div", { class: "vh" }, tile(), el("div", { class: "grow" }, el("div", { class: "t" }, "Surehand"))), line));
+  // capture, snapshot and list have no view of their own, nor has guidance or AE not reachable: the text itself
+  root.replaceChildren(textResult(TITLES[toolName(app) ?? ""] ?? "Surehand", r));
 }
 
 startView("Changes", { onResult })
