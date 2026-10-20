@@ -542,6 +542,18 @@ aemcp = (function () {
     }
     return v;
   };
+  // ---------- render queue ----------
+  // A comp into the render queue (ae_add_to_render_queue, ae_versions_from_data). o: renderSettingsTemplate,
+  // outputModuleTemplate, outputPath, workAreaOnly (false: the whole comp). Returns the item and its output module.
+  A.addToRenderQueue = function (c, o) {
+    var it = app.project.renderQueue.items.add(c);
+    if (o.renderSettingsTemplate) it.applyTemplate(o.renderSettingsTemplate);
+    var om = it.outputModule(1);
+    if (o.outputModuleTemplate) om.applyTemplate(o.outputModuleTemplate);
+    if (o.outputPath) om.file = new File(o.outputPath);
+    if (o.workAreaOnly === false) { it.timeSpanStart = 0; it.timeSpanDuration = c.duration; }
+    return { item: it, om: om };
+  };
   A.color3 = function (v) { var c = A.color(v); return [c[0], c[1], c[2]]; };
   A.applyText = function (td, o) {
     if (o.text !== undefined) td.text = o.text;

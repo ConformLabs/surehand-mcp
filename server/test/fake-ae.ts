@@ -5,6 +5,8 @@
 // that is already set moves the revision but leaves no undo step), an edit outside a group is a step of
 // its own, an extra endUndoGroup() closes the group early, and Edit > Undo moves the revision forward
 // (it doesn't restore it).
+import { existsSync } from "node:fs";
+import { basename, resolve as resolvePath } from "node:path";
 import { helperSource } from "../src/jsx.js";
 
 class CompItem {}
@@ -258,11 +260,15 @@ export interface FakeLayerSpec {
   /** animated values by match name ("ADBE Position", "ADBE Opacity", "ADBE Text Document"...): value at a time */
   anim?: Record<string, (t: number) => unknown>;
   /** sourceRectAtTime [left, top, width, height] (default: text [0,-50,400,60], others the source size) */
-  rect?: number[] | ((t: number) => number[]);
-  /** text layers: the text (default: the layer name), font size (default 50), paragraph box overflow */
+  rect?: number[] | ((t: number, text: string) => number[]);
+  /** text layers: the text (default: the layer name), font size (default 50), paragraph box overflow (or by the text shown) */
   text?: string;
   fontSize?: number;
-  boxOverflow?: boolean;
+  boxOverflow?: boolean | ((text: string) => boolean);
+  /** text layers: fill colour (default white) */
+  fillColor?: number[];
+  /** more properties at a path ("Contents/Rectangle 1/Fill 1/Color"): value, type (PropertyValueType name), keyframes, expression */
+  props?: Record<string, { value: unknown; type: string; keyed?: boolean; expression?: string }>;
   /** characters the text's font has no glyph for (the font gets hasGlyphsFor, as in AE 25.1+) */
   glyphsMissing?: string;
   /** per-character fonts (style runs, AE 24+ characterRange): the font of character i, and what it lacks */
@@ -282,6 +288,8 @@ export interface FakeCompSpec {
   motionBlur?: boolean;
   samples?: number;
   renderer?: string;
+  /** Essential Graphics controllers (name, value and type of the Essential Property a precomp layer gets) */
+  egp?: { name: string; value: unknown; type: string }[];
 }
 export interface FakeFootageSpec {
   name: string;
@@ -306,7 +314,13 @@ export interface FakeProjectSpec {
   /** app.project.usedFonts: a font and the layers (by name) that use it; noIds: usedAt entries without layerID */
   usedFonts?: { ps: string; layers: string[]; noIds?: boolean }[];
   activeComp?: string;
+  /** output module templates applyTemplate accepts (default: any) */
+  outputModuleTemplates?: string[];
 }
+
+/** PropertyValueType with After Effects' own values. */
+export const PVT_FULL = { NO_VALUE: 6412, ThreeD_SPATIAL: 6413, ThreeD: 6414, TwoD_SPATIAL: 6415, TwoD: 6416, OneD: 6417, COLOR: 6418, CUSTOM_VALUE: 6419, MARKER: 6420, LAYER_INDEX: 6421, MASK_INDEX: 6422, SHAPE: 6423, TEXT_DOCUMENT: 6424 };
+const clone = <T>(v: T): T => (Array.isArray(v) ? (v.map(clone) as T) : v && typeof v === "object" ? (Object.defineProperties(Object.create(Object.getPrototypeOf(v)), Object.getOwnPropertyDescriptors(v)) as T) : v);
 
 export function fakeProject(spec: FakeProjectSpec) {
   class Item {}
@@ -326,9 +340,18 @@ export function fakeProject(spec: FakeProjectSpec) {
   class LightLayer extends Layer {}
   class PropertyBase {}
   const globals: Record<string, unknown> = {
-    File: { decode: decodeURIComponent },
+    File: Object.assign(
+      function (this: any, path: string) {
+        const full = resolvePath(String(path));
+        return { fsName: full, name: basename(full), get exists() { return existsSync(full); } };
+      },
+      { decode: decodeURIComponent },
+    ),
+    ImportOptions: function (this: any, file: any) {
+      this.file = file;
+    },
     Item, CompItem, FootageItem, FolderItem, FootageSource, FileSource, SolidSource, PlaceholderSource, Layer, AVLayer, TextLayer, ShapeLayer, CameraLayer, LightLayer, PropertyBase,
-    PropertyType, PropertyValueType, BlendingMode, TrackMatteType,
+    PropertyType, PropertyValueType: PVT_FULL, BlendingMode, TrackMatteType,
     AlphaMode: { IGNORE: 5412, STRAIGHT: 5413, PREMULTIPLIED: 5414 },
     RQItemStatus: { QUEUED: 3015, UNQUEUED: 3013, DONE: 3019 },
     AutoOrientType: { NO_AUTO_ORIENT: 4212, ALONG_PATH: 4213 },
@@ -352,6 +375,10 @@ export function fakeProject(spec: FakeProjectSpec) {
           calls.push("valueAtTime");
           return anim ? anim(t) : this.value;
         },
+        setValue(this: any, v: unknown) {
+          if (this.numKeys > 0) throw new Error("After Effects error: can't use setValue on a property with keyframes");
+          this.value = v;
+        },
         ...extra,
       }),
       name,
@@ -365,6 +392,7 @@ export function fakeProject(spec: FakeProjectSpec) {
 
   const items: any[] = [];
   let nextId = 1;
+  const root: any = Object.assign(new FolderItem(), { id: 0, name: "Root" });
   const byName = (n: string) => items.find((i) => i.name === n);
   for (const f of spec.footage ?? []) {
     const kind = f.kind ?? "file";
@@ -378,21 +406,59 @@ export function fakeProject(spec: FakeProjectSpec) {
     items.push(watch(it, f.name));
   }
   const comps: any[] = [];
-  for (const c of spec.comps) {
+  const omTemplates = spec.outputModuleTemplates;
+  const makeComp = (c: FakeCompSpec, name = c.name): any => {
     const it: any = Object.assign(new CompItem(), {
-      id: nextId++, name: c.name, width: c.width ?? 1920, height: c.height ?? 1080, pixelAspect: 1, frameRate: c.fps ?? 25, duration: c.duration ?? 10,
+      id: nextId++, name, width: c.width ?? 1920, height: c.height ?? 1080, pixelAspect: 1, frameRate: c.fps ?? 25, duration: c.duration ?? 10,
       motionBlur: !!c.motionBlur, shutterAngle: 180, shutterPhase: -90, motionBlurSamplesPerFrame: c.samples ?? 16, motionBlurAdaptiveSampleLimit: 128,
       frameBlending: true, renderer: c.renderer ?? "ADBE Advanced 3d", usedIn: [], layers: [] as any[], time: 0, frameDuration: 1 / (c.fps ?? 25), displayStartTime: 0,
+      bgColor: [0, 0, 0], workAreaStart: 0, workAreaDuration: c.duration ?? 10, parentFolder: root,
     });
     Object.defineProperty(it, "numLayers", { get: () => it.layers.length });
     it.layer = (k: number | string) => (typeof k === "number" ? it.layers[k - 1] : it.layers.find((l: any) => l.name === k)) ?? null;
-    comps.push(it);
-    items.push(watch(it, c.name));
-  }
+    const egp = c.egp ?? [];
+    it.motionGraphicsTemplateControllerCount = egp.length;
+    it.getMotionGraphicsTemplateControllerName = (k: number) => egp[k - 1].name;
+    // CompItem.duplicate: a new comp with copies of the layers and their current values (precomps stay shared)
+    it.duplicate = () => {
+      const d = makeComp(c, `${it.name} 2`);
+      addLayers(d, c);
+      it.layers.forEach((L: any, k: number) => copyInto(L, d.layers[k]));
+      const w = watch(d, d.name);
+      items.push(w);
+      return w;
+    };
+    // comp.layers.add(item): a precomp layer, with the item's Essential Properties when it is a comp that has them
+    it.layers.add = (item: any) => {
+      const children: any[] = [group("Transform", "ADBE Transform Group", [prop("Scale", "ADBE Scale", { value: [100, 100, 100], propertyValueType: PVT_FULL.ThreeD })])];
+      const L: any = Object.assign(new AVLayer(), { index: it.layers.length + 1, id: 1000 + nextId++, name: item.name, enabled: true, source: item, parent: null, inPoint: 0, outPoint: it.duration, startTime: 0, stretch: 100, children });
+      L.property = (k: number | string) => (typeof k === "number" ? L.children[k - 1] : L.children.find((x: any) => x.name === k || x.matchName === k)) ?? null;
+      const eg = item.__egp as FakeCompSpec["egp"];
+      if (eg) L.essentialProperty = group("Essential Properties", "ADBE Layer Overrides", eg.map((e) => prop(e.name, e.name, { value: clone(e.value), propertyValueType: (PVT_FULL as any)[e.type] })));
+      const w = watch(L, L.name);
+      it.layers.push(w);
+      return w;
+    };
+    it.__egp = c.egp;
+    return it;
+  };
+  /** the values of a layer's properties (and its source) into the same layer of a duplicate */
+  const copyInto = (a: any, b: any) => {
+    b.source = a.source;
+    const walk = (x: any, y: any) => {
+      for (let k = 0; k < (x.children?.length ?? 0); k++) {
+        const cx = x.children[k], cy = y.children[k];
+        if (!cy) continue;
+        if (cx.propertyType === PropertyType.PROPERTY) cy.value = clone(cx.value);
+        else walk(cx, cy);
+      }
+    };
+    walk(a, b);
+  };
   const effectGroups = (l: FakeLayerSpec) =>
     (l.effects ?? []).map((e) => group(e.name, e.matchName, [], { enabled: e.enabled !== false }));
-  spec.comps.forEach((c, ci) => {
-    const comp = comps[ci];
+  const T = (n: string) => (PVT_FULL as any)[n];
+  function addLayers(comp: any, c: FakeCompSpec) {
     c.layers.forEach((ls, li) => {
       const type = ls.type ?? "solid";
       const Cls = type === "text" ? TextLayer : type === "shape" ? ShapeLayer : type === "camera" ? CameraLayer : AVLayer;
@@ -400,31 +466,42 @@ export function fakeProject(spec: FakeProjectSpec) {
       if (source && !source.usedIn.includes(comp)) source.usedIn.push(comp);
       const an = ls.anim ?? {};
       const transform = group("Transform", "ADBE Transform Group", [
-        prop("Anchor Point", "ADBE Anchor Point", { value: ls.anchor ?? [0, 0, 0] }, an["ADBE Anchor Point"]),
-        prop("Position", "ADBE Position", { value: ls.position ?? [960, 540, 0] }, an["ADBE Position"]),
-        prop("Scale", "ADBE Scale", { value: ls.scale ?? [100, 100, 100] }, an["ADBE Scale"]),
-        prop("Z Rotation", "ADBE Rotate Z", { value: ls.rotation ?? 0 }, an["ADBE Rotate Z"]),
-        prop("Opacity", "ADBE Opacity", { value: ls.opacity ?? 100 }, an["ADBE Opacity"]),
+        prop("Anchor Point", "ADBE Anchor Point", { value: clone(ls.anchor ?? [0, 0, 0]), propertyValueType: T("ThreeD_SPATIAL") }, an["ADBE Anchor Point"]),
+        prop("Position", "ADBE Position", { value: clone(ls.position ?? [960, 540, 0]), propertyValueType: T("ThreeD_SPATIAL") }, an["ADBE Position"]),
+        prop("Scale", "ADBE Scale", { value: clone(ls.scale ?? [100, 100, 100]), propertyValueType: T("ThreeD") }, an["ADBE Scale"]),
+        prop("Z Rotation", "ADBE Rotate Z", { value: ls.rotation ?? 0, propertyValueType: T("OneD") }, an["ADBE Rotate Z"]),
+        prop("Opacity", "ADBE Opacity", { value: ls.opacity ?? 100, propertyValueType: T("OneD") }, an["ADBE Opacity"]),
       ]);
       const children: any[] = [transform];
       if (type !== "camera") children.push(group("Effects", "ADBE Effect Parade", effectGroups(ls)));
       const fontObj = (ps: string, missing: string) => ({ postScriptName: ps, hasGlyphsFor: (ch: string) => !missing.includes(ch) });
-      const doc = (text: string) => ({ font: ls.font ?? "ArialMT", text, fontSize: ls.fontSize ?? 50, boxText: ls.boxOverflow !== undefined, boxOverflow: ls.boxOverflow,
-        ...(ls.glyphsMissing !== undefined ? { fontObject: fontObj(ls.font ?? "ArialMT", ls.glyphsMissing) } : {}),
-        ...(ls.charFonts ? { characterRange: (i: number) => ({ font: ls.charFonts![i].font, fontObject: fontObj(ls.charFonts![i].font, ls.charFonts![i].missing ?? "") }) } : {}) });
+      const doc = (text: string) => {
+        const d: any = { font: ls.font ?? "ArialMT", text, fontSize: ls.fontSize ?? 50, boxText: ls.boxOverflow !== undefined, applyFill: true, fillColor: clone(ls.fillColor ?? [1, 1, 1]),
+          ...(ls.glyphsMissing !== undefined ? { fontObject: fontObj(ls.font ?? "ArialMT", ls.glyphsMissing) } : {}),
+          ...(ls.charFonts ? { characterRange: (i: number) => ({ font: ls.charFonts![i].font, fontObject: fontObj(ls.charFonts![i].font, ls.charFonts![i].missing ?? "") }) } : {}) };
+        const bo = ls.boxOverflow;
+        Object.defineProperty(d, "boxOverflow", { get() { return typeof bo === "function" ? bo(this.text) : bo; }, enumerable: true, configurable: true });
+        return d;
+      };
       const textAnim = an["ADBE Text Document"];
-      if (type === "text") children.push(group("Text", "ADBE Text Properties", [prop("Source Text", "ADBE Text Document", { value: doc(ls.text ?? ls.name) }, textAnim && ((t: number) => doc(String(textAnim(t)))))]));
-      for (const [path, e] of Object.entries(ls.expressions ?? {})) {
+      if (type === "text") children.push(group("Text", "ADBE Text Properties", [prop("Source Text", "ADBE Text Document", { value: doc(ls.text ?? ls.name), propertyValueType: T("TEXT_DOCUMENT") }, textAnim && ((t: number) => doc(String(textAnim(t)))))]));
+      const at = (path: string, leaf: (name: string) => any) => {
         const segs = path.split("/");
         let g: any = { children };
         for (const [k, s] of segs.entries()) {
           let next = g.children.find((x: any) => x.name === s);
           if (!next) {
-            next = k === segs.length - 1 ? prop(s, s) : group(s, s, []);
+            next = k === segs.length - 1 ? leaf(s) : group(s, s, []);
             g.children.push(next);
           }
           g = next;
         }
+        return g;
+      };
+      for (const [path, p] of Object.entries(ls.props ?? {}))
+        at(path, (s) => prop(s, s, { value: clone(p.value), propertyValueType: T(p.type), numKeys: p.keyed ? 2 : 0, ...(p.expression ? { expression: p.expression } : {}) }));
+      for (const [path, e] of Object.entries(ls.expressions ?? {})) {
+        const g = at(path, (s) => prop(s, s));
         Object.assign(g, { expression: e.expr, expressionError: e.error ?? "", expressionEnabled: e.enabled !== false });
       }
       const L: any = Object.assign(new Cls(), {
@@ -435,8 +512,13 @@ export function fakeProject(spec: FakeProjectSpec) {
         startTime: ls.startTime ?? 0, stretch: 100,
         sourceRectAtTime: (t: number) => {
           calls.push("sourceRectAtTime");
-          const r = typeof ls.rect === "function" ? ls.rect(t) : (ls.rect ?? (type === "text" ? [0, -50, 400, 60] : [0, 0, source?.width ?? 100, source?.height ?? 100]));
+          const text = type === "text" ? String(L.property("ADBE Text Properties").property("ADBE Text Document").valueAtTime(t, false).text) : "";
+          const src = L.source;
+          const r = typeof ls.rect === "function" ? ls.rect(t, text) : (ls.rect ?? (type === "text" ? [0, -50, 400, 60] : [0, 0, src?.width ?? 100, src?.height ?? 100]));
           return { left: r[0], top: r[1], width: r[2], height: r[3] };
+        },
+        replaceSource(this: any, item: any) {
+          this.source = item;
         },
       });
       Object.defineProperty(L, "threeDLayer", {
@@ -458,12 +540,27 @@ export function fakeProject(spec: FakeProjectSpec) {
     c.layers.forEach((ls, li) => {
       if (ls.parent) comp.layers[li].parent = comp.layers[ls.parent - 1];
     });
-  });
+  }
+  for (const c of spec.comps) {
+    const it = makeComp(c);
+    comps.push(it);
+    items.push(watch(it, c.name));
+  }
+  spec.comps.forEach((c, ci) => addLayers(comps[ci], c));
   writes.length = 0; // setting up parents is not the tool's doing
-  const rqItems = (spec.rq ?? []).map((r) => ({
-    comp: byName(r.comp), render: r.render, status: r.render ? (globals.RQItemStatus as any).QUEUED : (globals.RQItemStatus as any).UNQUEUED,
-    outputModule: () => ({ file: { fsName: `/renders/${r.comp}.mov` } }),
-  }));
+  const imported: string[] = [];
+  const RQS = globals.RQItemStatus as any;
+  const rqItem = (comp: any, render: boolean, file: any): any => {
+    const om: any = { name: "Lossless", file, applyTemplate(n: string) {
+      if (omTemplates && !omTemplates.includes(n)) throw new Error(`After Effects error: no output module template named "${n}"`);
+      om.name = n;
+    } };
+    const q: any = { comp, status: render ? RQS.QUEUED : RQS.UNQUEUED, outputModule: () => om, applyTemplate() {}, remove: () => rqItems.splice(rqItems.indexOf(q), 1) };
+    Object.defineProperty(q, "render", { get: () => q.status === RQS.QUEUED, set: (v: boolean) => (q.status = v ? RQS.QUEUED : RQS.UNQUEUED), enumerable: true });
+    return q;
+  };
+  const rqItems: any[] = (spec.rq ?? []).map((r) => rqItem(byName(r.comp), r.render, { fsName: `/renders/${r.comp}.mov` }));
+  const rendered: string[] = [];
   const project: any = watch(
     {
       file: { name: "Inherited.aep", fsName: "/jobs/Inherited.aep" }, bitsPerChannel: 16, expressionEngine: "javascript-1.0",
@@ -471,7 +568,29 @@ export function fakeProject(spec: FakeProjectSpec) {
       item: (i: number) => items[i - 1],
       itemByID: (id: number) => items.find((i) => i.id === id) ?? null,
       activeItem: spec.activeComp ? byName(spec.activeComp) : null,
-      renderQueue: { get numItems() { return rqItems.length; }, item: (i: number) => rqItems[i - 1] },
+      renderQueue: {
+        get numItems() { return rqItems.length; },
+        item: (i: number) => rqItems[i - 1],
+        items: { add: (comp: any) => { const q = rqItem(comp, true, null); rqItems.push(q); return q; } },
+        render: () => { for (const q of rqItems) if (q.render) { rendered.push(q.comp.name); q.status = RQS.DONE; } },
+      },
+      items: {
+        addFolder: (name: string) => { const f = watch(Object.assign(new FolderItem(), { id: nextId++, name, parentFolder: root }), name); items.push(f); return f; },
+        addComp: (name: string, w: number, h: number, _par: number, dur: number, fps: number) => {
+          const c = makeComp({ name, width: w, height: h, duration: dur, fps, layers: [] });
+          const wc = watch(c, name);
+          items.push(wc);
+          return wc;
+        },
+      },
+      importFile: (o: any) => {
+        const f = o.file;
+        if (!f.exists) throw new Error(`After Effects error: file "${f.fsName}" can't be imported: it doesn't exist`);
+        const it = watch(Object.assign(new FootageItem(), { id: nextId++, name: f.name, width: 1920, height: 1080, file: { fsName: f.fsName, exists: true }, footageMissing: false, mainSource: new FileSource(), usedIn: [], parentFolder: root }), f.name);
+        items.push(it);
+        imported.push(f.fsName);
+        return it;
+      },
     },
     "project",
   );
@@ -497,5 +616,5 @@ export function fakeProject(spec: FakeProjectSpec) {
     const fn = new Function("aemcp", "app", ...names, `return function (args, log) {\n${jsx}\n};`)(aemcp, app, ...values);
     return JSON.parse(aemcp.run(fn, args, { undoGroup: false }));
   };
-  return { app, comps, items, writes, calls, run };
+  return { app, comps, items, writes, calls, run, rqItems, rendered, imported };
 }

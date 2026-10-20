@@ -1,6 +1,6 @@
 ---
 name: surehand-ae-delivery
-description: Checks an After Effects comp and its rendered file against the user's own delivery spec (QC preflight), fixes what fails and reports the exact verdict. Use for delivery specs, QC, renders.
+description: Checks After Effects comps and renders against the user's own delivery spec (QC preflight) and builds checked versions from CSV/JSON data. Use for delivery specs, QC, data versions, renders.
 license: MIT
 ---
 
@@ -45,6 +45,12 @@ skill for every edit.
    - the remaining findings with their timecodes;
    - every edit made;
    - every check that didn't run, and why.
+
+## Versions from data
+
+When a CSV / JSON file becomes many versions of a comp (names, scores, prices, bars, photos), use
+ae_versions_from_data: it builds every row in one undo step and checks every row (values, text overflow and frame,
+glyphs, fonts, bar sizes, footage). Follow references/versions-from-data.md for the workflow.
 
 ## Notes
 

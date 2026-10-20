@@ -17,7 +17,7 @@
 
 Surehand MCP connects **Claude** (Desktop / Code), **ChatGPT** (desktop app or web), Cursor, Codex, VS Code (GitHub Copilot), Windsurf / Devin Desktop, LM Studio, or any MCP client to **Adobe® After Effects®**.
 The AI can run any script inside After Effects (modern JavaScript, converted for AE's ExtendScript engine automatically),
-read information back, and use up to 106 ready-made tools for projects, comps, layers, keyframes (Graph Editor level),
+read information back, and use up to 107 ready-made tools for projects, comps, layers, keyframes (Graph Editor level),
 text styling and animators, footage, effects, shapes, masks, 3D cameras/lights/materials, audio, color management,
 Essential Graphics and rendering (including background renders with aerender). Batch edits run many steps as one
 undo step, checkpoints keep safety copies of the project, structural changes can be proven not to change the render,
@@ -96,7 +96,7 @@ The installer:
 
 Four Agent Skills teach the AI how to work with Surehand well: `surehand-ae` (the basics: check the connection, read
 before editing, confirm each edit with its change report, look at the result, never work around a refusal, plus the
-ExtendScript traps seen live), `surehand-ae-delivery` (preflight against your own delivery spec),
+ExtendScript traps seen live), `surehand-ae-delivery` (preflight against your own delivery spec, and versions from data checked row by row),
 `surehand-ae-safe-restructure` (structural edits with pixel proof) and `surehand-ae-timing-layout` (exact keyframes,
 easing and measured alignment). The source is `skills/` in this repo.
 
@@ -194,7 +194,7 @@ To rotate the token, delete `token` from `~/.surehand/ae/config.json` and re-run
 | `ae_get_scripting_guide` | ExtendScript cheat sheet for the model (also an MCP resource `aemcp://docs/extendscript`). |
 
 **Tool profiles.** Every tool description is sent to the AI in every chat, so by default only a **core set of
-29 tools** is loaded (about 9k tokens instead of 33k for all 106), and **every other tool stays available on demand**:
+29 tools** is loaded (about 9k tokens instead of 39k for all 107), and **every other tool stays available on demand**:
 `ae_tools` lists all tools by category (or gives full parameter details of chosen ones), and `ae_call` runs any tool by
 name with the same validation, permissions, change report and activity log. Loading everything up front is optional:
 switch to **All tools** in the Surehand panel in After Effects (**☰ › Tools the AI sees › All tools**), in Claude Desktop's
@@ -267,7 +267,8 @@ unknown effect name gets suggestions.
 - **Footage:** `ae_set_footage_interpretation` (conform frame rate, alpha, fields, pulldown, loop, pixel aspect),
   `ae_set_proxy`, `ae_relink_footage` (find missing files by name in a folder tree, keeps sequences)
 - **Essential Graphics:** `ae_essential_graphics` (add properties as controllers, template name), `ae_export_mogrt`
-- **Checks:** `ae_preflight` (check the delivered comp and its render against your own delivery spec; see Preflight below)
+- **Checks:** `ae_preflight` (check the delivered comp and its render against your own delivery spec; see Preflight below),
+  `ae_versions_from_data` (a CSV / JSON file becomes versions of a comp, then every row is checked; see Versions from data below)
 - **Project:** `ae_project_health` (missing footage/fonts/effects, expression errors, unused footage, empty comps/folders,
   duplicate comp names); `ae_project_xray` (explains an inherited project: what the render queue pulls in, what
   every expression depends on and which links are fragile, what is missing, footage specs, what makes it heavy)
@@ -331,6 +332,36 @@ check (failures first, then warnings, by time), with timecode in the comp's fram
 target). For files it also shows what ffprobe found and up to four frames at the worst problems. Preflight changes
 nothing in the project and leaves no undo step, so it also runs in read-only mode. Long comps are checked within a
 time budget (`timeBudgetSeconds`, default 120 s); a partial check says so.
+
+### Versions from data
+
+`ae_versions_from_data` turns a CSV or JSON file (or rows in the chat) into versions of a template comp, and then
+**checks every row**. Filling data in is the easy part; this is about knowing that each version is right. Nothing is
+built in: every format, colour, size and margin comes from your data and your own rules.
+
+- **Mapping:** each column goes to a layer of the template comp (or an Essential Graphics controller): text; a number in
+  your format (decimals, decimal and thousands separators, prefix, suffix, how negatives are written); a colour from the
+  cell or from your rules (for example "below 0: #C62828, otherwise #2E7D32"); a footage file that replaces the layer's
+  source; any property value; or a bar's on-screen width or height through your value-to-pixels mapping (for example
+  0 → 0 px, 100 → 800 px). Names come from a pattern like `{comp} - {City}`.
+- **Two modes.** `duplicate` (layer targets) duplicates the comp per row. Duplicating a comp doesn't duplicate the
+  precomps inside it (every version shares them), so targets are layers of the template comp itself. `essentialGraphics`
+  (controller targets) makes a comp per row with the template as a precomp and sets that row's Essential Graphics values,
+  the way After Effects keeps per-instance values; a row's layout can't be measured there, so those checks don't run.
+- **One undo step**, with the Changes list and an optional checkpoint first. `dryRun: true` checks the mapping against
+  the template and the data and shows what each row would get, without changing anything. Names already in the
+  project, keyframed targets and output files that exist are refused before anything is built.
+- **Every row is checked:** each value is read back where it renders (with expressions applied), so the text shows
+  exactly the formatted string and the colour is what the rule says; paragraph text must not overflow its box, and the
+  mapped text must stay inside the frame (or title- / action-safe with your margins) on every frame, measured with
+  Preflight's own code; characters the font has no glyph for and missing fonts fail the row; bars are measured on screen
+  (through parents) against your mapping within a tolerance you set; footage files must exist.
+- **The report:** a verdict (`FAIL (n of m rows)`, `INCOMPLETE`, `WARNINGS` or `PASS`), totals, then one line per row:
+  PASS, or FAIL with what and where. A check that didn't run (an older After Effects, a layer not visible at the
+  checked time, Essential Graphics mode) makes the row INCOMPLETE, never PASS.
+- **Render (optional):** `queue` adds every version to the render queue with your output module template and an output
+  path pattern (`/renders/{City}_{#3}.mov`); `render: true` renders only the versions that pass. Existing files are never
+  replaced unless `overwrite: true`.
 
 ### Change report
 
@@ -449,6 +480,7 @@ mean opening the old `.aep` in place of your project, so it isn't done automatic
 - "Rename all layers in the selected comp to Title Case and color-label text layers yellow."
 - "Un-precompose 'Logo Precomp' into the main comp and prove the render didn't change."
 - "Import /Users/me/footage/*.mov, make a comp for each clip and add them all to the render queue as ProRes."
+- "Make a version of 'Score Card' for every row of scores.csv: City into the City layer, Score as $1,234.00, the bar 0-100 → 0-800 px, red below zero. Check every row before you queue them."
 
 ## Control and trust
 

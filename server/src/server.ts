@@ -8,6 +8,7 @@ import { registerWorkflowTools } from "./tools/workflow.js";
 import { registerProveTools } from "./tools/prove.js";
 import { registerHistoryTools } from "./tools/history.js";
 import { registerPreflightTools } from "./tools/preflight.js";
+import { registerVersionsTools } from "./tools/versions.js";
 import { registerFileTools } from "./tools/files.js";
 import { registerOnDemandTools } from "./tools/ondemand.js";
 import { registerViews, watchViewClient } from "./tools/views.js";
@@ -28,6 +29,7 @@ export function createMcpServer(profile: ToolProfile = resolveProfile()): McpSer
   registerProveTools(server);
   registerHistoryTools(server);
   registerPreflightTools(server);
+  registerVersionsTools(server);
   registerFileTools(server);
   registerViews(server); // in-chat views and their app-only tools (on only where the AI app shows views)
   server.registerResource(
