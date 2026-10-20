@@ -2,8 +2,8 @@
 <!-- Template for npm run package:mac-pkg: server/scripts/package-mac-pkg.mjs fills it in with installer/ai-apps.mjs
      (macDistribution): the version, the packages, and one choice per AI app from installer/ai-apps.json.
      Installation Type shows the choices directly (customize="always"): Surehand MCP (required), "Connect <app>" for each
-     app (ticked when found on this Mac; a greyed "(not found on this Mac)" line otherwise), and ChatGPT on the web
-     (cloudflared, unticked). Each app choice installs a payload-free package whose postinstall connects that app after
+     app (ticked when found on this Mac; greyed out otherwise, the description says why), and ChatGPT on the web
+     (cloudflared, unticked). Titles stay short (MAC_TITLE_MAX): the Package Name column cuts longer ones off. Each app choice installs a payload-free package whose postinstall connects that app after
      the main package; a hidden last one writes the summary at the top of ~/.surehand/ae/install.log. -->
 <installer-gui-script minSpecVersion="2">
     <title>Surehand MCP</title>

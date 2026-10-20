@@ -157,6 +157,7 @@ const EXPECTED: Record<string, Hints> = {
   // checks
   ae_reformat: D, // a new comp (and precomp copies) in one undo step; checkpoint: true saves the project (overwrites the .aep) first
   ae_preflight: [false, false, true, true], // never changes the project; may download ffmpeg (with consent) and writes temporary thumbnails
+  ae_versions_from_data: D, // builds comps (one undo step); with render and overwrite: true it replaces output files
   ae_tools: R,
   ae_call: SCRIPT, // runs any tool, including ae_run_script
 };
