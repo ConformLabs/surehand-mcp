@@ -4,7 +4,7 @@
 //
 // The algorithm (idempotent, resumable, never deletes the user's data):
 //  1. Nothing to do unless a move is pending (paths.ts migrationPending: an unfinished move's marker,
-//     or ~/.aemcp with contents and no MOVED.txt).
+//     or ~/.aemcp with 1.3 data and no MOVED.txt; a Node.js left by an uninstall is not data).
 //  2. One process at a time: a lock file in ~/.surehand holding the owner's process id and start time;
 //     a lock whose process is gone (or that is very old) is taken over.
 //  3. Before the first rename, a marker (~/.surehand/.migrate-ae.inprogress) records the plan. From then
@@ -33,7 +33,10 @@ import { homedir } from "node:os";
 import nodePath from "node:path";
 import { pathToFileURL } from "node:url";
 import { readJsonFile, writeFileAtomic } from "./fsutil.js";
-import { APP, LEGACY_SERVER_FILE, legacyDir, migrationInProgress, migrationMarker, migrationPending, MOVED_NOTE, newAppDir, SERVER_FILE, surehandRoot } from "./paths.js";
+import {
+  APP, FORWARDER_MARK, isForwarder, LEGACY_SERVER_FILE, LEGACY_VOLATILE as VOLATILE, legacyDir, migrationInProgress, migrationMarker, migrationPending, MOVED_NOTE, newAppDir,
+  SERVER_FILE, surehandRoot,
+} from "./paths.js";
 
 type PathImpl = typeof nodePath.posix;
 
@@ -103,8 +106,8 @@ const FROM_LEGACY = ".from-aemcp";
 
 /** What stays in ~/.aemcp after the move on purpose: for the 1.3 extension and AI app settings. */
 const COMPAT = new Set([MOVED_NOTE, "config.json", "instances", "server", "runtime.json", "node"]);
-/** Written into ~/.aemcp by a still-running 1.3 extension or server: status, not the user's data. */
-const VOLATILE = new Set(["bridge-status.json", "update-check.json", "extension-hash", "tmp"]);
+/** Our own status files: the one in ~/.surehand/ae is the current one; a copy in ~/.aemcp is stale (see lateMerge). */
+const STALE_STATUS = new Set(["install-result.json", "install.log"]);
 
 export const migrationLog = () => nodePath.join(surehandRoot(), "migration.log");
 const lockFile = () => nodePath.join(surehandRoot(), LOCK);
@@ -112,7 +115,7 @@ const lockFile = () => nodePath.join(surehandRoot(), LOCK);
 /** The forwarding file left at ~/.aemcp/server/ae-mcp.mjs: AI app settings written by 1.3 keep working. */
 export const forwarder = (target: string) =>
   `// Surehand MCP moved to ${nodePath.dirname(nodePath.dirname(target))} (see ../${MOVED_NOTE}).\n` +
-  `// AI app settings from version 1.3 still start this file; it runs the server from its new place.\n` +
+  `// ${FORWARDER_MARK}; it runs the server from its new place.\n` +
   `await import(${JSON.stringify(pathToFileURL(target).href)});\n`;
 
 function movedText(now: string, still: string[]): string {
@@ -271,6 +274,19 @@ function readPlan(): Plan | null {
   return r.ok && r.data && Array.isArray(r.data.entries) ? r.data : null;
 }
 const writePlan = (p: Plan) => writeFileAtomic(migrationMarker(), JSON.stringify(p, null, 2));
+
+/** Checkpoint indexes in <A>/checkpoints that still name files in ~/.aemcp: pointed at the new place. */
+function mapCheckpointIndexes(A: string) {
+  const root = nodePath.join(A, "checkpoints");
+  if (!existsSync(root)) return;
+  for (const d of readdirSync(root)) {
+    const f = nodePath.join(root, d, "index.json");
+    if (!existsSync(f)) continue;
+    const text = readFileSync(f, "utf8");
+    const next = JSON.stringify(mapStrings(JSON.parse(text)), null, 2);
+    if (next !== JSON.stringify(JSON.parse(text), null, 2)) writeFileAtomic(f, next);
+  }
+}
 
 /** Order of the move: the user's data first, then the server, Node.js and ffmpeg last. */
 function ordered(names: string[]): string[] {
@@ -435,17 +451,7 @@ export function migrateLegacy(o: MigrationOptions = {}): MigrationResult {
         res.notes.push(`${what}: ${e.message}`);
       }
     };
-    step("checkpoint indexes", () => {
-      const root = nodePath.join(A, "checkpoints");
-      if (!existsSync(root)) return;
-      for (const d of readdirSync(root)) {
-        const f = nodePath.join(root, d, "index.json");
-        if (!existsSync(f)) continue;
-        const text = readFileSync(f, "utf8");
-        const next = JSON.stringify(mapStrings(JSON.parse(text)), null, 2);
-        if (next !== JSON.stringify(JSON.parse(text), null, 2)) writeFileAtomic(f, next);
-      }
-    });
+    step("checkpoint indexes", () => mapCheckpointIndexes(A));
     step("runtime.json", () => {
       const f = nodePath.join(A, "runtime.json");
       if (!existsSync(f)) return;
@@ -516,6 +522,8 @@ export interface LateMergeResult {
   merged: string[];
   renamed: string[];
   adopted: string[];
+  /** put right in ~/.aemcp: a full server where the forwarder belongs, stale status files */
+  repaired: string[];
   notes: string[];
 }
 
@@ -524,15 +532,23 @@ export interface LateMergeResult {
  * since then. Data (checkpoints, history, activity...) is merged into ~/.surehand/ae with the same
  * rules as the move; settings the 1.3 panel saved (permissions, pause) in ~/.aemcp/config.json are
  * adopted when that file is newer and they differ. Logged; cheap when there is nothing to do.
+ *
+ * It also repairs what 1.4.0-beta.3 and earlier could write into ~/.aemcp when a reinstall after an
+ * uninstall took a leftover ~/.aemcp/node for a 1.3 installation and resolved its paths there before the
+ * move: a full server where the forwarder belongs (AI apps pointed at it would never get updates), and
+ * install-result.json / install.log (ours; the ones in ~/.surehand/ae are current, so those copies go;
+ * one that only exists here moves). Data it wrote (checkpoints, history...) is merged like any other.
  */
 export function lateMerge(o: { rename?: (from: string, to: string) => void } = {}): LateMergeResult {
-  const out: LateMergeResult = { merged: [], renamed: [], adopted: [], notes: [] };
+  const out: LateMergeResult = { merged: [], renamed: [], adopted: [], repaired: [], notes: [] };
   const L = legacyDir(), A = newAppDir();
   if (migrationPending() || !existsSync(nodePath.join(L, MOVED_NOTE)) || !existsSync(A)) return out;
   const data = readdirSafe(L).filter((n) => !COMPAT.has(n) && !VOLATILE.has(n) && n !== "ffmpeg" && !n.endsWith(".tmp"));
   const legacyCfg = nodePath.join(L, "config.json"), cfg = nodePath.join(A, "config.json");
   const adopt = adoptable(legacyCfg, cfg);
-  if (!data.length && !adopt) return out;
+  const oldServer = nodePath.join(L, "server", LEGACY_SERVER_FILE), server = nodePath.join(A, "server", SERVER_FILE);
+  const fullServer = existsSync(oldServer) && existsSync(server) && !isForwarder(oldServer);
+  if (!data.length && !adopt && !fullServer) return out;
   let fd: number | null = null;
   try {
     fd = takeLock();
@@ -542,6 +558,11 @@ export function lateMerge(o: { rename?: (from: string, to: string) => void } = {
     const mover = new Mover(o.rename ?? renameSync);
     for (const n of data) {
       try {
+        if (STALE_STATUS.has(n) && existsSync(nodePath.join(A, n))) {
+          rmSync(nodePath.join(L, n), { recursive: true, force: true });
+          out.repaired.push(`removed the stale ${n}`);
+          continue;
+        }
         mover.move(nodePath.join(L, n), nodePath.join(A, n), n);
         out.merged.push(n);
       } catch (e: any) {
@@ -549,6 +570,21 @@ export function lateMerge(o: { rename?: (from: string, to: string) => void } = {
       }
     }
     out.renamed.push(...mover.renamed);
+    if (out.merged.includes("checkpoints")) {
+      try {
+        mapCheckpointIndexes(A);
+      } catch (e: any) {
+        out.notes.push(`checkpoint indexes: ${e.message}`);
+      }
+    }
+    if (fullServer) {
+      try {
+        writeFileAtomic(oldServer, forwarder(server));
+        out.repaired.push(`server/${LEGACY_SERVER_FILE} forwards again`);
+      } catch (e: any) {
+        out.notes.push(`server/${LEGACY_SERVER_FILE}: ${e.message}`);
+      }
+    }
     if (adopt) {
       try {
         const next = { ...adopt.current };
@@ -562,9 +598,10 @@ export function lateMerge(o: { rename?: (from: string, to: string) => void } = {
         out.notes.push(`settings from ${legacyCfg}: ${e.message}`);
       }
     }
-    if (out.merged.length || out.adopted.length || out.notes.length)
+    if (out.merged.length || out.adopted.length || out.repaired.length || out.notes.length)
       logLine(
         `after the move: ${out.merged.length ? `merged ${out.merged.join(", ")} from ${L}` : ""}` +
+          `${out.repaired.length ? `; repaired in ${L}: ${out.repaired.join("; ")}` : ""}` +
           `${out.renamed.length ? `; arrived under another name: ${out.renamed.join("; ")}` : ""}` +
           `${out.adopted.length ? `; adopted ${out.adopted.join(", ")} saved by the previous panel in ${legacyCfg}` : ""}` +
           `${out.notes.length ? `; problems: ${out.notes.join("; ")}` : ""}`,

@@ -15,13 +15,36 @@ export const OWN_FILES = [
   "activity.jsonl", "tmp", "renders", "compat", "install.log", "install-result.json", "chatgpt.json", "chatgpt.lock", "sessions", "skills", MOVED_NOTE,
 ];
 
-/** Removes our own entries of `dir` (all with `all`); returns what was kept. `node` is left to the launcher. */
+/**
+ * ~/.aemcp/node and ~/.aemcp/ffmpeg are always ours: 1.3's private runtimes, a copy the move left because the
+ * original was in use, or a link to the shared one in ~/.surehand. A link goes (only the link); a real folder
+ * too, unless it runs this process (the launcher removes it after we exit). ffmpeg stays when it is the only copy.
+ */
+function removeLegacyRuntime(p: string, name: string, all: boolean) {
+  try {
+    if (lstatSync(p).isSymbolicLink()) return unlinkSync(p);
+  } catch {
+    return;
+  }
+  if (process.execPath.startsWith(p + sep)) return;
+  if (name === "ffmpeg" && !all && !existsSync(join(surehandRoot(), "ffmpeg"))) return;
+  rmSync(p, { recursive: true, force: true });
+}
+
+/** Removes our own entries of `dir` (all with `all`); returns what was kept. `node` in ~/.surehand/ae is left to the launcher. */
 function clean(dir: string, keepConfig: boolean, all: boolean): string[] {
   const kept: string[] = [];
   if (!existsSync(dir)) return kept;
+  const legacy = dir === legacyDir();
   for (const name of readdirSync(dir)) {
     const p = join(dir, name);
-    // ~/.aemcp/node can be a link to ~/.surehand/node (after the move from 1.3): only the link goes
+    if (legacy && (name === "node" || name === "ffmpeg")) {
+      // a Node.js in use stays; it no longer makes a reinstall treat ~/.aemcp as a 1.3 installation (paths.ts)
+      try {
+        removeLegacyRuntime(p, name, all);
+      } catch {}
+      continue;
+    }
     if (name === "node") {
       try {
         if (lstatSync(p).isSymbolicLink()) unlinkSync(p);

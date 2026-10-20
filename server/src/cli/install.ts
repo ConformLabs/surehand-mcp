@@ -191,11 +191,14 @@ export async function install(argv: string[]) {
     console.log(installResultText(r.data));
     return;
   }
+  const connectOnly = flags.has("--connect-only");
+  // a 1.3 installation (~/.aemcp) moves to ~/.surehand/ae first (reported below): every path (the results, the
+  // installed server that AI apps are given) is resolved after it, so none of them can point into ~/.aemcp
+  const moved = connectOnly ? null : moveFromLegacy({ force: true });
   const resultFile = argValue(argv, "--result") || installResultFile();
   const unknown: string[] = [];
   const chosen = idList(argValue(argv, "--clients"), unknown);
   const unchosen = idList(argValue(argv, "--disconnect"), unknown) ?? new Set<ClientId>();
-  const connectOnly = flags.has("--connect-only");
   // a --connect-only run connects only the apps it is given
   const want = (id: ClientId) => (chosen ? chosen.has(id) : !connectOnly && !flags.has("--skip-clients") && !flags.has(`--no-${id}`));
   for (const u of unknown) warn(`Unknown AI app "${u}" (known: ${INSTALLER_ORDER.join(", ")})`);
@@ -233,14 +236,13 @@ export async function install(argv: string[]) {
   // the Mac .pkg and the Windows installer run the already installed copy; there is no release folder with launchers
   const fromInstaller = self === INSTALLED_SERVER;
 
-  if (!connectOnly) {
+  if (moved) {
     console.log(bold(`\nSurehand MCP installer v${VERSION}`));
     console.log(dim(`${process.platform} · node ${process.version}`));
     if (!isMac && !isWin) warn("After Effects only runs on macOS and Windows; continuing anyway.");
 
     step("1/4  Installing the MCP server");
-    // a 1.3 installation (~/.aemcp) moves to ~/.surehand/ae first
-    const moved = moveFromLegacy({ force: true });
+    // a 1.3 installation (~/.aemcp) moved to ~/.surehand/ae first (above)
     if (moved.status === "migrated") {
       ok(`Moved your settings and files from the previous version to ${dirname(dirname(installedServer()))}${moved.kept.length ? ` (left in place: ${moved.kept.join("; ")})` : ""}`);
       if (moved.repointed.length) ok(`Updated the connection settings of ${moved.repointed.join(", ")}`);

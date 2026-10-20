@@ -736,6 +736,17 @@ Section "Uninstall"
   ${EndIf}
   Push $5
   Call un.cl.StepEnd
+  ; .aemcp\node is ours: 1.3's private Node.js, a copy the move left (in use then), or a junction to .surehand\node.
+  ; `surehand-ae uninstall` removes it; when it could not run (no server left), here. A plain RMDir removes a
+  ; junction itself (never what it points to); a real folder (not a reparse point, 0x400) goes with /r.
+  RMDir "${LEGACY}\node"
+  System::Call "kernel32::GetFileAttributesW(w '${LEGACY}\node') i.r0"
+  ${If} $0 != -1
+    IntOp $0 $0 & 0x400
+    ${If} $0 == 0
+      RMDir /r "${LEGACY}\node"
+    ${EndIf}
+  ${EndIf}
   RMDir "${APPDIR}" ; only if empty (config.json and checkpoints are kept)
   RMDir "${SUREHAND}"
   RMDir "${LEGACY}"
