@@ -541,6 +541,7 @@ Section "Install"
   WriteRegDWORD HKCU "${UNINST_KEY}" "NoModify" 1
   WriteRegDWORD HKCU "${UNINST_KEY}" "NoRepair" 1
   SetOutPath "$TEMP"
+  SetAutoClose true ; on to the finish page, which says what happened
 SectionEnd
 
 ; "Also remove my settings and checkpoints" with an uninstaller from before it knew /ALL (1.4.0-beta.1): what it

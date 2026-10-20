@@ -983,6 +983,13 @@ FunctionEnd
 ; Control ids 1300 + 4 * step + 0 hairline, 1 glyph, 2 text, 3 state, so the install section can find them.
 !macro CL_PAGE_INSTFILES
   !define MUI_PAGE_CUSTOMFUNCTION_SHOW cl.InstFilesShow
+  ; when the page stays open at the end (a failure), MUI's own "Installation Complete" title would show
+  !define MUI_PAGE_HEADER_TEXT "Installing"
+  !define MUI_PAGE_HEADER_SUBTEXT "This takes about a minute."
+  !define MUI_INSTFILESPAGE_FINISHHEADER_TEXT "Finished"
+  !define MUI_INSTFILESPAGE_FINISHHEADER_SUBTEXT "Next shows what happened."
+  !define MUI_INSTFILESPAGE_ABORTHEADER_TEXT "Stopped"
+  !define MUI_INSTFILESPAGE_ABORTHEADER_SUBTEXT "Click Show details for the reason."
   !insertmacro MUI_PAGE_INSTFILES
   Function cl.InstFilesShow
     Call cl.InnerPageShow
@@ -1173,6 +1180,10 @@ Function cl.StepEnd
     System::Call "user32::InvalidateRect(p $cl.InnerDlg, p 0, i 1)"
   ${EndIf}
   IntOp $cl.StepNow $cl.StepNow + 1
+  ${If} $cl.InnerDlg != ""
+  ${AndIf} $cl.StepNow >= $cl.StepCount
+    SendMessage $cl.Status ${WM_SETTEXT} 0 "STR:Done."
+  ${EndIf}
   Pop $3
   Pop $2
   Pop $0
@@ -1284,10 +1295,10 @@ Function cl.FinishResults
   Pop $0
   SetCtlColors $0 "" "${CL_SUNK}"
   IntOp $R9 $R9 + 3
-  StrCpy $R4 0
-  ${DoWhile} $R4 < $R8
-    ReadINIStr $1 "${CL_RESULTS_INI}" "summary.$R4" "kind"
-    ReadINIStr $2 "${CL_RESULTS_INI}" "summary.$R4" "text"
+  StrCpy $R0 0 ; the row (cl.TextLines returns in $R4)
+  ${DoWhile} $R0 < $R8
+    ReadINIStr $1 "${CL_RESULTS_INI}" "summary.$R0" "kind"
+    ReadINIStr $2 "${CL_RESULTS_INI}" "summary.$R0" "text"
     ${If} $1 != "done"
     ${AndIf} $1 != "failed"
       StrCpy $1 "skipped"
@@ -1311,7 +1322,7 @@ Function cl.FinishResults
     ${EndIf}
     SendMessage $0 ${WM_SETFONT} $cl.FontMono 0
     IntOp $R9 $R9 + $3
-    IntOp $R4 $R4 + 1
+    IntOp $R0 $R0 + 1
   ${Loop}
   ${NSD_CreateLabel} 124u $R9u 196u 3u ""
   Pop $0
@@ -1320,10 +1331,10 @@ Function cl.FinishResults
 
   ; the next steps, numbered
   ReadINIStr $R8 "${CL_RESULTS_INI}" "next" "count"
-  StrCpy $R4 0
-  ${DoWhile} $R4 < $R8
-    ReadINIStr $2 "${CL_RESULTS_INI}" "next" "$R4"
-    IntOp $1 $R4 + 1
+  StrCpy $R0 0 ; the row (cl.TextLines returns in $R4)
+  ${DoWhile} $R0 < $R8
+    ReadINIStr $2 "${CL_RESULTS_INI}" "next" "$R0"
+    IntOp $1 $R0 + 1
     ${NSD_CreateLabel} 124u $R9u 9u 9u "$1."
     Pop $0
     SetCtlColors $0 "${CL_MUTED}" "${CL_PAPER}"
@@ -1339,7 +1350,7 @@ Function cl.FinishResults
     SetCtlColors $0 "${CL_INK}" "${CL_PAPER}"
     IntOp $R9 $R9 + $3
     IntOp $R9 $R9 + 3
-    IntOp $R4 $R4 + 1
+    IntOp $R0 $R0 + 1
   ${Loop}
 FunctionEnd
 !endif
@@ -1354,13 +1365,16 @@ Function cl.TextLines
   Push $1
   Push $2
   Push $3
+  Push $4
   System::Call "user32::GetDC(p $HWNDPARENT) p.r0"
   System::Call "gdi32::SelectObject(p r0, p $R1) p.r1"
   System::Call "*(i 0, i 0, i $R3, i 0)p.r2"
   System::Call "user32::DrawTextW(p r0, w R2, i -1, p r2, i 0xC10) i.r3" ; DT_CALCRECT | DT_WORDBREAK | DT_NOPREFIX: measures, draws nothing
   System::Call "*$2(i,i,i,i.r3)" ; the text's height
   System::Call "*$2(i 0, i 0, i $R3, i 0)"
-  System::Call "user32::DrawTextW(p r0, w 'X', i -1, p r2, i 0xC10) i.r2" ; one line's
+  System::Call "user32::DrawTextW(p r0, w 'X', i -1, p r2, i 0xC10) i.r4" ; one line's
+  System::Free $2
+  StrCpy $2 $4
   System::Call "gdi32::SelectObject(p r0, p r1)"
   System::Call "user32::ReleaseDC(p $HWNDPARENT, p r0)"
   ${If} $2 > 0
@@ -1371,6 +1385,7 @@ Function cl.TextLines
     StrCpy $R4 1
   ${EndIf}
   ${IfThen} $R4 < 1 ${|} StrCpy $R4 1 ${|}
+  Pop $4
   Pop $3
   Pop $2
   Pop $1
