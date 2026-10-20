@@ -408,6 +408,18 @@ describe("updates: versions and the Beta updates switch", () => {
     expect(UI.channelToast("stable")).toBe("Beta updates off: stable releases only.");
   });
 
+  it("reads release-notes Markdown as text pieces: bold, inline code, headings, links' text", () => {
+    expect(UI.noteView("**Surehand MCP 1.4.0-beta.3**: the third beta")).toEqual({ heading: false, parts: [{ text: "Surehand MCP 1.4.0-beta.3", bold: true }, { text: ": the third beta" }] });
+    expect(UI.noteView("### In-chat views")).toEqual({ heading: true, parts: [{ text: "In-chat views" }] });
+    expect(UI.noteView("- **Preflight report** (`ae_preflight`):")).toEqual({
+      heading: false, parts: [{ text: "Preflight report", bold: true }, { text: " (" }, { code: true, text: "ae_preflight" }, { text: "):" }],
+    });
+    expect(UI.noteView("See [the wiki](https://example.invalid/w) and *this*.")).toEqual({ heading: false, parts: [{ text: "See " }, { text: "the wiki" }, { text: " and this." }] });
+    // HTML stays text: the panel never parses it
+    expect(UI.noteView("<img src=x onerror=alert(1)> **<b>x</b>**").parts).toEqual([{ text: "<img src=x onerror=alert(1)> " }, { text: "<b>x</b>", bold: true }]);
+    expect(UI.noteView("a ** b")).toEqual({ heading: false, parts: [{ text: "a  b" }] });
+  });
+
   it("the Updates screen's line for a beta kept on stable", () => {
     expect(UI.keptBetaText("stable", "1.3.4", "1.4.0-beta.3")).toBe("You have a beta, newer than the latest stable release (1.3.4): it stays until a newer stable release is out.");
     expect(UI.keptBetaText("beta", "1.3.4", "1.4.0-beta.3")).toBeNull();

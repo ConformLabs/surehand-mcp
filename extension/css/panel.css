@@ -357,6 +357,8 @@ pre.code, pre.details { max-height: 180px; overflow: auto; }
 .upd-head .v { font: 600 15px/20px var(--font-display); letter-spacing: -0.01em; }
 .upd-head .have { font: 400 11px/16px var(--font-mono); color: var(--ink-muted); }
 .upd ul { margin: 0; padding-left: 16px; color: var(--ink); }
+.upd li b { font-weight: 600; }
+.upd li.h { list-style: none; margin-left: -16px; }
 .upd .note { color: var(--ink-muted); }
 .kv { padding: 0 12px; display: flex; flex-direction: column; flex: none; }
 .kv > * + * { margin-top: 8px; }

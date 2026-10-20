@@ -527,6 +527,30 @@
     if (channel !== "stable" || !latest || String(version).indexOf("-") < 0 || cmpVersions(latest, version) >= 0) return null;
     return "You have a beta, newer than the latest stable release (" + latest + "): it stays until a newer stable release is out.";
   }
+  /**
+   * A release-notes line (Markdown) as plain text pieces: { heading, parts: [{ text, bold?, code? }] }. Only
+   * **bold**, `code`, [links](url) (their text) and a leading "#" heading are understood; any other mark is
+   * dropped or left as text. The panel puts each piece in as text, so nothing in the notes becomes HTML.
+   */
+  function noteView(line) {
+    var s = String(line || "").replace(/^\s*(?:[-*+]\s+)/, "");
+    var heading = /^#{1,6}\s+/.test(s);
+    if (heading) s = s.replace(/^#{1,6}\s+/, "");
+    var parts = [], re = /\*\*([^*]+)\*\*|`([^`]+)`|\[([^\]]+)\]\([^)]*\)/g, at = 0, m;
+    function plain(t) {
+      t = t.replace(/\*\*|__/g, "").replace(/(^|[\s(])[*_]([^*_\s][^*_]*)[*_](?=[\s.,;:!?)]|$)/g, "$1$2"); // stray or *italic* marks
+      if (t) parts.push({ text: t });
+    }
+    while ((m = re.exec(s))) {
+      plain(s.slice(at, m.index));
+      if (m[1] !== undefined) parts.push({ text: m[1], bold: true });
+      else if (m[2] !== undefined) parts.push({ text: m[2], code: true });
+      else parts.push({ text: m[3] });
+      at = re.lastIndex;
+    }
+    plain(s.slice(at));
+    return { heading: heading, parts: parts };
+  }
   /** The toast after switching. */
   function channelToast(channel) {
     return channel === "beta" ? "Beta updates on: Surehand offers pre-releases too." : "Beta updates off: stable releases only.";
@@ -543,7 +567,7 @@
     renderIdOf: renderIdOf, renderStartInfo: renderStartInfo, renderProgress: renderProgress, timeLeft: timeLeft,
     riskChips: riskChips, approvalView: approvalView, countdown: countdown, countdownView: countdownView, previewView: previewView,
     hhmm: hhmm, dayLabel: dayLabel, whenLabel: whenLabel, parseCliJson: parseCliJson, cmpVersions: cmpVersions, aeLabel: aeLabel,
-    updateChannel: updateChannel, updateFor: updateFor, betaSwitchText: betaSwitchText, keptBetaText: keptBetaText, channelToast: channelToast,
+    updateChannel: updateChannel, updateFor: updateFor, betaSwitchText: betaSwitchText, keptBetaText: keptBetaText, channelToast: channelToast, noteView: noteView,
   };
   global.SurehandUI = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;

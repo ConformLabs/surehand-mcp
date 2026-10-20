@@ -1421,6 +1421,13 @@
       if (S.screen === "menu") redraw();
     }, { since: "1.4.0", timeout: 30000 });
   }
+  /** A release-notes line: bold, inline code in the mono font, a heading as a bold line; all of it as text, never HTML. */
+  function noteItem(line) {
+    var v = UI.noteView(line);
+    return el("li", { cls: v.heading ? "h" : null }, v.parts.map(function (p) {
+      return p.bold || v.heading ? el("b", { text: p.text, cls: p.code ? "mono" : null }) : p.code ? el("span", { cls: "mono", text: p.text }) : p.text;
+    }));
+  }
   var updating = false, updatedTo = null;
   function drawUpdate(body, u, checking, note) {
     body.innerHTML = "";
@@ -1434,7 +1441,7 @@
     } else if (avail) {
       card.appendChild(el("div", { cls: "upd-head" }, [el("span", { cls: "v", text: latest + " is ready" }), el("span", { cls: "have", text: "you have " + current })]));
       var notes = u.notes || u.highlights;
-      if (notes && notes.length) card.appendChild(el("ul", {}, notes.slice(0, 5).map(function (n) { return el("li", { text: n }); })));
+      if (notes && notes.length) card.appendChild(el("ul", {}, notes.slice(0, 5).map(noteItem)));
       if (u.url) card.appendChild(button("link green under", "What’s new", function () { openUrl(u.url); }));
       var b = button("btn main big", updating ? "Updating\u2026" : rt ? "Update now" : "Download", function () {
         if (!rt) return openUrl(u.url || REPO_URL + "/releases/latest");

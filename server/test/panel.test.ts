@@ -409,6 +409,29 @@ describe("Surehand panel: ☰ menu", () => {
     expect($("screen").hidden).toBe(true);
   });
 
+  it("Updates shows the release notes' Markdown as formatting, and never their HTML", async () => {
+    cliAnswer = (cmd) =>
+      cmd === "update --check --json"
+        ? {
+            current: "test", latest: "99.0.0", updateAvailable: true, url: "https://example.invalid/r", checkedAt: new Date().toISOString(),
+            notes: ["**Surehand MCP 99.0.0**: the release", "### In-chat views", "**Preflight report** (`ae_preflight`)", "<img src=x onerror=\"window.pwned=1\">"],
+          }
+        : undefined;
+    const panel = () => (dom.window as any).SurehandPanel;
+    panel().menu("update");
+    await waitFor(() => doc().querySelectorAll("#screenBody .upd li").length === 4);
+    const li = [...doc().querySelectorAll("#screenBody .upd li")] as any[];
+    expect(li.map((l) => l.textContent)).toEqual(["Surehand MCP 99.0.0: the release", "In-chat views", "Preflight report (ae_preflight)", '<img src=x onerror="window.pwned=1">']);
+    expect(li[0].querySelector("b").textContent).toBe("Surehand MCP 99.0.0");
+    expect(li[1].className).toBe("h");
+    expect(li[1].querySelector("b").textContent).toBe("In-chat views");
+    expect(li[2].querySelector(".mono").textContent).toBe("ae_preflight");
+    expect(doc().querySelector("#screenBody img")).toBeNull();
+    expect((dom.window as any).pwned).toBeUndefined();
+    cliAnswer = null;
+    panel().closeScreen();
+  });
+
   it("Updates: checks, then updates in place and asks for a restart", async () => {
     panel().menu("update");
     // the cached result first, then the server's answer (with what's new)

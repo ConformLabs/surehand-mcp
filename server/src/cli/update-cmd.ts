@@ -65,11 +65,15 @@ export interface UpdateCheck {
   error?: string;
 }
 
-/** Release notes as lines for the panel. */
+/**
+ * Release notes as lines for the panel: bullet marks removed, a heading kept as "### title" (the panel
+ * shows it as a bold line). Inline **bold** and `code` stay; the panel renders them as text, never HTML.
+ */
 export function noteLines(body: string | null | undefined): string[] {
   return (body ?? "")
     .split(/\r?\n/)
-    .map((l) => l.replace(/^\s*(?:#{1,6}\s+|[-*+]\s+)/, "").trim())
+    .map((l) => (/^\s*#{1,6}\s+/.test(l) ? l.replace(/^\s*#{1,6}\s+/, "### ") : l.replace(/^\s*[-*+]\s+/, "")).trim())
+    .filter((l) => l && l !== "###")
     .filter(Boolean)
     .slice(0, 60);
 }
