@@ -1,5 +1,5 @@
 /* What the Surehand panel and the approval pop-up show, as pure functions (no DOM, no Node):
- * status, mode texts, feed items from the activity log, approval cards, layout, render progress.
+ * status, mode texts, feed items from the activity log, approval cards, layout, render progress, the Chat screen.
  * ES5 only (CEP 9 runs an old Chromium). Tested in server/test/panel-model.test.ts. */
 (function (global) {
   "use strict";
@@ -31,6 +31,7 @@
     [/claude.?code/i, "Claude Code"],
     [/cursor/i, "Cursor"],
     [/codex/i, "Codex"],
+    [/antigravity|^agy\b/i, "Antigravity"],
     [/chatgpt|openai/i, "ChatGPT"],
     [/windsurf|codeium/i, "Windsurf"],
     [/devin/i, "Devin Desktop"],
@@ -462,6 +463,275 @@
     return { open: !!state.open, text: lines.join("\n"), toggle: (state.open ? "Hide " : "Show ") + noun, danger: danger };
   }
 
+  // ---------- Chat (☰ › Chat with your AI app) ----------
+  // The panel runs `surehand-ae chat` (server/src/chat): an AI agent the user already has, signed in with their
+  // own account, with Surehand as its only tools. These are the screens' texts and states (the approved boards
+  // ChatStart, ChatWorking, ChatAsk, and ChatSignIn: "AI apps for chat"), and the chat's items from the runner's events.
+  // `install`: where to get it ({term}: Terminal, or PowerShell on Windows); `login`: the command that signs in.
+  var CHAT_AGENTS = [
+    { id: "codex", label: "Codex", login: "codex login",
+      install: "OpenAI’s Codex. Install the Codex app, or in {term} run npm install -g @openai/codex (or brew install --cask codex), then run:" },
+    { id: "claude", label: "Claude Code", login: "claude auth login",
+      install: "Anthropic’s Claude Code. Install it from claude.com/claude-code, then in {term} run:" },
+    { id: "agy", label: "Antigravity", login: "agy",
+      install: "Google’s Antigravity command-line tool. Install it from antigravity.google, then in {term} run:" },
+  ];
+  var CHAT_TRIES = ["What’s in this project?", "Check the active comp against my delivery spec", "Why does this project render slowly?"];
+  function chatDef(id) { return CHAT_AGENTS.filter(function (x) { return x.id === id; })[0] || null; }
+  function chatLabel(id) { var d = chatDef(id); return d ? d.label : "Your AI app"; }
+  function chatFound(agents) { return (agents || []).filter(function (a) { return a && a.found; }); }
+  function chatAgentInfo(agents, id) { return chatFound(agents).filter(function (a) { return a.id === id; })[0] || null; }
+  /** Installed and not signed out (as its own status command says; "couldn't tell" is listed, and a turn then says). */
+  function chatReady(a) { return !!(a && a.found && a.signedIn !== false); }
+  function chatReadyList(agents) { return chatFound(agents).filter(chatReady); }
+  /** Which agent to chat with: the one picked before if it is ready, else the first ready one, else null. */
+  function chatPick(agents, preferred) {
+    var ready = chatReadyList(agents);
+    if (preferred && ready.some(function (a) { return a.id === preferred; })) return preferred;
+    return ready[0] ? ready[0].id : null;
+  }
+  /** Another agent that is ready ("Use Codex instead"), or null. */
+  function chatOther(agents, id) { return chatReadyList(agents).filter(function (a) { return a.id !== id; })[0] || null; }
+  /** "Codex · signed in with ChatGPT" (the header) or "Codex · signed in" (`short`: the menu's row). */
+  function chatAgentStatus(a, short) {
+    if (a.signedIn === false) return a.label + " · not signed in";
+    if (a.id === "agy" && a.connected === false) return a.label + " · not connected";
+    if (a.signedIn === true) return a.label + " · signed in" + (a.account && !short ? " with " + a.account : "");
+    return a.label + " · ready";
+  }
+  /** The menu row's second line. */
+  function chatMenuSub(agents, id) {
+    if (!agents) return "Codex, Claude Code or Antigravity";
+    var a = chatAgentInfo(agents, id);
+    return a && chatReady(a) ? chatAgentStatus(a, true) : "No AI app ready: set one up";
+  }
+  function termWord(platform) { return platform === "win32" ? "PowerShell" : "Terminal"; }
+  /** Codex from the ChatGPT / Codex desktop app (not on PATH): signing in there signs in its CLI. */
+  function codexFromApp(a) { return a.id === "codex" && /[\\/]OpenAI[\\/]Codex[\\/]/i.test(a.path || ""); }
+
+  /**
+   * "AI apps for chat" (board ChatSignIn): each AI app with its own state, from what its command line said.
+   * -> { title, sub: "1 ready · 2 need setting up", rows: [{ id, label, glyph, word, lines: [string | { report }] }], foot }
+   */
+  function chatAppsView(agents, platform) {
+    var term = termWord(platform), ready = 0;
+    var rows = CHAT_AGENTS.map(function (d) {
+      var a = chatAgentInfo(agents, d.id), asks = d.id === "agy" ? "Surehand asks before it connects to Antigravity." : null;
+      var after = d.id === "agy" ? "Sign in the first time it starts, then press Check again." : "Sign in in the browser, then press Check again.";
+      var r = { id: d.id, label: d.label, lines: [] };
+      if (a && a.signedIn === true) {
+        ready++;
+        r.glyph = "verified"; r.word = "Ready";
+        r.lines.push(a.account ? "Signed in with " + a.account + "." : "Signed in.");
+        if (asks && a.connected === false) r.lines.push(asks);
+      } else if (a && a.signedIn === null) {
+        // its command line couldn't say: listed for chat, and the first turn says if it isn't signed in
+        ready++;
+        r.glyph = "verified"; r.word = "Ready";
+        r.lines.push("Installed. Its sign-in couldn’t be checked; the chat says if it isn’t signed in.");
+        if (a.authText) r.lines.push({ says: a.authText });
+        if (asks && a.connected === false) r.lines.push(asks);
+      } else if (a) {
+        r.glyph = "notrun"; r.word = "Not signed in";
+        if (codexFromApp(a)) r.lines.push("Installed with the Codex app. Open it and sign in with ChatGPT, then press Check again.");
+        else {
+          r.lines.push("Installed. To sign in, open " + term + " and run:", { report: d.login }, after);
+          if (asks) r.lines.push(asks);
+        }
+        if (a.authText) r.lines.push({ says: a.authText });
+      } else {
+        r.glyph = "pending"; r.word = "Not installed";
+        r.lines.push(d.install.replace("{term}", term), { report: d.login }, d.id === "agy" ? after + " " + asks : after);
+      }
+      return r;
+    });
+    var need = rows.length - ready;
+    return { title: "AI apps for chat", sub: need ? ready + " ready · " + need + " need setting up" : ready + " ready", rows: rows,
+      foot: "Surehand never sees your sign-in. Each AI app keeps its own." };
+  }
+
+  /**
+   * The Chat screen for a state c: { agents (null while looking), agent, items, running, asking (an approval
+   * waits), error (the agents couldn't be listed) }, on `platform`. -> what to draw:
+   * { apps (no AI app is ready: show "AI apps for chat" instead), status: {glyph, text}, picker: [{id, label, checked}]
+   *   (two or more ready) | null, single (the one ready app's name) | null, desc, addLink, tries, note, input: {disabled,
+   *   placeholder}, hint, button: {text, main, disabled}, newChat: {disabled} }
+   */
+  function chatView(c, platform) {
+    var items = c.items || [], fresh = !items.length;
+    var a = chatAgentInfo(c.agents, c.agent), label = a ? a.label : "", ready = chatReadyList(c.agents);
+    var v = { apps: false, status: null, picker: null, single: null, desc: null, addLink: null, tries: null, note: null, input: { disabled: true, placeholder: "" }, hint: null,
+      button: { text: "Send", main: false, disabled: true }, newChat: { disabled: fresh } };
+    if (c.running) {
+      v.status = c.asking ? { glyph: "waiting", text: "Waiting for you · Ask mode" } : { glyph: "waiting", text: label + " is working…" };
+      v.input.placeholder = c.asking ? label + " is waiting for your OK…" : label + " is working…";
+      v.hint = c.asking ? "Deny tells " + label + " it wasn’t allowed" : "Every edit is also in the activity list";
+      v.button = { text: "Stop", main: false, disabled: false };
+      v.newChat.disabled = false;
+      return v;
+    }
+    v.input.placeholder = "Ask about this project, or describe an edit…";
+    if (!c.agents) {
+      v.status = { glyph: "pending", text: c.error ? "Couldn’t look for AI apps" : "Looking for your AI apps…" };
+      if (c.error) v.note = { kind: "error", title: "Couldn’t look for AI apps", text: c.error, steps: [], buttons: [{ id: "check", text: "Check again" }] };
+      return v;
+    }
+    if (!a || (!chatReady(a) && fresh)) {
+      v.apps = true;
+      v.status = { glyph: "notrun", text: "No AI app ready" };
+      return v;
+    }
+    v.status = { glyph: chatReady(a) && !(a.id === "agy" && a.connected === false) ? "verified" : "notrun", text: chatAgentStatus(a) };
+    // a conversation: whose it is, and how to talk to another app
+    if (!fresh && chatReady(a)) v.status.text = label + " \u00b7 New chat to switch";
+    var other = chatOther(c.agents, a.id), use = other ? [{ id: "use:" + other.id, text: "Use " + other.label + " instead" }] : [];
+    if (!chatReady(a)) {
+      // a turn said it isn't signed in
+      v.note = { kind: "signin", title: "Sign in to " + label + " first", text: "The chat uses your own " + label + " sign-in. Surehand never sees it.",
+        steps: [], says: a.authText || null, buttons: [{ id: "apps", text: "How to sign in" }].concat(use) };
+      v.input.placeholder = "Sign in to " + label + " to chat";
+      return v;
+    }
+    if (fresh) {
+      if (ready.length > 1) v.picker = ready.map(function (x) { return { id: x.id, label: x.label, checked: x.id === a.id }; });
+      else v.single = label;
+      v.desc = "Only AI apps that are installed and signed in are listed. Each runs on its own sign-in and works in this project through Surehand, under the same Full / Ask / Read-only setting.";
+      v.addLink = "Add another AI app ›";
+    }
+    if (a.id === "agy" && a.connected === false) {
+      v.note = { kind: "connect", title: "Connect Surehand to Antigravity first", text: "Antigravity has no setting for one chat, so Surehand adds itself to its MCP servers and allows only its own tools there, after a backup. Uninstalling Surehand removes both again.",
+        steps: [], buttons: [{ id: "connect", text: "Connect", main: true }].concat(use) };
+      v.input.placeholder = "Connect Surehand to Antigravity to chat";
+      return v;
+    }
+    if (fresh) v.tries = CHAT_TRIES.slice();
+    v.input = { disabled: false, placeholder: "Ask about this project, or describe an edit…" };
+    v.hint = "Enter sends · Shift+Enter new line";
+    v.button = { text: "Send", main: true, disabled: false };
+    return v;
+  }
+
+  /**
+   * An AI app's answer (Markdown) as blocks: { kind: "p" | "h" | "ul" | "ol" | "code", parts (noteView's pieces) |
+   * items (pieces per item) | text }. The same small subset as release notes (bold, `code`, links as their text,
+   * headings, lists) plus fenced code; everything stays text, nothing becomes HTML.
+   */
+  function chatBlocks(text) {
+    var lines = String(text || "").replace(/\r\n?/g, "\n").split("\n"), out = [], i = 0;
+    var UL = /^\s*[-*+]\s+/, OL = /^\s*\d+[.)]\s+/, FENCE = /^\s*```/, HEAD = /^\s*#{1,6}\s+/;
+    while (i < lines.length) {
+      var l = lines[i];
+      if (FENCE.test(l)) {
+        var code = [];
+        for (i++; i < lines.length && !FENCE.test(lines[i]); i++) code.push(lines[i]);
+        i++;
+        out.push({ kind: "code", text: code.join("\n") });
+      } else if (!l.trim()) i++;
+      else if (HEAD.test(l)) { out.push({ kind: "h", parts: noteView(l.replace(/^\s+/, "")).parts }); i++; }
+      else if (UL.test(l) || OL.test(l)) {
+        var re = UL.test(l) ? UL : OL, items = [];
+        for (; i < lines.length && re.test(lines[i]); i++) items.push(noteView(lines[i].replace(re, "")).parts);
+        out.push({ kind: re === UL ? "ul" : "ol", items: items });
+      } else {
+        var para = [];
+        for (; i < lines.length && lines[i].trim() && !UL.test(lines[i]) && !OL.test(lines[i]) && !HEAD.test(lines[i]) && !FENCE.test(lines[i]); i++) para.push(lines[i]);
+        out.push({ kind: "p", parts: noteView(para.join("\n")).parts });
+      }
+    }
+    return out;
+  }
+  /** Settings › Panel opens on: "chat" or "activity" (the default). */
+  function opensOn(cfg) { return cfg && cfg.panelOpensOn === "chat" ? "chat" : "activity"; }
+
+  /**
+   * The chat's items from the runner's events (server/src/chat/agents.ts ChatEvent). Items: { kind: "user" |
+   * "agent" | "tool" | "notice" | "error", text, at, head (the first of a reply: shows the agent's name), ... }.
+   * Changes `c` (items, session, running, and the agent's sign-in when a turn says it isn't signed in).
+   */
+  function chatApply(c, ev, at) {
+    var items = c.items, lastItem = items[items.length - 1];
+    function push(it) {
+      it.at = at;
+      if (c.replyHead) { it.head = true; c.replyHead = false; }
+      items.push(it);
+      return it;
+    }
+    switch (ev && ev.type) {
+      case "session": c.session = ev.id; break;
+      case "text":
+        if (ev.delta !== undefined) {
+          if (lastItem && lastItem.kind === "agent" && !lastItem.tid) lastItem.text += ev.delta;
+          else push({ kind: "agent", text: String(ev.delta) });
+        } else if (ev.id) {
+          var same = items.filter(function (x) { return x.kind === "agent" && x.tid === ev.id; })[0];
+          if (same) same.text = String(ev.text || "");
+          else push({ kind: "agent", tid: ev.id, text: String(ev.text || "") });
+        } else if (ev.text) push({ kind: "agent", text: String(ev.text), tid: "t" + items.length });
+        break;
+      case "tool":
+        var t = items.filter(function (x) { return x.kind === "tool" && x.id === ev.id; })[0];
+        if (ev.phase === "start" && !t) push({ kind: "tool", id: ev.id, name: ev.name, args: ev.args, builtin: !!ev.builtin, state: "running", startedAt: at });
+        else if (ev.phase === "end" && t) { t.state = ev.ok ? "done" : "failed"; t.error = ev.error || null; t.endedAt = at; }
+        break;
+      case "notice": push({ kind: "notice", text: String(ev.text || "") }); break;
+      case "error":
+        push({ kind: "error", text: String(ev.message || "Something went wrong."), auth: !!ev.auth, title: ev.title || null });
+        if (ev.auth) (c.agents || []).forEach(function (a) { if (a.id === c.agent) { a.signedIn = false; a.authText = String(ev.message || ""); } });
+        break;
+      case "done":
+        c.running = false;
+        c.replyHead = false;
+        if (ev.session) c.session = ev.session;
+        items.forEach(function (x) { if (x.kind === "tool" && x.state === "running") x.state = ev.stopped ? "stopped" : "done"; });
+        if (ev.stopped) push({ kind: "notice", text: "Stopped." });
+        break;
+    }
+    return c;
+  }
+  /** "Main › Title › Position" from a call's arguments (what it works on), or "". */
+  function chatArgsLine(args) {
+    if (!args || typeof args !== "object") return "";
+    if (args.tool && args.args) return chatArgsLine(args.args);
+    var parts = [args.comp, args.layer, args.property || args.path].filter(function (x) { return typeof x === "string" && x; });
+    var s = parts.join(" › ");
+    if (!s && typeof args.command === "string") s = args.command;
+    if (!s && typeof args.query === "string") s = args.query;
+    return s.length > 80 ? s.slice(0, 77) + "…" : s;
+  }
+  var BUILTIN_NAMES = { shell: "Shell command", "file change": "File change", "web search": "Web search" };
+  /**
+   * A tool row in the chat, as the feed shows it: { glyph, title, word, line, muted, list (the change report) }.
+   * `entry`: the activity log's entry for this call when the panel found it (then it is exactly the feed's row).
+   */
+  function chatToolView(t, entry) {
+    if (entry) {
+      var it = describeEntry(entry), st = statusOf(it);
+      var list = entry.changeList || entry.changeLines;
+      return { glyph: st.glyph, title: it.title, word: st.word, line: it.line, muted: it.kind === "read", list: it.kind === "change" && list && list.length ? list : null };
+    }
+    var title = t.builtin ? BUILTIN_NAMES[t.name] || t.name : toolName(t.name, t.args), line = chatArgsLine(t.args);
+    if (t.state === "running") return { glyph: "pending", title: title, word: "Running", line: line, muted: true, list: null };
+    if (t.state === "failed") {
+      var why = refusal(t.error) || (t.builtin ? "Not allowed in the chat." : null);
+      if (why) return { glyph: "notrun", title: title, word: "Not run", line: why, muted: false, list: null };
+      return { glyph: "failed", title: title, word: "Failed", line: readableError(t.error || ""), muted: false, list: null };
+    }
+    if (t.state === "stopped") return { glyph: "notrun", title: title, word: "Stopped", line: line, muted: true, list: null };
+    return { glyph: "pending", title: title, word: "", line: line, muted: true, list: null };
+  }
+  /** The activity entry of a chat tool call: same tool, logged since it started (not one already used). */
+  function chatEntryFor(t, activity, used) {
+    if (!t || t.builtin || !t.startedAt) return null;
+    var since = Date.parse(t.startedAt) - 2000;
+    for (var i = activity.length - 1; i >= 0; i--) {
+      var e = activity[i];
+      if (!e || used[entryKey(e)]) continue;
+      var tool = e.tool === "ae_call" && e.args && e.args.tool ? String(e.args.tool) : e.tool;
+      if ((tool === t.name || e.tool === t.name) && Date.parse(e.at) >= since) return e;
+    }
+    return null;
+  }
+
   // ---------- small helpers ----------
   function hhmm(iso) {
     var d = new Date(iso);
@@ -566,6 +836,7 @@
     toolName: toolName, describeEntry: describeEntry, statusOf: statusOf, changeParts: changeParts, refusal: refusal, readableError: readableError, workingView: workingView, writeAccessCheck: writeAccessCheck, writeAccessWhere: writeAccessWhere, entryDetails: entryDetails, feedItems: feedItems, entryKey: entryKey, canUndo: canUndo,
     renderIdOf: renderIdOf, renderStartInfo: renderStartInfo, renderProgress: renderProgress, timeLeft: timeLeft,
     riskChips: riskChips, approvalView: approvalView, countdown: countdown, countdownView: countdownView, previewView: previewView,
+    CHAT_AGENTS: CHAT_AGENTS, chatPick: chatPick, chatOther: chatOther, chatMenuSub: chatMenuSub, chatView: chatView, chatAppsView: chatAppsView, chatReady: chatReady, chatApply: chatApply, chatToolView: chatToolView, chatEntryFor: chatEntryFor, chatArgsLine: chatArgsLine, chatLabel: chatLabel, chatBlocks: chatBlocks, opensOn: opensOn,
     hhmm: hhmm, dayLabel: dayLabel, whenLabel: whenLabel, parseCliJson: parseCliJson, cmpVersions: cmpVersions, aeLabel: aeLabel,
     updateChannel: updateChannel, updateFor: updateFor, betaSwitchText: betaSwitchText, keptBetaText: keptBetaText, channelToast: channelToast, noteView: noteView,
   };

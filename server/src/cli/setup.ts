@@ -203,8 +203,9 @@ export function setupHint(): string {
  *  (~/.surehand/ae/server) records itself: the Claude Desktop extension is updated by installing a new .mcpb. */
 export const runtimeFile = () => appFile("runtime.json");
 /** The panel's ☰ screens run these server commands (clients, connect, checkpoints, test, update --check...):
- *  the panel checks this level instead of the version number (betas and dev builds keep older numbers). */
-export const PANEL_COMMANDS = 1;
+ *  the panel checks this level instead of the version number (betas and dev builds keep older numbers).
+ *  2: `chat` (the Chat screen). */
+export const PANEL_COMMANDS = 2;
 export function recordRuntime() {
   try {
     const server = installedServer();

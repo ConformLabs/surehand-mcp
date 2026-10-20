@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { JSDOM } from "jsdom";
 import { createRequire } from "node:module";
 import { createServer, type Server } from "node:http";
+import { EventEmitter } from "node:events";
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -30,6 +31,22 @@ let cliDelay = 20;
 // the bridge can't answer while After Effects runs a long script: /health then gets no answer
 let healthDown = false;
 let ownBridgeStarts = 0;
+// the chat's turns (`surehand-ae chat --agent ...`): spawned processes the test speaks for
+class FakeChild extends EventEmitter {
+  stdout = new EventEmitter();
+  written: string[] = [];
+  killed = false;
+  stdin = { write: (s: string) => void this.written.push(s), on: () => undefined };
+  kill() {
+    this.killed = true;
+    this.emit("close", null);
+  }
+  /** the runner's events, as lines */
+  say(...events: unknown[]) {
+    this.stdout.emit("data", events.map((e) => JSON.stringify(e) + "\n").join(""));
+  }
+}
+const spawned: { file: string; args: string[]; env: Record<string, string | undefined>; child: FakeChild }[] = [];
 
 const waitFor = async (cond: () => boolean, ms = 4000) => {
   const t0 = Date.now();
@@ -128,6 +145,11 @@ beforeAll(async () => {
       else if (cmd === "test --json") out = { checks: [{ ok: true, name: "Bridge running" }] };
       setTimeout(() => cb(null, "progress\n" + JSON.stringify(out), ""), cliDelay);
       return undefined;
+    },
+    spawn: (file: string, args: string[], opts: any) => {
+      const child = new FakeChild();
+      spawned.push({ file, args, env: opts.env, child });
+      return child;
     },
   };
   w.require = (m: string) => (m === "os" ? os : m === "child_process" ? childProcess : nodeRequire(m));
@@ -721,11 +743,11 @@ describe("Surehand panel: UX pass (menu button, refusals, long scripts)", () => 
     expect($("screen").hidden).toBe(false);
     expect($("screenTitle").textContent).toBe("Surehand");
     const rows = [...doc().querySelectorAll("#screenBody .mrow .mlabel")].map((x: any) => x.textContent);
-    expect(rows).toEqual(["Connect an AI app", "ChatGPT on the web", "Checkpoints", "Activity history", "Test the connection", "Copy diagnostics", "Updates", "About and help"]);
+    expect(rows).toEqual(["Chat with your AI app", "Connect an AI app", "ChatGPT on the web", "Checkpoints", "Activity history", "Test the connection", "Copy diagnostics", "Updates", "About and help"]);
     // the update that is ready shows on its row
     expect($("screenBody").textContent).toMatch(/99\.0\.0 is ready · you have test/);
     expect($("screenBody").textContent).not.toMatch(/&/);
-    (doc().querySelectorAll("#screenBody .mrow")[0] as any).click();
+    (doc().querySelectorAll("#screenBody .mrow")[1] as any).click();
     expect($("screenTitle").textContent).toBe("Connect an AI app");
     $("back").click();
     expect($("screenTitle").textContent).toBe("Surehand");
@@ -857,6 +879,206 @@ describe("Surehand panel: the menu in the Conform Labs style", () => {
     await waitFor(() => row("Copy diagnostics").lastChild.textContent === "Copied");
     expect(row("Copy diagnostics").lastChild.className).toBe("st st-verified");
     await waitFor(() => row("Copy diagnostics").lastChild.textContent === "", 3000);
+    panel().closeScreen();
+  });
+});
+
+describe("Surehand panel: Chat with your AI app", () => {
+  const panel = () => (dom.window as any).SurehandPanel;
+  const row = (label: string) => [...doc().querySelectorAll("#screenBody .mrow")].find((r: any) => r.querySelector(".mlabel").textContent === label) as any;
+  const body = () => $("screenBody");
+  const statusText = () => $("screenStatusText").textContent;
+  const send = () => [...doc().querySelectorAll("#screenBody .cbar button")][0] as any;
+  const toolRows = () => [...doc().querySelectorAll("#screenBody .ctool")].map((r: any) => [r.querySelector(".title").textContent, r.querySelector(".st")?.textContent ?? null]);
+  const agents = (claude: Record<string, unknown> = { signedIn: true, account: "Claude" }) => ({
+    ok: true,
+    agents: [
+      { id: "codex", label: "Codex", found: true, signedIn: true, account: "ChatGPT", path: "/opt/homebrew/bin/codex" },
+      { id: "claude", label: "Claude Code", found: true, path: "/u/.local/bin/claude", ...claude },
+      { id: "agy", label: "Antigravity", found: false, signedIn: null },
+    ],
+  });
+  const lastChild = () => spawned[spawned.length - 1].child;
+
+  it("☰ › Work starts with the chat, saying which AI app it uses", async () => {
+    Object.assign(panel().chat, { agents: null, error: null, loading: false, agent: null });
+    cliAnswer = (cmd) => (cmd === "chat --agents --json" ? agents() : undefined);
+    $("menuBtn").click();
+    await waitFor(() => row("Chat with your AI app")?.querySelector(".msub").textContent === "Codex · signed in");
+    row("Chat with your AI app").click();
+    expect($("screenTitle").textContent).toBe("Chat");
+    expect($("screenStatus").hidden).toBe(false);
+  });
+
+  it("a new chat: the agents found, what the chat does, what to try, Enter sends", () => {
+    expect(statusText()).toBe("Codex · signed in with ChatGPT");
+    expect($("screenStatusGlyph").className).toBe("g g-sm g-verified");
+    const seg = [...body().querySelectorAll(".seg [role=radio]")] as any[];
+    expect(seg.map((b) => [b.textContent, b.getAttribute("aria-checked")])).toEqual([["Codex", "true"], ["Claude Code", "false"]]);
+    expect(body().querySelector(".modes .label").textContent).toBe("Chat with");
+    expect(body().querySelector(".modes .desc").textContent).toBe("Only AI apps that are installed and signed in are listed. Each runs on its own sign-in and works in this project through Surehand, under the same Full / Ask / Read-only setting.");
+    expect(body().querySelector(".modes .link").textContent).toBe("Add another AI app ›");
+    expect([...body().querySelectorAll(".tries .btn")].map((b: any) => b.textContent)).toEqual(["What’s in this project?", "Check the active comp against my delivery spec", "Why does this project render slowly?"]);
+    expect($("chatInput").placeholder).toBe("Ask about this project, or describe an edit…");
+    expect(body().querySelector(".cbar .time").textContent).toBe("Enter sends · Shift+Enter new line");
+    expect(send().textContent).toBe("Send");
+    expect(send().className).toBe("btn main");
+    expect(($("screenAction").querySelector("button") as any).disabled).toBe(true); // New chat
+  });
+
+  it("sends the message to `surehand-ae chat` without the panel secret, and shows the reply as it comes", async () => {
+    $("chatInput").value = "Make the title land on frame 12";
+    $("chatInput").dispatchEvent(new dom.window.KeyboardEvent("keydown", { keyCode: 13, bubbles: true } as any));
+    expect(spawned.length).toBe(1);
+    const s = spawned[0];
+    expect(s.args.slice(1)).toEqual(["chat", "--agent", "codex"]);
+    expect(s.env.SUREHAND_AE_PANEL_SECRET).toBeUndefined();
+    expect(JSON.parse(s.child.written[0])).toEqual({ text: "Make the title land on frame 12", project: "/work/Spot.aep" });
+    expect($("chatInput").value).toBe("");
+    // working: the header, the disabled field, Stop
+    expect(statusText()).toBe("Codex is working…");
+    expect($("screenStatusGlyph").className).toBe("g g-sm g-waiting");
+    expect($("chatInput").disabled).toBe(true);
+    expect($("chatInput").placeholder).toBe("Codex is working…");
+    expect(body().querySelector(".cbar .time").textContent).toBe("Every edit is also in the activity list");
+    expect(send().textContent).toBe("Stop");
+    expect(body().querySelector(".seg")).toBeNull();
+    expect([...body().querySelectorAll(".cmsg.user .label, .cmsg.user .ctext")].map((x: any) => x.textContent)).toEqual(["You", "Make the title land on frame 12"]);
+    s.child.say({ type: "session", id: "thread-1" }, { type: "tool", phase: "start", id: "i1", name: "ae_get_keyframes", args: { comp: "Main", layer: "Title" } });
+    await waitFor(() => toolRows().length === 1);
+    expect(body().querySelector(".cmsg.rhead .label").textContent).toBe("Codex");
+    expect(toolRows()).toEqual([["Get keyframes", "Running"]]);
+    expect(body().querySelector(".ctool .line").textContent).toBe("Main › Title");
+  });
+
+  it("in Ask mode the approval card shows in the chat; Esc there denies", async () => {
+    pending = [request("chat1", "Set keyframe table", '{"layer":"Title"}')];
+    pending[0].client = "codex-mcp-client";
+    await waitFor(() => !$("ask").hidden && body().contains($("ask")));
+    expect($("askWho").textContent).toBe("Codex asks");
+    await waitFor(() => statusText() === "Waiting for you · Ask mode");
+    expect($("chatInput").placeholder).toBe("Codex is waiting for your OK…");
+    expect(body().querySelector(".cbar .time").textContent).toBe("Deny tells Codex it wasn’t allowed");
+    await new Promise((r) => setTimeout(r, 200)); // the card arms
+    doc().dispatchEvent(new dom.window.KeyboardEvent("keydown", { keyCode: 27, bubbles: true } as any));
+    await waitFor(() => answers.some((a) => a.id === "chat1"));
+    expect(answers.find((a) => a.id === "chat1")).toMatchObject({ allow: false });
+    expect($("screenTitle").textContent).toBe("Chat"); // Esc denied, it didn't go back
+    await waitFor(() => statusText() === "Codex is working…");
+  });
+
+  it("the reply, the call's end, done; the next message continues the session", async () => {
+    const c = lastChild();
+    c.say(
+      { type: "tool", phase: "end", id: "i1", name: "ae_get_keyframes", ok: true },
+      { type: "text", id: "m1", text: "Both keys now sit on **frames 12 and 24**:\n\n- `Position` key 1\n- key 2 <img src=x onerror=alert(1)>" },
+      { type: "done", ok: true, session: "thread-1" },
+    );
+    await waitFor(() => send().textContent === "Send");
+    expect(toolRows()).toEqual([["Get keyframes", null]]);
+    expect([...body().querySelectorAll(".cmsg .ctext")].map((x: any) => x.textContent)).toEqual(["Make the title land on frame 12", "Both keys now sit on frames 12 and 24:Position key 1key 2 <img src=x onerror=alert(1)>"]);
+    // the answer's Markdown as the panel's own text: bold, code, a list; nothing becomes HTML
+    const md = [...body().querySelectorAll(".ctext.md")].pop() as any;
+    expect(md.querySelector(".mp b").textContent).toBe("frames 12 and 24");
+    expect([...md.querySelectorAll("ul li")].length).toBe(2);
+    expect(md.querySelector("li .mono").textContent).toBe("Position");
+    expect(md.querySelector("img")).toBeNull();
+    // whose conversation this is, and how to switch
+    expect(statusText()).toBe("Codex · New chat to switch");
+    expect(($("screenAction").querySelector("button") as any).disabled).toBe(false);
+    $("chatInput").value = "Thanks, check it";
+    send().click();
+    expect(spawned[spawned.length - 1].args.slice(1)).toEqual(["chat", "--agent", "codex", "--session", "thread-1"]);
+  });
+
+  it("Stop asks the runner to end the agent", async () => {
+    const c = lastChild();
+    send().click();
+    expect(c.written.map((w) => JSON.parse(w))).toContainEqual({ stop: true });
+    c.say({ type: "done", ok: true, session: "thread-1", stopped: true });
+    await waitFor(() => send().textContent === "Send");
+    expect([...body().querySelectorAll(".cmsg .muted")].map((x: any) => x.textContent)).toContain("Stopped.");
+  });
+
+  it("Back puts the approval card back in the main view", async () => {
+    $("back").click();
+    expect($("ask").parentNode).toBe(doc().querySelector("main.right"));
+    pending = [];
+    panel().closeScreen();
+  });
+
+  it("only the AI apps that are ready are offered; Add another AI app opens AI apps for chat", async () => {
+    Object.assign(panel().chat, { agents: null, error: null, loading: false, items: [], session: null });
+    cliAnswer = (cmd) => (cmd === "chat --agents --json" ? agents({ signedIn: false, authText: "Not logged in" }) : undefined);
+    panel().openScreen("chat", "menu");
+    await waitFor(() => !!body().querySelector(".modes"));
+    // one ready: its name, not a choice
+    expect(body().querySelector(".seg")).toBeNull();
+    expect(body().querySelector(".modes .title").textContent).toBe("Codex");
+    const link = [...body().querySelectorAll(".modes .link")].find((b: any) => b.textContent === "Add another AI app ›") as any;
+    link.click();
+    expect($("screenTitle").textContent).toBe("AI apps for chat");
+    expect(statusText()).toBe("1 ready · 2 need setting up");
+    expect($("screenStatusGlyph").hidden).toBe(true);
+    expect(($("screenAction").querySelector("button") as any).textContent).toBe("Check again");
+    const rows = [...body().querySelectorAll(".capps .item")] as any[];
+    expect(rows.map((r) => [r.querySelector(".title").textContent, r.querySelector(".st").textContent, r.querySelector(".g").className])).toEqual([
+      ["Codex", "Ready", "g g-verified"], ["Claude Code", "Not signed in", "g g-notrun"], ["Antigravity", "Not installed", "g g-pending"],
+    ]);
+    expect(rows[1].querySelector(".report").textContent).toBe("claude auth login");
+    expect([...rows[1].querySelectorAll(".line")].map((l: any) => l.textContent)).toEqual([
+      "Installed. To sign in, open Terminal and run:", "Sign in in the browser, then press Check again.", "Claude Code says: Not logged in",
+    ]);
+    expect(rows[2].querySelector(".report").textContent).toBe("agy");
+    expect(body().querySelector(".sfoot").textContent).toBe("Surehand never sees your sign-in. Each AI app keeps its own.");
+    // Back: the chat
+    $("back").click();
+    expect($("screenTitle").textContent).toBe("Chat");
+    $("back").click();
+    expect($("screenTitle").textContent).toBe("Surehand");
+    panel().closeScreen();
+  });
+
+  it("no AI app ready: the chat opens AI apps for chat; Check again asks again", async () => {
+    Object.assign(panel().chat, { agents: null, error: null, loading: false, items: [], session: null, from: null });
+    const signedOut: any = agents({ signedIn: false, authText: "Not logged in" });
+    signedOut.agents[0] = { ...signedOut.agents[0], signedIn: false };
+    cliAnswer = (cmd) => (cmd === "chat --agents --json" ? signedOut : undefined);
+    panel().openScreen("chat");
+    await waitFor(() => $("screenTitle").textContent === "AI apps for chat" && !!body().querySelector(".capps"));
+    expect(statusText()).toBe("0 ready · 3 need setting up");
+    const asked = cli.filter((c) => c.join(" ").includes("chat --agents")).length;
+    cliAnswer = (cmd) => (cmd === "chat --agents --json" ? agents() : undefined);
+    ($("screenAction").querySelector("button") as any).click();
+    await waitFor(() => statusText() === "2 ready · 1 need setting up");
+    expect(cli.filter((c) => c.join(" ").includes("chat --agents")).length).toBe(asked + 1);
+    $("back").click();
+    expect($("screen").hidden).toBe(true);
+    cliAnswer = null;
+  });
+});
+
+describe("Surehand panel: the chat button and Panel opens on", () => {
+  const panel = () => (dom.window as any).SurehandPanel;
+  it("the header's chat button (between Pause and ☰) opens the chat; Back returns", async () => {
+    const head = [...doc().querySelectorAll(".head button:not([hidden])")].map((b: any) => b.id);
+    expect(head.slice(-2)).toEqual(["chatBtn", "menuBtn"]);
+    expect($("chatBtn").getAttribute("aria-label")).toBe("Chat with your AI app");
+    $("chatBtn").click();
+    expect($("screenTitle").textContent).toBe("Chat");
+    $("back").click();
+    expect($("screen").hidden).toBe(true);
+  });
+  it("Settings › Panel opens on: Activity (default) or Chat, saved in the config", async () => {
+    const seg = () => [...doc().querySelectorAll("#screenBody .mset")].find((x: any) => x.textContent.includes("Panel opens on")) as any;
+    $("menuBtn").click();
+    expect(seg().querySelector(".msub").textContent).toBe("What you see first when After Effects starts.");
+    expect(seg().querySelector("button.on").textContent).toBe("Activity");
+    [...seg().querySelectorAll("button")].find((b: any) => b.textContent === "Chat")!.click();
+    expect(config().panelOpensOn).toBe("chat");
+    expect(seg().querySelector("button.on").textContent).toBe("Chat");
+    [...seg().querySelectorAll("button")].find((b: any) => b.textContent === "Activity")!.click();
+    expect(config().panelOpensOn).toBeUndefined();
     panel().closeScreen();
   });
 });

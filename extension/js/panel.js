@@ -3,7 +3,7 @@
  * whose screens slide over the feed. If the background bridge extension isn't running (some
  * hosts don't honour StartOn for invisible extensions), the panel starts the bridge itself.
  * Answers, Pause / Resume and the panel's own jobs carry the panel secret (control.js), which the AI
- * app never has.
+ * app never has. ☰ › Chat with your AI app runs the user's own AI agent with Surehand's tools.
  * Needs paths.js, panel-model.js, bridge-core.js and control.js. ES5 only. */
 (function () {
   "use strict";
@@ -141,6 +141,15 @@
   }
   var NO_RUNTIME = "This needs the Surehand MCP app installed with its installer. With only the Claude Desktop extension it isn't available here.";
   var TOO_OLD = "This needs a newer Surehand MCP server. Update it from \u2630 \u203a Check for updates.";
+  /** The server commands' environment: never the panel secret (only a job the user started here gets it, asPanel). */
+  function cliEnv() {
+    var env = {};
+    Object.keys(process.env).forEach(function (k) { env[k] = process.env[k]; });
+    env.AEMCP_NO_AUTOSETUP = "1";
+    delete env.SUREHAND_AE_PANEL_SECRET;
+    delete env.AEMCP_PANEL_SECRET;
+    return env;
+  }
   /**
    * `<node> <server> args...` -> cb(err, json, text). err.friendly says what to show. Commands added in
    * 1.4 aren't run on an older server (it would start an MCP server instead of answering).
@@ -152,11 +161,7 @@
     // the server says which panel commands it has (runtime.json panelCommands); the version number alone
     // can't tell (a beta or dev build of 1.4 still says 1.3.x until it's released)
     if (opts.since && !(rt.panelCommands >= 1) && rt.version && UI.cmpVersions(String(rt.version).split("-")[0], opts.since) < 0) return cb({ friendly: TOO_OLD });
-    var env = {};
-    Object.keys(process.env).forEach(function (k) { env[k] = process.env[k]; });
-    env.AEMCP_NO_AUTOSETUP = "1";
-    delete env.SUREHAND_AE_PANEL_SECRET;
-    delete env.AEMCP_PANEL_SECRET;
+    var env = cliEnv();
     if (opts.asPanel) {
       // read-only checks the user started here (Compare with now, Test the connection): their jobs run as
       // the panel's own, on this After Effects' bridge, also while the AI is paused
@@ -313,6 +318,7 @@
   }
   $("pause").onclick = function () { setPaused(true); };
   $("menuBtn").onclick = function () { openScreen("menu"); };
+  $("chatBtn").onclick = function () { openScreen("chat"); };
   $("resume").onclick = function () { setPaused(false); };
 
   // ---------- mode switch (config permissions.mode) ----------
@@ -470,19 +476,25 @@
       });
       renderAsk();
       renderHeader();
+      // the chat's header and field say when an approval waits
+      var asking = !$("ask").hidden;
+      if (S.screen === "chat" && asking !== chatAsking) { chatAsking = asking; drawChat(); }
     });
   }
+  var chatAsking = false;
 
   // ---------- keyboard: Esc denies (or closes a screen); there is no key that allows ----------
   document.addEventListener("keydown", function (e) {
     if (e.keyCode === 9) document.body.classList.add("kbd");
     var tag = e.target && e.target.tagName;
+    // Enter never allows, not even on a focused Allow button (Space or a click does, deliberately)
+    if (e.keyCode === 13 && e.target && e.target.id === "allow") { e.preventDefault(); return; }
     if (S.screen) {
+      // in the chat, Esc denies the approval card shown there (as in the main view); otherwise it goes back
+      if (e.keyCode === 27 && S.screen === "chat" && !$("ask").hidden) { e.preventDefault(); answer(false); return; }
       if (e.keyCode === 27) { e.preventDefault(); goBack(); }
       return;
     }
-    // Enter never allows, not even on a focused Allow button (Space or a click does, deliberately)
-    if (e.keyCode === 13 && e.target && e.target.id === "allow") { e.preventDefault(); return; }
     if ($("ask").hidden || tag === "INPUT" || tag === "TEXTAREA") return;
     if (e.keyCode === 27) {
       e.preventDefault();
@@ -889,6 +901,8 @@
   // ---------- ☰ screens ----------
   var SCREENS = {
     menu: { title: "Surehand", render: screenMenu },
+    chat: { title: "Chat", render: screenChat },
+    chatApps: { title: "AI apps for chat", render: screenChatApps },
     connect: { title: "Connect an AI app", render: screenConnect },
     checkpoints: { title: "Checkpoints", render: screenCheckpoints },
     history: { title: "Activity history", render: screenHistory },
@@ -906,16 +920,23 @@
     if (from !== undefined) S.from = from;
     else if (id === "menu" || !S.screen) S.from = null;
     else if (S.screen === "menu") S.from = "menu";
+    // the chat comes back (from the activity history) with where it was opened from
+    if (id === "chat") { if (from !== undefined) chat.from = S.from; else S.from = chat.from; }
+    if (S.screen === "chat" && id !== "chat") { placeAsk(false); chatUI = null; }
     S.screen = id;
     screenToken++;
     $("screenTitle").textContent = SCREENS[id].title;
+    $("screenStatus").hidden = id !== "chat" && id !== "chatApps";
+    $("screenStatusGlyph").hidden = false;
     $("screenAction").innerHTML = "";
     $("screenBody").innerHTML = "";
+    $("screenBody").className = "screen-body";
     $("screen").hidden = false;
     SCREENS[id].render($("screenBody"), $("screenAction"), screenToken);
     $("back").focus();
   }
   function closeScreen() {
+    if (S.screen === "chat") { placeAsk(false); chatUI = null; }
     S.screen = null;
     S.from = null;
     S.backTo = null;
@@ -1424,9 +1445,13 @@
   /** A release-notes line: bold, inline code in the mono font, a heading as a bold line; all of it as text, never HTML. */
   function noteItem(line) {
     var v = UI.noteView(line);
-    return el("li", { cls: v.heading ? "h" : null }, v.parts.map(function (p) {
-      return p.bold || v.heading ? el("b", { text: p.text, cls: p.code ? "mono" : null }) : p.code ? el("span", { cls: "mono", text: p.text }) : p.text;
-    }));
+    return el("li", { cls: v.heading ? "h" : null }, noteParts(v.parts, v.heading));
+  }
+  /** noteView's pieces as text nodes: bold, inline code in the mono font (also the chat's answers). */
+  function noteParts(parts, allBold) {
+    return parts.map(function (p) {
+      return p.bold || allBold ? el("b", { text: p.text, cls: p.code ? "mono" : null }) : p.code ? el("span", { cls: "mono", text: p.text }) : p.text;
+    });
   }
   var updating = false, updatedTo = null;
   function drawUpdate(body, u, checking, note) {
@@ -1486,6 +1511,274 @@
     }, { timeout: 180000 });
   }
 
+  // Chat with your AI app: an agent the user already has (Codex, Claude Code, Antigravity), on their own sign-in,
+  // with Surehand as its only tools (`surehand-ae chat`, server/src/chat). Its calls are an AI app's calls: the
+  // mode (Full / Ask / Read-only), Pause and the approval card apply, and the feed lists them. Each turn is a
+  // process of its own, so the panel never waits; Stop asks it to end the agent. The approval card moves into the
+  // chat while it is open (the same card, the same answers).
+  var CHAT_LEVEL = 2; // runtime.json panelCommands that has `chat`
+  var chat = S.chat = { agents: null, agent: null, items: [], running: false, session: null, proc: null, loading: false, used: {}, from: null, error: null };
+  try { chat.agent = window.localStorage.getItem("surehand.chat.agent"); } catch (e) {}
+  function chatTooOld() { var rt = runtime(); return !!(rt && !(rt.panelCommands >= CHAT_LEVEL) && rt.version); }
+  function loadAgents(cb) {
+    if (chat.loading) return;
+    if (chatTooOld()) { chat.error = TOO_OLD; if (cb) cb(); return; }
+    chat.loading = true;
+    runCli(["chat", "--agents", "--json"], function (err, json) {
+      chat.loading = false;
+      if (err || !json || !json.agents) chat.error = err ? err.friendly : "No answer.";
+      else { chat.error = null; chat.agents = json.agents; }
+      if (chat.agents && !chat.running) chat.agent = UI.chatPick(chat.agents, chat.agent);
+      if (cb) cb();
+    }, { timeout: 45000 });
+  }
+  function setChatAgent(id) {
+    if (chat.running || id === chat.agent) return;
+    chat.agent = id;
+    chat.items = [];
+    chat.session = null;
+    try { window.localStorage.setItem("surehand.chat.agent", id); } catch (e) {}
+    drawChat();
+  }
+  /** The open project, as the activity log last saw it (the agent is told to look anyway). */
+  function chatProject() {
+    for (var i = 0; i < S.activity.length; i++) if (S.activity[i] && typeof S.activity[i].project === "string" && S.activity[i].project) return S.activity[i].project;
+    return null;
+  }
+  function chatSend(text) {
+    text = String(text || "").replace(/\s+$/, "");
+    if (!text || chat.running || !chat.agent) return;
+    var rt = runtime();
+    if (!rt) return toast(NO_RUNTIME, true);
+    if (chatTooOld()) return toast(TOO_OLD, true);
+    var args = [rt.server, "chat", "--agent", chat.agent];
+    if (chat.session) args.push("--session", chat.session);
+    var child;
+    try { child = childProcess.spawn(rt.node, args, { env: cliEnv(), windowsHide: true }); } catch (e) { return toast("Could not start the chat: " + e.message, true); }
+    chat.items.push({ kind: "user", text: text, at: new Date().toISOString() });
+    chat.running = true;
+    chat.replyHead = true;
+    chat.proc = child;
+    var buf = "", ended = false;
+    function finish(ev) {
+      if (ended) return;
+      ended = true;
+      if (chat.proc === child) chat.proc = null;
+      UI.chatApply(chat, ev, new Date().toISOString());
+      drawChat();
+    }
+    child.stdout.on("data", function (d) {
+      buf += d;
+      var lines = buf.split("\n");
+      buf = lines.pop();
+      lines.forEach(function (l) {
+        var ev = null;
+        try { ev = JSON.parse(l); } catch (e) { return; }
+        if (!ev || ended) return;
+        if (ev.type === "done") return finish(ev);
+        UI.chatApply(chat, ev, new Date().toISOString());
+        drawChatSoon();
+      });
+    });
+    child.stdin.on("error", function () {});
+    child.on("error", function (e) { UI.chatApply(chat, { type: "error", message: "Could not start the chat: " + e.message }, new Date().toISOString()); finish({ type: "done", ok: false }); });
+    child.on("close", function () { finish({ type: "done", ok: false }); });
+    child.stdin.write(JSON.stringify({ text: text, project: chatProject() }) + "\n");
+    drawChat();
+  }
+  /** Stop: the runner ends the agent (and what it started); killed here if it doesn't within 8 s. */
+  function chatStop() {
+    var child = chat.proc;
+    if (!child) return;
+    try { child.stdin.write(JSON.stringify({ stop: true }) + "\n"); } catch (e) {}
+    setTimeout(function () { if (chat.proc === child) try { child.kill(); } catch (e) {} }, 8000);
+  }
+  function chatNew() {
+    chatStop();
+    chat.items = [];
+    chat.session = null;
+    chat.running = false;
+    chat.proc = null;
+    drawChat();
+    if (chatUI) chatUI.input.focus();
+  }
+  function chatAction(id) {
+    if (id === "check") { chat.agents = null; chat.error = null; drawChat(); return loadAgents(drawChat); }
+    if (id === "apps") return openScreen("chatApps", "chat", "chat");
+    if (id.indexOf("use:") === 0) return setChatAgent(id.slice(4));
+    if (id === "connect") {
+      runCli(["chat", "--connect", "agy", "--json"], function (err, r) {
+        if (err) return toast(err.friendly, true);
+        toast(r.message || (r.ok ? "Connected." : "Could not connect."), r.ok === false);
+        loadAgents(drawChat);
+      }, { timeout: 60000 });
+    }
+  }
+
+  // the screen: built once when opened (the text field keeps what's typed), then drawn again on every event
+  var chatUI = null, chatTimer = null;
+  function screenChat(body, action) {
+    body.className = "screen-body chat";
+    var newBtn = button("btn", "New chat", chatNew);
+    action.appendChild(newBtn);
+    var input = el("textarea", { id: "chatInput", cls: "cinput", rows: "3" });
+    var send = button("btn main", "Send", function () { if (chat.running) chatStop(); else { var t = input.value; input.value = ""; chatSend(t); } });
+    input.onkeydown = function (e) {
+      if (e.keyCode === 13 && !e.shiftKey) {
+        e.preventDefault();
+        if (!chat.running && !send.disabled) { var t = input.value; input.value = ""; chatSend(t); }
+      }
+    };
+    chatUI = {
+      newBtn: newBtn, input: input, send: send,
+      top: el("div"), list: el("div", { cls: "clist", role: "log", "aria-label": "Chat", "aria-live": "polite" }), msgs: el("div", { cls: "cmsgs" }),
+      hint: el("span", { cls: "time" }),
+    };
+    chatUI.list.appendChild(chatUI.msgs);
+    body.appendChild(chatUI.top);
+    body.appendChild(chatUI.list);
+    body.appendChild(el("div", { cls: "cfoot" }, [el("label", { cls: "label", "for": "chatInput", text: "Message" }), input, el("div", { cls: "cbar" }, [chatUI.hint, send])]));
+    drawChat();
+    if (!chat.agents) loadAgents(drawChat);
+  }
+  function drawChatSoon() {
+    if (chatTimer) return;
+    chatTimer = setTimeout(function () { chatTimer = null; drawChat(); }, 60);
+  }
+  /** The approval card and "withdrawn" go into the chat while it is open, back to the main view after. */
+  function placeAsk(inChat) {
+    var ask = $("ask"), gone = $("askGone"), right = document.querySelector("main.right");
+    if (inChat && chatUI) { chatUI.list.appendChild(gone); chatUI.list.appendChild(ask); }
+    else if (right && ask.parentNode !== right) { right.insertBefore(ask, $("setup")); right.insertBefore(gone, ask); }
+  }
+  function chatState() {
+    return { agents: chat.agents, agent: chat.agent, items: chat.items, running: chat.running, asking: chat.running && !$("ask").hidden, error: chat.error };
+  }
+  function drawChat() {
+    if (S.screen !== "chat" || !chatUI) return;
+    var v = UI.chatView(chatState(), process.platform), a = chatUI;
+    // no AI app ready: "AI apps for chat" says how to set one up (Back goes where the chat would)
+    if (v.apps) return setTimeout(function () { if (S.screen === "chat") openScreen("chatApps", chat.from, chat.from); }, 0);
+    $("screenStatusGlyph").className = "g g-sm g-" + v.status.glyph;
+    $("screenStatusText").textContent = v.status.text;
+    a.newBtn.disabled = v.newChat.disabled;
+    // top: the agent picker and what it does, or what to do first
+    a.top.innerHTML = "";
+    if (v.picker || v.single) {
+      // the AI apps that are ready: a choice with two or more, its name with one
+      var pick = v.single ? el("div", { cls: "title", text: v.single }) : el("div", { cls: "seg", role: "radiogroup", "aria-labelledby": "chatWith", style: "grid-template-columns:repeat(" + v.picker.length + ",minmax(0,1fr))" });
+      (v.picker || []).forEach(function (p) {
+        pick.appendChild(button("", p.label, function () { setChatAgent(p.id); }, { role: "radio", "aria-checked": p.checked ? "true" : "false", tabindex: p.checked ? "0" : "-1" }));
+      });
+      a.top.appendChild(el("div", { cls: "modes" }, [el("span", { id: "chatWith", cls: "label", text: "Chat with" }), pick, v.desc ? el("div", { cls: "desc", text: v.desc }) : null,
+        v.addLink ? button("link", v.addLink, function () { chatAction("apps"); }) : null]));
+    }
+    if (v.note) {
+      var acts = el("div", { cls: "setup-acts" });
+      v.note.buttons.forEach(function (b) { acts.appendChild(button("btn small" + (b.main ? " main" : ""), b.text, function () { chatAction(b.id); })); });
+      a.top.appendChild(el("div", { cls: "notebox" + (v.note.kind === "none" ? "" : " amber") }, [
+        el("span", { cls: "title", text: v.note.title }),
+        el("span", { cls: "muted", text: v.note.text }),
+        v.note.steps.length ? el("ol", { cls: "steps" }, v.note.steps.map(function (s) {
+          return el("li", {}, s.map(function (p) { return typeof p === "string" ? p : el("span", { cls: "mono", text: p.mono }); }));
+        })) : null,
+        v.note.says ? el("span", { cls: "mono-s", text: UI.chatLabel(chat.agent) + " says: " + v.note.says }) : null,
+        acts,
+      ]));
+    }
+    // the conversation (or what to try)
+    var stick = a.list.scrollHeight - a.list.scrollTop - a.list.clientHeight < 40;
+    a.msgs.innerHTML = "";
+    a.list.className = "clist" + (chat.items.length ? "" : " fresh");
+    if (v.tries) {
+      a.msgs.appendChild(el("div", { cls: "tries" }, [el("span", { cls: "label", text: "Try" })].concat(v.tries.map(function (t) {
+        return button("btn", t, function () { chatSend(t); });
+      }))));
+    }
+    drawChatItems(a.msgs);
+    placeAsk(true);
+    if (stick || chat.running) a.list.scrollTop = a.list.scrollHeight;
+    // the message field
+    a.input.disabled = v.input.disabled;
+    a.input.placeholder = v.input.placeholder;
+    a.hint.textContent = v.hint || "";
+    a.hint.hidden = !v.hint;
+    a.send.textContent = v.button.text;
+    a.send.className = "btn" + (v.button.main ? " main" : "");
+    a.send.disabled = v.button.disabled;
+  }
+  // AI apps for chat: each one's state as its own command line says, and how to set it up
+  function screenChatApps(body, action, token) {
+    action.appendChild(button("btn", "Check again", function () {
+      chat.agents = null;
+      chat.error = null;
+      drawChatApps(body);
+      loadAgents(still(token, function () { drawChatApps(body); }));
+    }));
+    drawChatApps(body);
+    if (!chat.agents) loadAgents(still(token, function () { drawChatApps(body); }));
+  }
+  function drawChatApps(body) {
+    $("screenStatusGlyph").hidden = true;
+    body.innerHTML = "";
+    if (!chat.agents) {
+      $("screenStatusText").textContent = chat.error ? "Couldn\u2019t look for AI apps" : "Checking\u2026";
+      return chat.error ? message(body, chat.error) : loading(body, "Checking your AI apps\u2026");
+    }
+    var v = UI.chatAppsView(chat.agents, process.platform);
+    $("screenStatusText").textContent = v.sub;
+    var list = el("div", { cls: "capps" });
+    v.rows.forEach(function (r) {
+      var kids = [el("div", { cls: "row1" }, [el("span", { cls: "tline" }, [el("span", { cls: "title", text: r.label })]), el("span", { cls: "meta" }, [el("span", { cls: "st st-" + r.glyph, text: r.word })])])];
+      r.lines.forEach(function (l) {
+        if (typeof l === "string") kids.push(el("div", { cls: "line", text: l }));
+        else if (l.report) kids.push(el("div", { cls: "report" }, [el("span", { text: l.report })]));
+        else if (l.says) kids.push(el("div", { cls: "line mono", text: r.label + " says: " + l.says }));
+      });
+      list.appendChild(el("div", { cls: "item", role: "listitem" }, [glyph(r.glyph, r.word), el("div", { cls: "body" }, kids)]));
+    });
+    body.appendChild(list);
+    body.appendChild(el("div", { cls: "spacer" }));
+    body.appendChild(el("div", { cls: "sfoot", text: v.foot }));
+  }
+  /** An answer's Markdown as the panel's own text: paragraphs, headings, lists, code (never HTML). */
+  function chatText(text) {
+    return el("div", { cls: "ctext md" }, UI.chatBlocks(text).map(function (b) {
+      if (b.kind === "code") return el("pre", { cls: "code", text: b.text });
+      if (b.kind === "ul" || b.kind === "ol") return el(b.kind, {}, b.items.map(function (parts) { return el("li", {}, noteParts(parts)); }));
+      return el("div", { cls: b.kind === "h" ? "mh" : "mp" }, noteParts(b.parts, b.kind === "h"));
+    }));
+  }
+  function drawChatItems(box) {
+    var label = UI.chatLabel(chat.agent);
+    chat.items.forEach(function (it) {
+      if (it.kind === "user") {
+        box.appendChild(el("div", { cls: "cmsg user" }, [el("div", { cls: "row1" }, [el("span", { cls: "label", text: "You" }), el("span", { cls: "time num", text: UI.hhmm(it.at) })]),
+          el("div", { cls: "ctext", text: it.text })]));
+        return;
+      }
+      if (it.head) box.appendChild(el("div", { cls: "cmsg rhead" }, [el("div", { cls: "row1" }, [el("span", { cls: "label", text: label }), el("span", { cls: "time num", text: UI.hhmm(it.at) })])]));
+      if (it.kind === "agent") { if (it.text) box.appendChild(el("div", { cls: "cmsg" }, [chatText(it.text)])); return; }
+      if (it.kind === "notice") { box.appendChild(el("div", { cls: "cmsg" }, [el("div", { cls: "muted", text: it.text })])); return; }
+      if (it.kind === "error") {
+        box.appendChild(el("div", { cls: "item ctool" }, [glyph("failed", "Failed"), el("div", { cls: "body" }, [el("div", { cls: "row1" }, [el("span", { cls: "tline" }, [el("span", { cls: "title", text: it.title || (it.auth ? "Not signed in" : "It stopped with an error") })]), el("span", { cls: "meta" }, [el("span", { cls: "st st-failed", text: "Failed" })])]), el("div", { cls: "line", text: it.text })])]));
+        return;
+      }
+      // a tool call: the feed's row once the activity log has it (click: Activity history)
+      if (!it.entry && it.state !== "running") { it.entry = UI.chatEntryFor(it, S.activity, chat.used); if (it.entry) chat.used[UI.entryKey(it.entry)] = true; }
+      var t = UI.chatToolView(it, it.entry);
+      var meta = el("span", { cls: "meta" }, [t.word ? el("span", { cls: "st st-" + t.glyph, text: t.word }) : null, el("span", { cls: "time num", text: UI.hhmm(it.endedAt || it.at) })]);
+      var body = el("div", { cls: "body" }, [el("div", { cls: "row1" }, [el("span", { cls: "tline" }, [el("span", { cls: "title", text: t.title })]), meta])]);
+      if (t.list) body.appendChild(changeReport(t.list));
+      else if (t.line) body.appendChild(el("div", { cls: "line mono", text: t.line }));
+      var row = el("div", { cls: "item ctool clickable" + (t.muted ? " read" : ""), role: "button", tabindex: "0", title: "In the activity history", "aria-label": t.title + (t.word ? ", " + t.word : "") },
+        [glyph(t.glyph, t.word || "Read only"), body]);
+      row.onclick = function () { openScreen("history", "chat", "chat"); };
+      row.onkeydown = function (e) { if (e.keyCode === 13 || e.keyCode === 32) { e.preventDefault(); row.onclick(); } };
+      box.appendChild(row);
+    });
+  }
+
   // The panel's own menu (the same as After Effects' ☰ flyout, which many people never open)
   function screenMenu(body) {
     var current = AEMCPBridge.VERSION;
@@ -1513,7 +1806,9 @@
     var clients = S.clients && S.clients.list || [];
     var web = clients.filter(function (c) { return c.action === "start"; })[0];
     var cps = S.current && S.current.project ? readIndex(S.current.project).length : 0;
+    if (!chat.agents && !chat.loading && !chat.error) loadAgents(redrawLater());
     body.appendChild(group("Work", [
+      row("chat", "Chat with your AI app", UI.chatMenuSub(chat.agents, chat.agent)),
       row("connect", "Connect an AI app", UI.connectedClientsText(clients) || "Claude, ChatGPT, Cursor and others"),
       row("chatgpt", "ChatGPT on the web", web ? (web.configured ? "Running" : web.note || "Off") : "A secure link ChatGPT can reach",
         { chevron: true, onclick: function () { openScreen("chatgpt", "menu", "menu"); } }),
@@ -1521,6 +1816,8 @@
       row("history", "Activity history", "Everything the AI did, searchable"),
     ]));
     body.appendChild(group("Settings", [
+      choice("Panel opens on", "What you see first when After Effects starts.", [["activity", "Activity"], ["chat", "Chat"]], UI.opensOn(S.cfg),
+        function (v) { if (writeConfig(function (cfg) { if (v === "chat") cfg.panelOpensOn = "chat"; else delete cfg.panelOpensOn; })) S.cfg = readConfig(); openScreen("menu"); }),
       choice("Tools the AI sees", all ? "All: more to choose from, a bigger prompt." : "Core: faster. The AI can still ask for the rest.", [["core", "Core"], ["all", "All"]], all ? "all" : "core",
         function (v) { onMenu(v === "all" ? "toolsAll" : "toolsCore"); openScreen("menu"); }),
       choice("Shell commands in scripts", shell ? "Scripts may run programs on this computer" : "Scripts can’t run programs", [["yes", "Allowed"], ["no", "Off"]], shell ? "yes" : "no",
@@ -1612,7 +1909,8 @@
       updateCurrent();
       renderWorking();
     });
-    readActivity();
+    // a chat's tool rows become the feed's rows once the activity log has them
+    if (readActivity() && S.screen === "chat") drawChatSoon();
     S.renders = readRenders();
     renderFeed(); // redraws only when something changed
     renderHeader();
@@ -1622,7 +1920,7 @@
 
   window.addEventListener("resize", applyLayout);
   document.addEventListener("visibilitychange", function () { if (!document.hidden) refresh(); });
-  window.SurehandPanel = { pickPort: pickPort, state: S, menu: onMenu, refresh: refresh, menuXml: menuXml, openScreen: openScreen, closeScreen: closeScreen, answer: answer };
+  window.SurehandPanel = { pickPort: pickPort, state: S, chat: chat, menu: onMenu, refresh: refresh, menuXml: menuXml, openScreen: openScreen, closeScreen: closeScreen, answer: answer };
 
   readActivity();
   applyLayout();
@@ -1630,5 +1928,7 @@
   Control.hello();
   findMyPort(refresh);
   loadClients();
+  // Settings › Panel opens on: Chat (or AI apps for chat when none is ready)
+  if (UI.opensOn(readConfig()) === "chat") openScreen("chat");
   setInterval(refresh, POLL_MS);
 })();
