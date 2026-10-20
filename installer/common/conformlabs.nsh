@@ -142,15 +142,17 @@ Function ${UN}cl.DarkControl
   !endif
 FunctionEnd
 
-; $0 = an etched line (SS_ETCHEDHORZ): redraw it as a flat line in the frame's line colour
-Function ${UN}cl.FlatLine
-  ${If} $0 == 0
-    Return
-  ${EndIf}
-  System::Call "user32::GetWindowLong(p r0, i ${GWL_STYLE}) i.r1"
-  IntOp $1 $1 & 0xFFFFFFE0 ; SS_TYPEMASK off: a plain static, filled with its background colour
-  System::Call "user32::SetWindowLong(p r0, i ${GWL_STYLE}, i r1)"
-  SetCtlColors $0 "" "${CL_LINE}"
+; MUI's etched separators (under the header 1036, above the buttons 1035 and 1045) draw white on the dark frame,
+; and MUI shows them again on every page change: hide them on every page. The header and the body differ in colour.
+Function ${UN}cl.HideLines
+  Push $0
+  GetDlgItem $0 $HWNDPARENT 1036
+  ShowWindow $0 ${SW_HIDE}
+  GetDlgItem $0 $HWNDPARENT 1035
+  ShowWindow $0 ${SW_HIDE}
+  GetDlgItem $0 $HWNDPARENT 1045
+  ShowWindow $0 ${SW_HIDE}
+  Pop $0
 FunctionEnd
 
 ; the outer window: header, branding line, buttons
@@ -182,12 +184,12 @@ Function ${UN}cl.GUIInit
   SetCtlColors $0 "${CL_TEXT3}" "${CL_PANEL}"
   GetDlgItem $0 $HWNDPARENT 1256
   SetCtlColors $0 "${CL_TEXT3}" "${CL_PANEL}"
-  GetDlgItem $0 $HWNDPARENT 1036 ; line under the header
-  Call ${UN}cl.FlatLine
-  GetDlgItem $0 $HWNDPARENT 1035 ; line above the buttons
-  Call ${UN}cl.FlatLine
-  GetDlgItem $0 $HWNDPARENT 1045 ; the same line on the welcome and finish pages
-  Call ${UN}cl.FlatLine
+  Call ${UN}cl.HideLines
+  ; a dark title bar: DWMWA_USE_IMMERSIVE_DARK_MODE is 20 on Windows 11 and Windows 10 20H1+, 19 before that
+  System::Call "dwmapi::DwmSetWindowAttribute(p $HWNDPARENT, i 20, *i 1, i 4) i.r0"
+  ${If} $0 != 0
+    System::Call "dwmapi::DwmSetWindowAttribute(p $HWNDPARENT, i 19, *i 1, i 4) i.r0"
+  ${EndIf}
   ${For} $1 1 3 ; Next, Cancel, Back
     GetDlgItem $0 $HWNDPARENT $1
     SetCtlColors $0 "${CL_TEXT}" "${CL_PANEL}"
@@ -202,6 +204,7 @@ Function ${UN}cl.InnerPageShow
   Push $0
   Push $1
   Push $2
+  Call ${UN}cl.HideLines
   FindWindow $1 "#32770" "" $HWNDPARENT
   SetCtlColors $1 "${CL_TEXT}" "${CL_PANEL}"
   StrCpy $0 0
@@ -336,6 +339,13 @@ Function cl.DetectInstalled
 FunctionEnd
 
 ; ---------- pages ----------
+Function cl.DisableBack
+  Push $0
+  GetDlgItem $0 $HWNDPARENT 3
+  EnableWindow $0 0
+  Pop $0
+FunctionEnd
+
 !macro CL_PAGE_MAINTENANCE
   Page custom cl.MaintenanceCreate cl.MaintenanceLeave
 !macroend
@@ -383,6 +393,8 @@ Function cl.MaintenanceCreate
   ${NSD_Check} $cl.RadioInstall
   Push $cl.RadioInstall
   Call cl.ChooseInstall
+  Call cl.HideLines
+  Call cl.DisableBack ; it is the first page
   nsDialogs::Show
 FunctionEnd
 
@@ -445,6 +457,8 @@ FunctionEnd
   FunctionEnd
   Function cl.WelcomeShow
     !insertmacro _CL_RELOAD_WIZARD $mui.WelcomePage.Image $mui.WelcomePage.Image.Bitmap
+    Call cl.HideLines
+    Call cl.DisableBack ; the first page (NSIS counts the skipped maintenance page before it)
   FunctionEnd
 !macroend
 
@@ -453,12 +467,40 @@ FunctionEnd
   !insertmacro MUI_PAGE_INSTFILES
 !macroend
 
+; The finish page's link (MUI_FINISHPAGE_LINK / _LINK_LOCATION, optional caption CL_FINISHPAGE_LINK_CAPTION): MUI's
+; owner-drawn link centres and wraps its text, which Segoe UI cuts off. Draw a caption and the link as two
+; left-aligned lines instead, the link in the accent colour, underlined, opening the location when clicked.
 !macro CL_PAGE_FINISH
+  !ifdef MUI_FINISHPAGE_LINK
+    !define CL_FINISH_LINK "${MUI_FINISHPAGE_LINK}"
+    !define CL_FINISH_URL "${MUI_FINISHPAGE_LINK_LOCATION}"
+  !endif
   !define MUI_PAGE_CUSTOMFUNCTION_SHOW cl.FinishShow
   !insertmacro MUI_PAGE_FINISH
   Function cl.FinishShow
     !insertmacro _CL_RELOAD_WIZARD $mui.FinishPage.Image $mui.FinishPage.Image.Bitmap
+    Call cl.HideLines
+    !ifdef CL_FINISH_LINK
+      ShowWindow $mui.FinishPage.Link ${SW_HIDE}
+      !ifdef CL_FINISHPAGE_LINK_CAPTION
+        ${NSD_CreateLabel} 120u 166u 195u 10u "${CL_FINISHPAGE_LINK_CAPTION}"
+        Pop $0
+        SetCtlColors $0 "${CL_TEXT3}" "${CL_PANEL}"
+      !endif
+      ${NSD_CreateLabel} 120u 177u 195u 11u "${CL_FINISH_LINK}"
+      Pop $0
+      SetCtlColors $0 "${CL_ACCENT}" "${CL_PANEL}"
+      CreateFont $1 "$(^Font)" "$(^FontSize)" 400 /UNDERLINE
+      SendMessage $0 ${WM_SETFONT} $1 0
+      ${NSD_OnClick} $0 cl.FinishLinkClick
+    !endif
   FunctionEnd
+  !ifdef CL_FINISH_LINK
+    Function cl.FinishLinkClick
+      Pop $0
+      ExecShell "open" "${CL_FINISH_URL}"
+    FunctionEnd
+  !endif
 !macroend
 
 !macro CL_UNPAGE_CONFIRM

@@ -74,6 +74,35 @@ describe("Windows installer: Conform Labs look", () => {
     expect(nsi).toMatch(/!include "\$\{__FILEDIR__\}\\\.\.\\\.\.\\common\\conformlabs\.nsh"/);
   });
 
+  it("darkens the title bar, hides MUI's white separators, and has no Back on the first page", () => {
+    const gui = fn(nsh, "${UN}cl.GUIInit");
+    expect(gui).toMatch(/DwmSetWindowAttribute\(p \$HWNDPARENT, i 20, \*i 1, i 4\)/);
+    expect(gui).toMatch(/DwmSetWindowAttribute\(p \$HWNDPARENT, i 19, \*i 1, i 4\)/); // older Windows 10
+    const hide = fn(nsh, "${UN}cl.HideLines");
+    for (const id of [1035, 1036, 1045]) expect(hide).toMatch(new RegExp(`GetDlgItem \\$0 \\$HWNDPARENT ${id}\\s*\\n\\s*ShowWindow \\$0 \\$\\{SW_HIDE\\}`));
+    // MUI shows the separators again on page changes: every page hides them
+    for (const page of ["cl.MaintenanceCreate", "cl.WelcomeShow", "cl.FinishShow", "${UN}cl.InnerPageShow"]) expect(fn(nsh, page)).toMatch(/Call (\$\{UN\})?cl\.HideLines/);
+    for (const page of ["cl.MaintenanceCreate", "cl.WelcomeShow"]) expect(fn(nsh, page)).toMatch(/Call cl\.DisableBack/);
+    expect(fn(nsh, "cl.DisableBack")).toMatch(/GetDlgItem \$0 \$HWNDPARENT 3\s*\n\s*EnableWindow \$0 0/);
+  });
+
+  it("draws the finish page's help link as two left-aligned lines, the link clickable", () => {
+    const finish = fn(nsh, "cl.FinishShow");
+    expect(finish).toMatch(/ShowWindow \$mui\.FinishPage\.Link \$\{SW_HIDE\}/);
+    expect(finish).toMatch(/NSD_CreateLabel\} 120u 166u 195u 10u "\$\{CL_FINISHPAGE_LINK_CAPTION\}"/);
+    expect(finish).toMatch(/NSD_CreateLabel\} 120u 177u 195u 11u "\$\{CL_FINISH_LINK\}"/);
+    expect(finish).toMatch(/NSD_OnClick\} \$0 cl\.FinishLinkClick/);
+    expect(fn(nsh, "cl.FinishLinkClick")).toMatch(/ExecShell "open" "\$\{CL_FINISH_URL\}"/);
+    expect(nsi).toMatch(/!define CL_FINISHPAGE_LINK_CAPTION "Documentation and help:"/);
+    expect(nsi).toMatch(/!define MUI_FINISHPAGE_LINK "github\.com\/ConformLabs\/surehand-mcp"/);
+  });
+
+  it("finish wording matches the panel's first-run hint, on Windows and Mac", () => {
+    const hint = "ask it something about your After Effects project, like “What’s in my project?” The Surehand panel in After Effects (Window › Extensions › Surehand MCP) shows when it's connected.";
+    expect(nsi).toContain(`Restart After Effects if it is open, and restart your AI apps.$\\r$\\n$\\r$\\nThen open your AI app and ${hint}`);
+    expect(read("installer/mac/pkg/resources/conclusion.body.html")).toContain(`Then open your AI app and ${hint}`);
+  });
+
   it("has every bitmap size the frame picks from, as 24-bit BMPs of the right size", async () => {
     const { WIZARD_SIZES, HEADER_SIZES } = await import(frameUrl);
     const pick = fn(nsh, "${UN}cl.PickArt");
