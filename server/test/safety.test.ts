@@ -60,7 +60,7 @@ describe("ensureConfig never replaces a config it can't read (H3)", () => {
     const cfg = JSON.parse(readFileSync(cfgFile(), "utf8"));
     expect(cfg).toMatchObject({ permissions: { mode: "ask" }, bridgePort: 8765, httpPort: 8766, token: expect.stringMatching(/^[0-9a-f]{48}$/) });
     if (process.platform !== "win32") expect((await import("node:fs")).statSync(cfgFile()).mode & 0o777).toBe(0o600);
-    expect(readdirSync(join(home, ".surehand", "ae"))).toEqual(["config.json"]);
+    expect(readdirSync(join(home, ".surehand", "ae")).sort()).toEqual(["config.json", "sessions"]); // no temporary file left
   });
 });
 

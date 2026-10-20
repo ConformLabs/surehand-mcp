@@ -20,7 +20,7 @@ export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$HOME/.volta/bin:
 
 # Surehand MCP's own entries in ~/.surehand/ae and ~/.aemcp: the same list as OWN_FILES in
 # server/src/cli/uninstall.ts (a test keeps them equal). Everything else there is the user's.
-OWN_FILES="server config.json runtime.json extension-hash bridge-status.json instances update-check.json activity.jsonl tmp renders compat install.log chatgpt.json chatgpt.lock MOVED.txt"
+OWN_FILES="server config.json runtime.json extension-hash bridge-status.json instances update-check.json activity.jsonl tmp renders compat install.log chatgpt.json chatgpt.lock sessions MOVED.txt"
 
 # Another Surehand app (~/.surehand/<app>) is installed: the shared Node.js stays for it.
 other_apps() {

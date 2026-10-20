@@ -18,6 +18,7 @@ import { updateCommand } from "./cli/update-cmd.js";
 import { recordRuntime } from "./cli/setup.js";
 import { uninstall } from "./cli/uninstall.js";
 import { createMcpServer } from "./server.js";
+import { trackSession } from "./sessions.js";
 import { env, migrationPending, SERVER_NAME } from "./paths.js";
 import { migrationLog } from "./migrate.js";
 import { movesLegacyBeforeRunning } from "./cli/commands.js";
@@ -233,6 +234,7 @@ async function main() {
   void checkForUpdate(); // background, cached for a day, silent when offline
   if (process.argv.includes("--http")) return startHttp();
   const server = createMcpServer();
+  trackSession(server);
   await server.connect(new StdioServerTransport());
 }
 

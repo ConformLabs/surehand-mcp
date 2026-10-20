@@ -44,6 +44,11 @@ export function ensureConfig(o: { waitMs?: number } = {}): boolean {
   const until = Date.now() + (o.waitMs ?? 5000);
   while (migrationBusy() && Date.now() < until) sleepSync(100);
   if (migrationBusy()) return false; // still moving: the next start does it
+  // the panel reads which AI apps are connected from sessions/: with the folder there, none means none
+  // (without it, an older server, it can't tell). The installer and every server start come through here.
+  try {
+    mkdirSync(appFile("sessions"), { recursive: true });
+  } catch {}
   const file = configPath();
   let r = readJsonFile<Record<string, unknown>>(file);
   for (let i = 0; i < 3 && !r.ok && !r.missing; i++) {
@@ -165,6 +170,7 @@ export function ensureAeSetup(opts: { forceExtension?: boolean } = {}): SetupRes
   } catch (e: any) {
     res.errors.push(`config: ${e.message}`);
   }
+
   try {
     const r = ensureExtension(opts.forceExtension);
     res.extensionInstalled = r.installed;

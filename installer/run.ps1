@@ -18,7 +18,7 @@ Get-ChildItem -Path $root -Recurse -File -ErrorAction SilentlyContinue | Unblock
 
 # Surehand MCP's own entries in .surehand\ae and .aemcp: the same list as OWN_FILES in
 # server/src/cli/uninstall.ts (a test keeps them equal). Everything else there is the user's.
-$ownFiles = @("server", "config.json", "runtime.json", "extension-hash", "bridge-status.json", "instances", "update-check.json", "activity.jsonl", "tmp", "renders", "compat", "install.log", "chatgpt.json", "chatgpt.lock", "MOVED.txt")
+$ownFiles = @("server", "config.json", "runtime.json", "extension-hash", "bridge-status.json", "instances", "update-check.json", "activity.jsonl", "tmp", "renders", "compat", "install.log", "chatgpt.json", "chatgpt.lock", "sessions", "MOVED.txt")
 $legacyDir = Join-Path $env:USERPROFILE ".aemcp"
 
 # Another Surehand app (.surehand\<app>) is installed: the shared Node.js stays for it.

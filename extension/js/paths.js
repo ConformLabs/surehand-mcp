@@ -35,6 +35,8 @@
       dir: appDir,
       config: config,
       instances: path.join(appDir, "instances"),
+      sessions: path.join(appDir, "sessions"),
+      chatgpt: path.join(appDir, "chatgpt.json"),
       activity: path.join(appDir, "activity.jsonl"),
       runtime: path.join(appDir, "runtime.json"),
       updateCheck: path.join(appDir, "update-check.json"),

@@ -233,3 +233,17 @@ describe("Preflight rows", () => {
   });
 });
 
+
+describe("connected AI apps", () => {
+  it("names the apps whose servers run, once each", () => {
+    const alive = (pid: number) => pid !== 3;
+    expect(UI.connectedApps([{ pid: 1, client: "claude-ai" }, { pid: 2, client: "claude-ai" }, { pid: 3, client: "cursor" }, { pid: 4, client: "cursor-vscode" }], alive)).toEqual(["Claude Desktop", "Cursor"]);
+    expect(UI.statusFor({ apps: ["Claude Desktop"], everConnected: false })).toMatchObject({ kind: "ready", text: "Connected · Claude Desktop" });
+    expect(UI.statusFor({ apps: ["Claude Desktop", "Cursor", "Codex"], everConnected: true }).text).toBe("Connected · Claude Desktop +2");
+    expect(UI.statusFor({ apps: [], everConnected: true })).toMatchObject({ kind: "idle", text: "No AI app open" });
+    // not known (no sessions folder): as before
+    expect(UI.statusFor({ apps: null, everConnected: true, client: "Cursor" }).text).toBe("Ready · Cursor");
+    // Pause and approvals still come first
+    expect(UI.statusFor({ apps: ["Cursor"], paused: true }).kind).toBe("paused");
+  });
+});
