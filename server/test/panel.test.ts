@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { JSDOM } from "jsdom";
 import { createRequire } from "node:module";
 import { createServer, type Server } from "node:http";
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -200,15 +200,14 @@ describe("Surehand panel: main view", () => {
     expect($("modeDesc").textContent).toMatch(/^Every change waits for your OK/);
   });
 
-  it("offers Undo only while the project is as the newest change left it", async () => {
+  it("offers Undo for the newest change, checking the project once, not on a timer (a script during a dialog makes After Effects show an alert)", async () => {
     const undoButton = () => [...doc().querySelectorAll("#feed .acts button")].find((b: any) => b.textContent === "Undo") as any;
     await waitFor(() => !!undoButton(), 6000);
-    // something else changed the project since: no Undo
-    revision = 813;
-    (dom.window as any).SurehandPanel.state.current = null;
-    await waitFor(() => !undoButton(), 8000);
-    revision = 812;
-    await waitFor(() => !!undoButton(), 8000);
+    const checks = () => evals.filter((e) => /project state/.test(e.label || "")).length;
+    const n = checks();
+    expect(n).toBe(1);
+    await new Promise((r) => setTimeout(r, 4000));
+    expect(checks()).toBe(n);
   });
 
   it("Undo on the newest change runs Edit > Undo in After Effects as the panel (checking project and revision again)", async () => {
@@ -671,3 +670,20 @@ describe("Surehand panel: UX pass (menu button, refusals, long scripts)", () => 
   }, 15_000);
 });
 
+
+describe("Surehand panel: which AI apps are connected", () => {
+  const sessions = () => join(home, ".aemcp", "sessions");
+  const statusText = () => $("statusText").textContent;
+  it("says an app is connected as soon as its server runs (before its first request), and ignores a crashed one", async () => {
+    mkdirSync(sessions(), { recursive: true });
+    writeFileSync(join(sessions(), `${process.pid}.json`), JSON.stringify({ pid: process.pid, client: "claude-ai" }));
+    writeFileSync(join(sessions(), "999999.json"), JSON.stringify({ pid: 999_999, client: "cursor" })); // gone
+    await waitFor(() => statusText() === "Connected · Claude Desktop", 4000);
+    // no app open any more: say so, and how to connect
+    rmSync(join(sessions(), `${process.pid}.json`));
+    await waitFor(() => statusText() === "No AI app open", 4000);
+    await waitFor(() => !$("setup").hidden && /ask it something about your After Effects project/.test($("setupText").textContent), 4000);
+    rmSync(sessions(), { recursive: true });
+    await waitFor(() => /^Ready/.test(statusText()), 4000);
+  });
+});

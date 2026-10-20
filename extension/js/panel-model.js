@@ -64,8 +64,27 @@
       return { kind: "waiting", tile: "green", short: "Waiting",
         text: "Waiting for you" + (s.pendingCount > 1 ? " · " + s.pendingCount + " requests" : "") };
     }
+    // s.apps: the AI apps connected right now (their servers run), or null when not known
+    if (s.apps && s.apps.length) return { kind: "ready", tile: "green", text: "Connected \u00b7 " + appsText(s.apps), short: "Connected" };
+    if (s.apps && s.everConnected) return { kind: "idle", tile: "gray", text: "No AI app open", short: "No AI app" };
     if (!s.everConnected) return { kind: "idle", tile: "gray", text: "No AI app connected", short: "Not connected" };
     return { kind: "ready", tile: "green", text: "Ready" + (s.client ? " · " + s.client : ""), short: "Ready" };
+  }
+  /** "Claude Desktop", "Claude Desktop and Cursor", "Claude Desktop +2" */
+  function appsText(apps) {
+    if (apps.length === 1) return apps[0];
+    if (apps.length === 2) return apps[0] + " and " + apps[1];
+    return apps[0] + " +" + (apps.length - 1);
+  }
+  /** The connected apps from the servers' session files ({pid, client}) whose process still runs. */
+  function connectedApps(sessions, alive) {
+    var out = [];
+    (sessions || []).forEach(function (x) {
+      if (!x || !x.pid || !alive(x.pid)) return;
+      var n = clientName(x.client) || "An AI app";
+      if (out.indexOf(n) < 0) out.push(n);
+    });
+    return out;
   }
 
   // ---------- readable tool names ----------
@@ -396,7 +415,7 @@
   }
 
   var api = {
-    layoutFor: layoutFor, MODES: MODES, modeOf: modeOf, clientName: clientName, lastClient: lastClient, statusFor: statusFor,
+    layoutFor: layoutFor, MODES: MODES, connectedApps: connectedApps, appsText: appsText, modeOf: modeOf, clientName: clientName, lastClient: lastClient, statusFor: statusFor,
     toolName: toolName, describeEntry: describeEntry, refusal: refusal, readableError: readableError, workingView: workingView, entryDetails: entryDetails, feedItems: feedItems, entryKey: entryKey, canUndo: canUndo,
     renderIdOf: renderIdOf, renderStartInfo: renderStartInfo, renderProgress: renderProgress, timeLeft: timeLeft,
     riskChips: riskChips, approvalView: approvalView, countdown: countdown,
