@@ -7,13 +7,14 @@ import type { XrayNode, XrayNodeView, XrayProblem, XrayTag, XrayView } from "./t
 
 const CHIP: Record<XrayTag, { one: string; many: string; cls: string }> = {
   missing: { one: "MISSING", many: "MISSING", cls: "bad" },
+  placeholder: { one: "PLACEHOLDER", many: "PLACEHOLDERS", cls: "bad" },
   fragile: { one: "FRAGILE LINK", many: "FRAGILE LINKS", cls: "bad" },
   heavy: { one: "HEAVY HIDDEN", many: "HEAVY HIDDEN", cls: "warn" },
   unused: { one: "UNUSED COMP", many: "UNUSED COMPS", cls: "" },
 };
 /** the tags drawn in the tree (unused comps are all under "Not rendered") */
-const TAG: Partial<Record<XrayTag, { text: string; cls: string }>> = { missing: { text: "MISSING", cls: "bad" }, fragile: { text: "FRAGILE", cls: "bad" }, heavy: { text: "HEAVY", cls: "warn" } };
-const KIND: Record<XrayTag, string> = { missing: "missing", fragile: "fragile link", heavy: "heavy while hidden", unused: "unused" };
+const TAG: Partial<Record<XrayTag, { text: string; cls: string }>> = { missing: { text: "MISSING", cls: "bad" }, placeholder: { text: "PLACEHOLDER", cls: "bad" }, fragile: { text: "FRAGILE", cls: "bad" }, heavy: { text: "HEAVY", cls: "warn" } };
+const KIND: Record<XrayTag, string> = { missing: "missing", placeholder: "placeholder", fragile: "fragile link", heavy: "heavy while hidden", unused: "unused" };
 /** problems shown before "Show all" */
 const COLLAPSED = 3;
 
@@ -92,8 +93,8 @@ function nodeRow(row: string, depth: number, parentN?: number): HTMLElement {
     },
     el("span", { class: "ind", style: { width: `${depth * 16}px` } }),
     el("span", { class: "car", "aria-hidden": "true" }, canOpen && !state.filter ? (open ? "▾" : "▸") : ""),
-    el("span", { class: "nm" }, n.name),
-    meta ? el("span", { class: "meta" }, meta) : null,
+    // the name keeps its room: the meta is cut first, the name only when it doesn't fit on its own
+    el("span", { class: "lbl" }, el("span", { class: "nm" }, n.name), meta ? el("span", { class: "meta" }, meta) : null),
     n.tags.map((t) => (TAG[t] ? el("span", { class: `tag ${TAG[t]!.cls}` }, TAG[t]!.text) : null)),
   );
 }
@@ -286,7 +287,7 @@ function show(d: XrayView) {
   const r0 = d.roots[0], c0 = state.nodes.get(r0)?.children?.[0];
   if (r0) state.open.add(r0);
   if (c0) state.open.add(`${r0}/${c0.key}`);
-  const first = (["fragile", "missing", "heavy"] as XrayTag[]).map((t) => d.paths[t]?.[0]).find(Boolean);
+  const first = (["fragile", "missing", "placeholder", "heavy"] as XrayTag[]).map((t) => d.paths[t]?.[0]).find(Boolean);
   if (first) {
     first.forEach((_, i) => state.open.add(first.slice(0, i + 1).join("/")));
     state.selected = first.join("/");

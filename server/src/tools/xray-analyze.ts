@@ -639,7 +639,9 @@ export function xraySummary(r: ReturnType<typeof analyzeXray>): string {
   }
   if (mi) {
     const fonts = "missingOrSubstituted" in mi.fonts ? `${n("missing.fonts", mi.fonts.missingOrSubstituted)} fonts` : "fonts not checked";
-    out.push(`missing: ${n("missing.effects", mi.effects)} effects, ${n("missing.footage", mi.footage)} footage, ${fonts}`);
+    // placeholders (stand-ins for footage: they render as color bars) are counted apart from missing footage
+    const ph = n("missing.placeholders", mi.placeholders);
+    out.push(`missing: ${n("missing.effects", mi.effects)} effects, ${n("missing.footage", mi.footage)} footage, ${fonts}${ph ? `; ${ph} placeholder${ph === 1 ? "" : "s"} instead of footage` : ""}`);
   }
   if (r.weight) out.push(`${n("weight.heavyEffects", r.weight.heavyEffects)} heavy effect types`);
   return out.join("; ") + (r.partial ? `. PARTIAL: ${r.partial.reason}.` : ".");

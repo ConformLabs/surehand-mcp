@@ -117,7 +117,8 @@ export class XrayModel {
     const id = Number(key.slice(1)), out: XrayTag[] = [];
     if (key[0] === "f") {
       const f = this.footage.get(id);
-      if (f && ((f.kind === "file" && f.missing) || f.kind === "placeholder")) out.push("missing");
+      if (f?.kind === "file" && f.missing) out.push("missing");
+      if (f?.kind === "placeholder") out.push("placeholder");
     } else if (key[0] === "c") {
       if (this.missingFx.has(id) || this.missingFonts.has(id)) out.push("missing");
       if (this.links.has(id)) out.push("fragile");
@@ -155,7 +156,7 @@ export class XrayModel {
       const path = f.missingPath ?? f.file ?? undefined;
       const used = f.usedIn.map((u) => this.comps.get(u)?.name).filter(Boolean).join(", ");
       if (f.kind === "placeholder")
-        out.push({ tag: "missing", title: "A placeholder instead of footage", ...(used ? { where: `used in ${used}` } : {}), text: "Placeholders render as color bars.", reveal: { item: id }, ask: { label: "Ask the AI to replace it", text: `Replace the placeholder "${f.name}" with the real footage.` } });
+        out.push({ tag: "placeholder", title: "A placeholder instead of footage", ...(used ? { where: `used in ${used}` } : {}), text: "Placeholders render as color bars.", reveal: { item: id }, ask: { label: "Ask the AI to replace it", text: `Replace the placeholder "${f.name}" with the real footage.` } });
       else if (f.missing)
         out.push({
           tag: "missing",
@@ -235,10 +236,12 @@ export class XrayModel {
   }
 
   counts(): Record<XrayTag, number> {
-    const missingFootage = this.d.footage.filter((f) => (f.kind === "file" && f.missing) || f.kind === "placeholder").length;
+    const missingFootage = this.d.footage.filter((f) => f.kind === "file" && f.missing).length;
+    const placeholders = this.d.footage.filter((f) => f.kind === "placeholder").length;
     const fx = new Set([...this.missingFx.values()].flat().map((x) => x.m)), fonts = new Set([...this.missingFonts.values()].flat().map((x) => x.font));
     return {
       missing: missingFootage + fx.size + fonts.size,
+      placeholder: placeholders,
       fragile: [...this.links.values()].reduce((n, l) => n + l.length, 0),
       heavy: [...this.hidden.values()].reduce((n, l) => n + l.length, 0),
       unused: this.unused.size,
@@ -334,7 +337,7 @@ export function xrayView(raw: unknown): XrayView {
     nodes[key] = n;
   }
   const counts = m.counts();
-  const tags: XrayTag[] = ["missing", "fragile", "heavy", "unused"];
+  const tags: XrayTag[] = ["missing", "placeholder", "fragile", "heavy", "unused"];
   const paths: XrayView["paths"] = {};
   for (const t of tags) {
     if (!counts[t]) continue;

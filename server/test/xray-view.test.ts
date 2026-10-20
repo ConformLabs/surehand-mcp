@@ -110,6 +110,19 @@ describe("X-ray view data", () => {
     expect(v.subtitle).toMatch(/render queue empty$/);
   });
 
+  it("a placeholder is a PLACEHOLDER, not MISSING, in the view; the text report says it in its missing line", () => {
+    const d = fx.mockupProject();
+    d.footage[0] = { ...d.footage[0], kind: "placeholder", missing: undefined };
+    const v = xrayView(d);
+    expect(v.chips.slice(0, 2)).toEqual([{ tag: "placeholder", count: 1 }, { tag: "fragile", count: 4 }]);
+    expect(v.nodes.f20.tags).toEqual(["placeholder"]);
+    expect(v.paths.placeholder).toEqual([["q1", "c1", "c3", "f20"]]);
+    const first = formatXray(d).split("\n")[0];
+    expect(first).toContain("missing: 0 effects, 0 footage, 0 fonts; 1 placeholder instead of footage");
+    // without placeholders, the line is as it was
+    expect(formatXray(fx.mockupProject()).split("\n")[0]).toContain("missing: 0 effects, 1 footage, 0 fonts;");
+  });
+
   it("no problems: no chips, no paths", () => {
     const v = xrayView(fx.cleanProject());
     expect(v.chips).toEqual([]);
@@ -268,17 +281,19 @@ describe("the X-ray view in a fake AI app (jsdom)", () => {
     d.footage[0] = { ...d.footage[0], kind: "placeholder", missing: undefined };
     const calls: [string, any][] = [];
     const { doc, until } = await host(xrayView(d), server(calls), 60);
-    await until(() => doc.querySelector('[data-k="chip-missing"]'));
-    (doc.querySelector('[data-k="chip-missing"]') as any).click();
+    await until(() => doc.querySelector('[data-k="chip-placeholder"]'));
+    (doc.querySelector('[data-k="chip-placeholder"]') as any).click();
     await until(() => doc.querySelector(".detail h4")?.textContent === "A placeholder instead of footage");
     expect(doc.querySelector(".node.sel .nm")!.textContent).toBe("bg_plate.exr");
-    expect(doc.querySelector(".detail .eyebrow")!.textContent).toBe("bg_plate.exr · missing");
+    expect(doc.querySelector(".node.sel .tag")!.textContent).toBe("PLACEHOLDER");
+    expect([...doc.querySelectorAll(".chip")].map((e) => e.textContent)[0]).toBe("1 PLACEHOLDER");
+    expect(doc.querySelector(".detail .eyebrow")!.textContent).toBe("bg_plate.exr · placeholder");
     expect([...doc.querySelectorAll(".detail button")].map((b) => b.textContent)).toEqual(["Show in AE", "Ask the AI to replace it"]);
     // and the same after the first node's late answer came in
     await new Promise((r) => setTimeout(r, 150));
     expect(doc.querySelector(".detail h4")!.textContent).toBe("A placeholder instead of footage");
     // the same from a chip once everything is loaded: clear, then filter again
-    (doc.querySelector('[data-k="chip-missing"]') as any).click();
+    (doc.querySelector('[data-k="chip-placeholder"]') as any).click();
     (doc.querySelector('[data-k="chip-fragile"]') as any).click();
     await until(() => doc.querySelector(".detail h4")?.textContent === "An expression finds a layer by its name");
   });

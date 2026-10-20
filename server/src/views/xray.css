@@ -17,8 +17,9 @@ button.chip[aria-pressed="true"] { background: var(--paper-raised); box-shadow: 
 .node { display: flex; align-items: center; gap: 8px; padding: 3px 14px; cursor: pointer; min-width: 0; }
 .node .ind { display: inline-block; flex: none; }
 .node .car { flex: none; width: 10px; color: var(--ink); }
-.node .nm { color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 0 1 auto; }
-.node .meta { color: var(--ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 0 100 auto; }
+.node .lbl { display: flex; gap: 8px; min-width: 0; flex: 0 1 auto; overflow: hidden; }
+.node .nm { color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 0 auto; max-width: 100%; }
+.node .meta { color: var(--ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 0 1 auto; }
 .node .tag, .legend .tag { font: 500 10px/16px var(--font-mono); padding: 0 5px; border: 1px solid; letter-spacing: 0.06em; flex: none; }
 .node.sel { background: var(--paper-raised); box-shadow: inset 2px 0 0 var(--ink); }
 .tree .more { padding: 3px 14px; color: var(--ink-muted); }

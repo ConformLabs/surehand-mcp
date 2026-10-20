@@ -111,7 +111,7 @@ export interface ChangesView {
 }
 
 /** X-ray problem kinds: the chips, the tags in the tree and the detail pane's sections. */
-export type XrayTag = "missing" | "fragile" | "heavy" | "unused";
+export type XrayTag = "missing" | "placeholder" | "fragile" | "heavy" | "unused";
 
 /** A node of the "What renders" tree: a render queue item, a comp, a footage item, or a group of roots. */
 export interface XrayNode {
