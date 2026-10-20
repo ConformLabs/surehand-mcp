@@ -303,6 +303,25 @@ describe("ae_handoff_package", () => {
     expect(calls[1].opts.bridge).toBeUndefined();
   });
 
+  it.skipIf(!posix)("verify without verifyComps: the render queue's comps in any status (not only queued), else the active comp", async () => {
+    const base = spec();
+    const other = { name: "Other", fps: 25, duration: 2, layers: [{ name: "Logo", type: "footage" as const, source: "Logo" }] };
+    // "needs output" (no output file set) or unqueued: not QUEUED, and still what the project is meant to deliver
+    fp = fakeProject({ ...base, comps: [...base.comps, other], rq: [{ comp: "Other", render: false }], activeComp: undefined });
+    let t = text(await handoff({ folder: join(work, "A"), verify: true, frames: 1 }, FULL));
+    expect(t).toMatch(/Verification: IDENTICAL: all 1 sample frames \(1 comp\)/);
+    expect(t).toMatch(/"Other" at 0s \(f0\): identical/);
+    // an empty queue: the active comp
+    fp = fakeProject({ ...base, comps: [...base.comps, other], rq: [], activeComp: "Other" });
+    t = text(await handoff({ folder: join(work, "B"), verify: true, frames: 1 }, FULL));
+    expect(t).toMatch(/"Other" at 0s \(f0\): identical/);
+    // neither: refused before anything is written
+    fp = fakeProject({ ...base, rq: [], activeComp: undefined });
+    const r = await handoff({ folder: join(work, "C"), verify: true }, FULL);
+    expect(text(r)).toMatch(/the render queue is empty and no comp is active\. Pass verifyComps/);
+    expect(existsSync(join(work, "C"))).toBe(false);
+  });
+
   it("a verify comp that isn't there is refused before anything is written", async () => {
     const r = await handoff({ folder: pkg, verify: true, verifyComps: ["Nope"] }, FULL);
     expect(text(r)).toMatch(/No comp "Nope" in the project\. Nothing was written\./);

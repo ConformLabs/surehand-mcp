@@ -470,10 +470,13 @@ export async function handoff(input: HandoffInput, perm: { mode: string }, signa
         if (!verifyComps.includes(one)) verifyComps.push(one);
       }
     } else {
-      const queued = [...new Set(scan.rq.filter((r) => r.queued).map((r) => r.comp))].map((id) => scan.comps.find((c) => c.id === id)!).filter(Boolean);
-      verifyComps = queued.length ? queued.slice(0, 4) : scan.comps.filter((c) => c.id === scan.active);
-      if (queued.length > 4) verifyNotes.push(`The render queue has ${queued.length} queued comps; the first 4 were rendered (pass verifyComps to choose).`);
-      if (!verifyComps.length) return errorResult("verify: nothing is queued in the render queue and no comp is active. Pass verifyComps (ids or names). Nothing was written.");
+      // the render queue's comps in any status (queued, unqueued, "needs output": what is meant to be delivered), queued
+      // ones first; the active comp only when the queue is empty
+      const ids = [...new Set([...scan.rq.filter((r) => r.queued), ...scan.rq.filter((r) => !r.queued)].map((r) => r.comp))];
+      const inQueue = ids.map((id) => scan.comps.find((c) => c.id === id)!).filter(Boolean);
+      verifyComps = inQueue.length ? inQueue.slice(0, 4) : scan.comps.filter((c) => c.id === scan.active);
+      if (inQueue.length > 4) verifyNotes.push(`The render queue has ${inQueue.length} comps; the first 4 were rendered (pass verifyComps to choose).`);
+      if (!verifyComps.length) return errorResult("verify: the render queue is empty and no comp is active. Pass verifyComps (ids or names). Nothing was written.");
     }
     bin = scan.app ? aerenderPath(scan.app) : null;
     if (!bin) notVerifiedWhy = `aerender was not found next to ${scan.app ?? "the After Effects application"}`;
@@ -757,7 +760,7 @@ export function registerHandoffTools(server: McpServer) {
         reduce: z.boolean().optional().describe("Remove unused items from the package's copy (Reduce Project, keeping every comp). Default false."),
         overwrite: z.boolean().optional().describe("Replace package files that exist already (default false: refuse and list them)."),
         verify: z.boolean().optional().describe("Prove it: render sample frames from the package and from the project with aerender and compare (takes minutes: aerender starts its own After Effects twice)."),
-        verifyComps: z.array(z.union([z.number().int(), z.string()])).min(1).max(4).optional().describe('verify: comps to render (id, exact name or "active"; default the queued render queue comps, else the active comp).'),
+        verifyComps: z.array(z.union([z.number().int(), z.string()])).min(1).max(4).optional().describe('verify: comps to render (id, exact name or "active"; default the comps in the render queue, in any status, else the active comp).'),
         frames: z.number().int().min(1).max(24).optional().describe("verify: frames per comp, spread over its work area (default 5)."),
         tolerance: z.number().min(0).max(255).optional().describe("verify: allowed difference per channel, 0-255 (default 0.5: less than one 8-bit step)."),
       },

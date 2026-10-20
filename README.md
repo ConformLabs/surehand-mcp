@@ -467,7 +467,7 @@ clean: missing items, footage still pointing outside the package, unused footage
 errors (every expression is evaluated in the copy).
 
 `verify: true` proves the package renders the same as your project. aerender, After Effects' command-line renderer,
-renders sample frames (default 5 per comp across the work area; the queued render queue comps, or `verifyComps`) from a
+renders sample frames (default 5 per comp across the work area; the render queue's comps in any status, else the active comp, or `verifyComps`) from a
 copy of your project and from the package's copy, each in a process of its own, and the frames are compared pixel by
 pixel with the same comparison as `ae_prove_identical`. The verdict is **IDENTICAL**, **DIFFERS** (with the frames, the
 area and a difference image) or **NOT VERIFIED** with the reason (aerender not found, no PNG output module, a render

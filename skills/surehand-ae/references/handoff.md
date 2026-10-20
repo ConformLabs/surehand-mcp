@@ -9,8 +9,8 @@ instead of collecting files by hand. It is on demand in a core-tools chat: run i
    save (ae_save_project). Don't save without asking: it changes their file.
 2. Tell the user what will happen: After Effects saves a copy into the package folder and then opens their project
    again from disk. The project itself is not changed, but its undo history starts fresh.
-3. For a proof (verify: true), check what the render queue has queued, or pick up to 4 comps for verifyComps. It takes
-   minutes: aerender starts its own After Effects twice.
+3. For a proof (verify: true): by default it renders the render queue's comps (any status), else the active comp;
+   or pick up to 4 comps for verifyComps. It takes minutes: aerender starts its own After Effects twice.
 
 ## The call
 
