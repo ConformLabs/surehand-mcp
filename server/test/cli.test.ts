@@ -2,7 +2,7 @@
 // spawns answer and exit; an unknown command never starts the MCP server. Temporary home, no After Effects.
 import { describe, expect, it } from "vitest";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -33,5 +33,14 @@ describe.skipIf(!existsSync(bundle))("surehand-ae command line", () => {
     const k = run("connect", "nope", "--json");
     expect(k.status).toBe(1);
     expect(JSON.parse(k.stdout)).toEqual({ ok: false, message: expect.stringMatching(/Unknown app "nope"/) });
+  });
+
+  it("clients --json tells the panel why the last install could not connect an app, while it still isn't connected", () => {
+    mkdirSync(join(home, ".surehand", "ae"), { recursive: true });
+    writeFileSync(join(home, ".surehand", "ae", "install-result.json"), JSON.stringify({ clients: [{ id: "cursor", outcome: "failed", message: "its settings file can't be read" }, { id: "codex", outcome: "not-found" }] }));
+    const c = JSON.parse(run("clients", "--json").stdout).clients;
+    expect(c.find((x: any) => x.id === "cursor").note).toBe("not connected during setup: its settings file can't be read");
+    expect(c.find((x: any) => x.id === "codex").note).toBeUndefined();
+    rmSync(join(home, ".surehand", "ae", "install-result.json"));
   });
 });

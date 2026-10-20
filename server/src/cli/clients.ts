@@ -10,23 +10,30 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { readJsonFile, UnreadableFileError, updateJsonFile } from "../fsutil.js";
 import { lateMerge, mapLegacyPath, migrateLegacy, type LateMergeResult, type MigrationResult } from "../migrate.js";
-import { installedServer, LEGACY_SERVER_NAME, migrationPending, SERVER_NAME } from "../paths.js";
+import { appFile, installedServer, LEGACY_SERVER_NAME, migrationPending, SERVER_NAME } from "../paths.js";
 import {
   chatgptDesktopInstalled, claudeCodeConfig, claudeDesktopConfig, claudeDesktopDir, codexBlock, codexConfig, cursorConfig, findClaudeCli,
   hasCodexBlock, isMac, isWin, removeCodexBlock, run, stableNodePath, writeTextWithBackup,
 } from "./util.js";
 import { spawnSync } from "node:child_process";
 import { chatgptStatus, tunnelTool } from "./chatgpt.js";
+import AI_APPS from "../../../installer/ai-apps.json" with { type: "json" };
 
 export type ClientId = "claude-desktop" | "claude-code" | "codex" | "cursor";
 export const CLIENT_IDS: ClientId[] = ["claude-desktop", "claude-code", "codex", "cursor"];
-const NAMES: Record<ClientId | "chatgpt-web", string> = {
-  "claude-desktop": "Claude Desktop",
-  "claude-code": "Claude Code",
-  codex: "ChatGPT desktop / Codex",
-  cursor: "Cursor",
-  "chatgpt-web": "ChatGPT (web)",
-};
+/**
+ * The apps' names come from installer/ai-apps.json, the one list the installers' app pickers are generated from
+ * (installer/ai-apps.mjs), so the server, the Windows Setup and the Mac Installer name them the same.
+ */
+const NAMES = Object.fromEntries([...AI_APPS.apps, AI_APPS.web].map((a) => [a.id, a.name])) as Record<ClientId | "chatgpt-web", string>;
+/** The order the installers list the apps in. */
+export const INSTALLER_ORDER = AI_APPS.apps.map((a) => a.id) as ClientId[];
+
+/** The display names (installers and panel use the same). */
+export const CLIENT_NAMES = NAMES;
+
+/** What the last `install` did (install.ts InstallResult): the installers' results, and the panel's notes. */
+export const installResultFile = () => appFile("install-result.json");
 
 export interface ClientInfo {
   id: ClientId | "chatgpt-web";
@@ -155,7 +162,8 @@ export function removeJsonEntries(file: string): boolean {
 
 // ---------- status ----------
 
-function installed(id: ClientId): boolean {
+/** Is the app on this computer? The same test for `clients`, the install and the installers' app lists. */
+export function clientInstalled(id: ClientId): boolean {
   switch (id) {
     case "claude-desktop":
       return existsSync(claudeDesktopDir());
@@ -169,7 +177,7 @@ function installed(id: ClientId): boolean {
 }
 
 export function clientInfo(id: ClientId): ClientInfo {
-  const base = { id, name: NAMES[id], installed: installed(id) };
+  const base = { id, name: NAMES[id], installed: clientInstalled(id) };
   if (id === "codex") {
     const file = codexConfig();
     let text = "";
@@ -227,9 +235,14 @@ export function settingsSnippet(entry = serverEntry()): string {
  * note ("Running", "Not running", "Needs cloudflared"...) and the long explanation in howTo).
  */
 export function clientsJson(): { clients: Record<string, unknown>[]; snippet?: string } {
+  const lastInstall = readJsonFile<{ clients?: { id: string; outcome: string; message?: string }[] }>(installResultFile());
+  const failedAtInstall = (id: string) => (lastInstall.ok && Array.isArray(lastInstall.data?.clients) ? lastInstall.data.clients.find((x) => x.id === id && x.outcome === "failed") : undefined);
   const clients = listClients().map((c) => {
     const o: Record<string, unknown> = { id: c.id, name: c.name, installed: c.installed, configured: c.configured };
     if (c.id === "claude-desktop" && c.installed && claudeDesktopRunning()) o.inUse = true;
+    // why the last install could not connect it (the panel shows the note), while it still isn't connected
+    const failed = !c.configured && !c.note ? failedAtInstall(c.id) : undefined;
+    if (failed) o.note = `not connected during setup: ${failed.message ?? "unknown error"}`;
     if (c.note) o.note = c.note;
     if (c.id === "chatgpt-web") {
       o.action = "start";

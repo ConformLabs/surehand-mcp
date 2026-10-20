@@ -74,6 +74,9 @@ export const privateNodeDir = () => (migrationPending() && existsSync(join(legac
 export const privateFfmpegDir = () =>
   migrationPending() && existsSync(join(legacyDir(), "ffmpeg")) ? join(legacyDir(), "ffmpeg") : join(surehandRoot(), "ffmpeg");
 
+/** Shared between the Surehand apps: programs downloaded for them (cloudflared), ~/.surehand/bin. */
+export const sharedBinDir = () => join(surehandRoot(), "bin");
+
 export const appFile = (...parts: string[]) => join(appDir(), ...parts);
 
 /**

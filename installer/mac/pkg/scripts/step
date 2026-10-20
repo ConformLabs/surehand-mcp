@@ -1,0 +1,31 @@
+#!/bin/bash
+# The postinstall of the Surehand MCP package's payload-free steps (server/scripts/package-mac-pkg.mjs puts a copy in
+# each step's package as "postinstall", with STEP_ARGS filled in from installer/ai-apps.mjs macComponents):
+#   connect one AI app       install --connect-only --clients <id>
+#   ChatGPT on the web       install --connect-only --tunnel        (downloads cloudflared)
+#   the summary (the last)   install --summary: what happened, written at the top of ~/.surehand/ae/install.log
+# They install after the main package (Installer follows the choices' order). Never fails the package.
+STEP_ARGS=(@STEP_ARGS@)
+. "$(dirname "$0")/common.sh"
+
+if [ "${STEP_ARGS[1]}" = "--summary" ]; then
+  SUMMARY="$(mktemp "${TMPDIR:-/tmp}/surehand-summary.XXXXXX")" || exit 0
+  # the summary is not in the log yet: run it on its own, then put it first
+  if "${AS_USER[@]+"${AS_USER[@]}"}" /usr/bin/env PATH="$PATH" HOME="$TARGET_HOME" AEMCP_NO_UPDATE_CHECK=1 \
+    /usr/bin/perl -e 'alarm shift; exec @ARGV or die "exec: $!"' 60 "$NODE" "$SERVER" install --summary </dev/null >"$SUMMARY" 2>&1; then
+    { cat "$SUMMARY"; echo; echo "The details of this install and the ones before it follow."; echo; cat "$LOG" 2>/dev/null; } >"$LOG.tmp" && mv -f "$LOG.tmp" "$LOG"
+  else
+    { echo "(no summary: $(cat "$SUMMARY"))"; } >>"$LOG"
+  fi
+  rm -f "$SUMMARY"
+  [ -n "${OWNER:-}" ] && chown "$OWNER" "$LOG" 2>/dev/null
+  exit 0
+fi
+
+echo "--- $(date '+%H:%M:%S') ${STEP_ARGS[*]}" >>"$LOG"
+# cloudflared is a download: more time
+LIMIT=120
+case " ${STEP_ARGS[*]} " in *" --tunnel "*) LIMIT=600 ;; esac
+run_server "$LIMIT" "${STEP_ARGS[@]}"
+echo "exited with status $?" >>"$LOG"
+exit 0

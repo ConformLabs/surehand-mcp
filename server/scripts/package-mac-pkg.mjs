@@ -13,8 +13,9 @@
 //                                            Developer ID (shared by the Surehand apps)
 //   ~/.surehand/node/LICENSE                 Node.js license
 //   ~/.surehand/ae/server/surehand-ae.mjs    the single-file server (server/dist)
-// then installer/mac/pkg/scripts/postinstall runs `node surehand-ae.mjs install` (moves a 1.3 ~/.aemcp, extension,
-// config, AI apps).
+// then installer/mac/pkg/scripts/postinstall runs `node surehand-ae.mjs install --clients none` (moves a 1.3 ~/.aemcp,
+// extension, config), and the payload-free step packages of the choices the user ticked on Installation Type connect
+// each AI app, get cloudflared, and write the summary at the top of ~/.surehand/ae/install.log (installer/ai-apps.mjs).
 //
 // Pipeline: build.mjs -> download both Node tarballs (cached in installer/mac/pkg/.cache, checked against the pinned
 // hashes and nodejs.org SHASUMS256.txt) -> lipo -create -> codesign (hardened runtime + node.entitlements) -> smoke
@@ -32,6 +33,8 @@ import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSy
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { macComponents, macDistribution } from "../../installer/ai-apps.mjs";
+import { macPage } from "../../installer/common/frame.mjs";
 
 const NODE_VERSION = "24.22.0"; // Node.js 24 LTS "Krypton"
 const NODE_SHA256 = {
@@ -237,10 +240,15 @@ rmSync(sandboxHome, { recursive: true, force: true });
 log("Building the component package");
 const componentName = `surehand-mcp-${version}-component.pkg`;
 const component = join(BUILD, componentName);
+// its scripts: postinstall (the server's install, no AI apps yet) and the helpers it shares with the steps below
+const mainScripts = join(BUILD, "scripts-main");
+mkdirSync(mainScripts, { recursive: true });
+for (const f of ["postinstall", "common.sh"]) copyFileSync(join(PKG_SRC, "scripts", f), join(mainScripts, f));
+chmodSync(join(mainScripts, "postinstall"), 0o755);
 run("pkgbuild", [
   "--root", payload,
   "--install-location", "/.surehand", // in the home domain this is ~/.surehand
-  "--scripts", join(PKG_SRC, "scripts"),
+  "--scripts", mainScripts,
   "--identifier", PKG_ID,
   "--version", version,
   component,
@@ -268,21 +276,36 @@ rmSync(component);
 run("pkgutil", ["--flatten", expandedComponent, component]);
 rmSync(expandedComponent, { recursive: true, force: true });
 
+// the payload-free steps behind Installation Type's choices (installer/ai-apps.mjs): connect each AI app, get
+// cloudflared, and the summary at the top of install.log. Each one's postinstall is scripts/step with its arguments.
+log("Building the step packages (Installation Type's choices)");
+const stepTemplate = readFileSync(join(PKG_SRC, "scripts", "step"), "utf8");
+const steps = macComponents();
+for (const c of steps) {
+  const dir = join(BUILD, `scripts-${c.choice}`);
+  mkdirSync(dir, { recursive: true });
+  copyFileSync(join(PKG_SRC, "scripts", "common.sh"), join(dir, "common.sh"));
+  writeFileSync(join(dir, "postinstall"), stepTemplate.replace("@STEP_ARGS@", c.args.map((a) => JSON.stringify(a)).join(" ")));
+  chmodSync(join(dir, "postinstall"), 0o755);
+  run("pkgbuild", ["--nopayload", "--scripts", dir, "--install-location", "/.surehand", "--identifier", c.id, "--version", version, join(BUILD, c.file)]);
+}
+
 log("Building the signed product archive");
 const res = join(BUILD, "resources");
 mkdirSync(res, { recursive: true });
-for (const page of ["welcome.html", "conclusion.html"])
-  writeFileSync(join(res, page), readFileSync(join(PKG_SRC, "resources", page), "utf8").replaceAll("@VERSION@", version));
+// welcome/conclusion: this app's page bodies (resources/*.body.html) in the Conform Labs frame (installer/common);
+// the background images come from installer/common/generate-art.mjs
+for (const page of ["welcome", "conclusion"]) writeFileSync(join(res, `${page}.html`), macPage(page, { version }));
 for (const image of ["background-light.tiff", "background-dark.tiff"]) copyFileSync(join(PKG_SRC, "resources", image), join(res, image));
 const dist = join(BUILD, "distribution.xml");
-writeFileSync(dist, readFileSync(join(PKG_SRC, "distribution.xml"), "utf8").replaceAll("@VERSION@", version).replaceAll("@COMPONENT_PKG@", componentName));
+writeFileSync(dist, macDistribution(readFileSync(join(PKG_SRC, "distribution.xml"), "utf8"), { version, componentPkg: componentName }));
 mkdirSync(OUT_DIR, { recursive: true });
 const pkg = join(OUT_DIR, `Surehand-MCP-${version}.pkg`);
 rmSync(pkg, { force: true });
 run("productbuild", ["--distribution", dist, "--resources", res, "--package-path", BUILD, "--sign", INSTALLER_IDENTITY, "--timestamp", pkg]);
 
 // payload sanity: exactly the expected files, with the node binary signed as above
-const files = capture("pkgutil", ["--payload-files", pkg]).trim().split("\n").sort();
+const files = [...new Set(capture("pkgutil", ["--payload-files", pkg]).trim().split("\n"))].sort();
 const expected = [".", "./ae", "./ae/server", "./ae/server/surehand-ae.mjs", "./node", "./node/LICENSE", "./node/bin", "./node/bin/node"];
 if (files.join("\n") !== expected.join("\n")) die(`unexpected payload files:\n${files.join("\n")}`);
 console.log(`payload (relative to ~/.surehand): ${files.filter((f) => f !== ".").join("  ")}`);
@@ -294,6 +317,8 @@ for (const rel of ["node/bin/node", "node/LICENSE", "ae/server/surehand-ae.mjs"]
   if (sha256(join(unpackedRoot, rel)) !== sha256(join(payload, rel))) die(`${rel} differs after unpacking the pkg`);
 run("codesign", ["--verify", "--strict", join(unpackedRoot, "node", "bin", "node")]);
 if (!existsSync(join(unpacked, componentName, "Scripts", "postinstall"))) die("postinstall script missing from the pkg");
+for (const c of steps)
+  for (const f of ["postinstall", "common.sh"]) if (!existsSync(join(unpacked, c.file, "Scripts", f))) die(`${c.file}: ${f} missing from the pkg`);
 rmSync(unpacked, { recursive: true, force: true });
 
 if (flag("--no-notarize")) {

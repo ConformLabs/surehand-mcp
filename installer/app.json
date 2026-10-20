@@ -1,0 +1,12 @@
+{
+  "$comment": "tile (optional): the logo on its own rounded tile, a file or { dark, light }; the installers show it in place of logo. This app's part of the Conform Labs installer frame (installer/common). Paths are relative to the repo root. After changing the logo or accent: node installer/common/generate-art.mjs",
+  "name": "Surehand MCP",
+  "for": "for Adobe® After Effects®",
+  "accent": { "dark": "#3DD68C", "light": "#14874F" },
+  "logo": { "dark": "brand/surehand-mark-reversed.svg", "light": "brand/surehand-mark.svg" },
+  "tile": "brand/surehand-tile.svg",
+  "out": {
+    "windows": "installer/windows/nsis/art",
+    "mac": "installer/mac/pkg/resources"
+  }
+}

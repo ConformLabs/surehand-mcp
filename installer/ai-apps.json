@@ -1,0 +1,31 @@
+{
+  "$comment": "The AI apps Surehand MCP connects to: one list for the server (names), the Windows Setup's Choose AI apps page and the Mac Installer's Installation Type choices (installer/ai-apps.mjs), in this order. id: the server's client id (surehand-ae connect <id>). mac: where the Mac Installer looks for the app (~ is the home folder); the server's own test (server/src/cli/clients.ts clientInstalled) is what Windows uses. web: ChatGPT on the web, which needs cloudflared (optional, never ticked by default).",
+  "apps": [
+    {
+      "id": "claude-desktop",
+      "name": "Claude Desktop",
+      "mac": ["~/Library/Application Support/Claude"]
+    },
+    {
+      "id": "claude-code",
+      "name": "Claude Code",
+      "mac": ["~/.claude.json", "~/.local/bin/claude", "~/.claude/local/claude", "/opt/homebrew/bin/claude", "/usr/local/bin/claude"]
+    },
+    {
+      "id": "cursor",
+      "name": "Cursor",
+      "mac": ["~/.cursor"]
+    },
+    {
+      "id": "codex",
+      "name": "ChatGPT desktop / Codex",
+      "mac": ["~/.codex", "/Applications/ChatGPT.app", "/Applications/Codex.app", "~/Applications/ChatGPT.app", "/opt/homebrew/bin/codex", "/usr/local/bin/codex"]
+    }
+  ],
+  "web": {
+    "id": "chatgpt-web",
+    "name": "ChatGPT (web)",
+    "title": "Set up ChatGPT on the web",
+    "default": false
+  }
+}

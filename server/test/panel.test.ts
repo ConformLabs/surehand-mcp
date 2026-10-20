@@ -561,6 +561,30 @@ describe("Surehand panel: ☰ screens (live findings)", () => {
     cliAnswer = null;
   });
 
+  it("ChatGPT on the web: Install it for me downloads cloudflared, shows a failure, and starts once it is installed", async () => {
+    let install: any = { ok: false, error: "checksum mismatch for cloudflared-darwin-arm64.tgz" };
+    let state: any = { ok: false, state: "needs-tunnel", installCommand: "brew install cloudflared" };
+    cliAnswer = (cmd) => (cmd === "chatgpt --install-tunnel --json" ? install : cmd.startsWith("chatgpt ") ? state : undefined);
+    panel().openScreen("chatgpt");
+    await waitFor(() => buttons("Install it for me").length === 1);
+    // the copy-a-command route stays as the alternative
+    expect(doc().querySelector("#screenBody .urlbox .mono")!.textContent).toBe("brew install cloudflared");
+    let n = cli.length;
+    buttons("Install it for me")[0].click();
+    await waitFor(() => /Could not install cloudflared: checksum mismatch/.test($("screenBody").textContent));
+    expect(after(n)).toEqual(["chatgpt --install-tunnel --json"]);
+    expect((buttons("Install it for me")[0] as any).disabled).toBe(false);
+    install = { ok: true, path: "/Users/x/.surehand/bin/cloudflared", version: "2026.9.3" };
+    state = { ok: true, state: "starting" };
+    n = cli.length;
+    buttons("Install it for me")[0].click();
+    await waitFor(() => after(n).includes("chatgpt --background --json"));
+    expect(after(n)[0]).toBe("chatgpt --install-tunnel --json");
+    await waitFor(() => $("toastText").textContent === "cloudflared is installed.");
+    panel().closeScreen();
+    cliAnswer = null;
+  });
+
   it("Connection test: shows each check's message (known names as a small readable label), a red row with Fix that connects the app", async () => {
     cliAnswer = (cmd) =>
       cmd === "test --json"

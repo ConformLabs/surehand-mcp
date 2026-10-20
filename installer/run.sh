@@ -20,7 +20,7 @@ export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$HOME/.volta/bin:
 
 # Surehand MCP's own entries in ~/.surehand/ae and ~/.aemcp: the same list as OWN_FILES in
 # server/src/cli/uninstall.ts (a test keeps them equal). Everything else there is the user's.
-OWN_FILES="server config.json runtime.json extension-hash bridge-status.json instances update-check.json activity.jsonl tmp renders compat install.log chatgpt.json chatgpt.lock sessions MOVED.txt"
+OWN_FILES="server config.json runtime.json extension-hash bridge-status.json instances update-check.json activity.jsonl tmp renders compat install.log install-result.json chatgpt.json chatgpt.lock sessions MOVED.txt"
 
 # Another Surehand app (~/.surehand/<app>) is installed: the shared Node.js stays for it.
 other_apps() {
@@ -28,7 +28,7 @@ other_apps() {
   for d in "$SUREHAND"/*/; do
     [ -d "$d" ] || continue
     n="$(basename "$d")"
-    case "$n" in ae|node|ffmpeg) ;; *) return 0 ;; esac
+    case "$n" in ae|node|ffmpeg|bin) ;; *) return 0 ;; esac
   done
   return 1
 }
@@ -55,6 +55,21 @@ remove_own() {
   return 0
 }
 
+# ~/.surehand/bin/cloudflared only when Surehand downloaded it: its marker (cloudflared.surehand.json, written by
+# `chatgpt --install-tunnel`) names the file's SHA-256 (server/src/cli/tunnel-install.ts removeOwnCloudflared)
+remove_own_cloudflared() {
+  local bin="$SUREHAND/bin" want have
+  [ -f "$bin/cloudflared.surehand.json" ] || return 0
+  want="$(sed -n 's/.*"sha256": *"\([0-9a-fA-F]*\)".*/\1/p' "$bin/cloudflared.surehand.json" | head -n 1)"
+  if [ -f "$bin/cloudflared" ] && [ -n "$want" ]; then
+    have="$(shasum -a 256 "$bin/cloudflared" | awk '{print $1}')"
+    [ "$have" = "$want" ] && rm -f "$bin/cloudflared"
+  fi
+  [ -e "$bin/cloudflared" ] || rm -f "$bin/cloudflared.surehand.json"
+  rmdir "$bin" 2>/dev/null
+  return 0
+}
+
 node_ok() { [ -x "$1" ] && [ "$("$1" -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)" -ge 18 ]; }
 
 NODE=""
@@ -73,6 +88,7 @@ if [ -z "$NODE" ]; then
     remove_own "$SUREHAND/ae"
     remove_own "$HOME/.aemcp"
     rm -f "$SUREHAND/migration.log"
+    remove_own_cloudflared
     if other_apps; then echo "Kept $PRIVATE_NODE (another Surehand app uses it)."; else rm -rf "$PRIVATE_NODE"; fi
     rmdir "$SUREHAND" 2>/dev/null
     echo "Removed the After Effects extension and Surehand MCP's own files (Node.js not found, so AI app settings were left unchanged)."
