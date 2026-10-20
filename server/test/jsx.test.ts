@@ -271,6 +271,13 @@ describe("strict ES3 parse (what After Effects' engine accepts)", () => {
       await parseES3(`(function(args, log){${src}\n})`);
     }
   });
+  it("localization (collect, build)", async () => {
+    const { COLLECT_JSX, BUILD_JSX } = await import("../src/localize/jsx.js");
+    for (const src of [COLLECT_JSX, BUILD_JSX]) {
+      expect(es3Problems(src)).toEqual([]);
+      await parseES3(`(function(args, log){${src}\n})`);
+    }
+  });
   it("preview tools (frame, contact sheet)", async () => {
     const { RENDER_FRAME_JSX, CONTACT_SHEET_JSX } = await import("../src/tools/core.js");
     await parseES3(`(function(args, log){${RENDER_FRAME_JSX}\n})`);
