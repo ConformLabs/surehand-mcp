@@ -9,7 +9,7 @@ STEP_ARGS=(@STEP_ARGS@)
 . "$(dirname "$0")/common.sh"
 
 if [ "${STEP_ARGS[1]}" = "--summary" ]; then
-  SUMMARY="$(mktemp -t surehand-summary)" || exit 0
+  SUMMARY="$(mktemp "${TMPDIR:-/tmp}/surehand-summary.XXXXXX")" || exit 0
   # the summary is not in the log yet: run it on its own, then put it first
   if "${AS_USER[@]+"${AS_USER[@]}"}" /usr/bin/env PATH="$PATH" HOME="$TARGET_HOME" AEMCP_NO_UPDATE_CHECK=1 \
     /usr/bin/perl -e 'alarm shift; exec @ARGV or die "exec: $!"' 60 "$NODE" "$SERVER" install --summary </dev/null >"$SUMMARY" 2>&1; then
