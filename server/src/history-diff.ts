@@ -1,5 +1,8 @@
 // Project history: the canonical project snapshot (built from the lines tools/history.ts's ExtendScript
-// returns) and the diff of two snapshots as a readable, grouped change list.
+// returns) and the diff of two snapshots as a readable, grouped change list (plus the same changes as
+// structured rows for the in-chat view).
+import { splitChange, splitField } from "./view-changes.js";
+import type { ViewChange } from "./views/types.js";
 
 export interface Key { t: number; v?: unknown; ip?: string; e?: string; f?: string; tan?: unknown; lb?: number }
 /** A property that is not at its default, is animated or has an expression (keyed by match-name path). */
@@ -184,7 +187,12 @@ export function diffKeys(a: Key[] = [], b: Key[] = [], max = 4): string[] {
 // ---------- diff ----------
 
 export type Counts = Record<string, number>;
-interface Section { title: string; comp?: Item; lines: string[] }
+/** lines: the text; changes: the same changes as structured rows for the in-chat view (never in the text) */
+interface Section { title: string; comp?: Item; lines: string[]; changes: ViewChange[] }
+/** a change of the layer being diffed, for the view (diffComp adds the comp and layer) */
+type Rec = (c: Omit<ViewChange, "comp" | "layer" | "layerIndex">) => void;
+/** "ADBE Transform Group/..." display path's parent as the view shows it: "Transform › ..." */
+const viewPath = (p: string) => (parentOf(p) ? { path: parentOf(p).split("/").join(" › ") } : {});
 export interface DiffResult { counts: Counts; sections: Section[]; notes: string[] }
 
 /** Indices (into seq) of a longest increasing subsequence: everything else "moved". */
@@ -211,7 +219,7 @@ type Inc = (k: string, n?: number) => void;
 /** A property's static value; undefined = at its default (not stored, or AE says it is at its default). */
 const staticValue = (p?: Prop) => (!p || p.vd ? undefined : p.v);
 
-function diffLayer(la: Layer, lb: Layer, name: string, inc: Inc, out: string[]) {
+function diffLayer(la: Layer, lb: Layer, name: string, inc: Inc, out: string[], rec: Rec) {
   const ga = la.groups;
   // groups renamed in place (same match name and position under the same parent): compare their contents
   const renames: [string, string][] = [];
@@ -222,6 +230,7 @@ function diffLayer(la: Layer, lb: Layer, name: string, inc: Inc, out: string[]) 
     if (!r) continue;
     renames.push([kb, r]);
     out.push(`~ ${name} > ${ga[r].path}: renamed ${q(lastSeg(ga[r].path))} -> ${q(lastSeg(g.path))}`);
+    rec({ op: "~", ...viewPath(ga[r].path), what: "Renamed", from: lastSeg(ga[r].path), to: lastSeg(g.path) });
     inc("groups renamed");
   }
   const gb: Record<string, Group> = {}, pb: Record<string, Prop> = {};
@@ -233,16 +242,19 @@ function diffLayer(la: Layer, lb: Layer, name: string, inc: Inc, out: string[]) 
   for (const k of outer(added)) {
     const inside = Object.keys(pb).filter((p) => p.startsWith(k + "/")).slice(0, 4).map((p) => `${lastSeg(pb[p].path)} ${pb[p].k ? `${pb[p].k!.length} keyframes` : fmt(pb[p].v, 30)}`);
     out.push(`+ ${name} > ${gb[k].path} (${gb[k].match})${inside.length ? `: ${inside.join(", ")}` : ""}`);
+    rec({ op: "+", ...viewPath(gb[k].path), what: `${lastSeg(gb[k].path)} added` });
     inc(`${kind(k)}s added`);
   }
   for (const k of outer(removed)) {
     out.push(`- ${name} > ${ga[k].path}`);
+    rec({ op: "-", ...viewPath(ga[k].path), what: `${lastSeg(ga[k].path)} removed` });
     inc(`${kind(k)}s removed`);
   }
   const common = Object.keys(gb).filter((k) => ga[k]);
   for (const k of common) {
     if ((ga[k].on ?? true) === (gb[k].on ?? true)) continue;
     out.push(`~ ${name} > ${gb[k].path}: turned ${gb[k].on === false ? "off" : "on"}`);
+    rec({ op: "~", ...viewPath(gb[k].path), what: `${lastSeg(gb[k].path)} turned ${gb[k].on === false ? "off" : "on"}` });
     inc("groups switched");
   }
   // mask settings (snapshots from before they were recorded have none: not compared)
@@ -252,6 +264,7 @@ function diffLayer(la: Layer, lb: Layer, name: string, inc: Inc, out: string[]) 
     const d = Object.keys(MASK_FIELDS).filter((f) => !same(a[f], b[f])).map((f) => `${MASK_FIELDS[f]} ${maskShow(a[f])} -> ${maskShow(b[f])}`);
     if (!d.length) continue;
     out.push(`~ ${name} > ${gb[k].path}: ${d.join("; ")}`);
+    rec({ op: "~", ...viewPath(gb[k].path), what: `${lastSeg(gb[k].path)}: ${d.join("; ")}` });
     inc("masks changed");
   }
   // stacking order of the children that exist on both sides, per parent
@@ -261,6 +274,7 @@ function diffLayer(la: Layer, lb: Layer, name: string, inc: Inc, out: string[]) 
     if (!moved) continue;
     const list = (s: Record<string, Group>) => [...kids].sort((x, y) => s[x].i - s[y].i).slice(0, 8).map((k) => lastSeg(s[k].path)).join(", ");
     out.push(`~ ${name} > ${parentOf(gb[kids[0]].path)}: reordered (${list(ga)} -> ${list(gb)})`);
+    rec({ op: "~", ...viewPath(gb[kids[0]].path), what: "Reordered", from: list(ga), to: list(gb) });
     inc(p === "ADBE Effect Parade" ? "effects reordered" : "groups reordered", moved);
   }
   // property values, keyframes, expressions (not inside a group that was added or removed)
@@ -296,14 +310,22 @@ function diffLayer(la: Layer, lb: Layer, name: string, inc: Inc, out: string[]) 
     if (toggled) parts.push(`expression ${b?.xoff ? "disabled" : "enabled"}`);
     if (xa !== xb || toggled) inc("expressions changed");
     if (parts.length) out.push(`~ ${name} > ${(b ?? a).path}: ${parts.join("; ")}`, ...extra.map((l) => `      ${l}`));
+    if (parts.length) {
+      // a plain value change: its two sides, so the view can strike the old one through
+      const path = (b ?? a).path, one = parts.length === 1 && !(a?.k || b?.k) && xa === xb && !toggled ? splitChange(parts[0]) : null;
+      rec({ op: "~", ...viewPath(path), ...(one ? { what: lastSeg(path), ...one } : { what: `${lastSeg(path)}: ${parts.join("; ")}` }) });
+    }
   }
 }
 
-function diffComp(a: Item, b: Item, inc: Inc, out: string[]) {
+function diffComp(a: Item, b: Item, inc: Inc, out: string[], changes: ViewChange[]) {
   const A = a.layers!, B = b.layers!;
   const line = (L: Layer, op: string) => `${op} layer #${L.index} ${q(L.name)} (${L.type})`;
-  for (const L of Object.values(B).sort((x, y) => x.index - y.index)) if (!A[L.key]) out.push(line(L, "+")), inc("layers added");
-  for (const L of Object.values(A).sort((x, y) => x.index - y.index)) if (!B[L.key]) out.push(line(L, "-")), inc("layers removed");
+  const at = (L: Layer) => ({ comp: b.name, layer: L.name, layerIndex: L.index });
+  for (const L of Object.values(B).sort((x, y) => x.index - y.index))
+    if (!A[L.key]) out.push(line(L, "+")), inc("layers added"), changes.push({ op: "+", ...at(L), what: `${L.name} added (${L.type})` });
+  for (const L of Object.values(A).sort((x, y) => x.index - y.index))
+    if (!B[L.key]) out.push(line(L, "-")), inc("layers removed"), changes.push({ op: "-", comp: b.name, layer: L.name, what: `${L.name} removed (layer ${L.index})` });
   const common = Object.keys(B).filter((k) => A[k]).sort((x, y) => A[x].index - A[y].index);
   const keep = lis(common.map((k) => B[k].index));
   common.forEach((k, i) => {
@@ -313,11 +335,16 @@ function diffComp(a: Item, b: Item, inc: Inc, out: string[]) {
     // parent / track matte are layer keys: shown by name
     const attrs = fieldDiff(la.attrs, lb.attrs, 99, (v, s) => (typeof v === "string" && [A, B][s][v] ? q([A, B][s][v].name) : fmt(v)));
     if (attrs.length) inc("layers changed");
-    if (d.length + attrs.length) out.push(`~ layer #${lb.index} ${q(lb.name)}: ${[...d, ...attrs].join("; ")}`);
-    diffLayer(la, lb, lb.name, inc, out);
+    if (d.length + attrs.length) {
+      out.push(`~ layer #${lb.index} ${q(lb.name)}: ${[...d, ...attrs].join("; ")}`);
+      const one =
+        !d.length && attrs.length === 1 ? splitField(attrs[0]) : d.length === 1 && !attrs.length && la.name !== lb.name ? { what: "Renamed", from: la.name, to: lb.name } : null;
+      changes.push({ op: "~", ...at(lb), ...(one ?? { what: [...d, ...attrs].join("; ") }) });
+    }
+    diffLayer(la, lb, lb.name, inc, out, (c) => changes.push({ ...c, ...at(lb) }));
   });
   const md = diffKeys(a.markers, b.markers, 8);
-  if (md.length) out.push(`~ comp markers: ${md.join("; ")}`), inc("marker changes");
+  if (md.length) out.push(`~ comp markers: ${md.join("; ")}`), inc("marker changes"), changes.push({ op: "~", comp: b.name, what: `Comp markers: ${md.join("; ")}` });
 }
 
 function itemLine(it: Item): string {
@@ -339,48 +366,56 @@ function rqFields(r: Record<string, any>) {
 export function diffSnapshots(a: Snapshot, b: Snapshot): DiffResult {
   const counts: Counts = {}, sections: Section[] = [], notes: string[] = [];
   const inc: Inc = (k, n = 1) => void (counts[k] = (counts[k] ?? 0) + n);
-  const section = (title: string, lines: string[], comp?: Item) => lines.length && sections.push({ title, lines, comp });
+  const section = (title: string, lines: string[], changes: ViewChange[], comp?: Item) => lines.length && sections.push({ title, lines, changes, comp });
 
-  const ps = fieldDiff(a.settings, b.settings).map((l) => `~ ${l}`);
+  const pd = fieldDiff(a.settings, b.settings), ps = pd.map((l) => `~ ${l}`);
   if (ps.length) inc("project settings changed", ps.length);
-  section("Project settings", ps);
+  section("Project settings", ps, pd.map((l): ViewChange => ({ op: "~", ...(splitField(l) ?? { what: l }) })));
 
-  const items: string[] = [], skipped: string[] = [], comps: [Item, Item][] = [];
+  const items: string[] = [], itemChanges: ViewChange[] = [], skipped: string[] = [], comps: [Item, Item][] = [];
   for (const id of union(a.items, b.items).sort((x, y) => +x - +y)) {
     const o = a.items[id], it = b.items[id];
     if (!o || !it) {
-      items.push(`${o ? "-" : "+"} ${itemLine(o ?? it)}`);
-      inc(`${(o ?? it).type}s ${o ? "removed" : "added"}`);
+      const x = o ?? it;
+      items.push(`${o ? "-" : "+"} ${itemLine(x)}`);
+      // a removed comp can't be shown in After Effects
+      itemChanges.push({ op: o ? "-" : "+", ...(x.type === "comp" && !o ? { comp: x.name } : {}), what: `${x.type} ${x.name} ${o ? "removed" : "added"}` });
+      inc(`${x.type}s ${o ? "removed" : "added"}`);
       continue;
     }
     const d = o.name !== it.name ? [`renamed from ${q(o.name)}`] : [];
     if (o.folder !== it.folder) d.push(`moved to folder ${q(it.folder || "(root)")} (was ${q(o.folder || "(root)")})`);
     d.push(...fieldDiff(o.fields, it.fields));
-    if (d.length) items.push(`~ ${it.type} ${q(it.name)}: ${d.join("; ")}`), inc(`${it.type}s ${o.name !== it.name ? "renamed" : "changed"}`);
+    if (d.length) {
+      items.push(`~ ${it.type} ${q(it.name)}: ${d.join("; ")}`), inc(`${it.type}s ${o.name !== it.name ? "renamed" : "changed"}`);
+      const one = d.length === 1 ? splitField(d[0]) : null;
+      itemChanges.push({ op: "~", ...(it.type === "comp" ? { comp: it.name } : {}), ...(one ?? { what: `${it.type} ${it.name}: ${d.join("; ")}` }) });
+    }
     if (it.type !== "comp") continue;
     if (o.layers && it.layers && !o.partial && !it.partial) comps.push([o, it]);
     else skipped.push(q(it.name));
   }
-  section("Project items", items);
+  section("Project items", items, itemChanges);
   for (const [o, it] of comps) {
-    const lines: string[] = [];
-    diffComp(o, it, inc, lines);
-    section(`Comp ${q(it.name)} (id ${it.id})`, lines, it);
+    const lines: string[] = [], changes: ViewChange[] = [];
+    diffComp(o, it, inc, lines, changes);
+    section(`Comp ${q(it.name)} (id ${it.id})`, lines, changes, it);
   }
   if (skipped.length)
     notes.push(`Layers not compared in ${skipped.length} comp${skipped.length > 1 ? "s" : ""} (not captured in both snapshots: limited with comps, or the time budget ran out): ${skipped.slice(0, 10).join(", ")}${skipped.length > 10 ? ", ..." : ""}`);
 
-  const rq: string[] = [];
+  const rq: string[] = [], rqChanges: ViewChange[] = [];
   for (const k of union(a.rq, b.rq)) {
     const o = a.rq[k], r = b.rq[k], name = `#${(r ?? o).index} ${q((r ?? o).compName)}`;
     const d = o && r ? fieldDiff(rqFields(o), rqFields(r)) : [];
-    if (!o || !r) rq.push(`${o ? "-" : "+"} ${name}`);
-    else if (d.length) rq.push(`~ ${name}: ${d.join("; ")}`);
+    const what = `Render queue item ${(r ?? o).index} (${(r ?? o).compName})`;
+    if (!o || !r) rq.push(`${o ? "-" : "+"} ${name}`), rqChanges.push({ op: o ? "-" : "+", what: `${what} ${o ? "removed" : "added"}` });
+    else if (d.length) rq.push(`~ ${name}: ${d.join("; ")}`), rqChanges.push({ op: "~", what: `${what}: ${d.join("; ")}` });
   }
   if (rq.length) inc("render queue changes", rq.length);
   const notRead = Math.max(a.stats?.rqNotRead ?? 0, b.stats?.rqNotRead ?? 0);
   if (notRead) notes.push(`Only the first 50 render queue items were read; the other ${notRead} were not compared.`);
-  section("Render queue", rq);
+  section("Render queue", rq, rqChanges);
   return { counts, sections, notes };
 }
 

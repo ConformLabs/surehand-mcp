@@ -309,7 +309,24 @@ function findLayer(m: Model, spec: LayerSpec, own: Target, parentGuard = false):
   return { ok: { comp, layer } };
 }
 
-function expressionSection(m: Model) {
+/**
+ * One expression link the in-chat view lists (never in the text): a fragile link (code from LEGEND), a link by name
+ * (breaks on rename), a broken link, or an expression error, where it is and the expression's source.
+ */
+export interface XLink {
+  comp: XComp;
+  layer: XLayer;
+  prop: string;
+  src: string;
+  kind: "fragile" | "name" | "broken" | "error";
+  /** the reference as written (`thisComp.layer("Logo")`), the LEGEND code, the name used, what it points at / why it's broken */
+  ref?: string;
+  why?: string;
+  name?: string;
+  target?: string;
+}
+
+function expressionSection(m: Model, sink?: (l: XLink) => void) {
   let total = 0, disabled = 0, cutShort = 0, unparsed = 0, unparsedAt: string | undefined;
   const errors: { at: string; error: string }[] = [];
   const broken: { at: string; ref: string; problem: string }[] = [];
@@ -326,7 +343,7 @@ function expressionSection(m: Model) {
     if (!enabled) disabled++;
     if (cut) cutShort++;
     const at = m.at(c, l, prop), from = m.at(c, l), own = { comp: c, layer: l };
-    if (err && enabled) errors.push({ at, error: err.length > 200 ? err.slice(0, 197) + "..." : err });
+    if (err && enabled) errors.push({ at, error: err.length > 200 ? err.slice(0, 197) + "..." : err }), sink?.({ comp: c, layer: l, prop, src, kind: "error", target: err });
     let parsed: ReturnType<typeof parseExpression>;
     try {
       parsed = parseExpression(src);
@@ -339,14 +356,16 @@ function expressionSection(m: Model) {
     const seen = new Set<string>();
     const once = (key: string) => !seen.has(key) && !!seen.add(key);
     const flag = (ref: ExprRef, why: string, now?: string) => {
-      if (once(why + ref.text)) (counts[why] = (counts[why] ?? 0) + 1), fragile.push({ at, ref: ref.text, why, now });
+      if (once(why + ref.text)) (counts[why] = (counts[why] ?? 0) + 1), fragile.push({ at, ref: ref.text, why, now }), sink?.({ comp: c, layer: l, prop, src, kind: "fragile", ref: ref.text, why, target: now });
     };
     const bad = (ref: ExprRef, problem?: string) => {
-      if (problem && once(problem + ref.text)) broken.push({ at, ref: ref.text, problem });
+      if (problem && once(problem + ref.text)) broken.push({ at, ref: ref.text, problem }), sink?.({ comp: c, layer: l, prop, src, kind: "broken", ref: ref.text, target: problem });
     };
-    const byName = (key: string, target: string) => {
+    // `ref` and `name` only for the in-chat view (sink)
+    const byName = (key: string, target: string, ref?: ExprRef, name?: string) => {
       const e = named.get(key) ?? { target, refs: 0, from: new Set<string>() };
       named.set(key, { ...e, refs: e.refs + 1, from: e.from.add(from) });
+      if (ref && once("name" + ref.text)) sink?.({ comp: c, layer: l, prop, src, kind: "name", ref: ref.text, name, target });
     };
     const link = (t: Target, via: string) => {
       if (t.comp === c && t.layer === l) return;
@@ -363,14 +382,14 @@ function expressionSection(m: Model) {
         const f = ref.item.by === "name" ? m.footageByName.get(ref.item.v) : undefined;
         if (ref.item.by !== "name") flag(ref, "dynamic");
         else if (!f) bad(ref, `no footage item named ${q(ref.item.v)}`);
-        else byName(`f${f[0].id}`, `footage ${q(f[0].name)}`);
+        else byName(`f${f[0].id}`, `footage ${q(f[0].name)}`, ref, f[0].name);
       } else if (ref.kind === "comp") {
         const r = findComp(m, ref.comp, own);
         bad(ref, r.broken);
         if (ref.comp.k === "sel" && ref.comp.sel.by !== "name") flag(ref, "dynamic");
         if (!r.ok) continue;
         compRefs.add(r.ok.id);
-        if (r.ok !== c) byName(`c${r.ok.id}`, `comp ${q(r.ok.name)}`);
+        if (r.ok !== c) byName(`c${r.ok.id}`, `comp ${q(r.ok.name)}`, ref, r.ok.name);
         const dup = m.compsByName.get(r.ok.name)!.length;
         if (dup > 1) bad(ref, `${dup} comps are named ${q(r.ok.name)}: the expression uses the first one`);
       } else if (ref.kind === "layer" || ref.kind === "parent") {
@@ -379,7 +398,7 @@ function expressionSection(m: Model) {
         if (ref.kind === "layer" && s !== "this") {
           if (s.by === "index") flag(ref, "index", t?.layer.n);
           else if (s.by !== "name") flag(ref, s.by);
-          else if (t) byName(`l${t.comp.id}:${t.layer.id}`, `layer ${q(t.layer.n)} in ${q(t.comp.name)}`);
+          else if (t) byName(`l${t.comp.id}:${t.layer.id}`, `layer ${q(t.layer.n)} in ${q(t.comp.name)}`, ref, t.layer.n);
         }
         if (t) link(t, ref.kind);
       } else if (ref.kind === "effect" || ref.kind === "param") {
@@ -392,7 +411,7 @@ function expressionSection(m: Model) {
           if (t) link(t, `effect ${q(s.v)}`);
           if (t && !fx && !looksLikeMatchName(s.v)) bad(ref, `no effect named ${q(s.v)} on layer ${q(t.layer.n)}`);
           if (t && fx && fx.m !== s.v) {
-            byName(`e${t.comp.id}:${t.layer.id}:${fx.n}`, `effect ${q(fx.n)} on ${q(t.layer.n)} in ${q(t.comp.name)}`);
+            byName(`e${t.comp.id}:${t.layer.id}:${fx.n}`, `effect ${q(fx.n)} on ${q(t.layer.n)} in ${q(t.comp.name)}`, ref, fx.n);
             if (fx.d) flag(ref, "effectDefaultName", fx.m);
           }
         } else {
@@ -572,6 +591,14 @@ function weightSection(m: Model) {
   };
 }
 
+/** Every expression link and error the in-chat view lists, with what LEGEND says about each fragile code. */
+export function xrayLinks(d: XData): XLink[] {
+  const out: XLink[] = [];
+  expressionSection(new Model(d, Infinity), (l) => out.push(l));
+  return out;
+}
+export const FRAGILE_LEGEND = LEGEND;
+
 // ---------- report ----------
 
 export function analyzeXray(d: XData, opts: { limit?: number } = {}) {
@@ -612,7 +639,9 @@ export function xraySummary(r: ReturnType<typeof analyzeXray>): string {
   }
   if (mi) {
     const fonts = "missingOrSubstituted" in mi.fonts ? `${n("missing.fonts", mi.fonts.missingOrSubstituted)} fonts` : "fonts not checked";
-    out.push(`missing: ${n("missing.effects", mi.effects)} effects, ${n("missing.footage", mi.footage)} footage, ${fonts}`);
+    // placeholders (stand-ins for footage: they render as color bars) are counted apart from missing footage
+    const ph = n("missing.placeholders", mi.placeholders);
+    out.push(`missing: ${n("missing.effects", mi.effects)} effects, ${n("missing.footage", mi.footage)} footage, ${fonts}${ph ? `; ${ph} placeholder${ph === 1 ? "" : "s"} instead of footage` : ""}`);
   }
   if (r.weight) out.push(`${n("weight.heavyEffects", r.weight.heavyEffects)} heavy effect types`);
   return out.join("; ") + (r.partial ? `. PARTIAL: ${r.partial.reason}.` : ".");

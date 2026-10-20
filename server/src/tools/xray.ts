@@ -4,7 +4,9 @@
 // (xray-analyze.ts, xray-expr.ts).
 import { z } from "zod";
 import type { JsxTool } from "./registry.js";
+import { XRAY_VIEW_URI } from "../views/types.js";
 import { formatXray, SECTIONS, type XData } from "./xray-analyze.js";
+import { xrayView } from "./xray-view.js";
 
 export const XRAY_JSX = `
 var P = app.project, t0 = new Date().getTime();
@@ -215,5 +217,7 @@ export const xrayTools: JsxTool[] = [
     timeoutMs: 720_000,
     jsx: XRAY_JSX,
     format: (result, args) => formatXray((typeof result === "string" ? JSON.parse(result) : result) as XData, { limit: args.limit as number | undefined }),
+    // the "Project X-ray" in-chat view: the tree and its problems (the text above stays the report)
+    view: { uri: XRAY_VIEW_URI, data: (result) => xrayView(result) },
   },
 ];

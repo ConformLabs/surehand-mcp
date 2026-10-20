@@ -44,6 +44,21 @@ export const CORE_TOOLS = new Set([
   "ae_call",
 ]);
 
+/**
+ * Tools with an in-chat view (MCP Apps). A view only shows when the AI app calls the tool itself, not through
+ * ae_call, so where the AI app shows views (it says so at initialize) these join the core set. That costs
+ * about 1,750 tokens of tool definitions per chat (ae_preflight ~650, ae_project_xray ~500, ae_project_history
+ * ~600: their tools/list JSON / 4); the two app-only tools are hidden from the AI by the AI app. AI apps without
+ * views keep today's core set. ae_prove_identical is core already.
+ */
+export const VIEW_TOOLS = new Set(["ae_preflight", "ae_project_xray", "ae_project_history"]);
+
+/** A tool only the in-chat views call (`_meta.ui.visibility: ["app"]`): never shown to the AI, never in ae_tools / ae_call. */
+export function isAppOnly(config: { _meta?: Record<string, any> } | undefined): boolean {
+  const v = config?._meta?.ui?.visibility;
+  return Array.isArray(v) && v.length > 0 && v.every((x) => x === "app");
+}
+
 export interface ToolProfile {
   name: "core" | "full" | "custom";
   allows(tool: string): boolean;
@@ -109,11 +124,34 @@ export function applyProfile(server: McpServer, profile: ToolProfile): Map<strin
         });
       }
     };
-    const direct = profile.allows(name);
-    catalog.set(name, { name, config, run: wrapped, direct });
-    return direct ? original(name, config, wrapped) : undefined;
+    const direct = profile.allows(name), appOnly = isAppOnly(config);
+    // registered but off until the AI app says it shows views (enableViewTools): app-only tools, and the
+    // tools with a view that this profile leaves out
+    const gated = appOnly || (!direct && VIEW_TOOLS.has(name));
+    if (!appOnly) catalog.set(name, { name, config, run: wrapped, direct });
+    if (!direct && !gated) return undefined;
+    const tool = original(name, config, wrapped);
+    if (gated && tool) {
+      tool.disable();
+      if (!viewGated.has(server)) viewGated.set(server, []);
+      viewGated.get(server)!.push({ name, tool });
+    }
+    return tool;
   };
+  viewCatalogs.set(server, catalog);
   return catalog;
+}
+
+const viewGated = new WeakMap<McpServer, { name: string; tool: { enable(): void; enabled: boolean } }[]>();
+const viewCatalogs = new WeakMap<McpServer, Map<string, CatalogEntry>>();
+
+/** The AI app shows in-chat views: turn on the app-only tools and the tools with a view (once). */
+export function enableViewTools(server: McpServer) {
+  for (const g of viewGated.get(server) ?? []) {
+    if (!g.tool.enabled) g.tool.enable();
+    const entry = viewCatalogs.get(server)?.get(g.name);
+    if (entry) entry.direct = true;
+  }
 }
 
 /** Tool categories for ae_tools (anything not listed falls under "other"). */

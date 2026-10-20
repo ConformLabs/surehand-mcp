@@ -176,6 +176,11 @@ export interface Finding {
   where?: string;
   /** a short suggestion of how to fix it */
   fix?: string;
+  // for the in-chat view only (never in the text report): comp pixels [x0, y0, x1, y1]
+  /** the layer's measured bounds at the finding's first frame */
+  box?: [number, number, number, number];
+  /** the safe area it must stay in */
+  area?: { name: "title" | "action" | "frame"; rect: [number, number, number, number] };
 }
 
 /**

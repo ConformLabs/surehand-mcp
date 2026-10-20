@@ -822,7 +822,7 @@ aemcp = (function () {
             var ena = cut1 < 0 ? gsa : gsa.substr(0, cut1), enb = cut2 < 0 ? gsb : gsb.substr(0, cut2);
             if (ena !== enb) gd.push("enabled " + ena + " -> " + enb);
             if (cut1 >= 0 && cut2 >= 0) gd = gd.concat(maskDiff(gsa.substr(cut1 + 1), gsb.substr(cut2 + 1)));
-            if (gd.length) add(ch.props, ["~", lname, gp, gd.join("; ")]);
+            if (gd.length) add(ch.props, ["~", lname, gp, gd.join("; "), cb.name]);
           }
         }
         for (var gq in la.groups) if (la.groups.hasOwnProperty(gq) && lb.groups[gq] === undefined) removedG.push(gq);
@@ -837,8 +837,8 @@ aemcp = (function () {
           return keep;
         };
         addedG = outermost(addedG); removedG = outermost(removedG);
-        for (var ga = 0; ga < addedG.length; ga++) add(ch.props, ["+", lname, addedG[ga]]);
-        for (var gr = 0; gr < removedG.length; gr++) add(ch.props, ["-", lname, removedG[gr]]);
+        for (var ga = 0; ga < addedG.length; ga++) add(ch.props, ["+", lname, addedG[ga], null, cb.name]);
+        for (var gr = 0; gr < removedG.length; gr++) add(ch.props, ["-", lname, removedG[gr], null, cb.name]);
         for (var pp in lb.props) {
           if (!lb.props.hasOwnProperty(pp)) continue;
           var sb = lb.props[pp], sa = la.props[pp];
@@ -850,7 +850,7 @@ aemcp = (function () {
           var ea = pa.slice(2).join(PSEP), eb = pb.slice(2).join(PSEP);
           if (ea !== eb) parts.push(!ea ? "expression added" : (!eb ? "expression removed" : "expression changed"));
           if (!parts.length) parts.push("changed");
-          add(ch.props, ["~", lname, pp, parts.join(", ")]);
+          add(ch.props, ["~", lname, pp, parts.join(", "), cb.name]);
         }
       }
       for (var k2 in ca.layers) if (ca.layers.hasOwnProperty(k2) && !cb.layers[k2]) add(ch.layers, ["-", cb.name, raw(ca.layers[k2].sig.split(SEP)[0])]);

@@ -358,3 +358,16 @@ describe("Conform Labs style: status words, glyphs and texts", () => {
     expect(UI.feedItems([entry], { current: { ...here, revision: 813 }, undone: { [UI.entryKey(entry)]: true } })[0].undoBlocked).toBe(false);
   });
 });
+
+describe("the in-chat views' tools in the feed", () => {
+  it("are named readably and count as looking, not changing", () => {
+    const reveal = UI.describeEntry({ at: "2026-10-20T01:00:00Z", ok: true, tool: "ae_view_reveal", args: { comp: 12, time: 12.4, layer: 3 }, summary: 'Showed "Main" at 00:00:12:10 (12.4 s), layer "LT_Name" selected.' });
+    expect(reveal).toMatchObject({ kind: "read", title: "Show in After Effects", undoable: false });
+    const frame = UI.describeEntry({ at: "2026-10-20T01:00:00Z", ok: true, tool: "ae_view_frame", args: { comp: 12, time: 12.4 }, summary: 'Frame of "Main" at 12.4 s (480x270).' });
+    expect(frame).toMatchObject({ kind: "read", title: "Frame for the chat" });
+    const proof = UI.describeEntry({ at: "2026-10-20T01:00:00Z", ok: true, tool: "ae_view_proof_frame", args: { id: "p", compared: "c", comp: 7, index: 3 }, summary: 'Before, after and difference ×50 of "Endcard" at 26.48 s (320x180).' });
+    expect(proof).toMatchObject({ kind: "read", title: "Proof frames for the chat" });
+    const node = UI.describeEntry({ at: "2026-10-20T01:00:00Z", ok: true, tool: "ae_view_xray_node", args: { run: "r", node: "c3" }, summary: "Endcard: 2 children, 4 problems." });
+    expect(node).toMatchObject({ kind: "read", title: "X-ray details for the chat" });
+  });
+});

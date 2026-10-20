@@ -105,6 +105,8 @@
     ae_status: "Check connection", ae_preflight: "Preflight", ae_prove_identical: "Prove identical", ae_checkpoint: "Checkpoint",
     ae_render_background: "Background render", ae_render_jobs: "Render jobs", ae_project_xray: "Project X-ray",
     ae_project_history: "Project history", ae_get_scripting_guide: "Read the scripting guide", ae_tools: "List tools", ae_call: "Tool",
+    // called by the in-chat views (MCP Apps), not the AI: navigation and looking only
+    ae_view_reveal: "Show in After Effects", ae_view_frame: "Frame for the chat", ae_view_proof_frame: "Proof frames for the chat", ae_view_xray_node: "X-ray details for the chat",
   };
   function toolName(tool, args) {
     if (tool === "ae_call" && args && args.tool) return toolName(String(args.tool), args.args);
@@ -113,7 +115,7 @@
     if (target && /^(Read|Measure|Preview)/.test(n)) n += " " + target;
     return n;
   }
-  var READ_TOOL = /^ae_(get_|list_|find_|render_frame|render_contact_sheet|status|sample_|project_xray|project_history|tools|check_expression|system_info|project_health)/;
+  var READ_TOOL = /^ae_(get_|list_|find_|view_|render_frame|render_contact_sheet|status|sample_|project_xray|project_history|tools|check_expression|system_info|project_health)/;
 
   function plural(n, one, many) { return n + " " + (n === 1 ? one : many || one + "s"); }
 

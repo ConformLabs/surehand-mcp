@@ -10,6 +10,7 @@ import { registerHistoryTools } from "./tools/history.js";
 import { registerPreflightTools } from "./tools/preflight.js";
 import { registerFileTools } from "./tools/files.js";
 import { registerOnDemandTools } from "./tools/ondemand.js";
+import { registerViews, watchViewClient } from "./tools/views.js";
 import { registerJsxTools } from "./tools/registry.js";
 import { ALL_JSX_TOOLS } from "./tools/all.js";
 import { applyProfile, resolveProfile, type ToolProfile } from "./tools/profile.js";
@@ -33,6 +34,7 @@ export function createMcpServer(profile: ToolProfile = resolveProfile()): McpSer
   registerHistoryTools(server);
   registerPreflightTools(server);
   registerFileTools(server);
+  registerViews(server); // in-chat views and their app-only tools (on only where the AI app shows views)
   server.registerResource(
     "extendscript-cheatsheet",
     "aemcp://docs/extendscript",
@@ -51,6 +53,7 @@ export function createMcpServer(profile: ToolProfile = resolveProfile()): McpSer
     async () => ({ content: [{ type: "text", text: EXTENDSCRIPT_DOC }] }),
   );
   registerOnDemandTools(server, catalog); // last: the catalog is complete by now
+  watchViewClient(server);
   server.registerPrompt(
     "after-effects-assistant",
     { title: "After Effects assistant", description: "Primes the model with how to work with this server." },

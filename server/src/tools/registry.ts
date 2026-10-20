@@ -5,6 +5,7 @@ import { BridgeError } from "../bridge.js";
 import { loadConfig } from "../config.js";
 import { formatChanges, runJsx, type RunResult } from "../jsx.js";
 import { approvalSummary, isWriteAccessError, permissions, READ_ONLY_REFUSAL, WRITE_ACCESS_HINT } from "../permissions.js";
+import { VIEW_ERROR_KEY, VIEW_META_KEY } from "../views/types.js";
 
 export interface JsxTool {
   name: string;
@@ -30,6 +31,8 @@ export interface JsxTool {
   timeoutMs?: number;
   /** Turns the JSX result into the tool's text (analysis done in TypeScript). */
   format?: (result: unknown, args: Record<string, unknown>) => string;
+  /** The tool's in-chat view (MCP Apps): its ui:// resource, and the view's data from the JSX result (in _meta, beside the unchanged text). */
+  view?: { uri: string; data: (result: unknown, args: Record<string, unknown>) => unknown };
 }
 
 // ---- shared argument schemas ----
@@ -120,6 +123,8 @@ export function registerJsxTools(server: McpServer, tools: JsxTool[]) {
         description: t.description,
         inputSchema: t.input,
         annotations: jsxAnnotations(t),
+        // the MCP Apps keys (as the ext-apps SDK's registerAppTool writes them)
+        ...(t.view ? { _meta: { ui: { resourceUri: t.view.uri }, "ui/resourceUri": t.view.uri } } : {}),
       },
       async (args: Record<string, unknown>) => {
         try {
@@ -134,10 +139,21 @@ export function registerJsxTools(server: McpServer, tools: JsxTool[]) {
             report: wantsReport ? reportScope(args) : undefined,
             bridge: edits && perm.mode === "ask" ? { approval: { tool: t.title, summary: approvalSummary(t.name, args) } } : undefined,
           });
+          const raw = r.result;
           if (r.ok && t.format) r.result = applyFormat(t.format, r.result, args);
-          return formatResult(r);
+          const out = formatResult(r);
+          if (r.ok && t.view) {
+            // a view that can't be built leaves the text result as it is
+            try {
+              out._meta = { [VIEW_META_KEY]: t.view.data(raw, args) };
+            } catch {}
+          }
+          return out;
         } catch (e) {
-          return errorResult(e);
+          const out = errorResult(e);
+          // for a view: whether After Effects isn't reachable or is busy (as views.ts viewError)
+          if (t.view && e instanceof BridgeError) out._meta = { [VIEW_ERROR_KEY]: e.code };
+          return out;
         }
       },
     );

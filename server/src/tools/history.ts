@@ -6,9 +6,12 @@ import { mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { basename, extname, join } from "node:path";
 import { gunzipSync, gzipSync } from "node:zlib";
 import { z } from "zod";
-import { diffSnapshots, formatDiff, parseSnapshotLines, type Snapshot } from "../history-diff.js";
+import { diffSnapshots, formatDiff, parseSnapshotLines, summary, type DiffResult, type Snapshot } from "../history-diff.js";
 import { runJsx } from "../jsx.js";
+import { capChanges } from "../view-changes.js";
+import { VIEW_META_KEY, type ChangesView } from "../views/types.js";
 import { capText, errorResult } from "./registry.js";
+import { CHANGES_VIEW_URI, registerViewTool, viewError } from "./views.js";
 import { onCheckpointSaved } from "./workflow.js";
 import { appFile } from "../paths.js";
 
@@ -336,6 +339,8 @@ export class HistoryRefError extends Error {}
 export async function historyDiff(
   project: string,
   a: { from?: string; to?: string; timeBudgetSeconds?: number; detail?: number | string; limit?: number },
+  /** gets the in-chat view's data (the same changes as structured rows) */
+  out?: { view?: ChangesView },
 ): Promise<string> {
   const index = readIndex(historyDir(project)), cps = checkpointsOf(project);
   const from = resolveRef(a.from ?? "latest", index, cps), to = resolveRef(a.to ?? "current", index, cps);
@@ -350,9 +355,29 @@ export async function historyDiff(
     live && live.revision != null && live.stats.revisionAfter != null && live.revision !== live.stats.revisionAfter
       ? `\nNote: the project changed while the current project was being read (revision ${live.revision} -> ${live.stats.revisionAfter}), so parts of it may be from before and parts from after that change; run the diff again for a consistent result.`
       : "";
-  const text = `From: ${title(A, !sa)}\nTo:   ${title(B, !sb)}\n` + formatDiff(diffSnapshots(A, B), { detail: a.detail, limit: a.limit }) + moving;
+  const diff = diffSnapshots(A, B);
+  const text = `From: ${title(A, !sa)}\nTo:   ${title(B, !sb)}\n` + formatDiff(diff, { detail: a.detail, limit: a.limit }) + moving;
+  if (out) out.view = historyView(project, { snapshot: A, current: !sa }, { snapshot: B, current: !sb }, diff, a.detail);
   return capText(text);
 }
+
+/** The history diff as the "What changed" view's data: every change (or one comp's, as `detail` asks), as the text has them. */
+export function historyView(project: string, from: { snapshot: Snapshot; current: boolean }, to: { snapshot: Snapshot; current: boolean }, diff: DiffResult, detail?: string | number): ChangesView {
+  const want = detail === undefined ? undefined : String(detail);
+  const sections = want === undefined ? diff.sections : diff.sections.filter((s) => s.comp && (String(s.comp.id) === want || s.comp.name === want));
+  return {
+    view: "changes",
+    source: "history",
+    title: `What changed · ${basename(project)}`,
+    subtitle: `${shortTitle(from.snapshot, from.current)} → ${shortTitle(to.snapshot, to.current)}`,
+    ...capChanges(sections.flatMap((s) => s.changes)),
+    footnote: summary(diff.counts),
+  };
+}
+
+/** A side of a diff in the view's header: `checkpoint "before un-precompose"`, `snapshot "v12"`, now. */
+const shortTitle = (s: Snapshot, current: boolean) =>
+  current ? "now" : s.checkpoint ? `checkpoint "${s.label ?? s.checkpoint}"` : `snapshot "${s.label ?? s.id}"`;
 
 /** The project's snapshots (oldest first). */
 export const snapshotIndex = (project: string) => readIndex(historyDir(project));
@@ -363,9 +388,12 @@ const title = (s: Snapshot, current: boolean) =>
     : `snapshot ${s.id}${s.label ? ` "${s.label}"` : ""}${s.checkpoint ? ` (checkpoint ${s.checkpoint})` : ""}, ${s.at.replace("T", " ").slice(0, 16)} UTC, revision ${s.revision ?? "n/a"}`;
 
 export function registerHistoryTools(server: McpServer) {
-  server.registerTool(
+  // diff is shown as the "What changed" view where the AI app has in-chat views (MCP Apps)
+  registerViewTool(
+    server,
     "ae_project_history",
     {
+      _meta: { ui: { resourceUri: CHANGES_VIEW_URI } },
       title: "Project history",
       description:
         "Snapshots of the project and what changed between them. snapshot: store a read-only record of the open project (items, comp settings, " +
@@ -405,9 +433,11 @@ export function registerHistoryTools(server: McpServer) {
           if (!rows.length) return { content: [{ type: "text", text: `No snapshots or checkpoints yet for ${project}. Take one with ae_project_history {action: "snapshot", label: "..."}.` }] };
           return { content: [{ type: "text", text: `History of ${project} (newest first):\n${rows.map((r) => r.line).join("\n")}` }] };
         }
-        return { content: [{ type: "text", text: await historyDiff(project, a) }] };
+        const out: { view?: ChangesView } = {};
+        const text = await historyDiff(project, a, out);
+        return { content: [{ type: "text", text }], ...(out.view ? { _meta: { [VIEW_META_KEY]: out.view } } : {}) };
       } catch (e) {
-        return errorResult(e);
+        return viewError(e);
       }
     },
   );

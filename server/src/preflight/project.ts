@@ -664,6 +664,11 @@ export function checkItems(spec: Spec, d: PData): ProjectResult {
           fix: "check it at key times with ae_render_frame",
         });
       const boxes = it.i.map((i, k) => ({ i, k, box: boundsThrough(trackAt(it.rect!, k), it.lv!, k) }));
+      // for the in-chat view: the layer's bounds where a run of samples starts
+      const boxAt = (i: number): Finding["box"] => {
+        const b = boxes.find((s) => s.i === i)?.box;
+        return b ? [Math.round(b.x0), Math.round(b.y0), Math.round(b.x1), Math.round(b.y1)] : undefined;
+      };
       for (const [area, ab] of areas) {
         const samples = boxes.map(({ i, box }) => {
           // not on screen at all (parked off-frame): not visible, so not a safe-area problem
@@ -681,6 +686,8 @@ export function checkItems(spec: Spec, d: PData): ProjectResult {
             at: at(r.i0, r.i1),
             message: `outside ${AREA_NAME[area]} by up to ${px(most)} ${sidesText(r.worst)}`,
             fix: area === "frame" ? "keep it inside the frame (move or scale it)" : `keep it inside ${AREA_NAME[area]} (x ${Math.round(ab.x0)}–${Math.round(ab.x1)}, y ${Math.round(ab.y0)}–${Math.round(ab.y1)} px): move, scale or re-time it`,
+            box: boxAt(r.i0),
+            area: { name: area, rect: [Math.round(ab.x0), Math.round(ab.y0), Math.round(ab.x1), Math.round(ab.y1)] },
           });
         }
       }
@@ -693,7 +700,7 @@ export function checkItems(spec: Spec, d: PData): ProjectResult {
           return { i, value: cap < min - 0.05 ? cap : null };
         });
         for (const r of runsOf(samples, Math.min))
-          findings.push({ check: "text.capHeight", severity: "fail", where: it.w, at: at(r.i0, r.i1), message: `cap height about ${r1(r.worst)} px (minimum ${min} px)`, fix: "make the text bigger (font size or scale)" });
+          findings.push({ check: "text.capHeight", severity: "fail", where: it.w, at: at(r.i0, r.i1), message: `cap height about ${r1(r.worst)} px (minimum ${min} px)`, fix: "make the text bigger (font size or scale)", box: boxAt(r.i0) });
       }
     }
     if (!it.t || !tx) continue;
