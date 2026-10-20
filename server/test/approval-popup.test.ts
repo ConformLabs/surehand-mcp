@@ -112,7 +112,9 @@ describe("approval pop-up", () => {
     expect($("pWhat").textContent).toBe("Run script");
     expect($("pSays").textContent).toBe("rebuild the lower thirds");
     expect($("pChips").textContent).toBe("deletes");
-    expect($("pTime").textContent).toMatch(/^1:1\d$/);
+    expect($("pTime").textContent).toMatch(/^1:1\d left$/);
+    expect($("pTime").className).toBe("time num"); // amber ("urgent") only under a minute
+    expect($("pDetails").textContent).toBe("Show the script in the panel");
     expect($("pMore").textContent).toBe("1 more after this");
     expect(polls[0]).toBe("/pending?ui=popup");
     // it reports which request is on screen (the bridge accepts an answer only after a moment)
@@ -123,6 +125,8 @@ describe("approval pop-up", () => {
     $("pAllow").click(); // still "…"
     await waitFor(armed);
     expect(answers).toHaveLength(0);
+    // the keyboard starts on Deny, never on Allow
+    expect(dom.window.document.activeElement?.id).toBe("pDeny");
     key(13);
     key(13, $("pAllow"));
     await new Promise((r) => setTimeout(r, 60));

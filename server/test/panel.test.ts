@@ -182,10 +182,17 @@ describe("Surehand panel: main view", () => {
   it("uses the 1.3 files in ~/.aemcp, shows the AI app and the feed, and reports in to the bridge", async () => {
     await waitFor(() => /Ready/.test($("statusText").textContent) && heartbeats.length > 0);
     expect($("statusText").textContent).toBe("Ready · Claude Desktop");
-    expect($("tile").getAttribute("class")).toBe("tile green");
+    expect($("statusGlyph").className).toBe("g g-sm g-verified");
     expect(heartbeats.some((h) => /ui=panel/.test(h))).toBe(true);
     const titles = [...doc().querySelectorAll("#feed .title")].map((t: any) => t.textContent);
     expect(titles).toEqual(["Set keyframes", "Preflight: 3 problems", "Read comp Main"]);
+    // a status square and word on each row (plain reads have none), then the time
+    const rows = [...doc().querySelectorAll("#feed .item")] as any[];
+    expect(rows.map((r) => r.querySelector(".g").className)).toEqual(["g g-changed", "g g-failed", "g g-pending"]);
+    expect(rows.map((r) => r.querySelector(".st")?.textContent ?? null)).toEqual(["Changed", "Failed", null]);
+    expect(rows[0].querySelector(".meta .time").textContent).toMatch(/^\d\d:\d\d$/);
+    // the panel never shows the endorsement
+    expect(doc().body.textContent).not.toMatch(/Conform Labs product/);
     expect($("hostLabel").textContent).toBe("After Effects 2026");
     expect($("ver").textContent).toBe("test · update ready");
   });
@@ -193,11 +200,11 @@ describe("Surehand panel: main view", () => {
   it("switches the mode and says what it means", async () => {
     const radios = () => [...doc().querySelectorAll("#modes [role=radio]")] as any[];
     expect(radios().map((r) => r.getAttribute("aria-checked"))).toEqual(["true", "false", "false"]);
-    expect($("modeDesc").textContent).toMatch(/^The AI edits your project directly/);
+    expect($("modeDesc").textContent).toBe("Edits directly; every step can be undone.");
     radios()[1].click();
     expect(config().permissions).toEqual({ mode: "ask", allowShell: true });
     expect(radios()[1].getAttribute("aria-checked")).toBe("true");
-    expect($("modeDesc").textContent).toMatch(/^Every change waits for your OK/);
+    expect($("modeDesc").textContent).toBe("Every change waits for your OK here.");
   });
 
   it("offers Undo for the newest change, checking the project once, not on a timer (a script during a dialog makes After Effects show an alert)", async () => {
@@ -229,12 +236,19 @@ describe("Surehand panel: main view", () => {
     await waitFor(() => pauses.length === 1);
     expect(pauses[0]).toEqual({ paused: true, secret: SECRET });
     await waitFor(() => $("statusText").textContent === "AI paused");
-    expect($("tile").getAttribute("class")).toBe("tile amber");
+    expect($("statusGlyph").className).toBe("g g-sm g-waiting");
     expect($("resume").hidden).toBe(false);
+    expect($("resume").className).toBe("btn main"); // the green main button while paused
+    // the mode block is dimmed and says when it applies
+    expect($("modeBox").className).toBe("modes dim");
+    expect($("modeDesc").textContent).toBe("Applies when you resume.");
+    expect($("pausedCount").hidden).toBe(true);
     paused = { since: paused!.since, refused: 3 };
     await waitFor(() => /3 refused so far/.test($("pausedNote").textContent));
+    expect($("pausedCount").textContent).toBe("3 refused so far");
     $("resume").click();
     await waitFor(() => pauses.length === 2 && $("pausedNote").hidden);
+    expect($("modeBox").className).toBe("modes");
     expect(pauses[1]).toEqual({ paused: false, secret: SECRET });
     await waitFor(() => /Ready/.test($("statusText").textContent));
   });
@@ -264,7 +278,7 @@ describe("Surehand panel: main view", () => {
     size(220, 560);
     expect(doc().body.className).toMatch(/layout-narrow/);
     await waitFor(() => $("statusText").textContent === "Ready");
-    expect([...doc().querySelectorAll("#modes [role=radio]")].map((r: any) => r.textContent)).toEqual(["Full", "Ask", "Read"]);
+    expect([...doc().querySelectorAll("#modes [role=radio]")].map((r: any) => r.textContent)).toEqual(["Full", "Ask", "Read-only"]);
     size(760, 200);
     expect(doc().body.className).toMatch(/layout-wide/);
     size(320, 560);
@@ -284,14 +298,19 @@ describe("Surehand panel: approvals", () => {
     expect($("askSays").textContent).toBe("rebuild the lower thirds");
     expect($("askSays").hidden).toBe(false);
     expect([...doc().querySelectorAll("#askChips .chip.danger")].map((c: any) => c.textContent)).toEqual(["deletes"]);
-    expect($("askHint").textContent).toBe("Esc denies · 1 more after this");
-    expect($("askTime").textContent).toMatch(/^0:4\d$/);
-    expect($("statusText").textContent).toBe("Waiting for you · 2 requests");
+    expect($("askHint").textContent).toBe("Esc denies · no key allows · 1 more after this");
+    expect($("askTime").textContent).toMatch(/^0:4\d left$/);
+    expect($("askTime").className).toBe("time num urgent"); // under a minute: amber
+    expect($("statusText").textContent).toBe("Waiting for you · 2");
+    expect($("statusGlyph").className).toBe("g g-sm g-waiting");
+    // the card says enough: the mode's line goes while it waits
+    expect($("modeDesc").hidden).toBe(true);
     // it tells the bridge which request is on screen
     await waitFor(() => heartbeats.some((h) => /showing=a1/.test(h)));
-    $("askShow").click();
+    // a danger chip ("deletes"): the script is open by itself; it is short, so there's nothing more to show
     expect($("askCode").hidden).toBe(false);
     expect($("askCode").textContent).toMatch(/layer\.remove/);
+    expect($("askShow").hidden).toBe(true);
     await waitFor(armed);
     $("allow").click();
     await waitFor(() => answers.length === 1);
@@ -363,7 +382,7 @@ describe("Surehand panel: ☰ menu", () => {
     const xml = panel().menuXml(config());
     expect(xml).toContain('<MenuItem Id="shellYes" Label="Allowed" Enabled="true" Checkable="true" Checked="true"/>');
     expect(xml).toContain('<MenuItem Id="toolsCore" Label="Core (faster)" Enabled="true" Checkable="true" Checked="true"/>');
-    expect(xml).toContain('Label="About &amp; help…"');
+    expect(xml).toContain('Label="About and help…"');
     panel().menu("shellNo");
     expect(config().permissions.allowShell).toBe(false);
     panel().menu("toolsAll");
@@ -580,13 +599,19 @@ describe("Surehand panel: ☰ screens (live findings)", () => {
           : undefined;
     panel().menu("test");
     await waitFor(() => /1 of 2 checks passed/.test($("screenBody").textContent));
+    expect(doc().querySelector("#screenBody .tsum .mono-s")!.textContent).toMatch(/^1 to fix · checked \d\d:\d\d$/);
+    // failing checks first, open with the message and the fix; passing ones one line: "Label · message" PASSED
     const rows = [...doc().querySelectorAll("#screenBody .check")] as any[];
-    expect(rows.map((r) => r.querySelector(".cmain").textContent)).toEqual(["Surehand MCP 1.4.0 is the latest version.", "Claude Desktop: its settings name a server that no longer exists."]);
-    // known checks get a readable label; an app's check already names the app in its message
-    expect(rows.map((r) => r.querySelector(".clabel")?.textContent ?? null)).toEqual(["Updates", null]);
-    expect(rows[1].className).toBe("check bad");
-    const fix = rows[1].querySelector("button");
-    expect(fix.textContent).toBe("Fix");
+    expect(rows.map((r) => r.className)).toEqual(["check bad", "check"]);
+    expect(rows[0].querySelector(".clabel").textContent).toBe("Claude Desktop");
+    expect(rows[0].querySelector(".cmain").textContent).toBe("Its settings name a server that no longer exists.");
+    expect(rows[0].querySelector(".st").textContent).toBe("Failed");
+    expect(rows[1].querySelector(".ctext").textContent).toBe("Updates · Surehand MCP 1.4.0 is the latest version");
+    expect(rows[1].querySelector(".ctext .mono").textContent).toBe("1.4.0");
+    expect(rows[1].querySelector(".st").textContent).toBe("Passed");
+    const fix = rows[0].querySelector("button");
+    expect(fix.textContent).toBe("Reconnect Claude Desktop");
+    expect(fix.className).toBe("btn small main");
     fix.click();
     await waitFor(() => cli.some((c) => c.slice(2).join(" ") === "connect claude-desktop --json"));
     await waitFor(() => /Claude Desktop is connected/.test($("toastText").textContent));
@@ -647,9 +672,10 @@ describe("Surehand panel: UX pass (menu button, refusals, long scripts)", () => 
     expect($("screen").hidden).toBe(false);
     expect($("screenTitle").textContent).toBe("Surehand");
     const rows = [...doc().querySelectorAll("#screenBody .mrow .mlabel")].map((x: any) => x.textContent);
-    expect(rows).toEqual(["Connect an AI app", "Checkpoints", "Activity history", "Test the connection", "Copy diagnostics", "Updates", "About & help"]);
+    expect(rows).toEqual(["Connect an AI app", "ChatGPT on the web", "Checkpoints", "Activity history", "Test the connection", "Copy diagnostics", "Updates", "About and help"]);
     // the update that is ready shows on its row
-    expect($("screenBody").textContent).toMatch(/99\.0\.0 is ready/);
+    expect($("screenBody").textContent).toMatch(/99\.0\.0 is ready · you have test/);
+    expect($("screenBody").textContent).not.toMatch(/&/);
     (doc().querySelectorAll("#screenBody .mrow")[0] as any).click();
     expect($("screenTitle").textContent).toBe("Connect an AI app");
     $("back").click();
@@ -709,5 +735,47 @@ describe("Surehand panel: which AI apps are connected", () => {
     await waitFor(() => !$("setup").hidden && /ask it something about your After Effects project/.test($("setupText").textContent), 4000);
     rmSync(sessions(), { recursive: true });
     await waitFor(() => /^Ready/.test(statusText()), 4000);
+  });
+});
+
+describe("Surehand panel: the menu in the Conform Labs style", () => {
+  const panel = () => (dom.window as any).SurehandPanel;
+  const row = (label: string) => [...doc().querySelectorAll("#screenBody .mrow")].find((r: any) => r.querySelector(".mlabel").textContent === label) as any;
+
+  it("names the connected AI apps and ChatGPT on the web's state, from the clients it loaded", async () => {
+    cliAnswer = (cmd) =>
+      cmd === "clients --json"
+        ? {
+            clients: [
+              { id: "claude-desktop", name: "Claude Desktop", installed: true, configured: true },
+              { id: "cursor", name: "Cursor", installed: true, configured: true },
+              { id: "codex", name: "Codex", installed: true, configured: false },
+              { id: "chatgpt-web", name: "ChatGPT (web)", installed: true, configured: false, note: "Off · needs cloudflared", action: "start" },
+            ],
+          }
+        : undefined;
+    panel().menu("connect"); // loads the clients
+    await waitFor(() => doc().querySelectorAll("#screenBody .client").length === 4);
+    panel().closeScreen();
+    $("menuBtn").click();
+    expect(row("Connect an AI app").querySelector(".msub").textContent).toBe("Claude Desktop, Cursor connected");
+    expect(row("ChatGPT on the web").querySelector(".msub").textContent).toBe("Off · needs cloudflared");
+    // ChatGPT on the web opens its screen, and Back comes back to the menu
+    cliAnswer = (cmd) => (cmd === "chatgpt --status --json" ? { ok: true, state: "stopped" } : undefined);
+    row("ChatGPT on the web").click();
+    expect($("screenTitle").textContent).toBe("ChatGPT on the web");
+    $("back").click();
+    expect($("screenTitle").textContent).toBe("Surehand");
+    cliAnswer = null;
+    panel().closeScreen();
+  });
+
+  it("Copy diagnostics says COPIED in its row for 2 s, in the verified colour", async () => {
+    $("menuBtn").click();
+    row("Copy diagnostics").click();
+    await waitFor(() => row("Copy diagnostics").lastChild.textContent === "Copied");
+    expect(row("Copy diagnostics").lastChild.className).toBe("st st-verified");
+    await waitFor(() => row("Copy diagnostics").lastChild.textContent === "", 3000);
+    panel().closeScreen();
   });
 });

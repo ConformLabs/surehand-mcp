@@ -1,5 +1,5 @@
 // The After Effects (CEP) extension files exactly as they are installed: every file under
-// extension/ with the release version stamped in. Shared by build.mjs (which embeds them) and
+// extension/ with the release version stamped in (binary files, the fonts, as they are). Shared by build.mjs (which embeds them) and
 // sign-extension.mjs (which signs them), so the signature always covers the same bytes.
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
@@ -8,6 +8,9 @@ export const CEP_ROOT = new URL("../../extension/", import.meta.url).pathname.re
 
 /** Files the signing tool adds; everything else is signed. */
 export const SIGNATURE_FILES = ["META-INF/signatures.xml", "mimetype"];
+
+/** Files kept as bytes (a Buffer), never read as text or stamped: the panel's fonts. */
+export const BINARY_FILE = /\.(woff2?|ttf|otf|png|jpe?g|gif|ico)$/i;
 
 export function readCepFiles(version) {
   const files = {};
@@ -18,6 +21,10 @@ export function readCepFiles(version) {
       if (statSync(p).isDirectory()) walk(p);
       else {
         const rel = relative(CEP_ROOT, p).split(sep).join("/");
+        if (BINARY_FILE.test(rel)) {
+          files[rel] = readFileSync(p);
+          continue;
+        }
         // CEP manifest versions are numeric (x.y.z): a pre-release such as 1.4.0-beta.1 is 1.4.0 there
         files[rel] = readFileSync(p, "utf8").replaceAll("__AEMCP_VERSION__", rel === "CSXS/manifest.xml" ? version.replace(/[-+].*$/, "") : version);
       }

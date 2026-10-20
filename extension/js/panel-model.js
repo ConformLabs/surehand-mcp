@@ -13,17 +13,13 @@
   }
 
   // ---------- modes (config permissions.mode) ----------
+  // one line everywhere (the boards); "Read-only" is spelled out also when narrow
   var MODES = [
-    { id: "full", label: "Full", short: "Full",
-      desc: "The AI edits your project directly. Every step it takes can be undone.",
-      narrow: "Edits directly; every step can be undone." },
-    { id: "ask", label: "Ask", short: "Ask",
-      desc: "Every change waits for your OK in this panel. Looking at the project is always allowed.",
-      narrow: "Every change waits for your OK here." },
-    { id: "read-only", label: "Read-only", short: "Read",
-      desc: "The AI can look at the project and preview frames, but can’t change anything.",
-      narrow: "Looks and previews; changes nothing." },
+    { id: "full", label: "Full", short: "Full", desc: "Edits directly; every step can be undone." },
+    { id: "ask", label: "Ask", short: "Ask", desc: "Every change waits for your OK here." },
+    { id: "read-only", label: "Read-only", short: "Read-only", desc: "Looks and previews; changes nothing." },
   ];
+  MODES.forEach(function (m) { m.narrow = m.desc; });
   function modeOf(cfg) {
     var m = cfg && cfg.permissions && cfg.permissions.mode;
     return m === "ask" || m === "read-only" ? m : "full";
@@ -55,26 +51,37 @@
   // ---------- status ----------
   /**
    * s: { bridgeError, paused, pendingCount, client, everConnected }
-   * -> { kind: "problem"|"paused"|"waiting"|"idle"|"ready", tile: "green"|"amber"|"gray", text, short }
+   * -> { kind: "problem"|"paused"|"waiting"|"idle"|"ready", tile, glyph, text, short } (glyph: the status square: "verified", "waiting" (amber), "pending" (dotted), "failed")
    */
   function statusFor(s) {
-    if (s.bridgeError) return { kind: "problem", tile: "gray", text: s.bridgeError, short: "Problem" };
-    if (s.paused) return { kind: "paused", tile: "amber", text: "AI paused", short: "Paused" };
+    if (s.bridgeError) {
+      return { kind: "problem", tile: "gray", glyph: /^Not connected/.test(s.bridgeError) ? "pending" : "failed", text: s.bridgeError, short: "Problem" };
+    }
+    if (s.paused) return { kind: "paused", tile: "amber", glyph: "waiting", text: "AI paused", short: "Paused" };
     if (s.pendingCount) {
-      return { kind: "waiting", tile: "green", short: "Waiting",
-        text: "Waiting for you" + (s.pendingCount > 1 ? " · " + s.pendingCount + " requests" : "") };
+      return { kind: "waiting", tile: "green", glyph: "waiting", short: "Waiting",
+        text: "Waiting for you" + (s.pendingCount > 1 ? " · " + s.pendingCount : "") };
     }
     // s.apps: the AI apps connected right now (their servers run), or null when not known
-    if (s.apps && s.apps.length) return { kind: "ready", tile: "green", text: "Connected \u00b7 " + appsText(s.apps), short: "Connected" };
-    if (s.apps && s.everConnected) return { kind: "idle", tile: "gray", text: "No AI app open", short: "No AI app" };
-    if (!s.everConnected) return { kind: "idle", tile: "gray", text: "No AI app connected", short: "Not connected" };
-    return { kind: "ready", tile: "green", text: "Ready" + (s.client ? " · " + s.client : ""), short: "Ready" };
+    if (s.apps && s.apps.length) return { kind: "ready", tile: "green", glyph: "verified", text: "Connected \u00b7 " + appsText(s.apps), short: "Connected" };
+    if (s.apps && s.everConnected) return { kind: "idle", tile: "gray", glyph: "pending", text: "No AI app open", short: "No AI app" };
+    if (!s.everConnected) return { kind: "idle", tile: "gray", glyph: "pending", text: "No AI app connected", short: "Not connected" };
+    return { kind: "ready", tile: "green", glyph: "verified", text: "Ready" + (s.client ? " · " + s.client : ""), short: "Ready" };
   }
   /** "Claude Desktop", "Claude Desktop and Cursor", "Claude Desktop +2" */
   function appsText(apps) {
     if (apps.length === 1) return apps[0];
     if (apps.length === 2) return apps[0] + " and " + apps[1];
     return apps[0] + " +" + (apps.length - 1);
+  }
+  /**
+   * The menu's "Connect an AI app" subtitle from the clients the panel loaded ({name, configured, action}):
+   * "Claude Desktop, Cursor connected", or null when none is set up. ChatGPT on the web has its own row.
+   */
+  function connectedClientsText(list) {
+    var names = (list || []).filter(function (c) { return c && c.configured && c.action !== "start"; }).map(function (c) { return c.name; });
+    if (!names.length) return null;
+    return (names.length > 3 ? names.slice(0, 3).join(", ") + " +" + (names.length - 3) : names.join(", ")) + " connected";
   }
   /** The connected apps from the servers' session files ({pid, client}) whose process still runs. */
   function connectedApps(sessions, alive) {
@@ -148,8 +155,8 @@
     if (!e.ok) {
       var why = refusal(summary, e);
       if (why) { item.kind = "blocked"; item.line = why; return item; }
+      // the title is the tool; the FAILED word and the red square say that it failed
       item.kind = "problem";
-      item.title = toolName(e.tool, args) + " failed";
       item.line = readableError(summary);
       return item;
     }
@@ -174,23 +181,48 @@
   }
 
   /**
+   * A feed item's status square and word: { glyph, word }. glyph: "changed" (hollow amber), "verified"
+   * (filled green), "failed" (red cross), "notrun" (grey bar), "pending" (dotted grey: looked only).
+   * word: "Changed" / "Passed" / "Identical" / "Failed" / "Not run", shown in mono capitals; reads have none.
+   */
+  function statusOf(item) {
+    switch (item && item.kind) {
+      case "change": return { glyph: "changed", word: "Changed" };
+      case "proof": return { glyph: "verified", word: item.tool === "ae_preflight" ? "Passed" : "Identical" };
+      case "problem": return { glyph: "failed", word: "Failed" };
+      case "blocked": return { glyph: "notrun", word: "Not run" };
+      default: return { glyph: "pending", word: "" };
+    }
+  }
+
+  /**
+   * One change-report line for the machine-output box: { path, from, to } when it says "x: old -> new"
+   * (the old value is shown struck through), else { path }.
+   */
+  function changeParts(line) {
+    var t = changeLine(line), m = /^(.*?):\s*(.+?)\s*->\s*(.+)$/.exec(t);
+    return m ? { path: m[1], from: m[2], to: m[3] } : { path: t };
+  }
+
+  /**
    * Calls that were not run because of a choice the user made (Pause, Deny, Read-only, shell commands off) or
    * because nobody answered: not failures. Returns the reason in the user's words, or null.
    */
   function refusal(summary, e) {
     var s = String(summary || "");
-    if ((e && e.paused) || /^Paused in the Surehand panel/.test(s)) return "Not run: the AI was paused";
-    if (/denied this change|denied in the Surehand/i.test(s)) return "You denied it";
-    if (/No one approved this change/i.test(s)) return "Not run: no answer within 10 minutes";
-    if (/read-only mode/i.test(s) && !/can.t undo|couldn.t reliably/i.test(s)) return "Not run: Read-only mode";
-    if (/Shell commands .*(disabled|blocked)/i.test(s)) return "Not run: shell commands are off";
+    // the row says NOT RUN; the line says why and how to allow it
+    if ((e && e.paused) || /^Paused in the Surehand panel/.test(s)) return "The AI was paused. Resume to allow it.";
+    if (/denied this change|denied in the Surehand/i.test(s)) return "You denied it.";
+    if (/No one approved this change/i.test(s)) return "No answer within 10 minutes.";
+    if (/read-only mode/i.test(s) && !/can.t undo|couldn.t reliably/i.test(s)) return "Read-only mode. Switch to Full or Ask to allow it.";
+    if (/Shell commands .*(disabled|blocked)/i.test(s)) return "Shell commands are off in the menu.";
     return null;
   }
-  /** A failure's first line for people: the known ones in plain words, others cut to their first sentence. */
+  /** A failure's first line for people: the known ones in plain words (with the fix), others cut to their first sentence. */
   function readableError(summary) {
     var s = String(summary || "").replace(/^Error:\s*/, "");
     if (/^Cannot reach After Effects/i.test(s)) return "After Effects wasn\u2019t reachable. Is it open?";
-    if (/busy or showing a dialog/i.test(s)) return "After Effects was busy or showing a dialog.";
+    if (/busy or showing a dialog|modal dialog/i.test(s)) return "After Effects was showing a dialog. Close it and ask again.";
     var t = /^Timed out after (\d+)s/.exec(s);
     if (t) return "Took longer than " + t[1] + " s: After Effects may have been busy.";
     var first = /^(.{12,}?[.!?])(\s|$)/.exec(s);
@@ -243,7 +275,10 @@
     }
     out.forEach(function (it) { if (it.group) finishReads(it); });
     out.forEach(function (it, k) {
-      it.undoable = it.undoable && k === 0 && it.entry === activity[0] && !undone[entryKey(it.entry)] && canUndo(it.entry, opts.current);
+      var newest = it.undoable && k === 0 && it.entry === activity[0] && !undone[entryKey(it.entry)];
+      it.undoable = newest && canUndo(it.entry, opts.current);
+      // it would be undoable, but the project changed since (or another one is open): say so instead of a dead button
+      it.undoBlocked = !!(newest && !it.undoable && opts.current && it.entry.undoGroup && it.entry.undoSteps === 1);
     });
     return out;
   }
@@ -252,7 +287,7 @@
     if (!row.group) row.group = [row.entry];
     row.group.push(it.entry);
   }
-  /** "Read comp Main" ×3, or "Looked at the project" with what it read. */
+  /** "Read comp Main" ×3, or "Read N items" with what it read. */
   function finishReads(row) {
     var titles = [], seen = {};
     row.group.forEach(function (e) {
@@ -262,10 +297,17 @@
     var n = row.group.length;
     if (titles.length === 1) { row.title = titles[0]; row.line = plural(n, "time"); }
     else {
-      row.title = "Looked at the project";
+      // "Read 2 items" with what it read ("comp Main · layer Title", shown in mono)
+      row.title = "Read " + plural(titles.length, "item");
+      titles = titles.map(readItemName);
       row.line = titles.slice(0, 3).join(" \u00b7 ") + (titles.length > 3 ? " \u00b7 +" + (titles.length - 3) : "");
     }
     row.count = n;
+  }
+
+  /** "Read comp Main" -> "comp Main"; "Measure layer Title" -> "measure layer Title". */
+  function readItemName(title) {
+    return /^Read /.test(title) ? title.slice(5) : title.charAt(0).toLowerCase() + title.slice(1);
   }
 
   // ---------- what the AI is doing right now ----------
@@ -374,6 +416,29 @@
     var s = Math.ceil(ms / 1000);
     return Math.floor(s / 60) + ":" + ("0" + (s % 60)).slice(-2);
   }
+  /** { text: "1:18 left", urgent }: urgent (shown amber) under a minute. */
+  function countdownView(deadline, now) {
+    var ms = Date.parse(deadline) - now;
+    return { text: countdown(deadline, now) + " left", urgent: !(ms >= 60000) };
+  }
+  var PREVIEW_LINES = 6;
+  /**
+   * The approval's script preview. With a danger chip it opens by itself, capped at 6 lines with
+   * "Show all N lines"; otherwise it stays closed behind "Show the script" (or "Show the details").
+   * -> { open, text, toggle (the link's text, or null for none) }. `state`: { open, full } after clicks.
+   */
+  function previewView(v, isScript, state) {
+    state = state || {};
+    var danger = v.chips.some(function (c) { return c.danger; });
+    var lines = String(v.code || "").replace(/\s+$/, "").split(/\r?\n/), n = lines.length;
+    var noun = isScript ? "the script" : "the details";
+    if (danger) {
+      if (n <= PREVIEW_LINES) return { open: true, text: lines.join("\n"), toggle: null, danger: true };
+      if (state.full) return { open: true, text: lines.join("\n"), toggle: "Show fewer lines", danger: true };
+      return { open: true, text: lines.slice(0, PREVIEW_LINES).join("\n"), toggle: "Show all " + n + " lines", danger: true };
+    }
+    return { open: !!state.open, text: lines.join("\n"), toggle: (state.open ? "Hide " : "Show ") + noun, danger: danger };
+  }
 
   // ---------- small helpers ----------
   function hhmm(iso) {
@@ -415,10 +480,10 @@
   }
 
   var api = {
-    layoutFor: layoutFor, MODES: MODES, connectedApps: connectedApps, appsText: appsText, modeOf: modeOf, clientName: clientName, lastClient: lastClient, statusFor: statusFor,
-    toolName: toolName, describeEntry: describeEntry, refusal: refusal, readableError: readableError, workingView: workingView, entryDetails: entryDetails, feedItems: feedItems, entryKey: entryKey, canUndo: canUndo,
+    layoutFor: layoutFor, MODES: MODES, connectedApps: connectedApps, appsText: appsText, connectedClientsText: connectedClientsText, modeOf: modeOf, clientName: clientName, lastClient: lastClient, statusFor: statusFor,
+    toolName: toolName, describeEntry: describeEntry, statusOf: statusOf, changeParts: changeParts, refusal: refusal, readableError: readableError, workingView: workingView, entryDetails: entryDetails, feedItems: feedItems, entryKey: entryKey, canUndo: canUndo,
     renderIdOf: renderIdOf, renderStartInfo: renderStartInfo, renderProgress: renderProgress, timeLeft: timeLeft,
-    riskChips: riskChips, approvalView: approvalView, countdown: countdown,
+    riskChips: riskChips, approvalView: approvalView, countdown: countdown, countdownView: countdownView, previewView: previewView,
     hhmm: hhmm, dayLabel: dayLabel, whenLabel: whenLabel, parseCliJson: parseCliJson, cmpVersions: cmpVersions, aeLabel: aeLabel,
   };
   global.SurehandUI = api;

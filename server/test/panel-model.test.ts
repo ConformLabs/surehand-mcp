@@ -56,7 +56,7 @@ describe("status", () => {
   it("bridge problems, then paused, then waiting, then not connected, then ready with the AI app", () => {
     expect(UI.statusFor({ bridgeError: "Bridge not running", paused: true })).toMatchObject({ kind: "problem", tile: "gray" });
     expect(UI.statusFor({ paused: true, pendingCount: 2 })).toMatchObject({ kind: "paused", tile: "amber", text: "AI paused" });
-    expect(UI.statusFor({ pendingCount: 2, everConnected: true })).toMatchObject({ kind: "waiting", text: "Waiting for you · 2 requests" });
+    expect(UI.statusFor({ pendingCount: 2, everConnected: true })).toMatchObject({ kind: "waiting", text: "Waiting for you · 2" });
     expect(UI.statusFor({ pendingCount: 1 }).text).toBe("Waiting for you");
     expect(UI.statusFor({ everConnected: false })).toMatchObject({ kind: "idle", tile: "gray", text: "No AI app connected" });
     expect(UI.statusFor({ everConnected: true, client: "Claude Desktop" })).toMatchObject({ kind: "ready", tile: "green", text: "Ready · Claude Desktop" });
@@ -70,7 +70,9 @@ describe("status", () => {
   });
   it("mode texts follow the boards", () => {
     expect(UI.MODES.map((m: any) => m.label)).toEqual(["Full", "Ask", "Read-only"]);
-    expect(UI.MODES[1].desc).toBe("Every change waits for your OK in this panel. Looking at the project is always allowed.");
+    // one line everywhere; "Read-only" is spelled out also when narrow
+    expect(UI.MODES.map((m: any) => m.desc)).toEqual(["Edits directly; every step can be undone.", "Every change waits for your OK here.", "Looks and previews; changes nothing."]);
+    expect(UI.MODES.map((m: any) => m.short)).toEqual(["Full", "Ask", "Read-only"]);
     expect(UI.modeOf({ permissions: { mode: "ask" } })).toBe("ask");
     expect(UI.modeOf({})).toBe("full");
   });
@@ -94,7 +96,7 @@ describe("feed", () => {
     const items = UI.feedItems(log, { limit: 10 });
     expect(items.map((i: any) => [i.kind, i.title])).toEqual([
       ["change", "Set keyframes"],
-      ["problem", "Apply effect failed"],
+      ["problem", "Apply effect"],
       ["proof", "Proven identical"],
       ["read", "Read comp Main"],
       ["problem", "Preflight: 3 problems"],
@@ -184,17 +186,17 @@ describe("approval card", () => {
 describe("UX pass: refusals, readable errors, grouped reads, working row", () => {
   const e = (o: Record<string, unknown>) => ({ at: "2026-10-20T01:00:00.000Z", ok: true, summary: "", ...o });
   it("a call the user stopped (Pause, Deny, Read-only, shell off, no answer) is 'blocked', not a failure", () => {
-    expect(UI.describeEntry(e({ tool: "ae_create_comp", ok: false, summary: "Paused in the Surehand panel: nothing was run. Ask the user to resume." }))).toMatchObject({ kind: "blocked", title: "Create comp", line: "Not run: the AI was paused" });
-    expect(UI.describeEntry(e({ tool: "ae_run_script", ok: false, summary: "The user denied this change in After Effects (Surehand MCP panel)." }))).toMatchObject({ kind: "blocked", line: "You denied it" });
-    expect(UI.describeEntry(e({ tool: "ae_run_script", ok: false, summary: "No one approved this change in the Surehand MCP panel within 10 minutes." })).line).toBe("Not run: no answer within 10 minutes");
-    expect(UI.describeEntry(e({ tool: "ae_set_property", ok: false, summary: "Surehand MCP is in read-only mode, so tools that change the project are disabled." })).line).toBe("Not run: Read-only mode");
-    expect(UI.describeEntry(e({ tool: "ae_run_script", ok: false, summary: "Shell commands (system.callSystem) are disabled in the Surehand MCP permissions." })).line).toBe("Not run: shell commands are off");
+    expect(UI.describeEntry(e({ tool: "ae_create_comp", ok: false, summary: "Paused in the Surehand panel: nothing was run. Ask the user to resume." }))).toMatchObject({ kind: "blocked", title: "Create comp", line: "The AI was paused. Resume to allow it." });
+    expect(UI.describeEntry(e({ tool: "ae_run_script", ok: false, summary: "The user denied this change in After Effects (Surehand MCP panel)." }))).toMatchObject({ kind: "blocked", line: "You denied it." });
+    expect(UI.describeEntry(e({ tool: "ae_run_script", ok: false, summary: "No one approved this change in the Surehand MCP panel within 10 minutes." })).line).toBe("No answer within 10 minutes.");
+    expect(UI.describeEntry(e({ tool: "ae_set_property", ok: false, summary: "Surehand MCP is in read-only mode, so tools that change the project are disabled." })).line).toBe("Read-only mode. Switch to Full or Ask to allow it.");
+    expect(UI.describeEntry(e({ tool: "ae_run_script", ok: false, summary: "Shell commands (system.callSystem) are disabled in the Surehand MCP permissions." })).line).toBe("Shell commands are off in the menu.");
     // a script that read-only mode refused because it can't be undone is a real problem for the AI to fix
     expect(UI.describeEntry(e({ tool: "ae_run_script", ok: false, summary: "This script writes the project to disk, which read-only mode can't undo" })).kind).toBe("problem");
   });
   it("failures read as plain words, never as instructions meant for the AI", () => {
     expect(UI.readableError("Cannot reach After Effects. Make sure After Effects is running and the Surehand MCP bridge is loaded (it starts...)")).toBe("After Effects wasn’t reachable. Is it open?");
-    expect(UI.readableError("After Effects is busy or showing a dialog: it has not accepted a script for 30s. Ask...")).toBe("After Effects was busy or showing a dialog.");
+    expect(UI.readableError("After Effects is busy or showing a dialog: it has not accepted a script for 30s. Ask...")).toBe("After Effects was showing a dialog. Close it and ask again.");
     expect(UI.readableError("Timed out after 120s waiting for After Effects (it may be busy).")).toBe("Took longer than 120 s: After Effects may have been busy.");
     expect(UI.readableError("Error: Layer 'Title' not found in comp 'Main'. Available: A, B")).toBe("Layer 'Title' not found in comp 'Main'.");
   });
@@ -209,7 +211,7 @@ describe("UX pass: refusals, readable errors, grouped reads, working row", () =>
     ];
     const items = UI.feedItems(log, { limit: 5 });
     expect(items.map((i: any) => [i.kind, i.title, i.line, i.count ?? 1])).toEqual([
-      ["read", "Looked at the project", "Read comp Main · Read layer Title", 3],
+      ["read", "Read 2 items", "comp Main · layer Title", 3],
       ["change", "Set property", "1 change", 1],
       ["read", "Read comp Main", "2 times", 2],
     ]);
@@ -245,5 +247,100 @@ describe("connected AI apps", () => {
     expect(UI.statusFor({ apps: null, everConnected: true, client: "Cursor" }).text).toBe("Ready · Cursor");
     // Pause and approvals still come first
     expect(UI.statusFor({ apps: ["Cursor"], paused: true }).kind).toBe("paused");
+  });
+});
+
+describe("Conform Labs style: status words, glyphs and texts", () => {
+  const e = (o: Record<string, unknown>) => ({ at: "2026-10-20T01:00:00.000Z", ok: true, summary: "", ...o });
+  const st = (o: Record<string, unknown>) => UI.statusOf(UI.describeEntry(e(o)));
+
+  it("each row has a status square and a word (none for plain reads)", () => {
+    expect(st({ tool: "ae_set_property", changes: 1 })).toEqual({ glyph: "changed", word: "Changed" });
+    expect(st({ tool: "ae_preflight", summary: "PASS" })).toEqual({ glyph: "verified", word: "Passed" });
+    expect(st({ tool: "ae_call", args: { tool: "ae_preflight" }, summary: "PASS" })).toEqual({ glyph: "verified", word: "Passed" });
+    expect(st({ tool: "ae_prove_identical", summary: "Verdict: IDENTICAL: all 24 frames" })).toEqual({ glyph: "verified", word: "Identical" });
+    expect(st({ tool: "ae_create_comp", ok: false, summary: "After Effects is busy or showing a dialog: ..." })).toEqual({ glyph: "failed", word: "Failed" });
+    expect(st({ tool: "ae_run_script", ok: false, summary: "Paused in the Surehand panel: nothing was run." })).toEqual({ glyph: "notrun", word: "Not run" });
+    expect(st({ tool: "ae_get_comp_info", args: { comp: "Main" } })).toEqual({ glyph: "pending", word: "" });
+  });
+
+  it("a failure is titled with the tool and its line gives the fix where it is known", () => {
+    const it = UI.describeEntry(e({ tool: "ae_create_comp", ok: false, summary: "After Effects is busy or showing a dialog: it has not accepted a script for 30s." }));
+    expect(it).toMatchObject({ kind: "problem", title: "Create comp", line: "After Effects was showing a dialog. Close it and ask again." });
+    expect(UI.readableError("Cannot run a script while a modal dialog is waiting for response")).toBe("After Effects was showing a dialog. Close it and ask again.");
+    expect(UI.describeEntry(e({ tool: "ae_status", ok: false, summary: "Cannot reach After Effects. Make sure..." })).line).toBe("After Effects wasn’t reachable. Is it open?");
+  });
+
+  it("not-run rows say why and how to allow it", () => {
+    expect(UI.refusal("", { paused: true })).toBe("The AI was paused. Resume to allow it.");
+    expect(UI.refusal("The user denied this change in After Effects (Surehand MCP panel).")).toBe("You denied it.");
+    expect(UI.refusal("No one approved this change in the Surehand MCP panel within 10 minutes.")).toBe("No answer within 10 minutes.");
+    expect(UI.refusal("Surehand MCP is in read-only mode, so tools that change the project are disabled.")).toBe("Read-only mode. Switch to Full or Ask to allow it.");
+    expect(UI.refusal("Shell commands (system.callSystem) are blocked in the Surehand MCP permissions.")).toBe("Shell commands are off in the menu.");
+    expect(UI.refusal("Layer not found")).toBeNull();
+  });
+
+  it("the header's status square: verified, amber while waiting or paused, dotted with no AI app, crossed for a broken setting", () => {
+    expect(UI.statusFor({ apps: ["Claude Desktop"] }).glyph).toBe("verified");
+    expect(UI.statusFor({ pendingCount: 2 }).glyph).toBe("waiting");
+    expect(UI.statusFor({ paused: true }).glyph).toBe("waiting");
+    expect(UI.statusFor({ apps: [], everConnected: true }).glyph).toBe("pending");
+    expect(UI.statusFor({ everConnected: false }).glyph).toBe("pending");
+    expect(UI.statusFor({ bridgeError: "Not connected to After Effects" }).glyph).toBe("pending");
+    expect(UI.statusFor({ bridgeError: "Settings file can’t be read: not valid JSON" }).glyph).toBe("failed");
+  });
+
+  it("counts down as \"1:18 left\", amber under a minute", () => {
+    const now = Date.parse("2026-10-19T16:00:00Z");
+    expect(UI.countdownView("2026-10-19T16:01:18Z", now)).toEqual({ text: "1:18 left", urgent: false });
+    expect(UI.countdownView("2026-10-19T16:01:00Z", now)).toEqual({ text: "1:00 left", urgent: false });
+    expect(UI.countdownView("2026-10-19T16:00:59Z", now)).toEqual({ text: "0:59 left", urgent: true });
+    expect(UI.countdownView("2026-10-19T15:59:00Z", now)).toEqual({ text: "0:00 left", urgent: true });
+  });
+
+  it("opens the script by itself when a chip is a danger chip, capped at 6 lines", () => {
+    const long = "// rebuild the lower thirds\n" + Array.from({ length: 41 }, (_, i) => `c.layer(${i + 1}).remove();`).join("\n");
+    const v = UI.approvalView({ tool: "Run script", summary: long });
+    expect(v.chips[0]).toEqual({ text: "deletes", danger: true });
+    const pv = UI.previewView(v, true, {});
+    expect(pv).toMatchObject({ open: true, toggle: "Show all 42 lines", danger: true });
+    expect(pv.text.split("\n")).toHaveLength(6);
+    expect(UI.previewView(v, true, { full: true })).toMatchObject({ open: true, toggle: "Show fewer lines" });
+    expect(UI.previewView(v, true, { full: true }).text.split("\n")).toHaveLength(42);
+    // short: all of it, no link
+    expect(UI.previewView(UI.approvalView({ tool: "Run script", summary: "// x\nl.remove();" }), true, {})).toMatchObject({ open: true, toggle: null });
+    // no danger chip: closed behind "Show the script" / "Show the details"
+    const safe = UI.approvalView({ tool: "Run script", summary: "// nudge\nl.position.setValue([1, 2]);" });
+    expect(UI.previewView(safe, true, {})).toMatchObject({ open: false, toggle: "Show the script", danger: false });
+    expect(UI.previewView(safe, true, { open: true })).toMatchObject({ open: true, toggle: "Hide the script" });
+    expect(UI.previewView(UI.approvalView({ tool: "Set property", summary: "{}" }), false, {}).toggle).toBe("Show the details");
+  });
+
+  it("the menu names the AI apps that are set up (ChatGPT on the web has its own row)", () => {
+    const list = [
+      { name: "Claude Desktop", configured: true },
+      { name: "Cursor", configured: true },
+      { name: "Codex", configured: false },
+      { name: "ChatGPT (web)", configured: true, action: "start" },
+    ];
+    expect(UI.connectedClientsText(list)).toBe("Claude Desktop, Cursor connected");
+    expect(UI.connectedClientsText([{ name: "Claude Desktop", configured: false }])).toBeNull();
+    expect(UI.connectedClientsText(null)).toBeNull();
+    expect(UI.connectedClientsText(["A", "B", "C", "D", "E"].map((name) => ({ name, configured: true })))).toBe("A, B, C +2 connected");
+  });
+
+  it("splits a change line into the path and the old and new value (the old one is struck through)", () => {
+    expect(UI.changeParts("~ Title > Opacity: 100 -> 0")).toEqual({ path: "Title › Opacity", from: "100", to: "0" });
+    expect(UI.changeParts('+ layer "X" in "Main"')).toEqual({ path: "layer X in Main" });
+  });
+
+  it("says Undo isn't possible here when the project changed since (instead of a dead button)", () => {
+    const entry = { at: "2026-10-20T01:00:00Z", tool: "ae_set_keyframes", ok: true, changes: 2, undoGroup: "Set keyframes", undoSteps: 1, revision: 812, project: "/p.aep", instance: { port: 1, pid: 2 } };
+    const here = { port: 1, pid: 2, project: "/p.aep", revision: 812 };
+    expect(UI.feedItems([entry], { current: here })[0]).toMatchObject({ undoable: true, undoBlocked: false });
+    expect(UI.feedItems([entry], { current: { ...here, revision: 813 } })[0]).toMatchObject({ undoable: false, undoBlocked: true });
+    // not known yet (no current state), or undone already: neither
+    expect(UI.feedItems([entry])[0]).toMatchObject({ undoable: false, undoBlocked: false });
+    expect(UI.feedItems([entry], { current: { ...here, revision: 813 }, undone: { [UI.entryKey(entry)]: true } })[0].undoBlocked).toBe(false);
   });
 });

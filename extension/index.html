@@ -9,20 +9,20 @@
 <div id="app">
   <aside class="left">
     <header class="head">
-      <svg id="tile" class="tile green" width="26" height="26" viewBox="0 0 200 200" aria-hidden="true"><rect width="200" height="200" rx="46"></rect><g transform="translate(24 24) scale(0.76)"><path d="M150 62 C128 18 50.5 50.5 78.8 78.8 L121.2 121.2 C149.5 149.5 72 182 50 138" fill="none" stroke="#14161A" stroke-width="24" stroke-linecap="round"></path><circle cx="57.6" cy="57.6" r="15" fill="#14161A"></circle><circle cx="142.4" cy="142.4" r="15" fill="#14161A"></circle></g></svg>
+      <svg id="tile" class="tile" width="28" height="28" viewBox="0 0 200 200" aria-hidden="true"><rect width="200" height="200"></rect><g transform="translate(24 24) scale(0.76)"><path d="M150 62 C128 18 50.5 50.5 78.8 78.8 L121.2 121.2 C149.5 149.5 72 182 50 138" fill="none" stroke="#14161A" stroke-width="24" stroke-linecap="round"></path><circle cx="57.6" cy="57.6" r="15" fill="#14161A"></circle><circle cx="142.4" cy="142.4" r="15" fill="#14161A"></circle></g></svg>
       <div class="who">
         <div class="name">Surehand</div>
-        <div id="status" class="status idle" role="status" aria-live="polite"><span class="dot" aria-hidden="true"></span><span id="statusText">Starting…</span></div>
+        <div id="status" class="status idle" role="status" aria-live="polite"><span id="statusGlyph" class="g g-pending g-sm" aria-hidden="true"></span><span id="statusText">Starting…</span></div>
       </div>
-      <button id="pause" class="icon-btn labeled" type="button" aria-label="Pause AI" title="Pause AI: its calls are refused until you resume"><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><rect x="1.5" y="1" width="2.4" height="8" rx="0.6" fill="#F2EFE8"></rect><rect x="6.1" y="1" width="2.4" height="8" rx="0.6" fill="#F2EFE8"></rect></svg><span class="lbl">Pause</span></button>
-      <button id="resume" class="primary pill" type="button" hidden>Resume</button>
-      <button id="menuBtn" class="icon-btn" type="button" aria-label="Menu" title="Menu: connect apps, checkpoints, history, settings" aria-haspopup="dialog"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#F2EFE8" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M2 3h8M2 6h8M2 9h8"></path></svg></button>
+      <button id="pause" class="btn labeled" type="button" aria-label="Pause AI" title="Pause AI: its calls are refused until you resume"><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><rect x="1.5" y="1" width="2.4" height="8" fill="currentColor"></rect><rect x="6.1" y="1" width="2.4" height="8" fill="currentColor"></rect></svg><span class="lbl">Pause</span></button>
+      <button id="resume" class="btn main" type="button" hidden>Resume</button>
+      <button id="menuBtn" class="btn icon" type="button" aria-label="Menu" title="Menu: connect apps, checkpoints, history, settings" aria-haspopup="dialog"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2 3h8M2 6h8M2 9h8"></path></svg></button>
     </header>
 
-    <div id="pausedNote" class="note-amber" hidden></div>
+    <div id="pausedNote" class="notebox amber" hidden><span class="label amber-text">Paused</span><span>Nothing runs in After Effects. AI calls are refused at once, so the AI stops instead of waiting.</span><span id="pausedCount" class="mono-s" hidden><span id="pausedN" class="ink"></span> refused so far</span></div>
 
-    <div class="modes">
-      <span id="mode-label" class="eyebrow">What the AI may do</span>
+    <div id="modeBox" class="modes">
+      <span id="mode-label" class="label">What the AI may do</span>
       <div id="modes" class="seg" role="radiogroup" aria-labelledby="mode-label"></div>
       <div id="modeDesc" class="desc"></div>
     </div>
@@ -31,23 +31,26 @@
   <main class="right">
     <div id="askGone" class="withdrawn" role="status" aria-live="polite" hidden>That request was withdrawn.</div>
     <section id="ask" class="ask" aria-label="Approval request" hidden>
-      <div class="ask-top"><span id="askWho"></span><span id="askTime" class="num" title="Time left to answer"></span></div>
-      <div id="askTitle" class="ask-title"></div>
-      <div id="askSays" class="says" hidden></div>
-      <div id="askChips" class="chips"></div>
-      <button id="askShow" class="link under" type="button" aria-expanded="false" aria-controls="askCode">Show the script</button>
-      <pre id="askCode" class="code" hidden></pre>
-      <div class="two">
-        <button id="allow" class="primary big" type="button">Allow</button>
-        <button id="deny" class="secondary big" type="button">Deny</button>
+      <div class="ask-top"><span id="askWho" class="label"></span><span id="askTime" class="time num" title="Time left to answer"></span></div>
+      <div class="ask-body">
+        <div id="askTitle" class="ask-title"></div>
+        <div id="askSays" class="says" hidden></div>
+        <div id="askChips" class="chips"></div>
+        <pre id="askCode" class="code report" hidden></pre>
+        <button id="askShow" class="link under small-link" type="button" aria-expanded="false" aria-controls="askCode">Show the script</button>
+        <div class="two">
+          <button id="allow" class="btn main big" type="button">Allow</button>
+          <button id="deny" class="btn big" type="button">Deny</button>
+        </div>
+        <div id="askHint" class="ask-hint"></div>
       </div>
-      <div id="askHint" class="ask-hint"></div>
     </section>
 
-    <section id="setup" class="setup" aria-label="Set up" hidden>
-      <span id="setupText" class="ink"></span>
-      <button id="setupBtn" class="primary pill" type="button">Set it up</button>
-      <span id="setupHint" class="muted2"></span>
+    <section id="setup" class="notebox setup" aria-label="Set up" hidden>
+      <span id="setupLabel" class="label">Next</span>
+      <span id="setupText"></span>
+      <span id="setupHint" class="muted"></span>
+      <div class="setup-acts"><button id="setupBtn" class="btn small main" type="button">Set it up</button></div>
     </section>
 
     <div id="working" class="working" role="status" aria-live="polite" hidden></div>
@@ -60,15 +63,14 @@
 
 <div id="screen" class="screen" role="dialog" aria-modal="true" aria-labelledby="screenTitle" hidden>
   <div class="screen-head">
-    <button id="back" class="icon-btn small" type="button" aria-label="Back"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="#F2EFE8" stroke-width="1.6" aria-hidden="true"><path d="M6.5 1.5 3 5l3.5 3.5"></path></svg></button>
+    <button id="back" class="btn icon" type="button" aria-label="Back"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M6.5 1.5 3 5l3.5 3.5"></path></svg></button>
     <span id="screenTitle" class="screen-title"></span>
     <span id="screenAction"></span>
-    <svg class="tile green mini" width="20" height="20" viewBox="0 0 200 200" aria-hidden="true"><rect width="200" height="200" rx="46"></rect><g transform="translate(22 22) scale(0.78)"><path d="M150 62 C128 18 50.5 50.5 78.8 78.8 L121.2 121.2 C149.5 149.5 72 182 50 138" fill="none" stroke="#14161A" stroke-width="28" stroke-linecap="round"></path><circle cx="57.6" cy="57.6" r="17" fill="#14161A"></circle><circle cx="142.4" cy="142.4" r="17" fill="#14161A"></circle></g></svg>
   </div>
   <div id="screenBody" class="screen-body"></div>
 </div>
 
-<div id="toast" class="toast" role="status" aria-live="polite" hidden><svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#14874F" stroke-width="2" aria-hidden="true"><path d="m3 7.4 2.6 2.6L11 4.4"></path></svg><span id="toastText"></span></div>
+<div id="toast" class="toast" role="status" aria-live="polite" hidden><span class="g g-verified" aria-hidden="true"></span><span id="toastText"></span></div>
 
 <script src="js/paths.js"></script>
 <script src="js/panel-model.js"></script>

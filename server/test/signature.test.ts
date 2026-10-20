@@ -18,7 +18,7 @@ describe("extension signature", () => {
   it("stamps the release version into the manifest (what ZXP installers and Adobe show)", () => {
     // CEP manifest versions are numeric: a pre-release (1.4.0-beta.1) is stamped as 1.4.0 there
     const v = version.replace(/[-+].*$/, "");
-    const manifest = readCepFiles(version)["CSXS/manifest.xml"];
+    const manifest = readCepFiles(version)["CSXS/manifest.xml"] as string;
     expect(manifest).toContain(`ExtensionBundleVersion="${v}"`);
     expect(manifest.match(/<Extension Id="[^"]+" Version="([^"]+)"/g)).toEqual([
       `<Extension Id="com.aemcp.bridge" Version="${v}"`,
@@ -26,6 +26,23 @@ describe("extension signature", () => {
       `<Extension Id="com.aemcp.approval" Version="${v}"`,
     ]);
     expect(readCepFiles("1.4.0-beta.1")["CSXS/manifest.xml"]).toContain('ExtensionBundleVersion="1.4.0"');
+  });
+
+  it("keeps the panel's fonts as bytes (never read as text, so they install byte for byte)", () => {
+    const files = readCepFiles(version);
+    const fonts = Object.keys(files).filter((f) => f.startsWith("fonts/") && f.endsWith(".woff2"));
+    expect(fonts.sort()).toEqual([
+      "fonts/ibm-plex-mono-latin-400-normal.woff2",
+      "fonts/ibm-plex-mono-latin-500-normal.woff2",
+      "fonts/ibm-plex-sans-latin-400-normal.woff2",
+      "fonts/ibm-plex-sans-latin-600-normal.woff2",
+      "fonts/space-grotesk-latin-600-normal.woff2",
+    ]);
+    for (const f of fonts) {
+      expect(Buffer.isBuffer(files[f]), f).toBe(true);
+      expect((files[f] as Buffer).subarray(0, 4).toString("latin1"), f).toBe("wOF2");
+    }
+    expect(typeof files["fonts/OFL-IBM-Plex.txt"]).toBe("string");
   });
 
   it("detects changed, extra and missing files", () => {

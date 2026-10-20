@@ -76,6 +76,8 @@
     $("pDeny").disabled = !on;
     $("pAllow").textContent = on ? "Allow" : "…";
     $("pDeny").textContent = on ? "Deny" : "…";
+    // the keyboard starts on Deny, never on Allow
+    if (on) try { $("pDeny").focus(); } catch (e) {}
   }
   function message(text, ok) {
     $("pBody").hidden = true;
@@ -96,6 +98,7 @@
     var v = UI.approvalView(p, lastClient());
     $("pAsks").textContent = v.client + " asks to";
     $("pWhat").textContent = v.title;
+    $("pDetails").textContent = /script/i.test(v.title) ? "Show the script in the panel" : "Show details in the panel";
     $("pSays").textContent = v.says || "";
     $("pSays").hidden = !v.says;
     var chips = $("pChips");
@@ -111,7 +114,9 @@
   }
   function tick() {
     if (!shown) return;
-    $("pTime").textContent = UI.countdown(shown.deadline || new Date(Date.parse(shown.at) + 600000).toISOString(), Date.now());
+    var left = UI.countdownView(shown.deadline || new Date(Date.parse(shown.at) + 600000).toISOString(), Date.now());
+    $("pTime").textContent = left.text;
+    $("pTime").className = "time num" + (left.urgent ? " urgent" : "");
     var more = pending.length - 1;
     $("pMore").textContent = more > 0 ? more + " more after this" : "Closes after you answer";
   }
