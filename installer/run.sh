@@ -15,7 +15,8 @@ export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$HOME/.volta/bin:
 [ -s "$HOME/.nvm/nvm.sh" ] && . "$HOME/.nvm/nvm.sh" >/dev/null 2>&1
 
 # Files from a downloaded zip are quarantined; clear it so the other launchers open normally.
-xattr -dr com.apple.quarantine "$ROOT" 2>/dev/null
+# (a downloaded release folder; not a development checkout, where it would walk every worktree and node_modules)
+[ -d "$ROOT/.git" ] || xattr -dr com.apple.quarantine "$ROOT" 2>/dev/null
 
 # Surehand MCP's own entries in ~/.surehand/ae and ~/.aemcp: the same list as OWN_FILES in
 # server/src/cli/uninstall.ts (a test keeps them equal). Everything else there is the user's.
