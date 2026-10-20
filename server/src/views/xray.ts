@@ -25,10 +25,11 @@ const state: {
   selected?: string;
   filter?: XrayTag;
   problems: Map<string, XrayNodeView | { error: string }>;
-  loading: Set<string>;
+  /** nodes being loaded, and since when */
+  loading: Map<string, number>;
   all?: boolean;
   message?: string;
-} = { nodes: new Map(), open: new Set(), problems: new Map(), loading: new Set() };
+} = { nodes: new Map(), open: new Set(), problems: new Map(), loading: new Map() };
 
 let view: View | undefined;
 const root = document.getElementById("app")!;
@@ -86,7 +87,7 @@ function nodeRow(row: string, depth: number, parentN?: number): HTMLElement {
       ...(canOpen && !state.filter ? { "aria-expanded": open ? "true" : "false" } : {}),
       tabindex: state.selected === row || (!state.selected && depth === 0) ? 0 : -1,
       "data-k": `n:${row}`,
-      onclick: (e: Event) => ((e.target as HTMLElement).classList.contains("car") ? toggle(row) : select(row)),
+      onclick: (e: Event) => ((e.target as HTMLElement).classList.contains("car") ? toggle(row) : choose(row)),
       onkeydown: (e: KeyboardEvent) => keys(e, row),
     },
     el("span", { class: "ind", style: { width: `${depth * 16}px` } }),
@@ -142,7 +143,11 @@ function detail(d: XrayView): HTMLElement {
     return box;
   }
   const key = keyOf(state.selected), n = state.nodes.get(key)!, v = state.problems.get(key);
-  if (!v) box.append(el("div", { class: "eyebrow" }, n.name));
+  if (!v) {
+    // however it was selected (a click, a chip, the start), the selected node's detail is loaded
+    box.append(el("div", { class: "eyebrow" }, n.name), el("div", { class: "mut", style: { marginTop: "6px" } }, "Loading…"));
+    queueMicrotask(() => void load(key));
+  }
   else if ("error" in v) box.append(el("div", { class: "eyebrow" }, n.name), el("div", { class: "err" }, v.error));
   else if (!v.problems.length) {
     const target = n.kind === "footage" ? { item: n.item } : n.comp !== undefined ? { comp: n.comp } : undefined;
@@ -181,17 +186,29 @@ function render() {
   if (focused) (root.querySelector(`[data-k="${focused.replace(/["\\]/g, "\\$&")}"]`) as HTMLElement | null)?.focus();
 }
 
-/** Load a node's children and problems (once). */
+/** Load a node's children and problems (once; a request that got no answer in 15 s can be made again). */
 async function load(key: string) {
-  if (!view || !state.data || state.problems.has(key) || state.loading.has(key)) return;
-  state.loading.add(key);
-  const r = await view.call("ae_view_xray_node", { run: state.data.run, node: key });
+  const d = state.data, since = state.loading.get(key);
+  if (!view || !d || state.problems.has(key) || (since !== undefined && Date.now() - since < 15_000)) return;
+  const started = Date.now();
+  state.loading.set(key, started);
+  // no answer in 15 s: ask again (drawing the selected node asks for it)
+  setTimeout(() => {
+    if (state.loading.get(key) !== started) return;
+    state.loading.delete(key);
+    if (state.selected && keyOf(state.selected) === key) render();
+  }, 15_000);
+  const r = await view.call("ae_view_xray_node", { run: d.run, node: key });
+  // another X-ray came in meanwhile: this answer is for the old one
+  if (state.data !== d) return;
   state.loading.delete(key);
   const v = r.ok ? viewData<XrayNodeView>(r.result) : undefined;
-  if (!v) return void (state.problems.set(key, { error: r.ok ? "This node couldn't be loaded." : r.message }), render());
-  state.nodes.set(key, v.node);
-  for (const c of v.children) if (!state.nodes.has(c.key)) state.nodes.set(c.key, c);
-  state.problems.set(key, v);
+  if (!v) state.problems.set(key, { error: r.ok ? "This node couldn't be loaded." : r.message });
+  else {
+    state.nodes.set(key, v.node);
+    for (const c of v.children) if (!state.nodes.has(c.key)) state.nodes.set(c.key, c);
+    state.problems.set(key, v);
+  }
   render();
 }
 
@@ -214,6 +231,16 @@ function select(row: string) {
   void load(keyOf(row));
 }
 
+/** A click on a row's name, or Enter: select it; a node with children and nothing wrong (a group, a render queue item) also opens or closes, as in any tree. */
+function choose(row: string) {
+  const n = state.nodes.get(keyOf(row));
+  const already = state.selected === row;
+  if (n && n.childCount && !n.tags.length && !state.filter) {
+    if (!already) select(row);
+    toggle(row);
+  } else select(row);
+}
+
 function setFilter(tag?: XrayTag) {
   state.filter = tag;
   // the first node with that problem is selected
@@ -225,7 +252,7 @@ function setFilter(tag?: XrayTag) {
 function keys(e: KeyboardEvent, row: string) {
   const all = [...root.querySelectorAll<HTMLElement>(".node")], i = all.findIndex((x) => x.dataset.k === `n:${row}`);
   const move = (j: number) => all[Math.max(0, Math.min(all.length - 1, j))]?.focus();
-  if (e.key === "Enter" || e.key === " ") select(row);
+  if (e.key === "Enter" || e.key === " ") choose(row);
   else if (e.key === "ArrowDown") move(i + 1);
   else if (e.key === "ArrowUp") move(i - 1);
   else if (e.key === "ArrowRight" && !state.open.has(row)) toggle(row);

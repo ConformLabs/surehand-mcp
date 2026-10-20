@@ -181,7 +181,8 @@ describe("ae_project_xray with a view", () => {
 });
 
 describe("the X-ray view in a fake AI app (jsdom)", () => {
-  async function host(view: any, onCall: (name: string, args: any) => any) {
+  /** delay: how long the server takes to answer a tool call (ms) */
+  async function host(view: any, onCall: (name: string, args: any) => any, delay = 0) {
     const { JSDOM } = await import("jsdom");
     const sent: any[] = [];
     let win: any;
@@ -199,7 +200,7 @@ describe("the X-ray view in a fake AI app (jsdom)", () => {
           else if (m.method === "ui/notifications/initialized") reply({ jsonrpc: "2.0", method: "ui/notifications/tool-result", params: { content: [{ type: "text", text: "Project X-ray" }], _meta: { "surehand/view": view } } });
           else if (m.method === "tools/call") reply({ jsonrpc: "2.0", id: m.id, result: onCall(m.params.name, m.params.arguments) ?? { content: [{ type: "text", text: "ok" }] } });
           else if (m.method === "ui/message") reply({ jsonrpc: "2.0", id: m.id, result: {} });
-        }, 0);
+        }, m.method === "tools/call" ? delay : 0);
       },
     };
     const dom = new JSDOM(buildViews().xray, {
@@ -259,6 +260,38 @@ describe("the X-ray view in a fake AI app (jsdom)", () => {
     expect(names(doc).length).toBeGreaterThan(4);
     (doc.querySelector('[data-k="chip-unused"]') as any).click();
     expect(names(doc)).toEqual(["Not rendered", "Endcard_old", "Endcard_v2", "Test_comp", "Logo_alt"]);
+  });
+
+  it("the node a chip selects gets its full detail, as a click does (also while another node is still loading)", async () => {
+    // the live case: a placeholder plate, a slow server, the chip clicked before the first node's detail arrived
+    const d = fx.mockupProject();
+    d.footage[0] = { ...d.footage[0], kind: "placeholder", missing: undefined };
+    const calls: [string, any][] = [];
+    const { doc, until } = await host(xrayView(d), server(calls), 60);
+    await until(() => doc.querySelector('[data-k="chip-missing"]'));
+    (doc.querySelector('[data-k="chip-missing"]') as any).click();
+    await until(() => doc.querySelector(".detail h4")?.textContent === "A placeholder instead of footage");
+    expect(doc.querySelector(".node.sel .nm")!.textContent).toBe("bg_plate.exr");
+    expect(doc.querySelector(".detail .eyebrow")!.textContent).toBe("bg_plate.exr · missing");
+    expect([...doc.querySelectorAll(".detail button")].map((b) => b.textContent)).toEqual(["Show in AE", "Ask the AI to replace it"]);
+    // and the same after the first node's late answer came in
+    await new Promise((r) => setTimeout(r, 150));
+    expect(doc.querySelector(".detail h4")!.textContent).toBe("A placeholder instead of footage");
+    // the same from a chip once everything is loaded: clear, then filter again
+    (doc.querySelector('[data-k="chip-missing"]') as any).click();
+    (doc.querySelector('[data-k="chip-fragile"]') as any).click();
+    await until(() => doc.querySelector(".detail h4")?.textContent === "An expression finds a layer by its name");
+  });
+
+  it("a group with no problems: a click on its name, or Enter, opens and closes it", async () => {
+    const { doc, until } = await host(xrayView(fx.mockupProject()), server([]));
+    await until(() => doc.querySelector(".detail h4"));
+    const row = () => doc.querySelector('[data-k="n:g:unused"]') as any;
+    row().querySelector(".nm").click();
+    await until(() => names(doc).includes("Endcard_old"));
+    expect(row().getAttribute("aria-expanded")).toBe("true");
+    row().dispatchEvent(new (doc.defaultView as any).KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await until(() => !names(doc).includes("Endcard_old"));
   });
 
   it("a big project: opening a node beyond the first levels fetches it", async () => {
