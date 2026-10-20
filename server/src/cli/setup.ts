@@ -105,7 +105,9 @@ export function ensureExtension(force = false): { installed: boolean; updated: b
   if (!force && present && installedVersion && compareVersions(installedVersion, VERSION) > 0) return { installed: false, updated: false };
   const updated = existsSync(dir);
   rmSync(dir, { recursive: true, force: true });
-  for (const [rel, content] of Object.entries(__AEMCP_CEP_FILES__)) {
+  const files: [string, string | Buffer][] = Object.entries(__AEMCP_CEP_FILES__);
+  for (const [rel, b64] of Object.entries(__AEMCP_CEP_BINARY__)) files.push([rel, Buffer.from(b64, "base64")]);
+  for (const [rel, content] of files) {
     const p = join(dir, ...rel.split("/"));
     mkdirSync(dirname(p), { recursive: true });
     writeFileSync(p, content);
