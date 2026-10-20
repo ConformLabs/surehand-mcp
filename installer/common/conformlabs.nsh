@@ -815,6 +815,26 @@ FunctionEnd
 
 
 ; ---------- start and end (call from .onInit / un.onInit, .onGUIEnd / un.onGUIEnd) ----------
+; One Setup at a time (first thing in .onInit): Setup can take seconds to appear after a double-click (Windows scans
+; the whole file before it starts), and people double-click again. The second one brings the first one's window to
+; the front, if it has one yet, and quits. A named mutex for this Windows session, held until Setup exits; a silent
+; Setup started meanwhile quits too (error level 5) instead of installing at the same time.
+!define /ifndef CL_MUTEX "ConformLabs.Setup.${CL_APP_NAME}"
+!macro CL_SINGLE_INSTANCE
+  System::Call 'kernel32::CreateMutexW(p 0, i 0, w "Local\${CL_MUTEX}") p.r0 ?e'
+  Pop $1 ; GetLastError
+  ${If} $1 = 183 ; ERROR_ALREADY_EXISTS
+    ${IfNot} ${Silent}
+      FindWindow $0 "#32770" "${CL_APP_NAME} setup"
+      ${If} $0 <> 0
+        System::Call "user32::ShowWindow(p r0, i 9)" ; SW_RESTORE
+        System::Call "user32::SetForegroundWindow(p r0)"
+      ${EndIf}
+    ${EndIf}
+    SetErrorLevel 5
+    Abort
+  ${EndIf}
+!macroend
 !macro CL_ONINIT
   Call cl.LoadFonts
   Call cl.DetectInstalled
@@ -934,24 +954,29 @@ FunctionEnd
 ; A check box row (the app's rows, built from what Setup found): a hairline above, the box (its text is the real name:
 ; what screen readers say; the box is only as wide as its square, so the text Windows would draw in black is never
 ; seen), beside it the name (IBM Plex Sans SemiBold) and an optional muted note under it, both clickable. Not enabled:
-; the box is disabled and the name muted; the labels stay enabled. Rows are 15u, 23u with a note: four apps that are
-; all missing and the cloudflared row still fit the 140u page.
-; $R0 top, $R1 title, $R2 note ("" for none), $R3 enabled (1/0), $R4 on-click function address (GetFunctionAddress)
-; -> $R5 box, $R6 height
+; the box is disabled and the name muted; the labels stay enabled. A row spans the page (left 0, width 300) or is one
+; of two cells side by side (two columns of 146u, 8u apart), so seven apps that are all missing, in four pairs, and the
+; cloudflared row still fit the 140u page. Rows are 15u, 23u with a note (one line: a cell's is short).
+; $R0 top, $R1 title, $R2 note ("" for none), $R3 enabled (1/0), $R4 on-click function address (GetFunctionAddress),
+; $R7 left, $R8 width (dialog units) -> $R5 box, $R6 height
 Function cl.CheckRow
   Push $0
   Push $1
-  ${NSD_CreateLabel} 0 $R0u 100% 1u ""
+  Push $2
+  Push $3
+  ${NSD_CreateLabel} $R7u $R0u $R8u 1u ""
   Pop $0
   SetCtlColors $0 "" "${CL_RULE}"
   Call cl.OnePixel
   IntOp $1 $R0 + 4
-  ${NSD_CreateCheckbox} 0 $1u 8u 10u "$R1"
+  ${NSD_CreateCheckbox} $R7u $1u 8u 10u "$R1"
   Pop $R5
   SetCtlColors $R5 "${CL_INK}" "${CL_PAPER}"
   StrCpy $0 $R5
   Call cl.DarkControl
-  ${NSD_CreateLabel} 13u $1u 280u 10u "$R1"
+  IntOp $2 $R7 + 13 ; the labels' left and width
+  IntOp $3 $R8 - 20
+  ${NSD_CreateLabel} $2u $1u $3u 10u "$R1"
   Pop $0
   ${If} $R3 == 1
     SetCtlColors $0 "${CL_INK}" "${CL_PAPER}"
@@ -964,7 +989,7 @@ Function cl.CheckRow
   StrCpy $R6 15
   ${If} $R2 != ""
     IntOp $1 $R0 + 13
-    ${NSD_CreateLabel} 13u $1u 280u 9u "$R2"
+    ${NSD_CreateLabel} $2u $1u $3u 9u "$R2"
     Pop $0
     SetCtlColors $0 "${CL_MUTED}" "${CL_PAPER}"
     ${If} $R3 == 1
@@ -972,6 +997,8 @@ Function cl.CheckRow
     ${EndIf}
     StrCpy $R6 23
   ${EndIf}
+  Pop $3
+  Pop $2
   Pop $1
   Pop $0
 FunctionEnd

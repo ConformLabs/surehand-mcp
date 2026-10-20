@@ -15,7 +15,7 @@
 
 *Formerly AE MCP. Same tools, same install folder and AI-app settings; only the name changed.*
 
-Surehand MCP connects **Claude** (Desktop / Code), **ChatGPT** (desktop app or web), Cursor, Codex, or any MCP client to **Adobe® After Effects®**.
+Surehand MCP connects **Claude** (Desktop / Code), **ChatGPT** (desktop app or web), Cursor, Codex, VS Code (GitHub Copilot), Windsurf / Devin Desktop, LM Studio, or any MCP client to **Adobe® After Effects®**.
 The AI can run any script inside After Effects (modern JavaScript, converted for AE's ExtendScript engine automatically),
 read information back, and use up to 106 ready-made tools for projects, comps, layers, keyframes (Graph Editor level),
 text styling and animators, footage, effects, shapes, masks, 3D cameras/lights/materials, audio, color management,
@@ -68,7 +68,7 @@ Surehand-MCP/
 ```
 
 Then double-click **1. Install** in the `2. Mac` or `3. Windows` folder (any app: Claude Desktop, Claude Code,
-ChatGPT desktop, Cursor, Codex), then restart After Effects once.
+ChatGPT desktop, Cursor, Codex, VS Code, Windsurf / Devin Desktop, LM Studio), then restart After Effects once.
 
 **Check it:** with After Effects open, double-click **2. Test Installation** in the same folder.
 
@@ -83,8 +83,10 @@ The installer:
   is signed, so it loads without enabling unsigned extensions (`PlayerDebugMode`)
 - creates `~/.surehand/ae/config.json` with a random access token
 - registers the server with **Claude Desktop**, **Claude Code**, **ChatGPT desktop / Codex** (`~/.codex/config.toml`,
-  created if the ChatGPT or Codex app is installed) and **Cursor** if they are installed
-  under the name `surehand-ae`. Before a config file is changed, a timestamped backup is made next to it
+  created if the ChatGPT or Codex app is installed), **Cursor**, **VS Code** (its user `mcp.json`, used by GitHub
+  Copilot's Agent mode), **Windsurf / Devin Desktop** (`~/.config/devin/mcp_config.json`, `%APPDATA%\devin` on Windows,
+  and Windsurf's `~/.codeium/windsurf/mcp_config.json` while that folder is there) and **LM Studio** (`~/.lmstudio/mcp.json`)
+  if they are installed, under the name `surehand-ae`. Before a config file is changed, a timestamped backup is made next to it
   (`*.surehand-<time>.bak`, the newest five are kept); the very first original also stays as `*.surehand.bak`. If Claude Desktop is open it offers to restart it,
   because a running Claude Desktop overwrites its config file
 
@@ -504,7 +506,7 @@ looked up next to it), `SUREHAND_AE_BRIDGE_PORT`, `SUREHAND_AE_TOKEN`, `SUREHAND
 
 **Commands for the panel** (with `--json` they print one JSON object and never ask anything; an unknown command exits
 with an error): `clients` → `{clients: [{id, name, installed, configured, inUse?, note?, action?}], snippet?}`;
-`connect <app>` / `disconnect <app>` (`claude-desktop`, `claude-code`, `codex`, `cursor`) → `{ok, message}`;
+`connect <app>` / `disconnect <app>` (`claude-desktop`, `claude-code`, `codex`, `cursor`, `vscode`, `windsurf`, `lm-studio`) → `{ok, message}`;
 `checkpoints [--project <path>]` → `{checkpoints: [{id, at, label, file, history?}]}`; `checkpoint-diff <id> [--project
 <path>]` → text (`{text}`; needs After Effects: it compares with the open project); `test --json` →
 `{checks: [{ok, name, message?, fix?: {connect, label?}}]}`; `update --check` → `{latest, current, updateAvailable, url,

@@ -33,6 +33,8 @@
     [/codex/i, "Codex"],
     [/chatgpt|openai/i, "ChatGPT"],
     [/windsurf|codeium/i, "Windsurf"],
+    [/devin/i, "Devin Desktop"],
+    [/lm.?studio/i, "LM Studio"],
     [/vscode|visual studio code|copilot/i, "VS Code"],
     [/zed/i, "Zed"],
   ];

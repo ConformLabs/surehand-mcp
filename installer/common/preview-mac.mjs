@@ -35,7 +35,7 @@ ${buttons.map(([label, right, def]) => `<div class="btn ${def ? "def" : ""}" sty
   const iframe = (page) => `data:text/html;base64,${Buffer.from(macPage(page, { version, app })).toString("base64")}`;
   const def = loadAiApps();
   // on the reviewer's Mac the choices would follow what is installed; the mock-up shows the design's case
-  const found = { "claude-desktop": true, "claude-code": true, cursor: true, codex: false };
+  const found = { "claude-desktop": true, "claude-code": true, cursor: true, codex: false, vscode: true, windsurf: false, "lm-studio": false };
   const rows = [
     `<tr><td><span class="cb on" style="opacity:.5"></span></td><td>${app.name}</td><td class="grey">Install</td></tr>`,
     ...def.apps.map((a) => found[a.id]
