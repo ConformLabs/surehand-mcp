@@ -17,7 +17,7 @@
 
 Surehand MCP connects **Claude** (Desktop / Code), **ChatGPT** (desktop app or web), Cursor, Codex, VS Code (GitHub Copilot), Windsurf / Devin Desktop, LM Studio, or any MCP client to **Adobe® After Effects®**.
 The AI can run any script inside After Effects (modern JavaScript, converted for AE's ExtendScript engine automatically),
-read information back, and use up to 109 ready-made tools for projects, comps, layers, keyframes (Graph Editor level),
+read information back, and use up to 110 ready-made tools for projects, comps, layers, keyframes (Graph Editor level),
 text styling and animators, footage, effects, shapes, masks, 3D cameras/lights/materials, audio, color management,
 Essential Graphics and rendering (including background renders with aerender). Batch edits run many steps as one
 undo step, checkpoints keep safety copies of the project, structural changes can be proven not to change the render,
@@ -96,7 +96,7 @@ The installer:
 
 Four Agent Skills teach the AI how to work with Surehand well: `surehand-ae` (the basics: check the connection, read
 before editing, confirm each edit with its change report, look at the result, never work around a refusal, plus the
-ExtendScript traps seen live), `surehand-ae-delivery` (preflight against your own delivery spec, and versions from data checked row by row),
+ExtendScript traps seen live), `surehand-ae-delivery` (preflight against your own delivery spec, versions from data checked row by row, and the localization round trip),
 `surehand-ae-safe-restructure` (structural edits with pixel proof) and `surehand-ae-timing-layout` (exact keyframes,
 easing and measured alignment). The source is `skills/` in this repo.
 
@@ -194,7 +194,7 @@ To rotate the token, delete `token` from `~/.surehand/ae/config.json` and re-run
 | `ae_get_scripting_guide` | ExtendScript cheat sheet for the model (also an MCP resource `aemcp://docs/extendscript`). |
 
 **Tool profiles.** Every tool description is sent to the AI in every chat, so by default only a **core set of
-29 tools** is loaded (about 9k tokens instead of 39k for all 109), and **every other tool stays available on demand**:
+29 tools** is loaded (about 9k tokens instead of 42k for all 110), and **every other tool stays available on demand**:
 `ae_tools` lists all tools by category (or gives full parameter details of chosen ones), and `ae_call` runs any tool by
 name with the same validation, permissions, change report and activity log. Loading everything up front is optional:
 switch to **All tools** in the Surehand panel in After Effects (**☰ › Tools the AI sees › All tools**), in Claude Desktop's
@@ -277,7 +277,9 @@ unknown effect name gets suggestions.
 - **Reformat:** `ae_reformat` (the comp at another size or aspect ratio, laid out by your own rules and checked on every
   frame; see Reformat below)
 - **Checks:** `ae_preflight` (check the delivered comp and its render against your own delivery spec; see Preflight below),
-  `ae_versions_from_data` (a CSV / JSON file becomes versions of a comp, then every row is checked; see Versions from data below)
+  `ae_versions_from_data` (a CSV / JSON file becomes versions of a comp, then every row is checked; see Versions from data below),
+  `ae_localize` (texts out to translators as CSV / XLIFF, translations back in as a version per language, fitted by your rules
+  and checked; Hebrew and Arabic right to left; see Localization below)
 - **Project:** `ae_project_health` (missing footage/fonts/effects, expression errors, unused footage, empty comps/folders,
   duplicate comp names); `ae_project_xray` (explains an inherited project: what the render queue pulls in, what
   every expression depends on and which links are fragile, what is missing, footage specs, what makes it heavy);
@@ -396,6 +398,37 @@ built in: every format, colour, size and margin comes from your data and your ow
 - **Render (optional):** `queue` adds every version to the render queue with your output module template and an output
   path pattern (`/renders/{City}_{#3}.mov`); `render: true` renders only the versions that pass. Existing files are never
   replaced unless `overwrite: true`.
+
+### Localization
+
+`ae_localize` takes a comp's texts to translators and back, with every language checked.
+
+- **Export** (`action: "export"`): every text layer of the comp and its precomps (visible or not; keyframed Source
+  Text per keyframe) to a **CSV** for Excel (UTF-8 with a BOM, so Hebrew and Arabic open correctly; one column per
+  language) or **XLIFF 1.2** for CAT tools (Trados, memoQ, Phrase...; one file per language). XLIFF 1.2 is the version
+  CAT tools import most widely; 2.0 files are read too. Each string has its context: comp and layer, time on screen,
+  the paragraph box or the width a point text has to the edge of the frame (or your safe area), a character limit
+  (yours, or estimated from the box with `maxChars: "fromBox"`) and your notes.
+- **Import** (`action: "import"`): one version per language. The comp tree is duplicated the way versions from data
+  duplicates a comp: the root and every precomp that holds a translated text, the copies using each other
+  (`"{comp} [{lang}]"`). One undo step with the Changes list; `dryRun: true` shows what each language gets; names
+  already in the project are refused unless `overwrite: true`.
+- **Fit by your rules, never invented:** the adjustments you allow, in your order: tracking down to a minimum, font
+  size down to a minimum (or a minimum cap height in comp pixels, measured on the font), horizontal scale down to a
+  minimum, the paragraph box growing by at most so many pixels (away from the edge the text is aligned to); point
+  text within a width you give. Each step goes only as far as needed. A text that still doesn't fit is left at the
+  best attempt and FAILs with what was tried; nothing goes below your minimum. Without rules nothing is adjusted.
+- **Right to left:** Hebrew, Arabic, Persian, Urdu, Yiddish (by the language code, or `direction`) get right-to-left
+  paragraph direction and the Universal composer (formerly South Asian and Middle Eastern, After Effects 24.0+), and
+  their alignment is mirrored (left becomes right); a point text whose alignment flips keeps its place. Your font
+  per language (`fonts: {"he": {"*": "YourHebrewFont"}}`). Not available to scripts, so not done: mirroring the
+  layout itself, kashida justification, per-character direction.
+- **Checks per language**, worded like Preflight (`FAIL (1 of 3 languages)`, `INCOMPLETE`, `PASS`): each text read
+  back where it renders, the fit, the direction, box overflow, text inside the frame or safe area on every frame,
+  missing glyphs (the common Hebrew / Arabic problem: a Latin font without those letters) and missing fonts.
+  Untranslated strings FAIL (or warn with `allowUntranslated: true`).
+- **Drift** (`action: "drift"`): which master texts changed since the export, per language, compared with the
+  file's source text; the import warns about them too.
 
 ### Change report
 
@@ -552,6 +585,7 @@ mean opening the old `.aep` in place of your project, so it isn't done automatic
 - "Un-precompose 'Logo Precomp' into the main comp and prove the render didn't change."
 - "Package this project for the render farm in ~/Handoff/Spot, and prove the package renders the same."
 - "Import /Users/me/footage/*.mov, make a comp for each clip and add them all to the render queue as ProRes."
+- "Export the texts of 'Promo' for Hebrew and French translators as a CSV. When it comes back, build both versions: tracking down to -40, then font size down to 36, never smaller."
 - "Make a version of 'Score Card' for every row of scores.csv: City into the City layer, Score as $1,234.00, the bar 0-100 → 0-800 px, red below zero. Check every row before you queue them."
 
 ## Control and trust
