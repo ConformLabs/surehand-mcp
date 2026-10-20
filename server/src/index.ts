@@ -9,6 +9,7 @@ import { checkForUpdate } from "./update.js";
 // dependencies (zod) too late for the MCP SDK, crashing the bundle at startup.
 import { activityFile, readActivity } from "./activity.js";
 import { chatgpt } from "./cli/chatgpt.js";
+import { chatCommand } from "./cli/chat.js";
 import { checkpointDiffCommand, checkpointSaveCommand, checkpointsCommand } from "./cli/checkpoints.js";
 import { CLIENT_IDS, clientsJson, connectClient, disconnectClient, listClients, moveFromLegacy } from "./cli/clients.js";
 import { diagnostics } from "./cli/diagnostics.js";
@@ -118,6 +119,10 @@ Usage:
   surehand-ae chatgpt --install-tunnel [--json]   download Cloudflare's cloudflared (pinned, verified) into ~/.surehand/bin
   surehand-ae chatgpt --background|--status|--stop [--json]
                          the same in the background (the panel's ChatGPT screen): start, its state and address, stop
+  surehand-ae chat --agents --json   the AI agents for the panel's Chat (Codex, Claude Code, Antigravity) and their sign-in
+  surehand-ae chat --agent <codex|claude|agy> [--session <id>]
+                         one chat turn for the panel: the message as JSON on stdin, events as JSON lines
+  surehand-ae chat --connect agy|--disconnect agy   Surehand in Antigravity's MCP servers
   surehand-ae update [--json]  install the latest release over this installation (and the AE extension)
   surehand-ae update --check [--json]   only report: {latest, current, updateAvailable, url, checkedAt, channel, notes}
   surehand-ae update --channel beta|stable [--check]   save the update channel first (beta: pre-releases too;
@@ -227,6 +232,9 @@ async function main() {
       return void console.log(await diagnostics());
     case "chatgpt":
       return chatgpt(rest);
+    case "chat":
+      process.exitCode = await chatCommand(rest);
+      return;
     case "update":
       return updateCommand(rest);
     case "setup": {

@@ -6,13 +6,15 @@ import { stopBackground } from "./chatgpt.js";
 import { CLIENT_IDS, disconnectClient } from "./clients.js";
 import { removeOwnCloudflared } from "./tunnel-install.js";
 import { uninstallSkills } from "./skills.js";
+import { agyConnected } from "../chat/agents.js";
+import { disconnectAgySync } from "../chat/runner.js";
 import { bold, extensionDir, ok, warn } from "./util.js";
 
 // Files and folders in ~/.surehand/ae (and, from 1.3, ~/.aemcp) that Surehand MCP creates. Everything else there is the user's.
 // installer/run.sh and installer/run.ps1 (uninstall without Node.js) carry the same list: a test keeps them equal.
 export const OWN_FILES = [
   "server", "config.json", "runtime.json", "extension-hash", "bridge-status.json", "instances", "update-check.json",
-  "activity.jsonl", "tmp", "renders", "compat", "install.log", "install-result.json", "chatgpt.json", "chatgpt.lock", "sessions", "skills", "xray", MOVED_NOTE,
+  "activity.jsonl", "tmp", "renders", "compat", "install.log", "install-result.json", "chatgpt.json", "chatgpt.lock", "sessions", "skills", "xray", "chat", MOVED_NOTE,
 ];
 
 /**
@@ -112,6 +114,12 @@ export function uninstall(argv: string[]) {
   for (const id of CLIENT_IDS) {
     const r = disconnectClient(id);
     if (r.ok && r.restartHint) ok(r.message);
+  }
+  // Antigravity, if the panel's Chat connected it (its own `agy mcp remove`)
+  if (agyConnected()) {
+    const r = disconnectAgySync();
+    if (r.ok) ok(r.message);
+    else warn(r.message);
   }
   console.log("\nDone. Restart After Effects and your AI apps.");
   console.log("If you installed the Claude Desktop extension (.mcpb), remove it in Claude Desktop > Settings > Extensions.");

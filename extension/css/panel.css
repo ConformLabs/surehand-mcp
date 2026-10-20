@@ -349,6 +349,38 @@ pre.code, pre.details { max-height: 180px; overflow: auto; }
 .steps { margin: 0; padding-left: 18px; color: var(--ink); }
 .steps li + li { margin-top: 4px; }
 
+/* Chat with your AI app: the boards ChatStart, ChatWorking, ChatAsk, ChatSignIn, from the panel's own pieces */
+.screen-head .who > .screen-title { display: block; }
+.screen-body.chat { overflow: hidden; }
+.clist { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
+.clist.fresh { justify-content: flex-end; }
+.cmsgs { display: flex; flex-direction: column; flex: none; }
+.cmsg { padding: 4px 12px; display: flex; flex-direction: column; flex: none; }
+.cmsg.user { padding: 8px 12px; border-bottom: 1px solid var(--rule); }
+.cmsg.user + .cmsg, .cmsg.rhead { padding-top: 8px; }
+#screenStatusText { overflow: hidden; text-overflow: ellipsis; }
+#screenStatusGlyph[hidden] + #screenStatusText { margin-left: 0; }
+.cmsg > * + * { margin-top: 4px; }
+.ctext { white-space: pre-wrap; word-break: break-word; -webkit-user-select: text; user-select: text; }
+.item.ctool { padding-top: 4px; padding-bottom: 4px; border-bottom: 0; }
+.capps { display: flex; flex-direction: column; flex: none; }
+.capps .line { color: var(--ink-muted); }
+.screen-body.chat .modes > .title { font-weight: 600; }
+.tries { padding: 12px; display: flex; flex-direction: column; flex: none; }
+.tries > * + * { margin-top: 4px; }
+.tries > .label { margin-bottom: 8px; }
+.tries .btn { justify-content: flex-start; font-weight: 400; overflow: hidden; text-overflow: ellipsis; }
+.screen-body.chat > .notebox .title { display: block; }
+.screen-body.chat > .notebox .steps { margin-top: 4px; }
+.cfoot { flex: none; padding: 12px; border-top: 1px solid var(--rule); display: flex; flex-direction: column; }
+.cfoot > * + * { margin-top: 8px; }
+.cbar { display: flex; justify-content: space-between; align-items: center; }
+.cbar > * + * { margin-left: 8px; }
+.cbar > .btn:only-child, .cbar > [hidden] + .btn { margin-left: auto; }
+.cinput { width: 100%; resize: none; border: 1px solid var(--rule-strong); border-radius: var(--radius-sm); background: var(--paper); color: var(--ink); font: 400 12px/18px var(--font-text); padding: 8px; }
+.cinput:focus { border-color: var(--ink); }
+.cinput:disabled { border-color: var(--rule); background: transparent; color: var(--ink-muted); }
+
 /* Updates */
 .upd { margin: 12px; padding: 12px; border: 1px solid var(--rule-strong); background: var(--paper); display: flex; flex-direction: column; flex: none; }
 .upd > * + * { margin-top: 8px; }
