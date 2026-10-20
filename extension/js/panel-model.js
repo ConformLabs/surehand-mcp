@@ -490,10 +490,46 @@
     }
     try { return JSON.parse(String(stdout)); } catch (e) { return null; }
   }
+  /** -1 / 0 / 1, like the server's compareVersions: a pre-release comes before its release (1.4.0-beta.3 < 1.4.0). */
   function cmpVersions(a, b) {
-    var pa = String(a).replace(/^v/, "").split("."), pb = String(b).replace(/^v/, "").split(".");
-    for (var i = 0; i < 3; i++) { var x = parseInt(pa[i], 10) || 0, y = parseInt(pb[i], 10) || 0; if (x !== y) return x > y ? 1 : -1; }
+    function parse(v) {
+      v = String(v).replace(/^v/, "");
+      var dash = v.indexOf("-");
+      return { n: (dash < 0 ? v : v.slice(0, dash)).split("."), pre: dash < 0 ? null : v.slice(dash + 1).split(".") };
+    }
+    var pa = parse(a), pb = parse(b), i;
+    for (i = 0; i < 3; i++) { var x = parseInt(pa.n[i], 10) || 0, y = parseInt(pb.n[i], 10) || 0; if (x !== y) return x > y ? 1 : -1; }
+    if (!pa.pre || !pb.pre) return pa.pre ? -1 : pb.pre ? 1 : 0;
+    for (i = 0; i < Math.max(pa.pre.length, pb.pre.length); i++) {
+      var p = pa.pre[i], q = pb.pre[i];
+      if (p === undefined || q === undefined) return p === undefined ? -1 : 1;
+      if (p === q) continue;
+      var np = /^\d+$/.test(p), nq = /^\d+$/.test(q);
+      if (np && nq) return Number(p) > Number(q) ? 1 : -1;
+      if (np !== nq) return np ? -1 : 1;
+      return p > q ? 1 : -1;
+    }
     return 0;
+  }
+
+  // ---------- updates ----------
+  /** "beta" | "stable" (the default), from config.json's updateChannel. */
+  function updateChannel(cfg) { return cfg && cfg.updateChannel === "beta" ? "beta" : "stable"; }
+  /** An update check (update-check.json or `update --check --json`) if it was made on this channel (older ones have none: stable). */
+  function updateFor(u, channel) { return u && u.latest && (u.channel || "stable") === channel ? u : null; }
+  /** The line under Settings › Beta updates. */
+  function betaSwitchText(channel, version) {
+    if (channel === "beta") return "Pre-releases too: new features first, less tested.";
+    return String(version).indexOf("-") > 0 ? "Stable only. Your beta stays until a newer stable release is out." : "Stable releases only.";
+  }
+  /** On stable with a beta installed that is newer than the latest stable release: the one line saying it stays; else null. */
+  function keptBetaText(channel, latest, version) {
+    if (channel !== "stable" || !latest || String(version).indexOf("-") < 0 || cmpVersions(latest, version) >= 0) return null;
+    return "You have a beta, newer than the latest stable release (" + latest + "): it stays until a newer stable release is out.";
+  }
+  /** The toast after switching. */
+  function channelToast(channel) {
+    return channel === "beta" ? "Beta updates on: Surehand offers pre-releases too." : "Beta updates off: stable releases only.";
   }
   /** "After Effects 2026" from "26.5". */
   function aeLabel(v) {
@@ -507,6 +543,7 @@
     renderIdOf: renderIdOf, renderStartInfo: renderStartInfo, renderProgress: renderProgress, timeLeft: timeLeft,
     riskChips: riskChips, approvalView: approvalView, countdown: countdown, countdownView: countdownView, previewView: previewView,
     hhmm: hhmm, dayLabel: dayLabel, whenLabel: whenLabel, parseCliJson: parseCliJson, cmpVersions: cmpVersions, aeLabel: aeLabel,
+    updateChannel: updateChannel, updateFor: updateFor, betaSwitchText: betaSwitchText, keptBetaText: keptBetaText, channelToast: channelToast,
   };
   global.SurehandUI = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;

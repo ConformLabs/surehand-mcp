@@ -371,3 +371,48 @@ describe("the in-chat views' tools in the feed", () => {
     expect(node).toMatchObject({ kind: "read", title: "X-ray details for the chat" });
   });
 });
+
+describe("updates: versions and the Beta updates switch", () => {
+  it("orders versions like the server, a pre-release before its release", () => {
+    expect(UI.cmpVersions("1.4.0-beta.3", "1.4.0")).toBe(-1);
+    expect(UI.cmpVersions("1.4.0", "1.4.0-beta.3")).toBe(1);
+    expect(UI.cmpVersions("1.4.0-beta.4", "1.4.0-beta.3")).toBe(1);
+    expect(UI.cmpVersions("1.4.0-beta.10", "1.4.0-beta.9")).toBe(1);
+    expect(UI.cmpVersions("v1.4.0-beta.3", "1.4.0-beta.3")).toBe(0);
+    expect(UI.cmpVersions("1.3.4", "1.4.0-beta.3")).toBe(-1);
+    expect(UI.cmpVersions("99.0.0", "test")).toBe(1);
+  });
+
+  it("reads the channel from config.json (stable unless it says beta)", () => {
+    expect(UI.updateChannel({ updateChannel: "beta" })).toBe("beta");
+    expect(UI.updateChannel({ updateChannel: "nightly" })).toBe("stable");
+    expect(UI.updateChannel({})).toBe("stable");
+    expect(UI.updateChannel(null)).toBe("stable");
+  });
+
+  it("uses an update check only on the channel it was made on (older checks: stable)", () => {
+    const beta = { latest: "1.4.0-beta.4", channel: "beta" }, old = { latest: "1.3.4" };
+    expect(UI.updateFor(beta, "beta")).toBe(beta);
+    expect(UI.updateFor(beta, "stable")).toBeNull();
+    expect(UI.updateFor(old, "stable")).toBe(old);
+    expect(UI.updateFor(old, "beta")).toBeNull();
+    expect(UI.updateFor({ channel: "beta" }, "beta")).toBeNull();
+    expect(UI.updateFor(null, "stable")).toBeNull();
+  });
+
+  it("says what the switch does, and that a beta stays after turning it off", () => {
+    expect(UI.betaSwitchText("beta", "1.4.0-beta.3")).toBe("Pre-releases too: new features first, less tested.");
+    expect(UI.betaSwitchText("stable", "1.4.0-beta.3")).toBe("Stable only. Your beta stays until a newer stable release is out.");
+    expect(UI.betaSwitchText("stable", "1.4.0")).toBe("Stable releases only.");
+    expect(UI.channelToast("beta")).toBe("Beta updates on: Surehand offers pre-releases too.");
+    expect(UI.channelToast("stable")).toBe("Beta updates off: stable releases only.");
+  });
+
+  it("the Updates screen's line for a beta kept on stable", () => {
+    expect(UI.keptBetaText("stable", "1.3.4", "1.4.0-beta.3")).toBe("You have a beta, newer than the latest stable release (1.3.4): it stays until a newer stable release is out.");
+    expect(UI.keptBetaText("beta", "1.3.4", "1.4.0-beta.3")).toBeNull();
+    expect(UI.keptBetaText("stable", "1.4.0", "1.4.0-beta.3")).toBeNull();
+    expect(UI.keptBetaText("stable", "1.3.4", "1.3.4")).toBeNull();
+    expect(UI.keptBetaText("stable", null, "1.4.0-beta.3")).toBeNull();
+  });
+});

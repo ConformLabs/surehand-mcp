@@ -151,7 +151,7 @@
     if (!rt) return cb({ friendly: NO_RUNTIME });
     // the server says which panel commands it has (runtime.json panelCommands); the version number alone
     // can't tell (a beta or dev build of 1.4 still says 1.3.x until it's released)
-    if (opts.since && !(rt.panelCommands >= 1) && rt.version && UI.cmpVersions(rt.version, opts.since) < 0) return cb({ friendly: TOO_OLD });
+    if (opts.since && !(rt.panelCommands >= 1) && rt.version && UI.cmpVersions(String(rt.version).split("-")[0], opts.since) < 0) return cb({ friendly: TOO_OLD });
     var env = {};
     Object.keys(process.env).forEach(function (k) { env[k] = process.env[k]; });
     env.AEMCP_NO_AUTOSETUP = "1";
@@ -1385,13 +1385,41 @@
     ]);
   }
   // Updates
+  /**
+   * The last update check on the channel set in config.json (Settings › Beta updates): this session's, else
+   * update-check.json, which the server writes. Read from the file, never from After Effects; null when the
+   * check was made on the other channel.
+   */
+  function knownUpdate() {
+    var ch = UI.updateChannel(S.cfg);
+    return UI.updateFor(S.update, ch) || UI.updateFor(readJson(P().updateCheck), ch);
+  }
   function screenUpdate(body, action, token) {
-    var cached = readJson(P().updateCheck);
+    var cached = knownUpdate();
     drawUpdate(body, cached, true);
     runCli(["update", "--check", "--json"], still(token, function (err, json) {
       if (!err && json) { S.update = json; drawUpdate(body, json, false); }
       else drawUpdate(body, cached, false, err && err.friendly);
     }), { since: "1.4.0", timeout: 30000 });
+  }
+  /** Settings › Beta updates: config.json updateChannel ("beta", or no key for stable), which the server's update reads. */
+  function saveChannel(channel) {
+    if (!writeConfig(function (cfg) { if (channel === "beta") cfg.updateChannel = "beta"; else delete cfg.updateChannel; })) return false;
+    S.cfg = readConfig();
+    S.update = knownUpdate(); // the last check on the other channel no longer counts
+    renderHeader();
+    toast(UI.channelToast(channel));
+    return true;
+  }
+  /** Checks on the new channel in the background (the server's command line, not After Effects): "update ready" follows. */
+  function checkChannel() {
+    var redraw = redrawLater();
+    runCli(["update", "--check", "--json"], function (err, json) {
+      if (err || !json || !json.latest) return;
+      S.update = json;
+      renderHeader();
+      if (S.screen === "menu") redraw();
+    }, { since: "1.4.0", timeout: 30000 });
   }
   var updating = false, updatedTo = null;
   function drawUpdate(body, u, checking, note) {
@@ -1407,6 +1435,7 @@
       card.appendChild(el("div", { cls: "upd-head" }, [el("span", { cls: "v", text: latest + " is ready" }), el("span", { cls: "have", text: "you have " + current })]));
       var notes = u.notes || u.highlights;
       if (notes && notes.length) card.appendChild(el("ul", {}, notes.slice(0, 5).map(function (n) { return el("li", { text: n }); })));
+      if (u.url) card.appendChild(button("link green under", "What’s new", function () { openUrl(u.url); }));
       var b = button("btn main big", updating ? "Updating\u2026" : rt ? "Update now" : "Download", function () {
         if (!rt) return openUrl(u.url || REPO_URL + "/releases/latest");
         runUpdate(body, latest);
@@ -1416,6 +1445,9 @@
       card.appendChild(el("div", { cls: "note", text: rt ? "Takes a few seconds. Restart After Effects and your AI apps afterwards." : "Download the installer and run it." }));
     } else {
       card.appendChild(el("div", { cls: "upd-head" }, [el("span", { cls: "v", text: checking ? "Checking\u2026" : "You\u2019re up to date" }), el("span", { cls: "have", text: "version " + current })]));
+      // back on stable with a newer beta: it stays (an update never goes back)
+      var kept = !checking && UI.keptBetaText(UI.updateChannel(S.cfg), latest, current);
+      if (kept) card.appendChild(el("div", { cls: "note", text: kept }));
     }
     body.appendChild(card);
     var autoOn = S.cfg.updateCheck !== false;
@@ -1438,12 +1470,12 @@
   function runUpdate(body, latest) {
     var token = screenToken;
     updating = true;
-    drawUpdate(body, readJson(P().updateCheck) || { latest: latest }, false);
+    drawUpdate(body, knownUpdate() || { latest: latest }, false);
     runCli(["update", "--json"], function (err, r) {
       updating = false;
-      if (r && r.ok && r.updated) { updatedTo = r.to; toast("Updated to " + r.to + ". Restart After Effects and your AI apps."); }
+      if (r && r.ok && r.updated) { updatedTo = r.to; toast("Updated to " + r.to + ". Restart After Effects and your AI apps to finish."); }
       else toast((r && r.message) || (err && err.friendly) || "The update did not finish.", true);
-      if (token === screenToken && S.screen === "update") drawUpdate(body, readJson(P().updateCheck) || { latest: latest }, false);
+      if (token === screenToken && S.screen === "update") drawUpdate(body, knownUpdate() || { latest: latest }, false);
     }, { timeout: 180000 });
   }
 
@@ -1469,6 +1501,7 @@
     }
     var shell = !(S.cfg.permissions && S.cfg.permissions.allowShell === false);
     var all = S.cfg.toolProfile === "full";
+    var channel = UI.updateChannel(S.cfg);
     // the subtitles come from what the panel already knows: the AI apps it loaded, the checkpoint index
     var clients = S.clients && S.clients.list || [];
     var web = clients.filter(function (c) { return c.action === "start"; })[0];
@@ -1485,6 +1518,8 @@
         function (v) { onMenu(v === "all" ? "toolsAll" : "toolsCore"); openScreen("menu"); }),
       choice("Shell commands in scripts", shell ? "Scripts may run programs on this computer" : "Scripts can’t run programs", [["yes", "Allowed"], ["no", "Off"]], shell ? "yes" : "no",
         function (v) { onMenu(v === "yes" ? "shellYes" : "shellNo"); openScreen("menu"); }),
+      choice("Beta updates", UI.betaSwitchText(channel, current), [["on", "On"], ["off", "Off"]], channel === "beta" ? "on" : "off",
+        function (v) { if (saveChannel(v === "on" ? "beta" : "stable")) { openScreen("menu"); checkChannel(); } }),
     ]));
     var copiedTimer = null;
     body.appendChild(group("Help", [
@@ -1525,7 +1560,7 @@
   var START_AFTER_FAILURES = Math.max(1, Math.round(8000 / POLL_MS));
   function refresh() {
     S.cfg = readConfig();
-    S.update = S.update || readJson(P().updateCheck);
+    S.update = knownUpdate();
     S.apps = readApps();
     setMenu();
     renderModes();

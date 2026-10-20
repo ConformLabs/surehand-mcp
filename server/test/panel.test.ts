@@ -119,7 +119,8 @@ beforeAll(async () => {
       let out: unknown = { ok: true };
       const own = cliAnswer?.(cmd);
       if (own !== undefined) out = own;
-      else if (cmd === "update --check --json") out = { ok: true, current: "test", latest: "99.0.0", updateAvailable: true, notes: ["Faster history"], checkedAt: new Date().toISOString() };
+      else if (cmd === "update --check --json")
+        out = { ok: true, current: "test", latest: "99.0.0", updateAvailable: true, notes: ["Faster history"], url: "https://example.invalid/release/v99.0.0", checkedAt: new Date().toISOString() };
       else if (cmd === "update --json") out = { ok: true, updated: true, to: "99.0.0", message: "Updated" };
       else if (cmd === "clients --json")
         out = { ok: true, clients: [{ id: "claude-desktop", name: "Claude Desktop", installed: true, configured: true }, { id: "cursor", name: "Cursor", installed: true, configured: false }] };
@@ -412,9 +413,17 @@ describe("Surehand panel: ☰ menu", () => {
     panel().menu("update");
     // the cached result first, then the server's answer (with what's new)
     await waitFor(() => /99\.0\.0 is ready/.test($("screenBody").textContent) && /Faster history/.test($("screenBody").textContent));
+    // "What's new" opens the release's page
+    const opened: string[] = [];
+    (dom.window as any).cep = { util: { openURLInDefaultBrowser: (u: string) => opened.push(u) } };
+    ([...doc().querySelectorAll("#screenBody button")].find((b: any) => b.textContent === "What’s new") as any).click();
+    expect(opened).toEqual(["https://example.invalid/release/v99.0.0"]);
+    delete (dom.window as any).cep;
     const btn = [...doc().querySelectorAll("#screenBody button")].find((b: any) => b.textContent === "Update now") as any;
     btn.click();
     await waitFor(() => /Updated to 99\.0\.0/.test($("screenBody").textContent));
+    expect($("screenBody").textContent).toMatch(/Restart After Effects and your AI apps to finish\./);
+    expect($("toastText").textContent).toBe("Updated to 99.0.0. Restart After Effects and your AI apps to finish.");
     expect(cli.map((c) => c.slice(2).join(" "))).toEqual(expect.arrayContaining(["update --check --json", "update --json"]));
     expect(cli.every((c) => c[0] === process.execPath && c[1] === __filename)).toBe(true);
     $("back").click();
@@ -717,6 +726,38 @@ describe("Surehand panel: UX pass (menu button, refusals, long scripts)", () => 
     expect(config().toolProfile).toBe("full");
     [...seg("Tools the AI sees").querySelectorAll("button")].find((b: any) => b.textContent === "Core")!.click();
     expect(config().toolProfile).toBe("core");
+    (dom.window as any).SurehandPanel.closeScreen();
+  });
+
+  it("Settings › Beta updates switches the channel and checks on it through the server, never through After Effects", async () => {
+    $("menuBtn").click();
+    const seg = () => [...doc().querySelectorAll("#screenBody .mset")].find((x: any) => x.textContent.includes("Beta updates")) as any;
+    expect(seg().querySelector("button.on").textContent).toBe("Off");
+    expect(seg().querySelector(".msub").textContent).toBe("Stable releases only.");
+    const evalsBefore = evals.length, checksBefore = cli.filter((c) => c.slice(2).join(" ") === "update --check --json").length;
+    cliAnswer = (cmd) =>
+      cmd === "update --check --json" ? { current: "test", latest: "99.1.0-beta.2", updateAvailable: true, channel: "beta", url: "https://example.invalid/release/v99.1.0-beta.2", checkedAt: new Date().toISOString() } : undefined;
+    [...seg().querySelectorAll("button")].find((b: any) => b.textContent === "On")!.click();
+    expect(config().updateChannel).toBe("beta");
+    expect(config().token).toBe("t"); // the rest of the settings stay
+    expect($("toastText").textContent).toBe("Beta updates on: Surehand offers pre-releases too.");
+    expect(seg().querySelector("button.on").textContent).toBe("On");
+    expect(seg().querySelector(".msub").textContent).toBe("Pre-releases too: new features first, less tested.");
+    // the stable check in update-check.json doesn't count on beta; the server's answer on beta does
+    await waitFor(() => /99\.1\.0-beta\.2 is ready/.test($("screenBody").textContent));
+    expect($("ver").textContent).toBe("test · update ready");
+    expect(cli.filter((c) => c.slice(2).join(" ") === "update --check --json").length).toBe(checksBefore + 1);
+    // and it stays through the panel's refreshes (which read files only)
+    await new Promise((r) => setTimeout(r, 1700));
+    expect($("ver").textContent).toBe("test · update ready");
+    expect(evals.slice(evalsBefore).filter((e) => /update/i.test(e.script + (e.label || "")))).toEqual([]);
+    // Off again: the beta answer no longer counts until the stable check comes back
+    cliAnswer = (cmd) => (cmd === "update --check --json" ? { current: "test", latest: "99.0.0", updateAvailable: true, channel: "stable", checkedAt: new Date().toISOString() } : undefined);
+    [...seg().querySelectorAll("button")].find((b: any) => b.textContent === "Off")!.click();
+    expect(config().updateChannel).toBeUndefined();
+    expect($("toastText").textContent).toBe("Beta updates off: stable releases only.");
+    await waitFor(() => /99\.0\.0 is ready/.test($("screenBody").textContent));
+    cliAnswer = null;
     (dom.window as any).SurehandPanel.closeScreen();
   });
 
