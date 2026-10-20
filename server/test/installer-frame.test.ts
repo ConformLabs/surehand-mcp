@@ -78,8 +78,27 @@ describe("Windows installer: Choose AI apps (one list with the Mac Installer)", 
     expect([...INSTALLER_ORDER].sort()).toEqual([...CLIENT_IDS].sort());
   });
 
+  it("shows the page (its own header) at once, reads the apps a moment later with Next disabled, then draws the rows", () => {
+    const create = fn(nsi, "AppsCreate");
+    // nothing slow before the page exists (reading first left a blank page and let a click through)
+    expect(create.indexOf("MUI_HEADER_TEXT")).toBeLessThan(create.indexOf("nsDialogs::Create 1018"));
+    expect(create).not.toMatch(/Call DetectApps/);
+    expect(create).toMatch(/"Looking for the AI apps on this PC…"[\s\S]*EnableWindow \$0 0[\s\S]*\$\{NSD_CreateTimer\} AppsDetect 50[\s\S]*nsDialogs::Show/);
+    const detect = fn(nsi, "AppsDetect");
+    expect(detect).toMatch(/NSD_KillTimer\} AppsDetect\s*\n\s*Call DetectApps[\s\S]*Call AppsRows[\s\S]*EnableWindow \$0 1\s*\n\s*Call cl\.SyncMainButton/);
+    expect(fn(nsi, "AppsLeave")).toMatch(/\$\{If\} \$Detected != 1\s*\n\s*Abort/);
+    // the installed Node.js runs the detection when there is one (no 80 MB to unpack)
+    expect(fn(nsi, "ExtractRuntime")).toMatch(/StrCpy \$RtNode "\$\{NODE_DIR\}\\node\.exe"\s*\n\s*\$\{IfNot\} \$\{FileExists\} "\$RtNode"/);
+  });
+
+  it("the accent button follows the Next button's own WS_VISIBLE (on the first page the window is not shown yet)", () => {
+    const sync = fn(nsh, "${UN}cl.SyncMainButton");
+    expect(sync).toMatch(/GetWindowLongW\(p r0, i -16\) i\.r1"\s*\n\s*IntOp \$1 \$1 & 0x10000000/);
+    expect(sync).not.toMatch(/user32::IsWindowVisible/);
+  });
+
   it("reads what is installed and connected with `surehand-ae clients --json`, before installing", () => {
-    expect(fn(nsi, "DetectApps")).toMatch(/cl-run\.cjs" --ini "\$PLUGINSDIR\\clients\.ini" -- "\$PLUGINSDIR\\rt\\surehand-ae\.mjs" clients --json/);
+    expect(fn(nsi, "DetectApps")).toMatch(/"\$RtNode" "\$PLUGINSDIR\\rt\\cl-run\.cjs" --ini "\$PLUGINSDIR\\clients\.ini" -- "\$PLUGINSDIR\\rt\\surehand-ae\.mjs" clients --json/);
     const find = fn(nsi, "FindClient");
     expect(find).toMatch(/ReadINIStr \$1 "\$PLUGINSDIR\\clients\.ini" "clients\.\$4" "installed"/);
     expect(find).toMatch(/ReadINIStr \$2 "\$PLUGINSDIR\\clients\.ini" "clients\.\$4" "configured"/);
@@ -137,10 +156,32 @@ describe("Windows installer: progress and finish pages", () => {
     expect(results).toMatch(/ReadINIStr \$R8 "\$\{CL_RESULTS_INI\}" "summary" "count"/);
     expect(results).toMatch(/glyph-\$1-sunk-\$R7\.bmp/);
     expect(results).toMatch(/SetCtlColors \$0 "" "\$\{CL_INK\}"/); // the 2 px ink rule
-    expect(results).toMatch(/SetCtlColors \$R6 "" "\$\{CL_SUNK\}"/); // the box
+    expect(results).toMatch(/SetCtlColors \$0 "" "\$\{CL_SUNK\}"/); // the box: strips and rows on paper-sunk
     expect(results).toMatch(/ReadINIStr \$R8 "\$\{CL_RESULTS_INI\}" "next" "count"/);
     // "restart After Effects" only comes from the results (the server says it only when After Effects is open)
     expect(nsi.slice(nsi.indexOf('Section "Install"'), nsi.indexOf('Section "Uninstall"'))).not.toMatch(/Restart After Effects/);
+  });
+
+  it("the results box: rows that never overlap, below the title, each label tall enough for its lines", () => {
+    const results = fn(nsh, "cl.FinishResults");
+    expect(nsh).toMatch(/StrCpy \$R9 38 ; the next free line/); // the title is 14u..30u
+    // rule, top strip, rows, bottom strip: each starts where the one before ends
+    expect(results).toMatch(/NSD_CreateLabel\} 124u \$R9u 196u 1u ""[\s\S]*?IntOp \$R9 \$R9 \+ 1\s*\n\s*\$\{NSD_CreateLabel\} 124u \$R9u 196u 3u ""[\s\S]*?IntOp \$R9 \$R9 \+ 3/);
+    expect(results).toMatch(/NSD_CreateBitmap\} 124u \$R9u 14u \$3u ""[\s\S]*?NSD_AddStyle\} \$0 \$\{CL_SS_CENTERIMAGE\}[\s\S]*?NSD_CreateLabel\} 138u \$R9u 182u \$3u "\$2"[\s\S]*?IntOp \$R9 \$R9 \+ \$3/);
+    expect(results).toMatch(/Call cl\.ResultLines[^\n]*\n\s*IntOp \$3 \$3 \* 10/);
+    // nothing is moved or re-stacked afterwards (that put the box over the title and the rows)
+    expect(results).not.toMatch(/PlaceDialogUnits|SendToBack|BringToTop|MoveWindow|SetWindowPos/);
+    expect(fn(nsh, "cl.ResultLines")).toContain(`\${If} $2 > ${frame.RESULT_LINE_CHARS}`);
+  });
+
+  it("counts a result's lines by words, as Windows wraps them (long lines get the height they need)", () => {
+    const { resultLines } = frame;
+    expect(resultLines("Adobe® After Effects® 2025, 2026")).toBe(1);
+    expect(resultLines("Connected Claude Desktop, Claude Code, Cursor")).toBe(1); // 45 characters
+    expect(resultLines("Connected Claude Desktop, Claude Code, Cursor, Codex")).toBe(2); // "Codex" moves down whole
+    expect(resultLines("cloudflared not downloaded: no internet. Panel › Menu › ChatGPT on the web installs it later.")).toBe(2);
+    expect(resultLines("x".repeat(100))).toBe(3); // a word longer than a line
+    expect(resultLines("Cursor not connected: could not update its settings: C:\\Users\\someone\\.cursor\\mcp.json is locked by another program")).toBe(3);
   });
 
   it("cl-run.cjs turns the results into an INI file NSIS can read (UTF-16)", async () => {
@@ -283,12 +324,13 @@ describe("Windows installer: the Conform Labs look", () => {
       for (const bg of Object.keys(frame.GLYPH_BACKGROUNDS))
         for (const px of g) {
           const b = readFileSync(join(ROOT, "installer/windows/nsis/art", `glyph-${kind}-${bg}-${px}.bmp`));
-          expect([b.readInt32LE(18), b.readInt32LE(22), b.readUInt16LE(28)]).toEqual([px, px, 24]);
+          expect([b.readInt32LE(18), b.readInt32LE(22), b.readUInt16LE(28)]).toEqual([px + 2, px + 2, 24]); // 1 px margin
         }
-    // a done glyph is the accent, pre-composited on paper-sunk at its edge
+    // a done glyph is the accent, with a corner of paper-sunk (what SS_CENTERIMAGE fills the gutter with)
     const done = readFileSync(join(ROOT, "installer/windows/nsis/art", "glyph-done-sunk-18.bmp"));
-    const centre = 54 + 9 * Math.ceil((18 * 3) / 4) * 4 + 9 * 3;
-    expect([done[centre + 2], done[centre + 1], done[centre]]).toEqual([0x3d, 0xd6, 0x8c]);
+    const row = Math.ceil((20 * 3) / 4) * 4, px = (x: number, y: number) => { const o = 54 + (19 - y) * row + x * 3; return [done[o + 2], done[o + 1], done[o]]; };
+    expect(px(10, 10)).toEqual([0x3d, 0xd6, 0x8c]);
+    expect(px(0, 0)).toEqual([0x0d, 0x0e, 0x11]);
   });
 
   it("the sidebar pages carry the version; header-band pages a hairline under the band; Finish alone on the finish page", () => {

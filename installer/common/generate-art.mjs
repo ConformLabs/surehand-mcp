@@ -194,7 +194,7 @@ for (const [kind, sizes, page] of [["wizard", WIZARD_SIZES, wizardPage], ["heade
 for (const [bgName, colorKey] of Object.entries(GLYPH_BACKGROUNDS))
   for (const px of GLYPH_SIZES) {
     const bg = COLORS[colorKey], stripW = 4 + GLYPH_KINDS.length * (px + 4), img = screenshot(glyphStrip(px, bg), stripW, px + 4);
-    GLYPH_KINDS.forEach((k, i) => writeFileSync(join(winOut, `glyph-${k}-${bgName}-${px}.bmp`), bmp24(crop(img, 2 + i * (px + 4), 2, px, px), bg)));
+    GLYPH_KINDS.forEach((k, i) => writeFileSync(join(winOut, `glyph-${k}-${bgName}-${px}.bmp`), bmp24(crop(img, 1 + i * (px + 4), 1, px + 2, px + 2), bg)));
     if (preview && px === 18) writeFileSync(join(preview, `win-glyphs-${bgName}-${px}.png`), img.png);
     written.push(`glyph-*-${bgName}-${px}.bmp`);
   }

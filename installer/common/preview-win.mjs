@@ -5,7 +5,7 @@
 // dark theme draws them (their colours come from Windows, not from Setup).
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { COLORS } from "./frame.mjs";
+import { COLORS, resultLines } from "./frame.mjs";
 
 const UX = 1.75, UY = 1.875;
 const W = Math.round(330 * UX), H = Math.round(219 * UY), BAR = 31;
@@ -57,7 +57,8 @@ img.p{position:absolute;image-rendering:pixelated}`;
   const checkRow = (y, title, note, on, enabled = true) =>
     rule(y) + `<div class="box ${on ? "on" : ""} ${enabled ? "" : "off"}" style="left:${Math.round(15 * UX)}px;top:${Math.round((44 + y + 4) * UY) + 3}px"></div>` +
     inner(13, y + 4, 280, 10, esc(title), enabled ? "strong" : "muted") + (note ? inner(13, y + 14, 280, 9, esc(note), "muted") : "");
-  const glyph = (kind, bg, x, y) => `<img class="p" src="${bmp(`glyph-${kind}-${bg}-9.bmp`)}" style="left:${Math.round(x * UX)}px;top:${Math.round(y * UY)}px;width:9px;height:9px">`;
+  // the bitmaps have a 1 px margin of their background
+  const glyph = (kind, bg, x, y) => `<img class="p" src="${bmp(`glyph-${kind}-${bg}-9.bmp`)}" style="left:${Math.round(x * UX) - 1}px;top:${Math.round(y * UY) - 1}px;width:11px;height:11px">`;
 
   const pages = {};
   pages.welcome = page(
@@ -105,14 +106,17 @@ img.p{position:absolute;image-rendering:pixelated}`;
     ["done", "Adobe® After Effects® 2025, 2026"],
     ["failed", "cloudflared not downloaded: no internet. Panel › Menu › ChatGPT on the web installs it later."],
   ];
-  let ry = 37 + 4, rbody = "";
+  // the results box as conformlabs.nsh builds it: the ink rule (1u), a 3u strip, rows (a 14u gutter with the glyph
+  // centred, the text from 138u), a 3u strip; lines counted the same way (frame.mjs resultLines)
+  let ry = 38 + 1 + 3, rbody = "";
   for (const [k, t] of results) {
-    const lines = Math.max(1, Math.ceil(t.length / 46));
-    rbody += glyph(k, "sunk", 130, ry + 2) + `<div class="a mono ${k === "skipped" ? "muted" : ""}" style="${px(140, ry, 176, lines * 10)}">${esc(t)}</div>`;
-    ry += lines * 10;
+    const h = resultLines(t) * 10;
+    rbody += glyph(k, "sunk", 124 + 7 - 9 / 2 / UX, ry + h / 2 - 9 / 2 / UY) + `<div class="a mono ${k === "skipped" ? "muted" : ""}" style="${px(138, ry, 182, h)}">${esc(t)}</div>`;
+    ry += h;
   }
+  ry += 3;
   const next = ["Restart After Effects (it is open).", "Restart Claude Desktop, Claude Code and Cursor.", "Ask one of them “What's in my project?” The Surehand panel (Window › Extensions › Surehand MCP) shows when it's connected."];
-  let ny = ry + 9, nbody = "";
+  let ny = ry + 8, nbody = "";
   next.forEach((t, i) => {
     const lines = Math.max(1, Math.ceil(t.length / 48));
     nbody += `<div class="a muted" style="${px(124, ny, 9, 9)}">${i + 1}.</div><div class="a" style="${px(134, ny, 186, lines * 9)}">${esc(t)}</div>`;
@@ -120,8 +124,8 @@ img.p{position:absolute;image-rendering:pixelated}`;
   });
   pages.finish = page(
     sidebar + `<div class="a t1" style="${px(124, 14, 196, 16)}">${esc(app.name)} is installed</div>` +
-      `<div class="a" style="${px(124, 36, 196, 1)};height:2px;background:${COLORS.ink}"></div>` +
-      `<div class="a" style="${px(124, 37, 196, ry - 37 + 3)};background:${COLORS.paperSunk}"></div>` + rbody + nbody +
+      `<div class="a" style="${px(124, 38, 196, 1)};background:${COLORS.ink}"></div>` +
+      `<div class="a" style="${px(124, 39, 196, ry - 39)};background:${COLORS.paperSunk}"></div>` + rbody + nbody +
       `<div class="a muted" style="${px(124, 177, 22, 9)}">Help:</div><div class="a" style="${px(145, 177, 150, 10)};text-decoration:underline;text-align:center">github.com/ConformLabs/surehand-mcp</div>`,
     [["Finish", 273, "main"]],
   );

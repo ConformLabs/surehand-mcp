@@ -124,6 +124,8 @@ Page custom AppsCreate AppsLeave ; Choose AI apps
 Var TunnelBox
 Var Tunnel     ; 1: "Set up ChatGPT on the web" ticked (download cloudflared)
 Var Detected   ; 1 once the app list was read
+Var RtNode     ; the Node.js ExtractRuntime found or unpacked
+Var AppsWait   ; "Looking for the AI apps on this PC…" while they are read
 Var UnAll      ; uninstaller: 1 with /ALL (remove the settings and checkpoints too)
 
 ; $0 = process image name -> $0 = 1 if running, else 0
@@ -157,16 +159,25 @@ Function .onGUIEnd
   !insertmacro CL_ONGUIEND
 FunctionEnd
 
-; This version's Node.js, server and cl-run.cjs in $PLUGINSDIR\rt: to read the AI apps before installing, and for
-; the uninstall's clean-up. Extracted once.
+; This version's server and cl-run.cjs in $PLUGINSDIR\rt, and a Node.js to run them -> $RtNode: the installed one
+; when there is one (quick: no 80 MB to unpack and have scanned), else this version's (also in $PLUGINSDIR\rt).
+; To read the AI apps before installing, and for the uninstall's clean-up. Extracted once.
 Function ExtractRuntime
-  ${IfNot} ${FileExists} "$PLUGINSDIR\rt\node.exe"
-    InitPluginsDir
+  InitPluginsDir
+  ${IfNot} ${FileExists} "$PLUGINSDIR\rt\surehand-ae.mjs"
     SetOutPath "$PLUGINSDIR\rt"
-    File "/oname=node.exe" "${NODE_EXE}"
     File "/oname=surehand-ae.mjs" "${SERVER_MJS}"
     File "/oname=cl-run.cjs" "${CL_RUN}"
     SetOutPath "$TEMP"
+  ${EndIf}
+  StrCpy $RtNode "${NODE_DIR}\node.exe"
+  ${IfNot} ${FileExists} "$RtNode"
+    StrCpy $RtNode "$PLUGINSDIR\rt\node.exe"
+    ${IfNot} ${FileExists} "$RtNode"
+      SetOutPath "$PLUGINSDIR\rt"
+      File "/oname=node.exe" "${NODE_EXE}"
+      SetOutPath "$TEMP"
+    ${EndIf}
   ${EndIf}
 FunctionEnd
 
@@ -177,7 +188,7 @@ Function DetectApps
   ${EndIf}
   StrCpy $Detected 1
   Call ExtractRuntime
-  nsExec::Exec '"$PLUGINSDIR\rt\node.exe" "$PLUGINSDIR\rt\cl-run.cjs" --ini "$PLUGINSDIR\clients.ini" -- "$PLUGINSDIR\rt\surehand-ae.mjs" clients --json'
+  nsExec::Exec '"$RtNode" "$PLUGINSDIR\rt\cl-run.cjs" --ini "$PLUGINSDIR\clients.ini" -- "$PLUGINSDIR\rt\surehand-ae.mjs" clients --json'
   Pop $0
 FunctionEnd
 
@@ -264,8 +275,10 @@ Function ToggleTunnel
   ${EndIf}
 FunctionEnd
 
+; The page is shown at once with its header and "Looking for…", Next disabled; the apps are read a moment later (a
+; timer), then the rows are drawn and Next enabled. (Reading them first, before the page, left the window blank
+; for seconds with the previous page's header, and a click then went through to the install.)
 Function AppsCreate
-  Call DetectApps
   !insertmacro MUI_HEADER_TEXT "Choose AI apps" "Surehand connects the apps you tick. You can change this later in the panel."
   nsDialogs::Create 1018
   Pop $0
@@ -273,6 +286,38 @@ Function AppsCreate
     Abort
   ${EndIf}
   SetCtlColors $0 "${CL_INK}" "${CL_PAPER}"
+  Call cl.AppPageShow
+  StrCpy $0 "&Install"
+  ${If} $cl.Installed == 1
+    StrCpy $0 $cl.ActionButton ; Update / Reinstall
+  ${EndIf}
+  Call cl.SetMainButton
+  ${If} $Detected == 1
+    Call AppsRows
+  ${Else}
+    ${NSD_CreateLabel} 0 0 100% 10u "Looking for the AI apps on this PC…"
+    Pop $AppsWait
+    SetCtlColors $AppsWait "${CL_MUTED}" "${CL_PAPER}"
+    GetDlgItem $0 $HWNDPARENT 1
+    EnableWindow $0 0
+    Call cl.SyncMainButton
+    ${NSD_CreateTimer} AppsDetect 50
+  ${EndIf}
+  nsDialogs::Show
+FunctionEnd
+
+Function AppsDetect
+  ${NSD_KillTimer} AppsDetect
+  Call DetectApps
+  ShowWindow $AppsWait ${SW_HIDE}
+  Call AppsRows
+  GetDlgItem $0 $HWNDPARENT 1
+  EnableWindow $0 1
+  Call cl.SyncMainButton
+FunctionEnd
+
+; the rows, on the page being shown
+Function AppsRows
   !insertmacro CL_SECTION_LABEL 0 "AI APPS"
   StrCpy $R0 11 ; the next row's top (dialog units)
   !insertmacro AI_APPS_FOR_EACH _APP_ROW
@@ -290,13 +335,6 @@ Function AppsCreate
   ${EndIf}
   IntOp $R0 $R0 + $R6
   !insertmacro CL_RULE $R0u
-  Call cl.AppPageShow
-  StrCpy $0 "&Install"
-  ${If} $cl.Installed == 1
-    StrCpy $0 $cl.ActionButton ; Update / Reinstall
-  ${EndIf}
-  Call cl.SetMainButton
-  nsDialogs::Show
 FunctionEnd
 
 !macro _APP_LEAVE N ID NAME
@@ -309,6 +347,9 @@ FunctionEnd
 !macroend
 
 Function AppsLeave
+  ${If} $Detected != 1
+    Abort ; the apps are still being read
+  ${EndIf}
   !insertmacro AI_APPS_FOR_EACH _APP_LEAVE
   ${NSD_GetState} $TunnelBox $0
   ${If} $0 == ${BST_CHECKED}
@@ -488,7 +529,7 @@ Function AfterUninstall
   ${If} $cl.RemoveAll == 1
   ${AndIf} ${FileExists} "${APPDIR}\*.*"
     Call ExtractRuntime
-    nsExec::Exec '"$PLUGINSDIR\rt\node.exe" "$PLUGINSDIR\rt\cl-run.cjs" -- "$PLUGINSDIR\rt\surehand-ae.mjs" uninstall --all'
+    nsExec::Exec '"$RtNode" "$PLUGINSDIR\rt\cl-run.cjs" -- "$PLUGINSDIR\rt\surehand-ae.mjs" uninstall --all'
     Pop $0
   ${EndIf}
 FunctionEnd

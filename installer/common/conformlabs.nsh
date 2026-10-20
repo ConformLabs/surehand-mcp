@@ -101,6 +101,7 @@
 !define CL_SS_RIGHT 0x2
 !define CL_SS_CENTER_V 0x201          ; SS_CENTER | SS_CENTERIMAGE (one line, centred both ways)
 !define CL_SS_BITMAP_CENTER 0x20E     ; SS_BITMAP | SS_CENTERIMAGE
+!define CL_SS_CENTERIMAGE 0x200
 !define CL_STM_SETIMAGE 0x172
 !define CL_SWP_ZORDER_ONLY 0x13       ; SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE
 !define CL_SWP_SIZE_ONLY 0x16         ; SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE
@@ -296,7 +297,9 @@ Function ${UN}cl.SyncMainButton
     Push $1
     Push $2
     GetDlgItem $0 $HWNDPARENT 1
-    System::Call "user32::IsWindowVisible(p r0) i.r1"
+    ; its own WS_VISIBLE: IsWindowVisible is false on the first page, before Windows shows Setup's window
+    System::Call "user32::GetWindowLongW(p r0, i -16) i.r1"
+    IntOp $1 $1 & 0x10000000
     System::Call "user32::IsWindowEnabled(p r0) i.r2"
     ${If} $1 = 0
     ${OrIf} $2 = 0
@@ -1215,7 +1218,7 @@ FunctionEnd
     Pop $0
     SetCtlColors $0 "${CL_INK}" "${CL_PAPER}"
     SendMessage $0 ${WM_SETFONT} $cl.FontTitle 0
-    StrCpy $R9 36 ; the next free line (dialog units)
+    StrCpy $R9 38 ; the next free line (dialog units): a clear gap under the title
     !ifdef CL_RESULTS_INI
       Call cl.FinishResults
     !endif
@@ -1244,7 +1247,9 @@ FunctionEnd
     FunctionEnd
   !endif
 !ifdef CL_RESULTS_INI
-; rows of the results box, from $R9 down; leaves $R9 under the next steps
+; The results box from $R9 down; leaves $R9 under the next steps. The box is built of controls that never overlap
+; (so none can paint over another): the 2 px ink rule, a top strip, one row per result (a gutter with the glyph
+; centred in it, and the text as a left-aligned label tall enough for its lines, both on paper-sunk), a bottom strip.
 Function cl.FinishResults
   ReadINIStr $R8 "${CL_RESULTS_INI}" "summary" "count"
   ${If} $R8 == ""
@@ -1258,21 +1263,15 @@ Function cl.FinishResults
   Call cl.PickArt
   StrCpy $R7 $cl.Art
   ShowWindow $0 ${SW_HIDE}
-  ; the 2 px ink rule, then the sunk box (sized when the rows are known)
-  ${NSD_CreateLabel} 124u $R9u 196u 2u ""
+  ; the ink rule on the box's top edge (1u: 2 px at 100 %)
+  ${NSD_CreateLabel} 124u $R9u 196u 1u ""
   Pop $0
   SetCtlColors $0 "" "${CL_INK}"
-  System::Call "*(i,i,i,i)p.r2"
-  System::Call "user32::GetClientRect(p r0, p r2)"
-  System::Call "*$2(i,i,i.r1,i)"
-  System::Free $2
-  IntOp $2 $cl.Px * 2
-  System::Call "user32::SetWindowPos(p r0, p 0, i 0, i 0, i r1, i r2, i ${CL_SWP_SIZE_ONLY})"
   IntOp $R9 $R9 + 1
-  ${NSD_CreateLabel} 124u $R9u 196u 10u ""
-  Pop $R6 ; the box
-  SetCtlColors $R6 "" "${CL_SUNK}"
-  IntOp $R5 $R9 + 4 ; first row
+  ${NSD_CreateLabel} 124u $R9u 196u 3u ""
+  Pop $0
+  SetCtlColors $0 "" "${CL_SUNK}"
+  IntOp $R9 $R9 + 3
   StrCpy $R4 0
   ${DoWhile} $R4 < $R8
     ReadINIStr $1 "${CL_RESULTS_INI}" "summary.$R4" "kind"
@@ -1281,39 +1280,28 @@ Function cl.FinishResults
     ${AndIf} $1 != "failed"
       StrCpy $1 "skipped"
     ${EndIf}
-    ; about 46 IBM Plex Mono characters fit on a line
-    StrLen $3 $2
-    IntOp $3 $3 + 45
-    IntOp $3 $3 / 46
-    ${IfThen} $3 < 1 ${|} StrCpy $3 1 ${|}
-    IntOp $3 $3 * 10
-    IntOp $4 $R5 + 2
-    ${NSD_CreateBitmap} 130u $4u 5u 5u ""
+    Push $2
+    Call cl.ResultLines ; -> $3 lines
+    IntOp $3 $3 * 10 ; 10u a line
+    ; the gutter: the glyph centred (SS_CENTERIMAGE fills the rest with the bitmap's corner, paper-sunk)
+    ${NSD_CreateBitmap} 124u $R9u 14u $3u ""
     Pop $0
+    ${NSD_AddStyle} $0 ${CL_SS_CENTERIMAGE}
     ${NSD_SetImage} $0 "$PLUGINSDIR\cl\glyph-$1-sunk-$R7.bmp" $5
-    ${NSD_CreateLabel} 140u $R5u 176u $3u "$2"
+    ${NSD_CreateLabel} 138u $R9u 182u $3u "$2"
     Pop $0
     SetCtlColors $0 "${CL_INK}" "${CL_SUNK}"
     ${If} $1 == "skipped"
       SetCtlColors $0 "${CL_MUTED}" "${CL_SUNK}"
     ${EndIf}
     SendMessage $0 ${WM_SETFONT} $cl.FontMono 0
-    IntOp $R5 $R5 + $3
+    IntOp $R9 $R9 + $3
     IntOp $R4 $R4 + 1
   ${Loop}
-  ; the box down to the last row, behind the rows
-  IntOp $3 $R5 - $R9
-  IntOp $3 $3 + 3
-  StrCpy $cl.InnerDlg $mui.FinishPage
-  StrCpy $0 $R6
-  StrCpy $cl.cX 124
-  StrCpy $cl.cY $R9
-  StrCpy $cl.cW 196
-  StrCpy $cl.cH $3
-  Call cl.PlaceDialogUnits
-  StrCpy $cl.InnerDlg ""
-  Call cl.SendToBack
-  IntOp $R9 $R5 + 9
+  ${NSD_CreateLabel} 124u $R9u 196u 3u ""
+  Pop $0
+  SetCtlColors $0 "" "${CL_SUNK}"
+  IntOp $R9 $R9 + 11
 
   ; the next steps, numbered
   ReadINIStr $R8 "${CL_RESULTS_INI}" "next" "count"
@@ -1341,6 +1329,58 @@ FunctionEnd
 !endif
 !macroend
 
+
+!ifdef CL_RESULTS_INI
+; Push "text" / Call cl.ResultLines -> $3: the lines a results row needs. IBM Plex Mono 8 is 6.4 px a character
+; at 96 dpi and the row's label 182u (318 px at Segoe UI 9): 49 fit; 47 leaves room. A word that would cross the
+; edge moves to the next line, so the count is by words, the way Windows wraps the label.
+Function cl.ResultLines
+  Exch $0 ; text
+  Push $1
+  Push $2
+  Push $4
+  StrCpy $3 1
+  StrCpy $4 0 ; characters on this line
+  ${Do}
+    ; the next word (up to a space) of $0
+    StrCpy $1 0
+    ${Do}
+      StrCpy $2 $0 1 $1
+      ${If} $2 == ""
+      ${OrIf} $2 == " "
+        ${Break}
+      ${EndIf}
+      IntOp $1 $1 + 1
+    ${Loop}
+    ${If} $4 > 0
+      IntOp $2 $4 + 1
+      IntOp $2 $2 + $1
+      ${If} $2 > 47
+        IntOp $3 $3 + 1
+        StrCpy $4 $1
+      ${Else}
+        StrCpy $4 $2
+      ${EndIf}
+    ${Else}
+      StrCpy $4 $1
+    ${EndIf}
+    ; a word longer than a line takes more lines
+    ${DoWhile} $4 > 47
+      IntOp $3 $3 + 1
+      IntOp $4 $4 - 47
+    ${Loop}
+    IntOp $1 $1 + 1
+    StrCpy $0 $0 "" $1
+    ${If} $0 == ""
+      ${Break}
+    ${EndIf}
+  ${Loop}
+  Pop $4
+  Pop $2
+  Pop $1
+  Pop $0
+FunctionEnd
+!endif
 
 !macro CL_UNPAGE_CONFIRM
   !define MUI_PAGE_CUSTOMFUNCTION_SHOW un.cl.ConfirmShow

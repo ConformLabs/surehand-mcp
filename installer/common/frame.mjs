@@ -63,11 +63,34 @@ export function fontFaces(keys = Object.keys(FONTS), { inline = true } = {}) {
 export const WIZARD_SIZES = [[164, 314], [191, 362], [238, 452], [286, 543], [334, 634], [382, 724]];
 export const HEADER_SIZES = [[150, 57], [175, 66], [219, 82], [262, 99], [306, 115], [350, 132]];
 // Status glyphs (the finish page's results and the progress steps): squares 5 dialog units wide, in pixels for the
-// same fonts and scalings, each kind on the background it is shown on (pre-composited: Windows draws them opaque).
+// same fonts and scalings, each kind on the background it is shown on (pre-composited: Windows draws them opaque),
+// with a 1 px margin of that background: a centred bitmap control (SS_CENTERIMAGE) fills around it with its corner.
 //   done: filled, the app's accent   skipped: dotted outline   failed: red outline with an X   waiting: dotted, dimmed
 export const GLYPH_SIZES = [8, 9, 11, 13, 15, 18];
 export const GLYPH_KINDS = ["done", "skipped", "failed", "waiting"];
 export const GLYPH_BACKGROUNDS = { sunk: "paperSunk", paper: "paper" };
+
+/**
+ * The lines a row of the Windows finish page's results box needs (conformlabs.nsh cl.ResultLines does the same): 47
+ * IBM Plex Mono characters to a line, words moved whole to the next line the way Windows wraps a label.
+ */
+export const RESULT_LINE_CHARS = 47;
+export function resultLines(text) {
+  let lines = 1, used = 0;
+  for (const word of text.split(" ")) {
+    let n = used > 0 ? used + 1 + word.length : word.length;
+    if (used > 0 && n > RESULT_LINE_CHARS) {
+      lines++;
+      n = word.length;
+    }
+    while (n > RESULT_LINE_CHARS) {
+      lines++;
+      n -= RESULT_LINE_CHARS;
+    }
+    used = n;
+  }
+  return lines;
+}
 
 export function loadApp(file = join(ROOT, "installer", "app.json")) {
   const app = JSON.parse(readFileSync(file, "utf8"));
