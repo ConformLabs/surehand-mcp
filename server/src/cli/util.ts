@@ -1,7 +1,7 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { homedir, platform } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { createInterface } from "node:readline";
 import { backupFile, readJsonFile, stripBom, writeFileAtomic } from "../fsutil.js";
 import { mapLegacyPath } from "../migrate.js";
@@ -25,6 +25,50 @@ export const claudeDesktopDir = () => (isWin ? join(APPDATA_(), "Claude") : join
 export const claudeDesktopConfig = () => join(claudeDesktopDir(), "claude_desktop_config.json");
 export const claudeCodeConfig = () => join(HOME_(), ".claude.json");
 export const cursorConfig = () => join(HOME_(), ".cursor", "mcp.json");
+/** VS Code's user-profile mcp.json (the default profile): top key "servers", entries with type "stdio". */
+export const vscodeUserDir = () =>
+  isWin ? join(APPDATA_(), "Code", "User")
+  : isMac ? join(HOME_(), "Library", "Application Support", "Code", "User")
+  : join(process.env.XDG_CONFIG_HOME || join(HOME_(), ".config"), "Code", "User");
+export const vscodeConfig = () => join(vscodeUserDir(), "mcp.json");
+/**
+ * Windsurf was renamed Devin Desktop (June 2026), which reads ~/.config/devin/mcp_config.json (%APPDATA%\devin on
+ * Windows; XDG_CONFIG_HOME is honoured), shared with the Devin CLI. Windsurf before the rename read
+ * ~/.codeium/windsurf/mcp_config.json.
+ */
+export const devinConfig = () =>
+  isWin ? join(APPDATA_(), "devin", "mcp_config.json") : join(process.env.XDG_CONFIG_HOME || join(HOME_(), ".config"), "devin", "mcp_config.json");
+export const windsurfLegacyConfig = () => join(HOME_(), ".codeium", "windsurf", "mcp_config.json");
+/** LM Studio's mcp.json (Cursor's notation; %USERPROFILE%\.lmstudio on Windows). */
+export const lmStudioConfig = () => join(HOME_(), ".lmstudio", "mcp.json");
+
+/** An app bundle in /Applications or ~/Applications (Mac), or one of these folders (Windows). */
+const appThere = (mac: string[], win: string[]) =>
+  isMac ? mac.some((a) => existsSync(join("/Applications", a)) || existsSync(join(HOME_(), "Applications", a)))
+  : isWin ? win.some((p) => existsSync(p))
+  : false;
+
+/** VS Code: its settings folder (made on its first start), else the app (user or system install). */
+export function vscodeInstalled(): boolean {
+  return (
+    existsSync(dirname(vscodeUserDir())) ||
+    appThere(["Visual Studio Code.app"], [join(LOCALAPPDATA_(), "Programs", "Microsoft VS Code"), join(process.env.ProgramFiles || "C:\\Program Files", "Microsoft VS Code")])
+  );
+}
+/** Windsurf or Devin Desktop: their settings folders, else the app. */
+export function windsurfInstalled(): boolean {
+  const appData = isWin ? APPDATA_() : join(HOME_(), "Library", "Application Support");
+  return (
+    existsSync(dirname(windsurfLegacyConfig())) ||
+    existsSync(dirname(devinConfig())) ||
+    existsSync(join(appData, "Windsurf")) ||
+    appThere(["Windsurf.app", "Devin.app"], [join(LOCALAPPDATA_(), "Programs", "Windsurf"), join(LOCALAPPDATA_(), "Programs", "Devin")])
+  );
+}
+/** LM Studio: its ~/.lmstudio folder, else the app. */
+export function lmStudioInstalled(): boolean {
+  return existsSync(dirname(lmStudioConfig())) || appThere(["LM Studio.app"], [join(LOCALAPPDATA_(), "Programs", "LM Studio"), join(LOCALAPPDATA_(), "Programs", "lm-studio")]);
+}
 /** ChatGPT desktop and Codex share this file (CODEX_HOME overrides ~/.codex). */
 export const codexConfig = () => join(process.env.CODEX_HOME || join(HOME_(), ".codex"), "config.toml");
 

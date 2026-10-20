@@ -11,7 +11,7 @@ const home = mkdtempSync(join(tmpdir(), "surehand-install-results-"));
 vi.mock("node:os", async (orig) => ({ ...(await orig<typeof import("node:os")>()), homedir: () => home }));
 
 // what is "installed" on this fake computer, and what connecting does
-const apps = { installed: new Set(["claude-desktop", "claude-code", "cursor"]), fail: new Map<string, string>(), connected: [] as string[], disconnected: [] as string[] };
+const apps = { installed: new Set(["claude-desktop", "claude-code", "cursor", "vscode"]), fail: new Map<string, string>(), connected: [] as string[], disconnected: [] as string[] };
 vi.mock("../src/cli/clients.js", async (orig) => {
   const real = await orig<typeof import("../src/cli/clients.js")>();
   return {
@@ -66,13 +66,14 @@ describe("install results and --clients", () => {
     // in the installers' order (installer/ai-apps.json)
     expect(r.clients.map((c: any) => [c.id, c.outcome])).toEqual([
       ["claude-desktop", "connected"], ["claude-code", "not-chosen"], ["cursor", "failed"], ["codex", "not-found"],
+      ["vscode", "not-chosen"], ["windsurf", "not-found"], ["lm-studio", "not-found"],
     ]);
     expect(r.clients.find((c: any) => c.id === "cursor").message).toBe("could not update its settings: EACCES");
     expect(rows()).toEqual(expect.arrayContaining([
       "done: Connected Claude Desktop",
       "failed: Cursor not connected: could not update its settings: EACCES",
-      "skipped: Not ticked: Claude Code",
-      "skipped: Not found: ChatGPT desktop / Codex",
+      "skipped: Not ticked: Claude Code, VS Code",
+      "skipped: Not found: ChatGPT desktop / Codex, Windsurf / Devin Desktop, LM Studio",
     ]));
     expect(r.next).toContain("Restart Claude Desktop.");
     expect(r.next).toContain("Ask it “What's in my project?” The Surehand panel (Window › Extensions › Surehand MCP) shows when it's connected.");
@@ -80,11 +81,11 @@ describe("install results and --clients", () => {
 
   it("without --clients connects every app found (a silent Setup, the zip launchers); none connects none", async () => {
     await install([]);
-    expect(apps.connected).toEqual(["claude-desktop", "claude-code", "cursor"]);
+    expect(apps.connected).toEqual(["claude-desktop", "claude-code", "cursor", "vscode"]);
     apps.connected.length = 0;
     await install(["--clients", "none"]);
     expect(apps.connected).toEqual([]);
-    expect(result().clients.map((c: any) => c.outcome)).toEqual(["not-chosen", "not-chosen", "not-chosen", "not-found"]);
+    expect(result().clients.map((c: any) => c.outcome)).toEqual(["not-chosen", "not-chosen", "not-chosen", "not-found", "not-chosen", "not-found", "not-found"]);
   });
 
   it("the installers' steps (--connect-only) add each app to the results of the install before, and exit 3 when it failed", async () => {

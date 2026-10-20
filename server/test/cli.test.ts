@@ -29,7 +29,7 @@ describe.skipIf(!existsSync(bundle))("surehand-ae command line", () => {
   it("clients --json and connect --json answer with the panel's shapes", () => {
     const c = run("clients", "--json");
     expect(c.status).toBe(0);
-    expect(JSON.parse(c.stdout).clients.map((x: any) => x.id)).toEqual(["claude-desktop", "claude-code", "codex", "cursor", "chatgpt-web"]);
+    expect(JSON.parse(c.stdout).clients.map((x: any) => x.id)).toEqual(["claude-desktop", "claude-code", "codex", "cursor", "vscode", "windsurf", "lm-studio", "chatgpt-web"]);
     const k = run("connect", "nope", "--json");
     expect(k.status).toBe(1);
     expect(JSON.parse(k.stdout)).toEqual({ ok: false, message: expect.stringMatching(/Unknown app "nope"/) });

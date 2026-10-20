@@ -20,6 +20,21 @@
       "id": "codex",
       "name": "ChatGPT desktop / Codex",
       "mac": ["~/.codex", "/Applications/ChatGPT.app", "/Applications/Codex.app", "~/Applications/ChatGPT.app", "/opt/homebrew/bin/codex", "/usr/local/bin/codex"]
+    },
+    {
+      "id": "vscode",
+      "name": "VS Code",
+      "mac": ["~/Library/Application Support/Code", "/Applications/Visual Studio Code.app", "~/Applications/Visual Studio Code.app"]
+    },
+    {
+      "id": "windsurf",
+      "name": "Windsurf / Devin Desktop",
+      "mac": ["~/.codeium/windsurf", "~/.config/devin", "~/Library/Application Support/Windsurf", "/Applications/Windsurf.app", "/Applications/Devin.app", "~/Applications/Windsurf.app", "~/Applications/Devin.app"]
+    },
+    {
+      "id": "lm-studio",
+      "name": "LM Studio",
+      "mac": ["~/.lmstudio", "/Applications/LM Studio.app", "~/Applications/LM Studio.app"]
     }
   ],
   "web": {

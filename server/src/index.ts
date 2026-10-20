@@ -10,7 +10,7 @@ import { checkForUpdate } from "./update.js";
 import { activityFile, readActivity } from "./activity.js";
 import { chatgpt } from "./cli/chatgpt.js";
 import { checkpointDiffCommand, checkpointSaveCommand, checkpointsCommand } from "./cli/checkpoints.js";
-import { clientsJson, connectClient, disconnectClient, listClients, moveFromLegacy } from "./cli/clients.js";
+import { CLIENT_IDS, clientsJson, connectClient, disconnectClient, listClients, moveFromLegacy } from "./cli/clients.js";
 import { diagnostics } from "./cli/diagnostics.js";
 import { install } from "./cli/install.js";
 import { selftest, selftestJson } from "./cli/selftest.js";
@@ -99,7 +99,7 @@ Usage:
   surehand-ae [--tools core|full]   core (default, 29 tools) or every tool
   surehand-ae --http [--port 8766] [--host 127.0.0.1] [--no-auth]
                          run over Streamable HTTP at /mcp (ChatGPT via a tunnel)
-  surehand-ae install [--skip-clients] [--no-claude-desktop|--no-claude-code|--no-cursor|--no-codex]
+  surehand-ae install [--skip-clients] [--no-<app>]
                          install the server + After Effects extension and connect AI apps
                          [--clients <id,id|none>] only these apps   [--tunnel] also get cloudflared
                          (results: ~/.surehand/ae/install-result.json; install --summary prints them)
@@ -117,7 +117,8 @@ Usage:
   surehand-ae update [--json]  install the latest release over this installation (and the AE extension)
   surehand-ae update --check [--json]   only report: {latest, current, updateAvailable, url, checkedAt, notes}
   surehand-ae clients [--json]          the AI apps on this computer and whether they are connected
-  surehand-ae connect <app> [--json]    connect one: claude-desktop, claude-code, codex, cursor
+  surehand-ae connect <app> [--json]    connect one: claude-desktop, claude-code, codex, cursor,
+                                        vscode, windsurf, lm-studio
   surehand-ae disconnect <app> [--json]
   surehand-ae checkpoints [--json] [--project <path.aep>]      a project's checkpoints (default: the open one)
   surehand-ae checkpoint-diff <id> [--json] [--project <path>]  what changed since a checkpoint (needs After Effects)
@@ -181,7 +182,7 @@ async function main() {
     case "connect":
     case "disconnect": {
       const id = rest.find((a) => !a.startsWith("--"));
-      const r = id ? (cmd === "connect" ? connectClient(id) : disconnectClient(id)) : { ok: false, message: `usage: surehand-ae ${cmd} <claude-desktop|claude-code|codex|cursor> [--json]`, restartHint: null };
+      const r = id ? (cmd === "connect" ? connectClient(id) : disconnectClient(id)) : { ok: false, message: `usage: surehand-ae ${cmd} <${CLIENT_IDS.join("|")}> [--json]`, restartHint: null };
       const message = `${r.message}${r.restartHint ? ` ${r.restartHint}` : ""}`;
       print({ ok: r.ok, message }, message);
       process.exitCode = r.ok ? 0 : 1;

@@ -26,6 +26,11 @@ Unicode true
 ManifestDPIAware true
 RequestExecutionLevel user
 SetCompressor /SOLID lzma
+; No CRC check of the whole file at start: NSIS reads all 24 MB for it before .onInit, before anything appears. The
+; released Setup is Authenticode-signed, which covers every byte: a damaged or changed file no longer matches its
+; signature, so Windows shows it as unsigned and SmartScreen warns before it starts. Data that can't be unpacked
+; still stops Setup with an error.
+CRCCheck off
 
 !include LogicLib.nsh
 !include x64.nsh
@@ -152,6 +157,7 @@ Var UnNodeKept ; uninstaller: 1 when the shared Node.js stayed for another Sureh
 !macroend
 
 Function .onInit
+  !insertmacro CL_SINGLE_INSTANCE ; a second double-click brings this Setup to the front
   ${IfNot} ${AtLeastWin10}
     MessageBox MB_ICONSTOP "${PRODUCT} needs Windows 10 or later." /SD IDOK
     SetErrorLevel 3
@@ -231,6 +237,7 @@ Function FindClient
 FunctionEnd
 
 ; ---------- Choose AI apps ----------
+; In two columns, in the list's order across (1 2 / 3 4 / ...): a pair is as tall as its taller cell.
 !macro _APP_ROW N ID NAME
   StrCpy $0 "${ID}"
   Call FindClient
@@ -241,10 +248,17 @@ FunctionEnd
   StrCpy $R3 1
   ${If} $1 != 1
     ; not found: the box disabled, the name muted with a note (the labels stay enabled)
-    StrCpy $R2 "Not found on this PC. Install it, then run Setup again."
+    StrCpy $R2 "Not found on this PC"
     StrCpy $R3 0
   ${EndIf}
   GetFunctionAddress $R4 ToggleApp${N}
+  !define /redef /math _APP_COL ${N} % 2
+  !if ${_APP_COL} == 1
+    StrCpy $R7 0
+  !else
+    StrCpy $R7 154
+  !endif
+  StrCpy $R8 146
   Call cl.CheckRow
   StrCpy $App${N}.Box $R5
   ; ticked: the user's own choice (back from the next page), else the current connections when updating, else
@@ -260,7 +274,14 @@ FunctionEnd
   ${AndIf} $1 == 1
     ${NSD_Check} $R5
   ${EndIf}
-  IntOp $R0 $R0 + $R6
+  ; $R9: the pair's height so far; the next pair starts under the taller cell
+  !if ${_APP_COL} == 1
+    StrCpy $R9 $R6
+  !else
+    ${IfThen} $R6 > $R9 ${|} StrCpy $R9 $R6 ${|}
+    IntOp $R0 $R0 + $R9
+    StrCpy $R9 0
+  !endif
 !macroend
 
 !macro _APP_TOGGLE N ID NAME
@@ -353,7 +374,9 @@ FunctionEnd
 Function AppsRows
   !insertmacro CL_SECTION_LABEL 0 "AI APPS"
   StrCpy $R0 11 ; the next row's top (dialog units)
+  StrCpy $R9 0
   !insertmacro AI_APPS_FOR_EACH _APP_ROW
+  IntOp $R0 $R0 + $R9 ; an odd one out (last, on the left)
   IntOp $R0 $R0 + 4
   !insertmacro CL_SECTION_LABEL $R0u "OPTIONAL"
   IntOp $R0 $R0 + 10
@@ -361,6 +384,8 @@ Function AppsRows
   StrCpy $R2 "Downloads Cloudflare's cloudflared (about 55 MB) for the secure link ChatGPT uses."
   StrCpy $R3 1
   GetFunctionAddress $R4 ToggleTunnel
+  StrCpy $R7 0 ; across the page
+  StrCpy $R8 300
   Call cl.CheckRow
   StrCpy $TunnelBox $R5
   ${If} $Tunnel == 1

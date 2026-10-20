@@ -2,7 +2,7 @@ SUREHAND MCP - START HERE
 =========================
 
 Surehand MCP for Adobe After Effects (formerly AE MCP) lets Claude, ChatGPT (desktop app),
-Cursor or Codex control Adobe After Effects on your computer.
+Cursor, Codex, VS Code, Windsurf or LM Studio control Adobe After Effects on your computer.
 
 Pick ONE way to install:
 

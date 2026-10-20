@@ -21,6 +21,7 @@ const put = (file: string, data: unknown) => {
 const json = (file: string) => JSON.parse(readFileSync(file, "utf8"));
 const ENTRY = () => ({ command: process.execPath, args: [server()] });
 const FOREIGN = { command: "/opt/other/ae-bridge", args: ["--port", "9000"] };
+const web = () => clients.clientsJson().clients.find((c) => c.id === "chatgpt-web")!;
 
 beforeEach(() => {
   home = mkdtempSync(join(tmpdir(), "surehand-clients-"));
@@ -28,6 +29,7 @@ beforeEach(() => {
   process.env.CODEX_HOME = join(home, ".codex");
   process.env.APPDATA = join(home, "AppData", "Roaming");
   process.env.LOCALAPPDATA = join(home, "AppData", "Local");
+  delete process.env.XDG_CONFIG_HOME;
   put(server(), "// server");
 });
 
@@ -44,12 +46,12 @@ describe("isOurEntry", () => {
 });
 
 describe("clients --json", () => {
-  it("lists the four apps and ChatGPT on the web, with what is connected and where", () => {
+  it("lists the seven apps and ChatGPT on the web, with what is connected and where", () => {
     put(util.claudeDesktopConfig(), { mcpServers: { "surehand-ae": ENTRY() } });
     put(util.cursorConfig(), { mcpServers: { "after-effects": { command: "node", args: [join(home, ".aemcp", "server", "ae-mcp.mjs")] } } });
     put(util.codexConfig(), 'model = "o3"\n');
     const list = clients.listClients();
-    expect(list.map((c) => c.id)).toEqual(["claude-desktop", "claude-code", "codex", "cursor", "chatgpt-web"]);
+    expect(list.map((c) => c.id)).toEqual(["claude-desktop", "claude-code", "codex", "cursor", "vscode", "windsurf", "lm-studio", "chatgpt-web"]);
     const by = Object.fromEntries(list.map((c) => [c.id, c]));
     expect(by["claude-desktop"]).toEqual({ id: "claude-desktop", name: "Claude Desktop", installed: true, configured: true, configPath: util.claudeDesktopConfig(), note: null });
     expect(by["claude-code"]).toMatchObject({ installed: false, configured: false, configPath: util.claudeCodeConfig() });
@@ -61,12 +63,12 @@ describe("clients --json", () => {
   it("--json is {clients: [{id, name, installed, configured, inUse?, note?, action?}], snippet}", () => {
     put(util.cursorConfig(), { mcpServers: {} });
     const out = clients.clientsJson();
-    expect(out.clients.map((c) => c.id)).toEqual(["claude-desktop", "claude-code", "codex", "cursor", "chatgpt-web"]);
+    expect(out.clients.map((c) => c.id)).toEqual(["claude-desktop", "claude-code", "codex", "cursor", "vscode", "windsurf", "lm-studio", "chatgpt-web"]);
     for (const c of out.clients) expect(Object.keys(c).every((k) => ["id", "name", "installed", "configured", "inUse", "note", "action", "howTo"].includes(k))).toBe(true);
     expect(out.clients[3]).toEqual({ id: "cursor", name: "Cursor", installed: true, configured: false });
-    expect(out.clients[4]).toMatchObject({ id: "chatgpt-web", configured: false, action: "start", howTo: expect.stringMatching(/Developer mode/) });
+    expect(out.clients[7]).toMatchObject({ id: "chatgpt-web", configured: false, action: "start", howTo: expect.stringMatching(/Developer mode/) });
     // a short status for the row; the long how-to stays out of the note
-    expect(["Not running", "Needs cloudflared"]).toContain(out.clients[4].note);
+    expect(["Not running", "Needs cloudflared"]).toContain(out.clients[7].note);
     expect(JSON.parse(out.snippet!)).toEqual({ mcpServers: { "surehand-ae": { command: expect.any(String), args: [server()] } } });
   });
 
@@ -74,12 +76,12 @@ describe("clients --json", () => {
     const file = join(home, ".surehand", "ae", "chatgpt.json");
     // a live supervisor is checked by its process: this test process isn't one, so a "running" file says stopped
     put(file, { state: "running", pid: process.pid, url: "https://x.trycloudflare.com/mcp/t" });
-    expect(clients.clientsJson().clients[4]).toMatchObject({ configured: false });
+    expect(web()).toMatchObject({ configured: false });
     put(file, { state: "needs-tunnel" });
-    const n = clients.clientsJson().clients[4].note;
+    const n = web().note;
     expect(n === "Needs cloudflared" || n === "Not running").toBe(true); // "Not running" when this computer has a tunnel tool
     put(file, { state: "error", error: "cloudflared stopped" });
-    expect(clients.clientsJson().clients[4]).toMatchObject({ configured: false, note: "Didn\u2019t start" });
+    expect(web()).toMatchObject({ configured: false, note: "Didn\u2019t start" });
   });
 
   it("notes an entry whose Node.js is gone", () => {
@@ -126,6 +128,58 @@ describe("connect / disconnect", () => {
     expect(clients.clientInfo("codex")).toMatchObject({ configured: true, note: null });
     expect(clients.disconnectClient("codex").ok).toBe(true);
     expect(readFileSync(util.codexConfig(), "utf8")).toBe(`model = "o3"\n\n${foreign}`);
+  });
+
+  it("VS Code: its user mcp.json, under \"servers\" with type stdio; comments read, everything else kept", () => {
+    const other = { type: "stdio", ...FOREIGN };
+    put(util.vscodeConfig(), '{\n  // mine\n  "inputs": [],\n  "servers": {\n    "other": { "type": "stdio", "command": "/opt/other/ae-bridge", "args": ["--port", "9000"] },\n  },\n}\n');
+    expect(clients.clientInfo("vscode")).toMatchObject({ installed: true, configured: false, configPath: util.vscodeConfig() });
+    expect(clients.connectClient("vscode", ENTRY())).toMatchObject({ ok: true, message: "VS Code is connected to Surehand MCP.", restartHint: expect.stringMatching(/Agent mode/) });
+    expect(json(util.vscodeConfig())).toEqual({ inputs: [], servers: { other, "surehand-ae": { type: "stdio", ...ENTRY() } } });
+    expect(readFileSync(util.vscodeConfig() + ".surehand.bak", "utf8")).toMatch(/\/\/ mine/);
+    expect(clients.clientInfo("vscode")).toMatchObject({ configured: true, note: null });
+    expect(clients.disconnectClient("vscode")).toMatchObject({ ok: true, message: "VS Code is no longer connected to Surehand MCP." });
+    expect(json(util.vscodeConfig())).toEqual({ inputs: [], servers: { other } });
+  });
+
+  it("VS Code: a settings file it can't read is left alone", () => {
+    put(util.vscodeConfig(), '{ "servers": { "other": ');
+    expect(clients.connectClient("vscode", ENTRY())).toMatchObject({ ok: false, message: expect.stringMatching(/could not be read/) });
+    expect(readFileSync(util.vscodeConfig(), "utf8")).toBe('{ "servers": { "other": ');
+    expect(clients.clientInfo("vscode").note).toMatch(/can't be read/);
+  });
+
+  it("Windsurf / Devin Desktop: Devin's mcp_config.json, and Windsurf's from before the rename while its folder is there", () => {
+    // a Windsurf from before the rename: only ~/.codeium/windsurf
+    put(util.windsurfLegacyConfig(), { mcpServers: { other: FOREIGN } });
+    expect(clients.clientInfo("windsurf")).toMatchObject({ installed: true, configured: false });
+    expect(clients.connectClient("windsurf", ENTRY())).toMatchObject({ ok: true, message: "Windsurf / Devin Desktop is connected to Surehand MCP." });
+    expect(json(util.windsurfLegacyConfig()).mcpServers).toEqual({ other: FOREIGN, "surehand-ae": ENTRY() });
+    expect(json(util.devinConfig())).toEqual({ mcpServers: { "surehand-ae": ENTRY() } });
+    expect(clients.disconnectClient("windsurf").ok).toBe(true);
+    expect(json(util.windsurfLegacyConfig()).mcpServers).toEqual({ other: FOREIGN });
+    expect(json(util.devinConfig()).mcpServers).toEqual({});
+    // connected only in the old file (by an older Surehand, or by hand): connected, and shown there
+    put(util.windsurfLegacyConfig(), { mcpServers: { "surehand-ae": ENTRY() } });
+    expect(clients.clientInfo("windsurf")).toMatchObject({ configured: true, configPath: util.windsurfLegacyConfig() });
+  });
+
+  it("Devin Desktop alone: only its own file is written", () => {
+    put(util.devinConfig(), { mcpServers: {}, other: 1 });
+    expect(clients.clientInfo("windsurf").installed).toBe(true);
+    expect(clients.connectClient("windsurf", ENTRY()).ok).toBe(true);
+    expect(json(util.devinConfig())).toEqual({ mcpServers: { "surehand-ae": ENTRY() }, other: 1 });
+    expect(existsSync(dirname(util.windsurfLegacyConfig()))).toBe(false);
+  });
+
+  it("LM Studio: ~/.lmstudio/mcp.json in Cursor's notation", () => {
+    put(util.lmStudioConfig(), { mcpServers: { other: FOREIGN } });
+    expect(clients.clientInfo("lm-studio")).toMatchObject({ installed: true, configured: false, configPath: join(home, ".lmstudio", "mcp.json") });
+    expect(clients.connectClient("lm-studio", ENTRY())).toMatchObject({ ok: true, message: "LM Studio is connected to Surehand MCP." });
+    expect(json(util.lmStudioConfig())).toEqual({ mcpServers: { other: FOREIGN, "surehand-ae": ENTRY() } });
+    expect(clients.clientInfo("lm-studio").configured).toBe(true);
+    expect(clients.disconnectClient("lm-studio").ok).toBe(true);
+    expect(json(util.lmStudioConfig())).toEqual({ mcpServers: { other: FOREIGN } });
   });
 
   it("unknown apps, ChatGPT on the web, and a missing server are explained, never half done", () => {
