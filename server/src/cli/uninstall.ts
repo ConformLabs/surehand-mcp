@@ -6,7 +6,7 @@ import { stopBackground } from "./chatgpt.js";
 import { CLIENT_IDS, disconnectClient } from "./clients.js";
 import { removeOwnCloudflared } from "./tunnel-install.js";
 import { uninstallSkills } from "./skills.js";
-import { agyConnected } from "../chat/agents.js";
+import { agyAllowed, agyRegistered } from "../chat/agents.js";
 import { disconnectAgySync } from "../chat/runner.js";
 import { bold, extensionDir, ok, warn } from "./util.js";
 
@@ -116,7 +116,7 @@ export function uninstall(argv: string[]) {
     if (r.ok && r.restartHint) ok(r.message);
   }
   // Antigravity, if the panel's Chat connected it (its own `agy mcp remove`)
-  if (agyConnected()) {
+  if (agyRegistered() || agyAllowed()) {
     const r = disconnectAgySync();
     if (r.ok) ok(r.message);
     else warn(r.message);

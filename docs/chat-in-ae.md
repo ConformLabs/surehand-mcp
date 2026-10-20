@@ -99,7 +99,9 @@ Sign-in check: it has no login or status command (it signs in on its first inter
 **Why it needs a one-time connect:**
 - `agy --help` (v1.4.3) has no per-session MCP option.
 - MCP servers live in `~/.gemini/config/mcp_config.json`, managed with `agy mcp add|remove|list`.
-- So the Chat screen asks once: **Connect** runs `agy mcp add surehand-ae <node> <server>` after a timestamped backup of that file. The uninstaller runs `agy mcp remove surehand-ae`.
+- So the Chat screen asks once: **Connect** runs `agy mcp add surehand-ae <node> <server>` after a timestamped backup of that file.
+- Its headless runs auto-deny any tool that would need a prompt ("Add an allow-rule under permissions.allow in settings.json", seen live). So Connect also adds one rule, `mcp(surehand-ae/*)` (Surehand's tools only), to `permissions.allow` in `~/.gemini/antigravity-cli/settings.json`, after a backup. The syntax and file are from [antigravity.google/docs/permissions](https://antigravity.google/docs/permissions/). Surehand's own Full / Ask / Read-only still decides on edits.
+- Disconnect and the uninstaller remove both (`agy mcp remove surehand-ae`, and the rule).
 
 One turn:
 
@@ -119,6 +121,14 @@ Gemini CLI is left out: it has no per-session MCP config (`--allowed-mcp-server-
 - **Chat** lists only the ready apps: equal segments for two or three, or the app's name for one.
 - **Add another AI app ›** opens **AI apps for chat**: one row per app, with how to sign in (`claude auth login`, `codex login`, `agy`) or where to get it. It says Terminal, or PowerShell on Windows.
 - When no app is ready, the chat opens that screen instead.
+
+## Answers and failures
+
+- Answers are Markdown. The panel shows the release notes' subset (bold, `code`, links as their text, headings, lists) plus fenced code, all as text; nothing becomes HTML.
+- A turn that ends without a word says so ("Antigravity ended without an answer", with the agent's last stderr words).
+- Antigravity refusing a tool shows "Antigravity refused Surehand's tools" with its reason.
+- A conversation's header says whose it is ("Codex · New chat to switch"). New chat brings the picker back.
+- The chat button sits in the panel's header. Settings › Panel opens on (Activity / Chat, config `panelOpensOn`) opens the panel on the chat.
 
 ## The preface (first message of a chat)
 

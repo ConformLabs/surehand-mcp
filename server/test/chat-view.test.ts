@@ -132,6 +132,24 @@ describe("the Chat screen (chatView, chatApply, chatToolView)", () => {
     expect(c.agents[0]).toMatchObject({ signedIn: false, authText: "Not logged in · Please run /login" });
   });
 
+  it("answers' Markdown as blocks of text pieces (the release notes' subset), and a titled error", () => {
+    expect(UI.chatBlocks("## Main\nIt has **3 layers**:\n- Title\n- `Logo`\n\n1. first\n2. [docs](https://x)\n```\nvar a = 1;\n```")).toEqual([
+      { kind: "h", parts: [{ text: "Main" }] },
+      { kind: "p", parts: [{ text: "It has " }, { text: "3 layers", bold: true }, { text: ":" }] },
+      { kind: "ul", items: [[{ text: "Title" }], [{ text: "Logo", code: true }]] },
+      { kind: "ol", items: [[{ text: "first" }], [{ text: "docs" }]] },
+      { kind: "code", text: "var a = 1;" },
+    ]);
+    expect(UI.chatBlocks("a <b>c</b>")).toEqual([{ kind: "p", parts: [{ text: "a <b>c</b>" }] }]);
+    const c: any = { agents: [], agent: "agy", items: [], running: true };
+    UI.chatApply(c, { type: "error", title: "Antigravity refused Surehand's tools", message: "auto-denied" }, "2026-10-20T20:10:00Z");
+    expect(c.items[0]).toMatchObject({ kind: "error", title: "Antigravity refused Surehand's tools", text: "auto-denied" });
+    expect(UI.opensOn({ panelOpensOn: "chat" })).toBe("chat");
+    expect(UI.opensOn({})).toBe("activity");
+    // a conversation's header says whose it is
+    expect(view({ agents: [codex, claude], agent: "codex", items: [{ kind: "user", text: "hi" }] }).status).toEqual({ glyph: "verified", text: "Codex · New chat to switch" });
+  });
+
   it("tool rows: running, refused, failed, and the feed's row once the activity log has it", () => {
     const t = { kind: "tool", id: "t", name: "ae_set_keyframes", args: { comp: "Main", layer: "Title", property: "Position" }, startedAt: "2026-10-20T20:10:00.000Z" };
     expect(UI.chatToolView({ ...t, state: "running" })).toEqual({ glyph: "pending", title: "Set keyframes", word: "Running", line: "Main › Title › Position", muted: true, list: null });

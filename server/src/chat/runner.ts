@@ -7,11 +7,11 @@ import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { createInterface } from "node:readline";
-import { backupFile } from "../fsutil.js";
+import { backupFile, updateJsonFile } from "../fsutil.js";
 import { appFile, SERVER_NAME } from "../paths.js";
 import { cmdExeLine, codexConfig } from "../cli/util.js";
 import {
-  AGENT_IDS, AGENT_LABELS, agyConnected, agyMcpConfig, checkSignIn, commonBinDirs, findAgent, parserFor, turnCommand,
+  AGENT_IDS, AGENT_LABELS, AGY_RULE, agyAllowed, agyConnected, agyMcpConfig, agyRegistered, agySettings, checkSignIn, commonBinDirs, findAgent, parserFor, turnCommand,
   type AgentId, type AgentInfo, type ChatEvent, type QuickRun,
 } from "./agents.js";
 
@@ -180,8 +180,9 @@ export function runTurn(o: TurnOptions, emit: (e: ChatEvent) => void): { stop: (
       return resolve();
     }
     const c = child;
-    let failed = false;
+    let failed = false, answered = false;
     const out = (e: ChatEvent) => {
+      if (e.type === "text") answered = true;
       // after Stop, the agent's "interrupted" isn't an error
       if (e.type === "error" && stopped) return;
       if (e.type === "error") failed = true;
@@ -212,6 +213,9 @@ export function runTurn(o: TurnOptions, emit: (e: ChatEvent) => void): { stop: (
     c.on("close", (code) => {
       rl.close();
       if (!stopped) for (const e of parser.end(code, stderr)) out(e);
+      // it ended without a word and without an error: never nothing on screen
+      if (!stopped && !failed && !answered)
+        out({ type: "error", title: `${AGENT_LABELS[o.agent]} ended without an answer`, message: stderr.trim().split(/\r?\n/).filter((l) => l.trim()).slice(-2).join(" ").slice(0, 600) || "It gave no reply." });
       try {
         writeFileSync(join(dir, `last-${o.agent}.log`), trace + (stderr ? `\n--- stderr ---\n${stderr}` : ""));
       } catch {}
@@ -241,22 +245,54 @@ export async function connectAgy(entry: { command: string; args: string[] }, run
     backupFile(agyMcpConfig());
   } catch {}
   const r = await run(exe, ["mcp", "add", SERVER_NAME, entry.command, ...entry.args], 30000);
-  if (r.code !== 0 || !agyConnected()) return { ok: false, message: `Antigravity did not add Surehand: ${r.out.trim().split(/\r?\n/).pop() || `exit code ${r.code}`}` };
+  if (r.code !== 0 || !agyRegistered()) return { ok: false, message: `Antigravity did not add Surehand: ${r.out.trim().split(/\r?\n/).pop() || `exit code ${r.code}`}` };
+  try {
+    setAgyRule(true);
+  } catch (e: any) {
+    return { ok: false, message: `Surehand is in Antigravity's MCP servers, but its tools couldn't be allowed in ${agySettings()}: ${e.message}` };
+  }
   return { ok: true, message: "Surehand is connected to Antigravity." };
 }
+/**
+ * Adds (or removes) the allow rule for Surehand's tools in Antigravity's settings.json (backed up first; any other
+ * setting is left as it is). Its headless runs refuse a tool that would need a prompt.
+ */
+export function setAgyRule(on: boolean): boolean {
+  return updateJsonFile<any>(agySettings(), (d) => {
+    if (!d || typeof d !== "object" || Array.isArray(d)) return false;
+    const p = d.permissions && typeof d.permissions === "object" ? d.permissions : (d.permissions = {});
+    const allow: unknown[] = Array.isArray(p.allow) ? p.allow : [];
+    const has = allow.includes(AGY_RULE);
+    if (on === has) return false;
+    p.allow = on ? [...allow, AGY_RULE] : allow.filter((x) => x !== AGY_RULE);
+    return true;
+  }, { jsonc: true, missing: () => (on ? {} : (null as any)) });
+}
+function removeAgyRule(): string | null {
+  try {
+    setAgyRule(false);
+    return null;
+  } catch (e: any) {
+    return `remove "${AGY_RULE}" from ${agySettings()} yourself (${e.message})`;
+  }
+}
 export async function disconnectAgy(run: QuickRun = quickRun): Promise<{ ok: boolean; message: string }> {
-  if (!agyConnected()) return { ok: true, message: "Surehand wasn't connected to Antigravity." };
+  const ruleProblem = agyAllowed() ? removeAgyRule() : null;
+  if (ruleProblem) return { ok: false, message: `Antigravity: ${ruleProblem}.` };
+  if (!agyRegistered()) return { ok: true, message: "Surehand wasn't connected to Antigravity." };
   const exe = findAgent("agy");
   if (!exe) return { ok: false, message: `Antigravity isn't installed: remove "${SERVER_NAME}" from ${agyMcpConfig()} yourself.` };
   try {
     backupFile(agyMcpConfig());
   } catch {}
   const r = await run(exe, ["mcp", "remove", SERVER_NAME], 30000);
-  return r.code === 0 && !agyConnected() ? { ok: true, message: "Removed Surehand from Antigravity." } : { ok: false, message: `Antigravity did not remove Surehand: ${r.out.trim() || `exit code ${r.code}`}` };
+  return r.code === 0 && !agyRegistered() ? { ok: true, message: "Removed Surehand from Antigravity." } : { ok: false, message: `Antigravity did not remove Surehand: ${r.out.trim() || `exit code ${r.code}`}` };
 }
 /** The same for the uninstaller (which runs synchronously). */
 export function disconnectAgySync(): { ok: boolean; message: string } {
-  if (!agyConnected()) return { ok: true, message: "Surehand wasn't connected to Antigravity." };
+  const ruleProblem = agyAllowed() ? removeAgyRule() : null;
+  if (ruleProblem) return { ok: false, message: `Antigravity: ${ruleProblem}.` };
+  if (!agyRegistered()) return { ok: true, message: "Surehand wasn't connected to Antigravity." };
   const exe = findAgent("agy");
   if (!exe) return { ok: false, message: `Antigravity isn't installed: remove "${SERVER_NAME}" from ${agyMcpConfig()} yourself.` };
   try {
@@ -264,5 +300,5 @@ export function disconnectAgySync(): { ok: boolean; message: string } {
   } catch {}
   const js = /\.(c|m)?js$/i.test(exe);
   const r = spawnSync(js ? process.execPath : exe, [...(js ? [exe] : []), "mcp", "remove", SERVER_NAME], { encoding: "utf8", timeout: 30000, windowsHide: true, env: agentEnv("agy") });
-  return r.status === 0 && !agyConnected() ? { ok: true, message: "Removed Surehand from Antigravity." } : { ok: false, message: `Antigravity did not remove Surehand: ${(r.stderr || r.stdout || "").trim() || `exit code ${r.status}`}` };
+  return r.status === 0 && !agyRegistered() ? { ok: true, message: "Removed Surehand from Antigravity." } : { ok: false, message: `Antigravity did not remove Surehand: ${(r.stderr || r.stdout || "").trim() || `exit code ${r.status}`}` };
 }

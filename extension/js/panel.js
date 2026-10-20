@@ -318,6 +318,7 @@
   }
   $("pause").onclick = function () { setPaused(true); };
   $("menuBtn").onclick = function () { openScreen("menu"); };
+  $("chatBtn").onclick = function () { openScreen("chat"); };
   $("resume").onclick = function () { setPaused(false); };
 
   // ---------- mode switch (config permissions.mode) ----------
@@ -1444,9 +1445,13 @@
   /** A release-notes line: bold, inline code in the mono font, a heading as a bold line; all of it as text, never HTML. */
   function noteItem(line) {
     var v = UI.noteView(line);
-    return el("li", { cls: v.heading ? "h" : null }, v.parts.map(function (p) {
-      return p.bold || v.heading ? el("b", { text: p.text, cls: p.code ? "mono" : null }) : p.code ? el("span", { cls: "mono", text: p.text }) : p.text;
-    }));
+    return el("li", { cls: v.heading ? "h" : null }, noteParts(v.parts, v.heading));
+  }
+  /** noteView's pieces as text nodes: bold, inline code in the mono font (also the chat's answers). */
+  function noteParts(parts, allBold) {
+    return parts.map(function (p) {
+      return p.bold || allBold ? el("b", { text: p.text, cls: p.code ? "mono" : null }) : p.code ? el("span", { cls: "mono", text: p.text }) : p.text;
+    });
   }
   var updating = false, updatedTo = null;
   function drawUpdate(body, u, checking, note) {
@@ -1736,6 +1741,14 @@
     body.appendChild(el("div", { cls: "spacer" }));
     body.appendChild(el("div", { cls: "sfoot", text: v.foot }));
   }
+  /** An answer's Markdown as the panel's own text: paragraphs, headings, lists, code (never HTML). */
+  function chatText(text) {
+    return el("div", { cls: "ctext md" }, UI.chatBlocks(text).map(function (b) {
+      if (b.kind === "code") return el("pre", { cls: "code", text: b.text });
+      if (b.kind === "ul" || b.kind === "ol") return el(b.kind, {}, b.items.map(function (parts) { return el("li", {}, noteParts(parts)); }));
+      return el("div", { cls: b.kind === "h" ? "mh" : "mp" }, noteParts(b.parts, b.kind === "h"));
+    }));
+  }
   function drawChatItems(box) {
     var label = UI.chatLabel(chat.agent);
     chat.items.forEach(function (it) {
@@ -1745,10 +1758,10 @@
         return;
       }
       if (it.head) box.appendChild(el("div", { cls: "cmsg rhead" }, [el("div", { cls: "row1" }, [el("span", { cls: "label", text: label }), el("span", { cls: "time num", text: UI.hhmm(it.at) })])]));
-      if (it.kind === "agent") { if (it.text) box.appendChild(el("div", { cls: "cmsg" }, [el("div", { cls: "ctext", text: it.text })])); return; }
+      if (it.kind === "agent") { if (it.text) box.appendChild(el("div", { cls: "cmsg" }, [chatText(it.text)])); return; }
       if (it.kind === "notice") { box.appendChild(el("div", { cls: "cmsg" }, [el("div", { cls: "muted", text: it.text })])); return; }
       if (it.kind === "error") {
-        box.appendChild(el("div", { cls: "item ctool" }, [glyph("failed", "Failed"), el("div", { cls: "body" }, [el("div", { cls: "row1" }, [el("span", { cls: "tline" }, [el("span", { cls: "title", text: it.auth ? "Not signed in" : "It stopped with an error" })]), el("span", { cls: "meta" }, [el("span", { cls: "st st-failed", text: "Failed" })])]), el("div", { cls: "line", text: it.text })])]));
+        box.appendChild(el("div", { cls: "item ctool" }, [glyph("failed", "Failed"), el("div", { cls: "body" }, [el("div", { cls: "row1" }, [el("span", { cls: "tline" }, [el("span", { cls: "title", text: it.title || (it.auth ? "Not signed in" : "It stopped with an error") })]), el("span", { cls: "meta" }, [el("span", { cls: "st st-failed", text: "Failed" })])]), el("div", { cls: "line", text: it.text })])]));
         return;
       }
       // a tool call: the feed's row once the activity log has it (click: Activity history)
@@ -1803,6 +1816,8 @@
       row("history", "Activity history", "Everything the AI did, searchable"),
     ]));
     body.appendChild(group("Settings", [
+      choice("Panel opens on", "What you see first when After Effects starts.", [["activity", "Activity"], ["chat", "Chat"]], UI.opensOn(S.cfg),
+        function (v) { if (writeConfig(function (cfg) { if (v === "chat") cfg.panelOpensOn = "chat"; else delete cfg.panelOpensOn; })) S.cfg = readConfig(); openScreen("menu"); }),
       choice("Tools the AI sees", all ? "All: more to choose from, a bigger prompt." : "Core: faster. The AI can still ask for the rest.", [["core", "Core"], ["all", "All"]], all ? "all" : "core",
         function (v) { onMenu(v === "all" ? "toolsAll" : "toolsCore"); openScreen("menu"); }),
       choice("Shell commands in scripts", shell ? "Scripts may run programs on this computer" : "Scripts can’t run programs", [["yes", "Allowed"], ["no", "Off"]], shell ? "yes" : "no",
@@ -1913,5 +1928,7 @@
   Control.hello();
   findMyPort(refresh);
   loadClients();
+  // Settings › Panel opens on: Chat (or AI apps for chat when none is ready)
+  if (UI.opensOn(readConfig()) === "chat") openScreen("chat");
   setInterval(refresh, POLL_MS);
 })();

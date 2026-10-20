@@ -362,6 +362,12 @@ pre.code, pre.details { max-height: 180px; overflow: auto; }
 #screenStatusGlyph[hidden] + #screenStatusText { margin-left: 0; }
 .cmsg > * + * { margin-top: 4px; }
 .ctext { white-space: pre-wrap; word-break: break-word; -webkit-user-select: text; user-select: text; }
+.ctext.md { white-space: normal; }
+.md > * + * { margin-top: 8px; }
+.md .mp { white-space: pre-wrap; }
+.md .mh { font-weight: 600; }
+.md ul, .md ol { margin: 0; padding-left: 18px; }
+.md li + li { margin-top: 2px; }
 .item.ctool { padding-top: 4px; padding-bottom: 4px; border-bottom: 0; }
 .capps { display: flex; flex-direction: column; flex: none; }
 .capps .line { color: var(--ink-muted); }

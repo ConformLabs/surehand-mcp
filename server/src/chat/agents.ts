@@ -8,6 +8,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { readJsonFile } from "../fsutil.js";
 import { SERVER_NAME } from "../paths.js";
 
 export type AgentId = "codex" | "claude" | "agy";
@@ -37,7 +38,8 @@ export type ChatEvent =
   | { type: "text"; id?: string; text?: string; delta?: string }
   | { type: "tool"; phase: "start" | "end"; id: string; name: string; args?: unknown; ok?: boolean; error?: string; builtin?: boolean }
   | { type: "notice"; text: string }
-  | { type: "error"; message: string; auth?: boolean }
+  /** `title`: what happened in a few words, when it isn't a plain error ("Antigravity refused Surehand's tools") */
+  | { type: "error"; message: string; auth?: boolean; title?: string }
   | { type: "done"; ok: boolean; session?: string; stopped?: boolean };
 
 const isWin = process.platform === "win32";
@@ -154,13 +156,28 @@ const firstLine = (s: string) => s.split(/\r?\n/).map((l) => l.trim()).find(Bool
 // ---------- Antigravity: Surehand in its MCP servers ----------
 /** Antigravity's user-level MCP servers (`agy mcp add` writes it). */
 export const agyMcpConfig = () => join(HOME(), ".gemini", "config", "mcp_config.json");
-export function agyConnected(): boolean {
+/** Surehand is in Antigravity's MCP servers. */
+export function agyRegistered(): boolean {
   try {
     return new RegExp(`"${SERVER_NAME}"\\s*:`).test(readFileSync(agyMcpConfig(), "utf8"));
   } catch {
     return false;
   }
 }
+
+/**
+ * Antigravity's CLI settings: its permission rules (`permissions.allow`, rules like "mcp(server/*)", per
+ * antigravity.google/docs/permissions). Headless runs deny any tool that would need a prompt.
+ */
+export const agySettings = () => join(HOME(), ".gemini", "antigravity-cli", "settings.json");
+/** The one rule Surehand adds: its own MCP tools only. Surehand's own mode (Full / Ask / Read-only) still decides on edits. */
+export const AGY_RULE = `mcp(${SERVER_NAME}/*)`;
+export function agyAllowed(): boolean {
+  const r = readJsonFile<any>(agySettings(), { jsonc: true });
+  return r.ok && Array.isArray(r.data?.permissions?.allow) && r.data.permissions.allow.includes(AGY_RULE);
+}
+/** Connected for chat: Surehand is in its MCP servers and its tools may run headless. */
+export const agyConnected = () => agyRegistered() && agyAllowed();
 
 // ---------- one turn's command line ----------
 export interface TurnSpec {
@@ -393,12 +410,19 @@ export function claudeParser(): Parser {
  * keeps the last raw stream in chat/last-agy.log to check against.
  */
 export function agyParser(): Parser {
-  let result = false, sawText = false;
+  let result = false, sawText = false, denied: string[] = [];
   const texts = new Map<string, string>();
   const tools = new Map<string, string>();
   const pick = (o: any, keys: string[]) => {
     for (const k of keys) if (o && typeof o[k] === "string" && o[k]) return o[k] as string;
     return "";
+  };
+  /** The Surehand tool a step is about, wherever the step names it ("mcp(surehand-ae/ae_get_project_info)", a tool_name...). */
+  const toolOf = (step: any): string => {
+    const named = pick(step, ["tool_name", "toolName", "mcp_tool", "tool", "name"]) || (step.tool_call && pick(step.tool_call, ["name", "tool_name"])) || "";
+    const m = new RegExp(`${SERVER_NAME}[/_.:]+(ae_[a-z0-9_]+)`).exec(named) || /\b(ae_[a-z0-9_]+)\b/.exec(named) ||
+      new RegExp(`${SERVER_NAME}[/_.:]+(ae_[a-z0-9_]+)`).exec(JSON.stringify(step));
+    return m ? m[1] : named.replace(SERVER_PREFIX, "");
   };
   return {
     line(o) {
@@ -413,18 +437,21 @@ export function agyParser(): Parser {
         const step = o.step || o.step_update || o;
         const kind = String(step.step_type || o.step_type || "");
         const id = String(step.step_id ?? step.stepIndex ?? step.step_index ?? step.id ?? o.step_index ?? kind);
-        const status = String(step.status || o.status || "");
-        const done = /done|complete|finish|success|fail|error|cancel/i.test(status);
-        const toolName = pick(step, ["tool_name", "toolName", "mcp_tool", "tool"]) || (step.tool_call && pick(step.tool_call, ["name", "tool_name"]));
-        if (/tool|mcp/i.test(kind) || toolName) {
-          const name = (toolName || kind).replace(SERVER_PREFIX, "").replace(new RegExp(`^${SERVER_NAME}[_.:/]`), "");
+        const status = String(step.status || step.state || o.status || o.state || "");
+        const done = /done|complete|finish|success|fail|error|cancel|denied/i.test(status);
+        const name = toolOf(step);
+        if (/tool|mcp/i.test(kind) || name) {
+          const shown = name || kind;
           if (!tools.has(id)) {
-            tools.set(id, name);
-            out.push({ type: "tool", phase: "start", id, name, args: step.arguments || step.args || step.input || step.tool_call?.arguments });
+            tools.set(id, shown);
+            out.push({ type: "tool", phase: "start", id, name: shown, args: step.arguments || step.args || step.input || step.tool_call?.arguments });
           }
           if (done) {
-            const failed = /fail|error|cancel/i.test(status);
-            out.push({ type: "tool", phase: "end", id, name, ok: !failed, ...(failed ? { error: short(pick(step, ["error", "error_message", "message"]) || status) } : {}) });
+            const failed = /fail|error|cancel|denied/i.test(status);
+            let why = pick(step, ["error", "error_message", "message", "reason"]) || (step.error && pick(step.error, ["message"])) || status;
+            // Antigravity's own permission settings refused it (not Surehand's)
+            if (/denied permission|auto-denied|permission/i.test(why)) why = `Antigravity's own permission settings refused it (${why}).`;
+            out.push({ type: "tool", phase: "end", id, name: shown, ok: !failed, ...(failed ? { error: short(why) } : {}) });
           }
           return out;
         }
@@ -441,15 +468,23 @@ export function agyParser(): Parser {
       if (t === "result") {
         result = true;
         if (sid) out.push({ type: "session", id: sid });
+        if (Array.isArray(o.denied_actions)) denied = o.denied_actions.map((d: any) => String(d?.target || d?.action || "")).filter(Boolean);
         const isError = o.is_error === true || o.subtype === "error" || (typeof o.status === "string" && /fail|error/i.test(o.status)) || !!o.error;
         const text = pick(o, ["result", "response", "text"]);
         if (isError) out.push(errorEvent(pick(o, ["error", "message"]) || (o.error && pick(o.error, ["message"])) || text || "The turn failed."));
-        else if (text && !sawText) out.push({ type: "text", id: "agy-result", text });
+        else if (text && !sawText) {
+          sawText = true;
+          out.push({ type: "text", id: "agy-result", text });
+        }
         return out;
       }
       return out;
     },
     end(code, stderr) {
+      // a tool it wasn't allowed: say so with its own reason (its stderr names the rule it wanted)
+      const why = stderr.split(/\r?\n/).find((l) => /auto-denied|cannot prompt|denied permission/i.test(l));
+      if (denied.length || why)
+        return [{ type: "error", title: "Antigravity refused Surehand's tools", message: (why || `It denied: ${denied.join(", ")}`).trim().slice(0, 600) }];
       if (result) return [];
       if (code !== 0) return [errorEvent(tail(stderr) || `Antigravity stopped (exit code ${code}).`)];
       return [];

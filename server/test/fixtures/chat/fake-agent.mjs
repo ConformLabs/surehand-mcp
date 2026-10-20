@@ -119,6 +119,17 @@ export async function run(agent) {
     process.exit(1);
   }
   if (scenario === "slow") return hang();
+  // as seen live (v1.4.3): its own permission settings refused the tool in a headless run
+  if (scenario === "denied") {
+    out({ type: "step_update", step: { step_index: 1, step_type: "MCP_TOOL", state: "ERROR", error: "user denied permission for mcp(surehand-ae/ae_get_project_info)" } });
+    out({ type: "result", conversation_id: conv, response: "", denied_actions: [{ action: "mcp", target: "surehand-ae/ae_get_project_info" }] });
+    process.stderr.write("note: a tool required the 'mcp' permission that headless mode cannot prompt for, so it was auto-denied. Add an allow-rule under permissions.allow in settings.json (e.g. mcp(surehand-ae/ae_get_project_info))\n");
+    return;
+  }
+  if (scenario === "empty") {
+    out({ type: "result", conversation_id: conv, response: "" });
+    return;
+  }
   out({ type: "step_update", step: { step_index: 1, step_type: "MCP_TOOL", tool_name: "surehand-ae_ae_get_comp_info", arguments: { comp: "Main" }, status: "RUNNING" } });
   out({ type: "step_update", step: { step_index: 1, step_type: "MCP_TOOL", tool_name: "surehand-ae_ae_get_comp_info", status: "DONE" } });
   out({ type: "step_update", step: { step_index: 2, step_type: "PLANNER_RESPONSE", text: "Main has" } });

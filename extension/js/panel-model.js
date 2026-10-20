@@ -582,6 +582,8 @@
       return v;
     }
     v.status = { glyph: chatReady(a) && !(a.id === "agy" && a.connected === false) ? "verified" : "notrun", text: chatAgentStatus(a) };
+    // a conversation: whose it is, and how to talk to another app
+    if (!fresh && chatReady(a)) v.status.text = label + " \u00b7 New chat to switch";
     var other = chatOther(c.agents, a.id), use = other ? [{ id: "use:" + other.id, text: "Use " + other.label + " instead" }] : [];
     if (!chatReady(a)) {
       // a turn said it isn't signed in
@@ -608,6 +610,38 @@
     v.button = { text: "Send", main: true, disabled: false };
     return v;
   }
+
+  /**
+   * An AI app's answer (Markdown) as blocks: { kind: "p" | "h" | "ul" | "ol" | "code", parts (noteView's pieces) |
+   * items (pieces per item) | text }. The same small subset as release notes (bold, `code`, links as their text,
+   * headings, lists) plus fenced code; everything stays text, nothing becomes HTML.
+   */
+  function chatBlocks(text) {
+    var lines = String(text || "").replace(/\r\n?/g, "\n").split("\n"), out = [], i = 0;
+    var UL = /^\s*[-*+]\s+/, OL = /^\s*\d+[.)]\s+/, FENCE = /^\s*```/, HEAD = /^\s*#{1,6}\s+/;
+    while (i < lines.length) {
+      var l = lines[i];
+      if (FENCE.test(l)) {
+        var code = [];
+        for (i++; i < lines.length && !FENCE.test(lines[i]); i++) code.push(lines[i]);
+        i++;
+        out.push({ kind: "code", text: code.join("\n") });
+      } else if (!l.trim()) i++;
+      else if (HEAD.test(l)) { out.push({ kind: "h", parts: noteView(l.replace(/^\s+/, "")).parts }); i++; }
+      else if (UL.test(l) || OL.test(l)) {
+        var re = UL.test(l) ? UL : OL, items = [];
+        for (; i < lines.length && re.test(lines[i]); i++) items.push(noteView(lines[i].replace(re, "")).parts);
+        out.push({ kind: re === UL ? "ul" : "ol", items: items });
+      } else {
+        var para = [];
+        for (; i < lines.length && lines[i].trim() && !UL.test(lines[i]) && !OL.test(lines[i]) && !HEAD.test(lines[i]) && !FENCE.test(lines[i]); i++) para.push(lines[i]);
+        out.push({ kind: "p", parts: noteView(para.join("\n")).parts });
+      }
+    }
+    return out;
+  }
+  /** Settings › Panel opens on: "chat" or "activity" (the default). */
+  function opensOn(cfg) { return cfg && cfg.panelOpensOn === "chat" ? "chat" : "activity"; }
 
   /**
    * The chat's items from the runner's events (server/src/chat/agents.ts ChatEvent). Items: { kind: "user" |
@@ -641,7 +675,7 @@
         break;
       case "notice": push({ kind: "notice", text: String(ev.text || "") }); break;
       case "error":
-        push({ kind: "error", text: String(ev.message || "Something went wrong."), auth: !!ev.auth });
+        push({ kind: "error", text: String(ev.message || "Something went wrong."), auth: !!ev.auth, title: ev.title || null });
         if (ev.auth) (c.agents || []).forEach(function (a) { if (a.id === c.agent) { a.signedIn = false; a.authText = String(ev.message || ""); } });
         break;
       case "done":
@@ -802,7 +836,7 @@
     toolName: toolName, describeEntry: describeEntry, statusOf: statusOf, changeParts: changeParts, refusal: refusal, readableError: readableError, workingView: workingView, writeAccessCheck: writeAccessCheck, writeAccessWhere: writeAccessWhere, entryDetails: entryDetails, feedItems: feedItems, entryKey: entryKey, canUndo: canUndo,
     renderIdOf: renderIdOf, renderStartInfo: renderStartInfo, renderProgress: renderProgress, timeLeft: timeLeft,
     riskChips: riskChips, approvalView: approvalView, countdown: countdown, countdownView: countdownView, previewView: previewView,
-    CHAT_AGENTS: CHAT_AGENTS, chatPick: chatPick, chatOther: chatOther, chatMenuSub: chatMenuSub, chatView: chatView, chatAppsView: chatAppsView, chatReady: chatReady, chatApply: chatApply, chatToolView: chatToolView, chatEntryFor: chatEntryFor, chatArgsLine: chatArgsLine, chatLabel: chatLabel,
+    CHAT_AGENTS: CHAT_AGENTS, chatPick: chatPick, chatOther: chatOther, chatMenuSub: chatMenuSub, chatView: chatView, chatAppsView: chatAppsView, chatReady: chatReady, chatApply: chatApply, chatToolView: chatToolView, chatEntryFor: chatEntryFor, chatArgsLine: chatArgsLine, chatLabel: chatLabel, chatBlocks: chatBlocks, opensOn: opensOn,
     hhmm: hhmm, dayLabel: dayLabel, whenLabel: whenLabel, parseCliJson: parseCliJson, cmpVersions: cmpVersions, aeLabel: aeLabel,
     updateChannel: updateChannel, updateFor: updateFor, betaSwitchText: betaSwitchText, keptBetaText: keptBetaText, channelToast: channelToast, noteView: noteView,
   };

@@ -214,17 +214,44 @@ describe("Claude Code (claude -p --output-format stream-json)", () => {
 describe("Antigravity (agy -p --output-format stream-json)", () => {
   it("connects Surehand to its MCP servers on request (with a backup), and removes it again", async () => {
     const cfg = join(home, ".gemini", "config", "mcp_config.json");
+    const settings = join(home, ".gemini", "antigravity-cli", "settings.json");
     mkdirSync(join(home, ".gemini", "config"), { recursive: true });
+    mkdirSync(join(home, ".gemini", "antigravity-cli"), { recursive: true });
+    writeFileSync(settings, '{\n  // the user\'s own settings\n  "theme": "dark",\n  "permissions": { "allow": ["command(git)"], "deny": ["command(sudo)"] },\n}\n');
     writeFileSync(cfg, JSON.stringify({ mcpServers: { other: { command: "x" } } }));
     expect(await connectAgy(SERVER)).toEqual({ ok: true, message: "Surehand is connected to Antigravity." });
     expect(agyConnected()).toBe(true);
     expect(JSON.parse(readFileSync(cfg, "utf8")).mcpServers).toEqual({ other: { command: "x" }, "surehand-ae": SERVER });
     expect(existsSync(cfg + ".surehand.bak")).toBe(true);
+    // its headless runs refuse tools that would need a prompt: an allow rule for Surehand's tools only, other settings kept
+    expect(JSON.parse(readFileSync(settings, "utf8"))).toEqual({ theme: "dark", permissions: { allow: ["command(git)", "mcp(surehand-ae/*)"], deny: ["command(sudo)"] } });
+    expect(existsSync(settings + ".surehand.bak")).toBe(true);
     expect(await disconnectAgy()).toMatchObject({ ok: true });
+    expect(JSON.parse(readFileSync(settings, "utf8")).permissions.allow).toEqual(["command(git)"]);
     expect(agyConnected()).toBe(false);
     await connectAgy(SERVER);
     expect(disconnectAgySync()).toMatchObject({ ok: true });
     expect(JSON.parse(readFileSync(cfg, "utf8")).mcpServers).toEqual({ other: { command: "x" } });
+    expect(JSON.parse(readFileSync(settings, "utf8")).permissions.allow).toEqual(["command(git)"]);
+    // registered but without the rule (connected before the rule existed): not connected for chat
+    await connectAgy(SERVER);
+    writeFileSync(settings, "{}");
+    expect(agyConnected()).toBe(false);
+  });
+
+  it("a tool its own permission settings refused: said, with its reason, not an empty reply", async () => {
+    process.env.FAKE_SCENARIO = "denied";
+    const ev = await turn("agy", "What's in this project?");
+    expect(ev.find((e) => e.type === "tool" && e.phase === "start")).toMatchObject({ name: "ae_get_project_info" });
+    expect(ev.find((e) => e.type === "tool" && e.phase === "end")).toMatchObject({ ok: false, error: expect.stringMatching(/^Antigravity's own permission settings refused it/) });
+    expect(ev.filter((e) => e.type === "error")).toEqual([{ type: "error", title: "Antigravity refused Surehand's tools", message: expect.stringMatching(/headless mode cannot prompt for, so it was auto-denied/) }]);
+    expect(last(ev)).toMatchObject({ type: "done", ok: false });
+  });
+
+  it("an empty reply is never nothing on screen", async () => {
+    process.env.FAKE_SCENARIO = "empty";
+    const ev = await turn("agy", "hi");
+    expect(ev.filter((e) => e.type === "error")).toEqual([{ type: "error", title: "Antigravity ended without an answer", message: "It gave no reply." }]);
   });
 
   it("runs a turn: the preface in the first prompt, then --conversation to continue; never skips permissions", async () => {

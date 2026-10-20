@@ -969,11 +969,22 @@ describe("Surehand panel: Chat with your AI app", () => {
 
   it("the reply, the call's end, done; the next message continues the session", async () => {
     const c = lastChild();
-    c.say({ type: "tool", phase: "end", id: "i1", name: "ae_get_keyframes", ok: true }, { type: "text", id: "m1", text: "Both keys now sit on frames 12 and 24." }, { type: "done", ok: true, session: "thread-1" });
+    c.say(
+      { type: "tool", phase: "end", id: "i1", name: "ae_get_keyframes", ok: true },
+      { type: "text", id: "m1", text: "Both keys now sit on **frames 12 and 24**:\n\n- `Position` key 1\n- key 2 <img src=x onerror=alert(1)>" },
+      { type: "done", ok: true, session: "thread-1" },
+    );
     await waitFor(() => send().textContent === "Send");
     expect(toolRows()).toEqual([["Get keyframes", null]]);
-    expect([...body().querySelectorAll(".cmsg .ctext")].map((x: any) => x.textContent)).toEqual(["Make the title land on frame 12", "Both keys now sit on frames 12 and 24."]);
-    expect(statusText()).toBe("Codex · signed in with ChatGPT");
+    expect([...body().querySelectorAll(".cmsg .ctext")].map((x: any) => x.textContent)).toEqual(["Make the title land on frame 12", "Both keys now sit on frames 12 and 24:Position key 1key 2 <img src=x onerror=alert(1)>"]);
+    // the answer's Markdown as the panel's own text: bold, code, a list; nothing becomes HTML
+    const md = [...body().querySelectorAll(".ctext.md")].pop() as any;
+    expect(md.querySelector(".mp b").textContent).toBe("frames 12 and 24");
+    expect([...md.querySelectorAll("ul li")].length).toBe(2);
+    expect(md.querySelector("li .mono").textContent).toBe("Position");
+    expect(md.querySelector("img")).toBeNull();
+    // whose conversation this is, and how to switch
+    expect(statusText()).toBe("Codex · New chat to switch");
     expect(($("screenAction").querySelector("button") as any).disabled).toBe(false);
     $("chatInput").value = "Thanks, check it";
     send().click();
@@ -1044,5 +1055,30 @@ describe("Surehand panel: Chat with your AI app", () => {
     $("back").click();
     expect($("screen").hidden).toBe(true);
     cliAnswer = null;
+  });
+});
+
+describe("Surehand panel: the chat button and Panel opens on", () => {
+  const panel = () => (dom.window as any).SurehandPanel;
+  it("the header's chat button (between Pause and ☰) opens the chat; Back returns", async () => {
+    const head = [...doc().querySelectorAll(".head button:not([hidden])")].map((b: any) => b.id);
+    expect(head.slice(-2)).toEqual(["chatBtn", "menuBtn"]);
+    expect($("chatBtn").getAttribute("aria-label")).toBe("Chat with your AI app");
+    $("chatBtn").click();
+    expect($("screenTitle").textContent).toBe("Chat");
+    $("back").click();
+    expect($("screen").hidden).toBe(true);
+  });
+  it("Settings › Panel opens on: Activity (default) or Chat, saved in the config", async () => {
+    const seg = () => [...doc().querySelectorAll("#screenBody .mset")].find((x: any) => x.textContent.includes("Panel opens on")) as any;
+    $("menuBtn").click();
+    expect(seg().querySelector(".msub").textContent).toBe("What you see first when After Effects starts.");
+    expect(seg().querySelector("button.on").textContent).toBe("Activity");
+    [...seg().querySelectorAll("button")].find((b: any) => b.textContent === "Chat")!.click();
+    expect(config().panelOpensOn).toBe("chat");
+    expect(seg().querySelector("button.on").textContent).toBe("Chat");
+    [...seg().querySelectorAll("button")].find((b: any) => b.textContent === "Activity")!.click();
+    expect(config().panelOpensOn).toBeUndefined();
+    panel().closeScreen();
   });
 });
