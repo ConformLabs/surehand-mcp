@@ -1,5 +1,6 @@
 // The Conform Labs installer frame: what every Conform Labs app's installer shares. An app adds only its own part
-// (installer/app.json: name, "for ..." line, logo SVGs, accent colour; and its own payload and wording).
+// (installer/app.json: name, "for ..." line, logo SVGs or a logo on a tile, accent colour; and its own payload and
+// wording).
 //
 //   frame.mjs           colours, bitmap sizes, the Mac welcome/conclusion page frame (this file)
 //   generate-art.mjs    renders the app's logo into the Windows bitmaps and the Mac background images
@@ -41,7 +42,15 @@ export function loadApp(file = join(ROOT, "installer", "app.json")) {
     if (!/^#[0-9A-Fa-f]{6}$/.test(app.accent?.[k] ?? "")) throw new Error(`${file}: accent.${k} must be #RRGGBB`);
     if (!app.logo?.[k]) throw new Error(`${file}: logo.${k} is missing`);
   }
+  if (app.tile !== undefined && typeof app.tile !== "string" && !(app.tile?.dark && app.tile?.light)) throw new Error(`${file}: tile must be a file or { dark, light }`);
   return app;
+}
+
+// The artwork the installers show for the app: its logo on a tile (app.tile) when it has one, else the bare logo.
+// mode: "dark" | "light". tiled: the image fills its square (a tile) rather than a mark with room around it.
+export function appArt(app, mode) {
+  if (app.tile) return { file: typeof app.tile === "string" ? app.tile : app.tile[mode], tiled: true };
+  return { file: app.logo[mode], tiled: false };
 }
 
 const html = (s) => s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");

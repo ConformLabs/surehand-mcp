@@ -103,6 +103,17 @@ describe("Windows installer: Conform Labs look", () => {
     expect(read("installer/mac/pkg/resources/conclusion.body.html")).toContain(`Then open your AI app and ${hint}`);
   });
 
+  it("shows the app's logo on its tile (app.json tile), the same as the After Effects panel", async () => {
+    const { appArt } = await import(frameUrl);
+    expect(appArt(app, "dark")).toEqual({ file: "brand/surehand-tile.svg", tiled: true });
+    expect(appArt({ ...app, tile: undefined }, "light")).toEqual({ file: app.logo.light, tiled: false });
+    const tile = read("brand/surehand-tile.svg");
+    expect(tile).toMatch(/<rect width="200" height="200" rx="46" fill="#3DD68C"\/>/);
+    // the panel's #tile draws the same S
+    const panel = /<svg id="tile"[\s\S]*?<\/svg>/.exec(read("extension/index.html"))?.[0] ?? "";
+    for (const part of tile.match(/<(path|circle)[^>]*>/g) ?? []) expect(panel.replace(/><\/(path|circle)>/g, "/>")).toContain(part);
+  });
+
   it("has every bitmap size the frame picks from, as 24-bit BMPs of the right size", async () => {
     const { WIZARD_SIZES, HEADER_SIZES } = await import(frameUrl);
     const pick = fn(nsh, "${UN}cl.PickArt");

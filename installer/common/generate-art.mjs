@@ -1,4 +1,5 @@
-// Renders an app's installer artwork in the Conform Labs frame from its logo SVGs and accent (installer/app.json):
+// Renders an app's installer artwork in the Conform Labs frame from its logo (on its tile, if app.json has one) and
+// accent (installer/app.json):
 //
 //   Windows (NSIS)  <out.windows>/wizard-<w>.bmp   welcome/finish sidebar, 24-bit BMP, one per WIZARD_SIZES entry
 //                   <out.windows>/header-<w>.bmp   page header image, one per HEADER_SIZES entry
@@ -14,7 +15,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { inflateSync } from "node:zlib";
-import { COLORS, HEADER_SIZES, ROOT, WIZARD_SIZES, loadApp, macPage } from "./frame.mjs";
+import { COLORS, HEADER_SIZES, ROOT, WIZARD_SIZES, appArt, loadApp, macPage } from "./frame.mjs";
 
 const arg = (name) => {
   const i = process.argv.indexOf(name);
@@ -111,24 +112,31 @@ const ENDORSEMENT = { dark: "brand/conformlabs-endorsement-reversed.svg", light:
 const doc = (body, bg = "transparent") =>
   `<!DOCTYPE html><html><head><meta charset="utf-8"><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:${bg}}img{position:absolute;display:block}</style></head><body>${body}</body></html>`;
 
+// The app's art (frame.mjs appArt): a tile fills its square; a bare mark has room around it, so it is drawn larger.
+// size = the visual size wanted for a tile; returns the <img> box size.
+const art = (mode) => appArt(app, mode);
+const box = (a, size) => Math.round(a.tiled ? size : size * 1.55);
+
 // welcome/finish sidebar: the app's logo on the header colour, the Conform Labs endorsement at the bottom, a hairline
 // on the right edge
 function wizardPage(w, h) {
-  const s = w / 164, logo = Math.round(112 * s), line = Math.max(1, Math.round(s)), endorse = Math.round(132 * s);
-  return doc(`<img src="${svgUri(app.logo.dark)}" style="width:${logo}px;height:${logo}px;left:${Math.round((w - line - logo) / 2)}px;top:${Math.round(34 * (h / 314))}px">` +
+  const a = art("dark"), s = w / 164, logo = box(a, 72 * s), line = Math.max(1, Math.round(s)), endorse = Math.round(132 * s);
+  const top = Math.round((a.tiled ? 54 : 34) * (h / 314));
+  return doc(`<img src="${svgUri(a.file)}" style="width:${logo}px;height:${logo}px;left:${Math.round((w - line - logo) / 2)}px;top:${top}px">` +
     `<img src="${svgUri(ENDORSEMENT.dark, COLORS.text3)}" style="width:${endorse}px;left:${Math.round((w - line - endorse) / 2)}px;bottom:${Math.round(18 * s)}px">` +
     `<div style="position:absolute;right:0;top:0;bottom:0;width:${line}px;background:${COLORS.line}"></div>`, COLORS.header);
 }
 // header: the logo at the right (MUI_HEADERIMAGE_RIGHT), on the header colour
 function headerPage(w, h) {
-  const logo = Math.round(h * 0.96);
-  return doc(`<img src="${svgUri(app.logo.dark)}" style="width:${logo}px;height:${logo}px;right:${Math.round(h * 0.12)}px;top:${Math.round((h - logo) / 2)}px">`, COLORS.header);
+  const a = art("dark"), logo = box(a, h * 0.62), right = Math.round(a.tiled ? h * 0.3 : h * 0.12);
+  return doc(`<img src="${svgUri(a.file)}" style="width:${logo}px;height:${logo}px;right:${right}px;top:${Math.round((h - logo) / 2)}px">`, COLORS.header);
 }
 // Mac Installer background (bottom left, under the step list): the logo and the Conform Labs endorsement line
 function macBackground(mode) {
-  const secondary = mode === "dark" ? COLORS.text3 : COLORS.text3Light;
-  return doc(`<img src="${svgUri(app.logo[mode])}" style="width:128px;height:128px;left:22px;top:6px">` +
-    `<img src="${svgUri(ENDORSEMENT[mode], secondary)}" style="width:128px;left:26px;top:146px">`);
+  const a = art(mode), secondary = mode === "dark" ? COLORS.text3 : COLORS.text3Light;
+  const logo = a.tiled ? `<img src="${svgUri(a.file)}" style="width:84px;height:84px;left:48px;top:40px">`
+    : `<img src="${svgUri(a.file)}" style="width:128px;height:128px;left:22px;top:6px">`;
+  return doc(logo + `<img src="${svgUri(ENDORSEMENT[mode], secondary)}" style="width:128px;left:26px;top:146px">`);
 }
 
 mkdirSync(winOut, { recursive: true });

@@ -10,6 +10,7 @@ The mark is an S drawn as a Pen tool path: one smooth anchor in the middle, with
 | `surehand-icon.svg` | app icon, 128 px and up |
 | `surehand-icon-small.svg` | app icon, 32–64 px (no centre anchor) |
 | `surehand-icon-16.svg` | app icon, 16 px (the S only) |
+| `surehand-tile.svg` | the S on the green tile, as the After Effects panel draws it (`#tile` in extension/index.html); used by the installers (installer/app.json `tile`) |
 | `png/icon-<size>.png` | app icon PNGs, 16–1024 px |
 | `png/mark-*.png` | the mark as PNG (128 and 512 px) |
 | `png/lockup-light.png`, `png/lockup-dark.png` | mark + "Surehand MCP for Adobe® After Effects®" (README header) |
