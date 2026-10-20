@@ -1,21 +1,28 @@
-// Renders an app's installer artwork in the Conform Labs frame from its logo (on its tile, if app.json has one) and
-// accent (installer/app.json):
+// Renders an app's installer artwork in the Conform Labs frame from its logo (on its tile, if app.json has one),
+// name and accent (installer/app.json), with the Conform Labs fonts (installer/common/fonts):
 //
-//   Windows (NSIS)  <out.windows>/wizard-<w>.bmp   welcome/finish sidebar, 24-bit BMP, one per WIZARD_SIZES entry
-//                   <out.windows>/header-<w>.bmp   page header image, one per HEADER_SIZES entry
-//   Mac (pkg)       <out.mac>/background-dark.tiff, background-light.tiff   180x180 with a 360x360 @2x image
+//   Windows (NSIS)  <out.windows>/wizard-<w>.bmp   welcome/finish sidebar: the square tile, the wordmark ("Surehand"
+//                                                  600 + "MCP" 500 muted, Space Grotesk) and the Conform Labs
+//                                                  endorsement, on paper-sunk; one per WIZARD_SIZES entry
+//                   <out.windows>/header-<w>.bmp   header band: the square tile at the right, one per HEADER_SIZES
+//                   <out.windows>/glyph-<kind>-<bg>-<px>.bmp   status squares (GLYPH_KINDS x GLYPH_BACKGROUNDS x
+//                                                  GLYPH_SIZES), pre-composited on the background they sit on
+//   Mac (pkg)       <out.mac>/background-dark.tiff, background-light.tiff   the same lockup for the bottom of the
+//                                                  Installer's sidebar: 152x120 points with a @2x image
 //
 //   node installer/common/generate-art.mjs [--app installer/app.json] [--preview <dir>]
 //
-// --preview also writes PNGs of every image and of the Mac welcome/conclusion pages (light and dark) for review.
-// Needs Google Chrome or Chromium (headless; set CHROME=/path/to/chrome) to draw the SVGs; the Mac images also need
-// sips and tiffutil (macOS). Uses Node.js built-ins only. The output is committed; re-run it when the logo changes.
+// --preview also writes PNGs of every image, and of the installers' pages at their real size: the Windows Setup's
+// pages as HTML mock-ups of conformlabs.nsh's layout (dialog units at Segoe UI 9, 100 %) and the Mac Installer's
+// welcome, choices and conclusion pages (light and dark).
+// Needs Google Chrome or Chromium (headless; set CHROME=/path/to/chrome) to draw; the Mac images also need sips and
+// tiffutil (macOS). Uses Node.js built-ins only. The output is committed; re-run it when the logo or colours change.
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { inflateSync } from "node:zlib";
-import { COLORS, HEADER_SIZES, ROOT, WIZARD_SIZES, appArt, loadApp, macPage } from "./frame.mjs";
+import { COLORS, GLYPH_BACKGROUNDS, GLYPH_KINDS, GLYPH_SIZES, HEADER_SIZES, ROOT, WIZARD_SIZES, appArt, fontFaces, loadApp, macPage, wordmark } from "./frame.mjs";
 
 const arg = (name) => {
   const i = process.argv.indexOf(name);
@@ -45,7 +52,7 @@ function screenshot(page, w, h, { scale = 1, transparent = false, dark = false }
   const r = spawnSync(CHROME, [
     "--headless=new", "--disable-gpu", "--hide-scrollbars", "--no-first-run", "--no-default-browser-check",
     "--allow-file-access-from-files", "--virtual-time-budget=3000", `--user-data-dir=${join(tmp, "profile")}`,
-    `--force-device-scale-factor=${scale}`, `--window-size=${w},${h}`,
+    `--force-device-scale-factor=${scale}`, `--window-size=${w},${h}`, "--font-render-hinting=none",
     ...(transparent ? ["--default-background-color=00000000"] : []),
     ...(dark ? ["--force-dark-mode", "--blink-settings=preferredColorScheme=0"] : ["--blink-settings=preferredColorScheme=1"]),
     `--screenshot=${png}`, `file://${htmlFile}`,
@@ -86,6 +93,13 @@ function decodePng(buf) {
   return { w, h, rgba: out };
 }
 
+/** A part of an RGBA image. */
+const crop = ({ w, rgba }, x0, y0, cw, ch) => {
+  const out = Buffer.alloc(cw * ch * 4);
+  for (let y = 0; y < ch; y++) rgba.copy(out, y * cw * 4, ((y0 + y) * w + x0) * 4, ((y0 + y) * w + x0 + cw) * 4);
+  return { w: cw, h: ch, rgba: out };
+};
+
 // ---------- RGBA -> 24-bit BMP (bottom-up), composited on an opaque background ----------
 function bmp24({ w, h, rgba }, bg) {
   const [br, bgG, bb] = [1, 3, 5].map((i) => parseInt(bg.slice(i, i + 2), 16));
@@ -103,60 +117,95 @@ function bmp24({ w, h, rgba }, bg) {
 }
 
 // ---------- artwork ----------
-const svgUri = (file, recolor) => {
+const svgUri = (file, { recolor, square } = {}) => {
   let svg = readFileSync(join(ROOT, file), "utf8");
   if (recolor) svg = svg.replace(/fill="#[0-9A-Fa-f]{6}"/g, `fill="${recolor}"`);
+  // the installers show the tile square (the design's square tile), the After Effects panel rounded
+  if (square) svg = svg.replace(/(<rect\b[^>]*?)\s+rx="[^"]*"/, "$1");
   return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
 };
 const ENDORSEMENT = { dark: "brand/conformlabs-endorsement-reversed.svg", light: "brand/conformlabs-endorsement.svg" };
-const doc = (body, bg = "transparent") =>
-  `<!DOCTYPE html><html><head><meta charset="utf-8"><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:${bg}}img{position:absolute;display:block}</style></head><body>${body}</body></html>`;
+const FONT_CSS = fontFaces(["display", "displayMedium", "text", "textStrong", "mono", "monoMedium"]);
+const doc = (body, bg = "transparent", css = "") =>
+  `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${FONT_CSS}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:${bg}}img{position:absolute;display:block}${css}</style></head><body>${body}</body></html>`;
 
-// The app's art (frame.mjs appArt): a tile fills its square; a bare mark has room around it, so it is drawn larger.
-// size = the visual size wanted for a tile; returns the <img> box size.
+// The app's art (frame.mjs appArt): a tile fills its square (drawn square); a bare mark has room around it, so it is
+// drawn larger. size = the visual size wanted for a tile; returns the <img> box size.
 const art = (mode) => appArt(app, mode);
 const box = (a, size) => Math.round(a.tiled ? size : size * 1.55);
+const artUri = (mode) => svgUri(art(mode).file, { square: art(mode).tiled });
+const [WORD, WORD_LIGHT] = wordmark(app);
 
-// welcome/finish sidebar: the app's logo on the header colour, the Conform Labs endorsement at the bottom, a hairline
-// on the right edge
+/**
+ * The lockup: tile, wordmark, endorsement, stacked from (left, top). Sizes in pixels: the design's Windows sidebar
+ * (tile 56, wordmark 16 on a 20 line, endorsement 124 wide, 8 apart) times s, or the Mac sidebar's own (z).
+ */
+function lockup(left, top, s, mode = "dark", z = { tile: 56 * s, word: 16 * s, line: 20 * s, endorse: 124 * s, gap: 8 * s }) {
+  const a = art(mode), t = Math.round(z.tile);
+  const ink = mode === "dark" ? COLORS.ink : COLORS.light.ink, muted = mode === "dark" ? COLORS.inkMuted : COLORS.light.inkMuted;
+  const wordTop = top + t + Math.round(z.gap), endorseTop = wordTop + Math.round(z.line) + Math.round(z.gap);
+  return `<img src="${artUri(mode)}" style="width:${box(a, t)}px;height:${box(a, t)}px;left:${left}px;top:${top}px">` +
+    `<div style="position:absolute;left:${left}px;top:${wordTop}px;font:600 ${z.word}px/${z.line}px 'Space Grotesk';letter-spacing:-.01em;color:${ink};white-space:nowrap">${WORD}${WORD_LIGHT ? ` <span style="font-weight:500;color:${muted}">${WORD_LIGHT}</span>` : ""}</div>` +
+    `<img src="${svgUri(ENDORSEMENT[mode], { recolor: muted })}" style="width:${Math.round(z.endorse)}px;left:${left}px;top:${endorseTop}px">`;
+}
+
+// welcome/finish sidebar (the design's 164 px sidebar, scaled to the bitmap): the lockup at the top left on
+// paper-sunk, a hairline on the right edge. The version is a label conformlabs.nsh draws over it (it changes).
 function wizardPage(w, h) {
-  const a = art("dark"), s = w / 164, logo = box(a, 72 * s), line = Math.max(1, Math.round(s)), endorse = Math.round(132 * s);
-  const top = Math.round((a.tiled ? 54 : 34) * (h / 314));
-  return doc(`<img src="${svgUri(a.file)}" style="width:${logo}px;height:${logo}px;left:${Math.round((w - line - logo) / 2)}px;top:${top}px">` +
-    `<img src="${svgUri(ENDORSEMENT.dark, COLORS.text3)}" style="width:${endorse}px;left:${Math.round((w - line - endorse) / 2)}px;bottom:${Math.round(18 * s)}px">` +
-    `<div style="position:absolute;right:0;top:0;bottom:0;width:${line}px;background:${COLORS.line}"></div>`, COLORS.header);
+  const s = w / 164, line = Math.max(1, Math.round(s));
+  return doc(lockup(Math.round(20 * s), Math.round(32 * s), s) +
+    `<div style="position:absolute;right:0;top:0;bottom:0;width:${line}px;background:${COLORS.rule}"></div>`, COLORS.paperSunk);
 }
-// header: the logo at the right (MUI_HEADERIMAGE_RIGHT), on the header colour
+// header band: the square tile at the right (MUI_HEADERIMAGE_RIGHT), on paper-sunk
 function headerPage(w, h) {
-  const a = art("dark"), logo = box(a, h * 0.62), right = Math.round(a.tiled ? h * 0.3 : h * 0.12);
-  return doc(`<img src="${svgUri(a.file)}" style="width:${logo}px;height:${logo}px;left:${w - right - logo}px;top:${Math.round((h - logo) / 2)}px">`, COLORS.header);
+  const a = art("dark"), t = Math.round(h * 0.46), right = Math.round(h * 0.34);
+  return doc(`<img src="${artUri("dark")}" style="width:${box(a, t)}px;height:${box(a, t)}px;left:${w - right - box(a, t)}px;top:${Math.round((h - box(a, t)) / 2)}px">`, COLORS.paperSunk);
 }
-// Mac Installer background (bottom left, under the step list): the logo and the Conform Labs endorsement line
+// status glyphs: one strip of GLYPH_KINDS squares of `px` pixels, 4 px apart, on `bg`
+function glyphStrip(px, bg) {
+  const b = Math.max(1, Math.round(px / 7)); // the design's 2 px border on a 14 px square (1.5x)
+  const cell = (k) => {
+    const st = `position:absolute;box-sizing:border-box;width:${px}px;height:${px}px;top:2px`;
+    if (k === "done") return `<div style="${st};background:${app.accent.dark}"></div>`;
+    if (k === "skipped") return `<div style="${st};border:${b}px dotted ${COLORS.inkMuted}"></div>`;
+    if (k === "waiting") return `<div style="${st};border:${b}px dotted ${COLORS.inkMuted};opacity:.5"></div>`;
+    return `<div style="${st};border:${b}px solid ${COLORS.refused}"><svg width="100%" height="100%" viewBox="0 0 10 10" style="position:absolute;inset:0" preserveAspectRatio="none"><path d="M1 1 9 9M9 1 1 9" stroke="${COLORS.refused}" stroke-width="${(b * 10) / (px - 2 * b)}" fill="none"/></svg></div>`;
+  };
+  return doc(GLYPH_KINDS.map((k, i) => cell(k).replace("position:absolute;", `position:absolute;left:${2 + i * (px + 4)}px;`)).join(""), bg);
+}
+// Mac Installer background (bottom left, under the step list of the 152 pt sidebar): the lockup at the design's
+// 44 pt tile, 16 pt from the left and 20 pt from the bottom
 function macBackground(mode) {
-  const a = art(mode), secondary = mode === "dark" ? COLORS.text3 : COLORS.text3Light;
-  const logo = a.tiled ? `<img src="${svgUri(a.file)}" style="width:84px;height:84px;left:48px;top:40px">`
-    : `<img src="${svgUri(a.file)}" style="width:128px;height:128px;left:22px;top:6px">`;
-  return doc(logo + `<img src="${svgUri(ENDORSEMENT[mode], secondary)}" style="width:128px;left:26px;top:146px">`);
+  return doc(lockup(16, 16, 1, mode, { tile: 44, word: 14, line: 18, endorse: 112, gap: 8 }));
 }
 
 mkdirSync(winOut, { recursive: true });
-for (const f of readdirSync(winOut)) if (/^(wizard|header)-\d+\.bmp$/.test(f)) rmSync(join(winOut, f));
+for (const f of readdirSync(winOut)) if (/^(wizard|header|glyph)-[\w-]+\.bmp$/.test(f)) rmSync(join(winOut, f));
 if (preview) mkdirSync(preview, { recursive: true });
 const written = [];
 for (const [kind, sizes, page] of [["wizard", WIZARD_SIZES, wizardPage], ["header", HEADER_SIZES, headerPage]])
   for (const [w, h] of sizes) {
     const img = screenshot(page(w, h), w, h);
-    writeFileSync(join(winOut, `${kind}-${w}.bmp`), bmp24(img, COLORS.header));
+    writeFileSync(join(winOut, `${kind}-${w}.bmp`), bmp24(img, COLORS.paperSunk));
     if (preview) writeFileSync(join(preview, `win-${kind}-${w}.png`), img.png);
     written.push(`${kind}-${w}.bmp ${w}x${h}`);
   }
+for (const [bgName, colorKey] of Object.entries(GLYPH_BACKGROUNDS))
+  for (const px of GLYPH_SIZES) {
+    const bg = COLORS[colorKey], stripW = 4 + GLYPH_KINDS.length * (px + 4), img = screenshot(glyphStrip(px, bg), stripW, px + 4);
+    GLYPH_KINDS.forEach((k, i) => writeFileSync(join(winOut, `glyph-${k}-${bgName}-${px}.bmp`), bmp24(crop(img, 2 + i * (px + 4), 2, px, px), bg)));
+    if (preview && px === 18) writeFileSync(join(preview, `win-glyphs-${bgName}-${px}.png`), img.png);
+    written.push(`glyph-*-${bgName}-${px}.bmp`);
+  }
 console.log(`Windows: ${winOut}\n  ${written.join("\n  ")}`);
 
+const MAC_BG = [152, 120];
 if (process.platform === "darwin") {
   mkdirSync(macOut, { recursive: true });
   for (const mode of ["light", "dark"]) {
     const parts = [1, 2].map((scale) => {
-      const img = screenshot(macBackground(mode), 180, 180, { scale, transparent: true });
+      const img = screenshot(macBackground(mode), MAC_BG[0], MAC_BG[1], { scale, transparent: true });
       const png = join(tmp, `bg-${mode}-${scale}.png`), tiff = join(tmp, `bg-${mode}-${scale}.tiff`);
       writeFileSync(png, img.png);
       if (preview) writeFileSync(join(preview, `mac-background-${mode}${scale === 2 ? "@2x" : ""}.png`), img.png);
@@ -167,32 +216,24 @@ if (process.platform === "darwin") {
     const out = join(macOut, `background-${mode}.tiff`);
     const t = spawnSync("tiffutil", ["-cathidpicheck", ...parts, "-out", out], { encoding: "utf8" });
     if (t.status !== 0) throw new Error(`tiffutil: ${t.stderr}`);
-    console.log(`Mac: ${out} (180x180 + @2x)`);
+    console.log(`Mac: ${out} (${MAC_BG.join("x")} + @2x)`);
   }
 } else console.log("Mac background images skipped (needs macOS: sips, tiffutil)");
 
-// ---------- previews of the Mac pages, in a frame shaped like the Installer window ----------
+// ---------- previews of the pages ----------
 if (preview) {
   const version = JSON.parse(readFileSync(join(ROOT, "server", "package.json"), "utf8")).version;
-  for (const page of ["welcome", "conclusion"]) {
-    const file = join(preview, `mac-${page}.html`);
-    writeFileSync(file, macPage(page, { version, app }));
-    for (const mode of ["light", "dark"]) {
-      const bg = join(preview, `mac-background-${mode}@2x.png`);
-      const win = mode === "dark" ? "#1E1E1E" : "#ECECEC", pane = mode === "dark" ? "#2A2A2A" : "#FFFFFF";
-      const steps = ["Introduction", "Destination Select", "Installation Type", "Installation", "Summary"]
-        .map((s, i) => `<li style="${(page === "welcome" ? i === 0 : i === 4) ? "font-weight:600" : "opacity:.6"}">${s}</li>`).join("");
-      const harness = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{margin:0;background:${win};font:13px -apple-system,sans-serif;color:${mode === "dark" ? "#ddd" : "#222"}}
-        .side{position:absolute;left:0;top:0;width:200px;height:520px;background:url('file://${bg}') no-repeat left bottom/180px 180px}
-        .side ul{list-style:none;margin:28px 0 0 22px;padding:0;line-height:2}
-        iframe{position:absolute;left:210px;top:20px;width:600px;height:430px;border:1px solid rgba(128,128,128,.25);border-radius:6px;background:${pane};padding:0}
-        .btn{position:absolute;bottom:18px;padding:4px 14px;border-radius:6px;background:${mode === "dark" ? "#555" : "#fff"};border:1px solid rgba(128,128,128,.35)}</style></head>
-        <body><div class="side"><ul>${steps}</ul></div><iframe src="file://${file}"></iframe>
-        <div class="btn" style="right:110px">Go Back</div><div class="btn" style="right:20px">${page === "welcome" ? "Continue" : "Close"}</div></body></html>`;
-      const img = screenshot(harness, 830, 520, { scale: 2, dark: mode === "dark" });
-      writeFileSync(join(preview, `mac-${page}-${mode}.png`), img.png);
-    }
+  const { winPages } = await import("./preview-win.mjs");
+  for (const [name, html] of Object.entries(winPages({ app, version, art: winOut, fonts: FONT_CSS }))) {
+    const img = screenshot(html.page, html.w, html.h, { scale: 2 });
+    writeFileSync(join(preview, `win-page-${name}.png`), img.png);
   }
+  const { macPages } = await import("./preview-mac.mjs");
+  for (const [name, html] of Object.entries(macPages({ app, version, preview, macPage })))
+    for (const mode of ["light", "dark"]) {
+      const img = screenshot(html(mode), 620, 440, { scale: 2, dark: mode === "dark" });
+      writeFileSync(join(preview, `mac-page-${name}-${mode}.png`), img.png);
+    }
   console.log(`Previews: ${preview}`);
 }
 rmSync(tmp, { recursive: true, force: true });

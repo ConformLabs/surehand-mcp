@@ -1,6 +1,7 @@
 // Conform Labs installer frame (Windows): how Setup runs the app's own commands with its private Node.js.
 //
 //   node cl-run.cjs [--ini <out.ini>] [--json-file <in.json>] -- <node arguments...>
+//   node cl-run.cjs --ini <out.ini> --json-file <in.json>     only the conversion (no command)
 //
 // Runs `node <arguments>` with no console input (a command never waits for an answer) and turns its output into
 // plain ASCII for Setup's "Show details" log (no colour codes; check marks become words). Exits with the
@@ -16,8 +17,8 @@ const { readFileSync, writeFileSync } = require("node:fs");
 
 const argv = process.argv.slice(2);
 const sep = argv.indexOf("--");
-const opts = sep >= 0 ? argv.slice(0, sep) : [];
-const args = sep >= 0 ? argv.slice(sep + 1) : argv;
+const opts = sep >= 0 ? argv.slice(0, sep) : argv;
+const args = sep >= 0 ? argv.slice(sep + 1) : [];
 const opt = (name) => {
   const i = opts.indexOf(name);
   return i >= 0 ? opts[i + 1] : undefined;
@@ -63,35 +64,55 @@ function lastJson(text) {
   return null;
 }
 
-module.exports = { toIni, lastJson };
-if (require.main !== module) return;
+/** The INI file Setup reads, in UTF-16 with a BOM: what Windows' INI functions (NSIS ReadINIStr) read as Unicode. */
+function writeIni(file, data) {
+  writeFileSync(file, Buffer.from(`\ufeff${toIni(data ?? { ok: false, error: "no answer" })}`, "utf16le"));
+}
 
-const child = spawn(process.execPath, args, { stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
-let stdout = "";
-for (const [from, to] of [[child.stdout, process.stdout], [child.stderr, process.stderr]]) {
-  from.setEncoding("utf8"); // decodes characters split across chunks correctly
-  from.on("data", (s) => {
-    if (from === child.stdout) stdout += s;
-    to.write(clean(s));
+module.exports = { toIni, lastJson, writeIni };
+
+/** Only the conversion: the JSON file Setup names, as an INI file. */
+function convert() {
+  try {
+    writeIni(iniFile, JSON.parse(readFileSync(jsonFile, "utf8").replace(/^\ufeff/, "")));
+  } catch (e) {
+    process.stderr.write(`Could not convert ${jsonFile}: ${e.message}\r\n`);
+    process.exitCode = 1;
+  }
+}
+
+function run() {
+  const child = spawn(process.execPath, args, { stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+  let stdout = "";
+  for (const [from, to] of [[child.stdout, process.stdout], [child.stderr, process.stderr]]) {
+    from.setEncoding("utf8"); // decodes characters split across chunks correctly
+    from.on("data", (s) => {
+      if (from === child.stdout) stdout += s;
+      to.write(clean(s));
+    });
+  }
+  child.on("error", (e) => {
+    process.stderr.write(`Could not run Node.js: ${e.message}\r\n`);
+    process.exitCode = 1;
+  });
+  child.on("close", (code, signal) => {
+    process.exitCode = code ?? (signal ? 1 : 0);
+    if (!iniFile) return;
+    let data = null;
+    try {
+      data = jsonFile ? JSON.parse(readFileSync(jsonFile, "utf8").replace(/^\ufeff/, "")) : lastJson(stdout);
+    } catch (e) {
+      process.stderr.write(`No result to read (${e.message})\r\n`);
+    }
+    try {
+      writeIni(iniFile, data);
+    } catch (e) {
+      process.stderr.write(`Could not write ${iniFile}: ${e.message}\r\n`);
+    }
   });
 }
-child.on("error", (e) => {
-  process.stderr.write(`Could not run Node.js: ${e.message}\r\n`);
-  process.exitCode = 1;
-});
-child.on("close", (code, signal) => {
-  process.exitCode = code ?? (signal ? 1 : 0);
-  if (!iniFile) return;
-  let data = null;
-  try {
-    data = jsonFile ? JSON.parse(readFileSync(jsonFile, "utf8")) : lastJson(stdout);
-  } catch (e) {
-    process.stderr.write(`No result to read (${e.message})\r\n`);
-  }
-  try {
-    // UTF-16 with a BOM: what Windows' INI functions (NSIS ReadINIStr) read as Unicode
-    writeFileSync(iniFile, Buffer.from(`\ufeff${toIni(data ?? { ok: false, error: "no answer" })}`, "utf16le"));
-  } catch (e) {
-    process.stderr.write(`Could not write ${iniFile}: ${e.message}\r\n`);
-  }
-});
+
+if (require.main === module) {
+  if (args.length) run();
+  else convert();
+}

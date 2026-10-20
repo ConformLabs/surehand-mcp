@@ -1,17 +1,18 @@
-// `surehand-ae chatgpt --install-tunnel [--json]`: downloads Cloudflare's cloudflared (the tunnel ChatGPT on the web
-// needs) into the shared ~/.surehand/bin. No administrator rights, no Homebrew or winget.
+// `surehand-ae chatgpt --install-tunnel [--json]` (and the installers' "Set up ChatGPT on the web"): downloads
+// Cloudflare's cloudflared, the tunnel ChatGPT on the web needs, into the shared ~/.surehand/bin. No administrator
+// rights, no Homebrew or winget.
 //
 // The build is PINNED: Cloudflare's own release on GitHub (github.com/cloudflare/cloudflared), refused unless its
 // SHA-256 matches the hash written below (GitHub's asset digest), the same standard as the installers' Node.js and
-// Preflight's ffmpeg. It is unpacked and checked (`cloudflared --version` names the pinned version) in a staging
-// folder, then renamed into place, so a failure leaves nothing half installed. A marker next to it
-// (cloudflared.surehand.json) records that Surehand put it there: uninstall removes cloudflared only then.
-// Running it again when the pinned version is already there does nothing.
+// Preflight's ffmpeg (it uses Preflight's download and unpack helpers). It is unpacked and checked
+// (`cloudflared --version` names the pinned version) in a staging folder, then renamed into place, so a failure
+// leaves nothing half installed. A marker next to it (cloudflared.surehand.json) records that Surehand put it there:
+// uninstall removes cloudflared only then. Running it again when the pinned version is already there does nothing.
 import { createHash, randomBytes } from "node:crypto";
-import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { sharedBinDir } from "../paths.js";
-import { download, runTool, unzip } from "../preflight/ffmpeg.js";
+import { download, findFile, runTool, sweepStaging, unzip } from "../preflight/ffmpeg.js";
 
 export const CLOUDFLARED_VERSION = "2026.9.3";
 const BASE = `https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}`;
@@ -54,12 +55,13 @@ export const cloudflaredName = (platform = process.platform) => (platform === "w
 export const cloudflaredPath = (dir = sharedBinDir(), platform = process.platform) => join(dir, cloudflaredName(platform));
 /** Written next to cloudflared when Surehand installed it: {version, sha256, source}. */
 export const cloudflaredMarker = (dir = sharedBinDir()) => join(dir, "cloudflared.surehand.json");
+const STAGING = ".cloudflared-staging-";
 
 export interface TunnelInstallResult {
   ok: boolean;
   path?: string;
   version?: string;
-  /** the pinned version was already there */
+  /** it was there already (this version, or another cloudflared the user installed) */
   already?: boolean;
   error?: string;
 }
@@ -98,18 +100,6 @@ export function ownsCloudflared(dir = sharedBinDir(), platform = process.platfor
   }
 }
 
-function findFile(root: string, name: string): string | null {
-  for (const e of readdirSync(root, { withFileTypes: true })) {
-    const p = join(root, e.name);
-    if (e.isFile() && e.name === name) return p;
-    if (e.isDirectory()) {
-      const f = findFile(p, name);
-      if (f) return f;
-    }
-  }
-  return null;
-}
-
 export async function installCloudflared(o: TunnelInstallOptions = {}): Promise<TunnelInstallResult> {
   const platform = o.platform ?? process.platform, arch = o.arch ?? process.arch;
   const dir = o.dir ?? sharedBinDir(), version = o.version ?? CLOUDFLARED_VERSION;
@@ -117,19 +107,16 @@ export async function installCloudflared(o: TunnelInstallOptions = {}): Promise<
   if (!asset) return { ok: false, error: `there is no cloudflared download for ${platform}-${arch}` };
   const file = cloudflaredPath(dir, platform);
   // already there (this version, and the file is the one we put there)
-  const m = readMarker(dir);
-  if (m?.version === version && ownsCloudflared(dir, platform)) return { ok: true, path: file, version, already: true };
+  if (readMarker(dir)?.version === version && ownsCloudflared(dir, platform)) return { ok: true, path: file, version, already: true };
+  // a cloudflared there that Surehand did not put there is the user's: never replaced
+  if (existsSync(file) && !ownsCloudflared(dir, platform)) return { ok: true, path: file, already: true };
 
-  mkdirSync(dir, { recursive: true });
-  // staging folders an interrupted run left (older than an hour: not one in progress)
-  for (const n of readdirSync(dir))
-    if (n.startsWith(".cloudflared-staging-"))
-      try {
-        if (Date.now() - statSync(join(dir, n)).mtimeMs > 60 * 60_000) rmSync(join(dir, n), { recursive: true, force: true });
-      } catch {}
-  const stage = join(dir, `.cloudflared-staging-${randomBytes(6).toString("hex")}`);
-  mkdirSync(stage);
+  let stage = "";
   try {
+    mkdirSync(dir, { recursive: true });
+    sweepStaging(dir, STAGING); // left by an interrupted run
+    stage = join(dir, `${STAGING}${randomBytes(6).toString("hex")}`);
+    mkdirSync(stage);
     const got = join(stage, asset.kind === "tgz" ? "cloudflared.tgz" : cloudflaredName(platform));
     await download(asset, got, o.signal);
     let program = got;
@@ -159,7 +146,7 @@ export async function installCloudflared(o: TunnelInstallOptions = {}): Promise<
   } catch (e: any) {
     return { ok: false, error: e?.message ?? String(e) };
   } finally {
-    rmSync(stage, { recursive: true, force: true });
+    if (stage) rmSync(stage, { recursive: true, force: true });
   }
 }
 
@@ -170,6 +157,7 @@ export function removeOwnCloudflared(dir = sharedBinDir(), platform = process.pl
     rmSync(cloudflaredPath(dir, platform), { force: true });
     removed = true;
   }
+  // the marker goes with our copy, or when there is no cloudflared at all any more
   if (removed || !existsSync(cloudflaredPath(dir, platform))) rmSync(cloudflaredMarker(dir), { force: true });
   try {
     if (!readdirSync(dir).length) rmSync(dir, { recursive: true, force: true });

@@ -1,35 +1,64 @@
 // `surehand-ae install`: the server, the After Effects extension, the config, and the AI apps.
 //
-//   install [--skip-clients] [--no-<app>]   everything; connects every AI app found (except --no-<app>)
-//   install --clients claude-desktop,cursor  connects only these (the installers' app list); "" connects none
-//   install --connect-only --clients <ids>   only the connecting step (the server is installed already): the
-//                                            installers run it once per app, to show each app's result
-//   install ... --result <file>              also writes what happened as JSON (InstallResult) for the installers'
-//                                            finish pages; the text output stays as it is
+//   install [--skip-clients] [--no-<app>]    everything; connects every AI app found (except --no-<app>)
+//   install --clients claude-desktop,cursor   connects only these (the installers' app lists); "none" (or "")
+//                                             connects none
+//   install --tunnel                          also gets cloudflared for ChatGPT on the web (installTunnel)
+//   install --connect-only --clients <ids> [--disconnect <ids>] [--tunnel]
+//                                             only the AI app step (the server is installed already): the installers
+//                                             run it once per app, so each app has its own progress step and result
+//   install --summary                         prints the last install's results (the Mac Installer writes them at
+//                                             the top of ~/.surehand/ae/install.log)
+//
+// Every run writes what happened as JSON (InstallResult) to ~/.surehand/ae/install-result.json (--result <file>
+// elsewhere). A --connect-only run adds its apps to the results that are there. The Windows Setup shows the
+// results on its finish page, the Mac Installer at the top of install.log, and `clients --json` gives the panel
+// the reason an app could not be connected. The text output stays as it is.
 import { spawn, spawnSync } from "node:child_process";
 import { chmodSync, copyFileSync, existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { VERSION } from "../config.js";
-import { writeFileAtomic } from "../fsutil.js";
-import { claudeDesktopRunning, CLIENT_IDS, CLIENT_NAMES, clientInstalled, connectClient, isOurEntry, mcpbInstalled, moveFromLegacy, repointLegacyClients, type ClientId } from "./clients.js";
+import { readJsonFile, writeFileAtomic } from "../fsutil.js";
+import { installTunnel } from "./chatgpt.js";
+import {
+  claudeDesktopRunning, CLIENT_NAMES, clientInstalled, connectClient, disconnectClient, INSTALLER_ORDER, installResultFile, isOurEntry, mcpbInstalled,
+  moveFromLegacy, repointLegacyClients, type ClientId,
+} from "./clients.js";
 import { bundledExtensionSigned, ensureConfig, ensureDebugMode, ensureExtension, PANEL_COMMANDS, runtimeFile } from "./setup.js";
 import {
   LEGACY_SERVER_NAME, SERVER_NAME, ask, bold, claudeDesktopConfig, claudeDesktopExe, configPath,
   dim, extensionDir, fail, installedServer, isMac, isWin, ok, readJson, sleep, stableNodePath, step, warn, CSXS_VERSIONS,
 } from "./util.js";
 
-export type ClientOutcome = "connected" | "failed" | "not-found" | "not-chosen";
+export type ClientOutcome = "connected" | "failed" | "not-found" | "not-chosen" | "disconnected";
+export type TunnelOutcome = "installed" | "already" | "failed";
+/** One line of the installers' results: done (filled green square), skipped (dotted), failed (red X). */
+export interface SummaryRow {
+  kind: "done" | "skipped" | "failed";
+  text: string;
+}
 export interface InstallResult {
   ok: boolean;
   version: string;
-  /** the server and the extension were installed (false with --connect-only) */
+  /** when it was written (ISO) */
+  at: string;
+  /** the server and the extension were installed (false when a --connect-only run started the file) */
   setup: boolean;
   error?: string;
-  /** "After Effects 2025", ... (installed copies found) */
+  /** "After Effects 2025", "After Effects (Beta)" (installed copies found) */
   afterEffects: string[];
+  afterEffectsRunning: boolean;
   clients: { id: ClientId; name: string; outcome: ClientOutcome; message?: string }[];
+  /** cloudflared for ChatGPT on the web, when it was asked for (--tunnel) */
+  tunnel?: { outcome: TunnelOutcome; path?: string; error?: string };
+  /** the results as the installers show them (installResultView) */
+  summary: SummaryRow[];
+  /** the numbered next steps */
+  next: string[];
 }
+
+export { installResultFile };
 
 /** The After Effects versions installed: "After Effects 2025", "After Effects (Beta)". `roots` for tests. */
 export function afterEffectsVersions(roots?: string[]): string[] {
@@ -46,6 +75,60 @@ export function afterEffectsVersions(roots?: string[]): string[] {
     }
   }
   return [...found].sort();
+}
+
+/** Is After Effects open? (Windows: AfterFX.exe; Mac: the After Effects app's process) */
+export function afterEffectsRunning(): boolean {
+  try {
+    if (isWin) return /afterfx\.exe/i.test(spawnSync("tasklist", ["/FI", "IMAGENAME eq AfterFX.exe", "/NH"], { encoding: "utf8", timeout: 15_000 }).stdout || "");
+    if (isMac)
+      return (spawnSync("ps", ["-axo", "comm="], { encoding: "utf8", timeout: 15_000 }).stdout || "").split("\n").some((l) => /\/Adobe After Effects[^/]*\.app\/Contents\/MacOS\//.test(l));
+  } catch {}
+  return false;
+}
+
+const list = (names: string[]) => (names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`);
+
+/** "Adobe® After Effects® 2025, 2026" from ["After Effects 2025", "After Effects 2026"]. */
+const aeNames = (versions: string[]) => `Adobe® After Effects® ${versions.map((v) => v.replace(/^After Effects /, "").replace(/^\((Beta)\)$/, "$1")).join(", ")}`;
+
+/** The results as the installers show them: rows (glyph + text) and the numbered next steps. */
+export function installResultView(r: Omit<InstallResult, "summary" | "next">): { summary: SummaryRow[]; next: string[] } {
+  const summary: SummaryRow[] = [];
+  const by = (o: ClientOutcome) => r.clients.filter((c) => c.outcome === o);
+  const connected = by("connected").map((c) => c.name);
+  if (r.error) summary.push({ kind: "failed", text: `Setup did not finish: ${r.error}` });
+  if (connected.length) summary.push({ kind: "done", text: `Connected ${connected.join(", ")}` });
+  for (const c of by("failed")) summary.push({ kind: "failed", text: `${c.name} not connected: ${c.message ?? "unknown error"}` });
+  if (by("disconnected").length) summary.push({ kind: "skipped", text: `Disconnected: ${by("disconnected").map((c) => c.name).join(", ")}` });
+  if (by("not-chosen").length) summary.push({ kind: "skipped", text: `Not ticked: ${by("not-chosen").map((c) => c.name).join(", ")}` });
+  if (by("not-found").length) summary.push({ kind: "skipped", text: `Not found: ${by("not-found").map((c) => c.name).join(", ")}` });
+  if (r.afterEffects.length) summary.push({ kind: "done", text: aeNames(r.afterEffects) });
+  else summary.push({ kind: "skipped", text: "Adobe® After Effects® not found. The panel loads once it is installed." });
+  const t = r.tunnel;
+  if (t?.outcome === "installed") summary.push({ kind: "done", text: "cloudflared downloaded for ChatGPT on the web" });
+  else if (t?.outcome === "already") summary.push({ kind: "done", text: "cloudflared is already on this computer, for ChatGPT on the web" });
+  else if (t?.outcome === "failed") summary.push({ kind: "failed", text: `cloudflared not downloaded: ${t.error ?? "unknown error"}. Panel › Menu › ChatGPT on the web installs it later.` });
+
+  const next: string[] = [];
+  if (r.afterEffectsRunning) next.push("Restart After Effects (it is open).");
+  if (connected.length) {
+    next.push(`Restart ${list(connected)}.`);
+    next.push(`Ask ${connected.length > 1 ? "one of them" : "it"} “What's in my project?” The Surehand panel (Window › Extensions › Surehand MCP) shows when it's connected.`);
+  } else next.push("Open After Effects and connect an AI app in the Surehand panel (Window › Extensions › Surehand MCP).");
+  return { summary, next };
+}
+
+/** The results as plain text (the top of the Mac install.log; `install --summary`). */
+export function installResultText(r: InstallResult): string {
+  const mark = { done: "[done]   ", skipped: "[skipped]", failed: "[failed] " };
+  return [
+    `Surehand MCP ${r.version} ${r.ok ? "is installed" : "did not finish installing"} (${r.at})`,
+    ...r.summary.map((s) => `  ${mark[s.kind]} ${s.text}`),
+    "",
+    "Next:",
+    ...r.next.map((n, i) => `  ${i + 1}. ${n}`),
+  ].join("\n");
 }
 
 async function quitClaudeDesktop(): Promise<boolean> {
@@ -69,22 +152,65 @@ function startClaudeDesktop() {
 
 const argValue = (argv: string[], name: string): string | undefined => {
   const i = argv.indexOf(name);
-  return i >= 0 && i + 1 < argv.length ? argv[i + 1] : undefined;
+  if (i < 0) return undefined;
+  const v = argv[i + 1];
+  return v === undefined || v.startsWith("--") ? "" : v;
 };
+/** "a,b" -> the known client ids in it ("none" or "" -> none); unknown ids are reported */
+function idList(value: string | undefined, unknown: string[]): Set<ClientId> | null {
+  if (value === undefined) return null;
+  const ids = new Set<ClientId>();
+  for (const s of value.split(",").map((x) => x.trim()).filter((x) => x && x !== "none")) {
+    if ((INSTALLER_ORDER as string[]).includes(s)) ids.add(s as ClientId);
+    else unknown.push(s);
+  }
+  return ids;
+}
 
 export async function install(argv: string[]) {
   const flags = new Set(argv);
-  const resultFile = argValue(argv, "--result");
-  const chosenArg = argValue(argv, "--clients");
-  const chosen = chosenArg === undefined ? null : new Set(chosenArg.split(",").map((s) => s.trim()).filter(Boolean));
+  if (flags.has("--summary")) {
+    const r = readJsonFile<InstallResult>(argValue(argv, "--result") || installResultFile());
+    if (!r.ok || !Array.isArray(r.data?.summary)) {
+      console.log("No install results yet.");
+      process.exitCode = 1;
+      return;
+    }
+    console.log(installResultText(r.data));
+    return;
+  }
+  const resultFile = argValue(argv, "--result") || installResultFile();
+  const unknown: string[] = [];
+  const chosen = idList(argValue(argv, "--clients"), unknown);
+  const unchosen = idList(argValue(argv, "--disconnect"), unknown) ?? new Set<ClientId>();
   const connectOnly = flags.has("--connect-only");
-  const want = (id: ClientId) => (chosen ? chosen.has(id) : !flags.has("--skip-clients") && !flags.has(`--no-${id}`));
-  const result: InstallResult = { ok: true, version: VERSION, setup: !connectOnly, afterEffects: afterEffectsVersions(), clients: [] };
+  // a --connect-only run connects only the apps it is given
+  const want = (id: ClientId) => (chosen ? chosen.has(id) : !connectOnly && !flags.has("--skip-clients") && !flags.has(`--no-${id}`));
+  for (const u of unknown) warn(`Unknown AI app "${u}" (known: ${INSTALLER_ORDER.join(", ")})`);
+
+  // a --connect-only run adds to the results of the install that ran just before it
+  const before = connectOnly ? readJsonFile<InstallResult>(resultFile) : null;
+  const prior = before?.ok && before.data?.version === VERSION && Array.isArray(before.data.clients) ? before.data : null;
+  const result: InstallResult = {
+    ok: prior?.ok ?? true,
+    version: VERSION,
+    at: new Date().toISOString(),
+    setup: prior?.setup ?? !connectOnly,
+    ...(prior?.error ? { error: prior.error } : {}),
+    afterEffects: afterEffectsVersions(),
+    afterEffectsRunning: afterEffectsRunning(),
+    clients: prior ? prior.clients.filter((c) => !(chosen?.has(c.id) || unchosen.has(c.id))) : [],
+    ...(prior?.tunnel ? { tunnel: prior.tunnel } : {}),
+    summary: [],
+    next: [],
+  };
   const writeResult = () => {
-    if (!resultFile) return;
+    // in the installers' order, whatever order the steps ran in
+    result.clients.sort((a, b) => INSTALLER_ORDER.indexOf(a.id) - INSTALLER_ORDER.indexOf(b.id));
+    Object.assign(result, installResultView(result));
     try {
       mkdirSync(dirname(resultFile), { recursive: true });
-      writeFileAtomic(resultFile, JSON.stringify(result, null, 2));
+      writeFileAtomic(resultFile, JSON.stringify(result, null, 2) + "\n");
     } catch (e: any) {
       warn(`Could not write ${resultFile}: ${e.message}`);
     }
@@ -130,7 +256,8 @@ export async function install(argv: string[]) {
     } catch (e: any) {
       fail(`Could not install the extension: ${e.message}`);
       result.ok = false;
-      result.error = `Could not install the After Effects extension: ${e.message}`;
+      result.error = `could not install the After Effects extension: ${e.message}`;
+      for (const id of INSTALLER_ORDER) result.clients.push({ id, name: CLIENT_NAMES[id], outcome: clientInstalled(id) ? "not-chosen" : "not-found" });
       writeResult();
       process.exit(1);
     }
@@ -151,7 +278,10 @@ export async function install(argv: string[]) {
   const nodePath = stableNodePath();
   const entry = { command: nodePath, args: [INSTALLED_SERVER] };
   const registered: string[] = [];
-  const record = (id: ClientId, outcome: ClientOutcome, message?: string) => result.clients.push({ id, name: CLIENT_NAMES[id], outcome, ...(message ? { message } : {}) });
+  const record = (id: ClientId, outcome: ClientOutcome, message?: string) => {
+    result.clients = result.clients.filter((c) => c.id !== id);
+    result.clients.push({ id, name: CLIENT_NAMES[id], outcome, ...(message ? { message } : {}) });
+  };
   const connect = (id: ClientId, label: string) => {
     const r = connectClient(id, entry);
     if (r.ok) {
@@ -160,15 +290,24 @@ export async function install(argv: string[]) {
       record(id, "connected");
     } else {
       warn(`${label}: ${r.message}`);
-      record(id, "failed", r.message);
+      record(id, "failed", r.message.replace(new RegExp(`^${CLIENT_NAMES[id].replace(/[.*+?^${}()|[\]\\/]/g, "\\$&")}: `), ""));
     }
   };
 
   let restartClaude = false;
-  for (const id of CLIENT_IDS) {
+  for (const id of INSTALLER_ORDER) {
     const label = id === "codex" ? "ChatGPT desktop" : CLIENT_NAMES[id];
+    if (unchosen.has(id)) {
+      // the installers' "change which AI apps are connected": an app that was connected and is no longer ticked
+      const r = disconnectClient(id);
+      if (r.ok) ok(r.message);
+      else warn(r.message);
+      record(id, r.ok ? "disconnected" : "failed", r.ok ? undefined : r.message);
+      continue;
+    }
     if (!want(id)) {
-      if (!chosen || !connectOnly) record(id, clientInstalled(id) ? "not-chosen" : "not-found");
+      // a --connect-only run only reports the apps it was given
+      if (!connectOnly) record(id, clientInstalled(id) ? "not-chosen" : "not-found");
       continue;
     }
     if (id === "claude-desktop" && mcpbInstalled()) {
@@ -209,12 +348,28 @@ export async function install(argv: string[]) {
     startClaudeDesktop();
     ok("Claude Desktop restarted");
   }
+  if (flags.has("--tunnel")) {
+    if (!connectOnly) step("ChatGPT on the web: cloudflared");
+    const t = await installTunnel();
+    if (t.ok) {
+      ok(t.already ? `cloudflared is already installed: ${t.path}` : `cloudflared downloaded: ${t.path}`);
+      result.tunnel = { outcome: t.already ? "already" : "installed", path: t.path };
+    } else {
+      warn(`cloudflared was not downloaded: ${t.error}`);
+      result.tunnel = { outcome: "failed", error: t.error };
+    }
+  }
   writeResult();
-  if (connectOnly) return;
+  if (connectOnly) {
+    // an installer step: exit code 3 when something it was asked for did not work
+    const failed = result.clients.some((c) => (chosen?.has(c.id) || unchosen.has(c.id)) && c.outcome === "failed") || (flags.has("--tunnel") && result.tunnel?.outcome === "failed");
+    if (failed) process.exitCode = 3;
+    return;
+  }
 
   step("4/4  Done!");
   console.log(`
-  ${bold("Restart After Effects")} if it is open. The connection starts automatically with it.
+  ${result.afterEffectsRunning ? `${bold("Restart After Effects")}: it is open. ` : ""}The connection starts automatically with After Effects.
   ${registered.length ? `Connected: ${registered.join(", ")}. Restart ${registered.filter((r) => r !== "Claude Desktop" || !restartClaude).join(", ") || "nothing else"} if open.` : flags.has("--skip-clients") || chosen?.size === 0 ? "AI apps were left as they are." : "No AI apps were found to connect."}
 
   Then open your AI app and ask it something about your After Effects project, like ${bold('"What\'s in my project?"')}
@@ -225,3 +380,4 @@ ${registered.includes("ChatGPT desktop") ? `  ChatGPT desktop app: restart it; $
                            args    ["${INSTALLED_SERVER}"]
 `);
 }
+

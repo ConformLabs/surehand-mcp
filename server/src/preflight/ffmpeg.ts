@@ -347,7 +347,8 @@ export async function unzip(zip: string, into: string): Promise<void> {
   throw new Error(`could not unpack ${basename(zip)}: ${why.trim().slice(0, 200)}`);
 }
 
-function findFile(root: string, name: string): string | null {
+/** The first file named `name` (any case) under `root`. Also used for cloudflared. */
+export function findFile(root: string, name: string): string | null {
   for (const e of readdirSync(root, { withFileTypes: true })) {
     const p = join(root, e.name);
     if (e.isFile() && e.name.toLowerCase() === name.toLowerCase()) return p;
@@ -359,11 +360,11 @@ function findFile(root: string, name: string): string | null {
   return null;
 }
 
-/** Removes staging folders left by an install that was interrupted (older than an hour: not one in progress). */
-function sweepStaging(dir: string) {
+/** Removes staging folders left by an install that was interrupted (older than an hour: not one in progress). Also used for cloudflared. */
+export function sweepStaging(dir: string, prefix = ".staging-") {
   try {
     for (const n of readdirSync(dir))
-      if (n.startsWith(".staging-"))
+      if (n.startsWith(prefix))
         try {
           if (Date.now() - statSync(join(dir, n)).mtimeMs > 60 * 60_000) rmSync(join(dir, n), { recursive: true, force: true });
         } catch {}

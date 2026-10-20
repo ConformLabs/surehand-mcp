@@ -18,7 +18,7 @@ Get-ChildItem -Path $root -Recurse -File -ErrorAction SilentlyContinue | Unblock
 
 # Surehand MCP's own entries in .surehand\ae and .aemcp: the same list as OWN_FILES in
 # server/src/cli/uninstall.ts (a test keeps them equal). Everything else there is the user's.
-$ownFiles = @("server", "config.json", "runtime.json", "extension-hash", "bridge-status.json", "instances", "update-check.json", "activity.jsonl", "tmp", "renders", "compat", "install.log", "chatgpt.json", "chatgpt.lock", "sessions", "MOVED.txt")
+$ownFiles = @("server", "config.json", "runtime.json", "extension-hash", "bridge-status.json", "instances", "update-check.json", "activity.jsonl", "tmp", "renders", "compat", "install.log", "install-result.json", "chatgpt.json", "chatgpt.lock", "sessions", "MOVED.txt")
 $legacyDir = Join-Path $env:USERPROFILE ".aemcp"
 
 # Another Surehand app (.surehand\<app>) is installed: the shared Node.js stays for it.
@@ -46,6 +46,19 @@ function Remove-Own($dir) {
   if ($kept.Count) { Write-Host "Kept your files in ${dir}: $($kept -join ', ')" }
 }
 
+# .surehand\bin\cloudflared.exe only when Surehand downloaded it: its marker (cloudflared.surehand.json, written by
+# `chatgpt --install-tunnel`) names the file's SHA-256 (server/src/cli/tunnel-install.ts removeOwnCloudflared)
+function Remove-OwnCloudflared {
+  $bin = Join-Path $surehand "bin"
+  $exe = Join-Path $bin "cloudflared.exe"
+  $marker = Join-Path $bin "cloudflared.surehand.json"
+  if (-not (Test-Path $marker)) { return }
+  try { $want = (Get-Content -Raw $marker | ConvertFrom-Json).sha256 } catch { $want = $null }
+  if ((Test-Path $exe) -and $want -and ((Get-FileHash -Algorithm SHA256 $exe).Hash.ToLower() -eq $want.ToLower())) { Remove-Item -Force -ErrorAction SilentlyContinue $exe }
+  if (-not (Test-Path $exe)) { Remove-Item -Force -ErrorAction SilentlyContinue $marker }
+  if ((Test-Path $bin) -and -not (Get-ChildItem $bin -Force)) { Remove-Item $bin -ErrorAction SilentlyContinue }
+}
+
 function Test-Node($path) {
   if (-not $path -or -not (Test-Path $path)) { return $false }
   try { return [int](& $path -p "process.versions.node.split('.')[0]") -ge 18 } catch { return $false }
@@ -68,6 +81,7 @@ if (-not $node) {
     Remove-Own (Join-Path $surehand "ae")
     Remove-Own $legacyDir
     Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $surehand "migration.log")
+    Remove-OwnCloudflared
     if (Test-OtherApps) { Write-Host "Kept $privateNode (another Surehand app uses it)." } else { Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $privateNode }
     if ((Test-Path $surehand) -and -not (Get-ChildItem $surehand -Force)) { Remove-Item $surehand }
     Write-Host "Removed the After Effects extension and Surehand MCP's own files (Node.js not found, so AI app settings were left unchanged)."

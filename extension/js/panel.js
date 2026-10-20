@@ -1019,7 +1019,7 @@
     } else if (st === "needs-tunnel") {
       var cmd = installCommand(s);
       box.appendChild(el("div", { cls: "lead", text: "ChatGPT needs a free tunnel tool, cloudflared." }));
-      box.appendChild(el("div", { cls: "line", text: "Surehand can download Cloudflare’s official cloudflared into its own folder. No administrator rights needed." }));
+      box.appendChild(el("div", { cls: "line", text: "Surehand can download Cloudflare\u2019s official cloudflared into its own folder. No administrator rights needed." }));
       var progress = el("div", { cls: "line", role: "status", hidden: true });
       box.appendChild(progress);
       box.appendChild(el("div", { cls: "acts" }, [button("primary pill sm", "Install it for me", function (ev) {
@@ -1027,7 +1027,7 @@
         b.disabled = true;
         progress.hidden = false;
         progress.className = "line";
-        progress.textContent = "Downloading cloudflared… This can take a minute.";
+        progress.textContent = "Downloading cloudflared\u2026 This can take a minute.";
         // `chatgpt --install-tunnel`: pinned and checked (SHA-256) download into ~/.surehand/bin; then start
         runCli(["chatgpt", "--install-tunnel", "--json"], still(token, function (err, r) {
           if (err || !r || !r.ok) {

@@ -99,8 +99,10 @@ Usage:
   surehand-ae [--tools core|full]   core (default, 29 tools) or every tool
   surehand-ae --http [--port 8766] [--host 127.0.0.1] [--no-auth]
                          run over Streamable HTTP at /mcp (ChatGPT via a tunnel)
-  surehand-ae install [--skip-clients] [--no-claude-desktop|--no-claude-code|--no-cursor|--no-codex] [--clients <ids>] [--result <file.json>]
+  surehand-ae install [--skip-clients] [--no-claude-desktop|--no-claude-code|--no-cursor|--no-codex]
                          install the server + After Effects extension and connect AI apps
+                         [--clients <id,id|none>] only these apps   [--tunnel] also get cloudflared
+                         (results: ~/.surehand/ae/install-result.json; install --summary prints them)
   surehand-ae uninstall [--keep-config] [--all]   (keeps checkpoints and files that are not ours unless --all)
   surehand-ae selftest [--full]  check the installation and the connection to After Effects;
                          --full also runs every major tool and saves a compatibility report

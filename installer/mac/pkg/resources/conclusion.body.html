@@ -1,10 +1,12 @@
-<!-- Surehand MCP's conclusion page for the Mac Installer: the body only; installer/common/mac/page.html is the frame. -->
+<!-- Surehand MCP's conclusion page for the Mac Installer: the body only; installer/common/mac/page.html is the frame.
+     The page is fixed HTML: what this install did is written at the top of ~/.surehand/ae/install.log (the
+     package's last step, scripts/summary), and the Surehand panel's Connect screen says why an app is not connected. -->
 <h1>@NAME@ is installed</h1>
-<p class="for">@FOR@ · version @VERSION@</p>
+<p class="for">@FOR@ · <span class="mono">@VERSION@</span></p>
+<p>What was connected, and anything that did not work, is listed at the top of <code>~/.surehand/ae/install.log</code>. The Surehand panel in After Effects shows it too.</p>
 <ol>
-<li><b>Restart After Effects</b> if it is open. The connection starts automatically with it.</li>
-<li><b>Restart your AI apps</b> (Claude Desktop, ChatGPT, Codex, Cursor) if they are open, so they pick up the new connection. If Claude Desktop was open during the install, quit it fully (Cmd+Q) and open it again.</li>
+<li>Restart After Effects if it is open.</li>
+<li>Restart the AI apps you connected. If Claude Desktop was open during the install, quit it fully (Cmd+Q) and open it again.</li>
 <li>Then open your AI app and ask it something about your After Effects project, like “What’s in my project?” The Surehand panel in After Effects (Window › Extensions › Surehand MCP) shows when it's connected.</li>
 </ol>
-<p>A log of this install is in <code>~/.surehand/ae/install.log</code>. If something did not connect, it says what and why.</p>
-<p>To check the installation, uninstall, or connect ChatGPT on the web, see <a href="https://github.com/ConformLabs/surehand-mcp">github.com/ConformLabs/surehand-mcp</a>.</p>
+<p class="muted">Help: <a href="https://github.com/ConformLabs/surehand-mcp">github.com/ConformLabs/surehand-mcp</a></p>

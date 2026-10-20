@@ -14,6 +14,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { nsisApps } from "../../installer/ai-apps.mjs";
 
 const NODE_VERSION = "24.22.0"; // Node.js 24 LTS ("Krypton")
 const NODE_ZIP = `node-v${NODE_VERSION}-win-x64.zip`;
@@ -92,8 +93,12 @@ const icon = join(ROOT, "brand", "Surehand.ico");
 if (!existsSync(icon)) throw new Error(`missing ${icon}`);
 
 // --- this app's artwork for the Conform Labs frame (installer/common/generate-art.mjs, committed) ---
-for (const f of ["wizard-164.bmp", "header-150.bmp"])
+for (const f of ["wizard-164.bmp", "header-150.bmp", "glyph-done-sunk-9.bmp"])
   if (!existsSync(join(NSIS_DIR, "art", f))) throw new Error(`missing installer/windows/nsis/art/${f}: run node installer/common/generate-art.mjs`);
+
+// --- the AI app list for "Choose AI apps", from installer/ai-apps.json (the same list as the Mac Installer's) ---
+const appsNsh = join(CACHE, "ai-apps.nsh");
+writeFileSync(appsNsh, nsisApps());
 
 // --- makensis ---
 const version = pkg.version;
@@ -108,7 +113,8 @@ const defines = {
   NODE_VERSION,
   NODE_EXE: nodeExe,
   SERVER_MJS: serverMjs,
-  LOG_FILTER: join(NSIS_DIR, "log-filter.cjs"),
+  CL_RUN: join(ROOT, "installer", "common", "windows", "cl-run.cjs"),
+  AI_APPS_NSH: appsNsh,
   ICON: icon,
   OUTFILE: outFile,
   ESTIMATED_KB: String(estimatedKb),
@@ -116,7 +122,7 @@ const defines = {
 if (sign) defines.SIGN_CMD = `"${process.execPath}" "${signScript}"`;
 // makensis on macOS aborts (std::bad_alloc) when the locale is not UTF-8, e.g. in a bare non-interactive shell
 const utf8 = /utf-?8/i.test(`${process.env.LC_ALL || process.env.LC_CTYPE || process.env.LANG || ""}`);
-run("makensis", ["-V2", "-INPUTCHARSET", "UTF8", ...Object.entries(defines).map(([k, v]) => `-D${k}=${v}`), join(NSIS_DIR, "surehand-mcp.nsi")], {
+run("makensis", ["-V2", "-WX", "-INPUTCHARSET", "UTF8", ...Object.entries(defines).map(([k, v]) => `-D${k}=${v}`), join(NSIS_DIR, "surehand-mcp.nsi")], {
   env: utf8 ? process.env : { ...process.env, LANG: "en_US.UTF-8", LC_ALL: "en_US.UTF-8" },
 });
 

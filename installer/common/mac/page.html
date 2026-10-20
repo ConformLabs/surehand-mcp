@@ -1,22 +1,26 @@
 <!DOCTYPE html>
-<!-- Conform Labs installer frame for the Mac Installer's welcome and conclusion pages (installer/common/frame.mjs fills it in).
-     The Conform Labs endorsement is on the background image (installer/common/generate-art.mjs). -->
+<!-- Conform Labs installer frame for the Mac Installer's welcome and conclusion pages (installer/common/frame.mjs fills
+     it in, with the Conform Labs fonts inlined). The app's tile, wordmark and the Conform Labs endorsement are on the
+     background image (installer/common/generate-art.mjs). Colours: the design system's tokens, light and dark. -->
 <html><head><meta charset="utf-8"><meta name="color-scheme" content="light dark">
 <style>
-:root{--text:#14161A;--text2:#3B3D42;--text3:#6E6B65;--accent:@ACCENT_LIGHT@}
-@media (prefers-color-scheme: dark){:root{--text:#F2EFE8;--text2:#D8D6D0;--text3:#A9A69F;--accent:@ACCENT_DARK@}}
+@FONTS@
+:root{--ink:#14161A;--muted:#5C5E62;--rule:#D6D1C6;--accent:@ACCENT_LIGHT@}
+@media (prefers-color-scheme: dark){:root{--ink:#F2EFE8;--muted:#A6A49D;--rule:#2C3036;--accent:@ACCENT_DARK@}}
 html,body{background:transparent}
-body{margin:8px;font-family:-apple-system,"Helvetica Neue",sans-serif;font-size:13px;line-height:1.45;color:var(--text2);}
-h1{font-size:19px;line-height:1.2;font-weight:600;letter-spacing:-.01em;color:var(--text);margin:0}
-h1 .version{font-weight:400;color:var(--text3)}
-p.for{margin:2px 0 14px;font-size:12px;color:var(--text3)}
-b,strong{color:var(--text);font-weight:600}
-ul,ol{padding-left:20px}
-li{margin:3px 0}
-li::marker{color:var(--text3)}
-a{color:var(--accent);text-decoration:none}
-a:hover{text-decoration:underline}
-code{font-family:Menlo,monospace;font-size:11.5px;color:var(--text)}
+body{margin:8px 10px;font:400 12px/18px "IBM Plex Sans",-apple-system,"Helvetica Neue",sans-serif;color:var(--ink)}
+h1{margin:0;font:600 20px/24px "Space Grotesk","Helvetica Neue",sans-serif;letter-spacing:-.01em;color:var(--ink)}
+p{margin:0 0 12px}
+p.for{margin:4px 0 16px;font-size:11px;line-height:16px;color:var(--muted)}
+.muted{color:var(--muted)}
+.mono,code{font-family:"IBM Plex Mono",Menlo,monospace;font-size:11px}
+b,strong{font-weight:600}
+ol,ul{margin:0 0 12px;padding-left:18px}
+li{margin:0 0 6px}
+li::marker{color:var(--muted)}
+a{color:var(--ink);text-decoration:underline;text-decoration-color:var(--rule);text-underline-offset:2px}
+a:hover{text-decoration-color:var(--accent)}
+.box{margin:0 0 14px;padding:8px 12px;border-top:2px solid var(--ink);background:rgba(128,128,128,.10);font:400 11px/16px "IBM Plex Mono",Menlo,monospace}
 </style></head>
 <body>
 @BODY@
