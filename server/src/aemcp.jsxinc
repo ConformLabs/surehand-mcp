@@ -961,6 +961,38 @@ aemcp = (function () {
     if (still) { try { still.remove(); } catch (e2) { fail.leftover = String(still.name); } }
     return fail;
   }
+  // Deferred rollbacks (rollback "deferred", renders): CompItem.saveFrameToPng is asynchronous (AE 26.5 writes the
+  // PNG only after the script returns), so a render's temporary comp, hidden layers and color settings must stay
+  // until the file is written. The call ends with its undo group closed and the sentinel in it; the undo and its
+  // check run later in A.finishRollback (a second call), only if nothing changed the project in between.
+  var pending = {};
+  // fix(): the caller's cleanup by hand (what is still there is removed / set back); it returns what it did
+  A.finishRollback = function (token, fix) {
+    var p = pending[token], out, done = [];
+    if (!p) return { undone: false, verified: false, problem: "unknown" };
+    delete pending[token];
+    if (p.rev !== null && A.revision() !== p.rev) {
+      // the project changed after the render: Edit > Undo would revert that instead
+      var leftover = null;
+      try { var left = findSentinel(p.id); if (left) { leftover = String(left.name); left.remove(); leftover = null; } } catch (e) {}
+      out = { undone: false, verified: false, problem: "changed meanwhile" };
+      if (leftover) out.leftover = leftover;
+      if (fix) { try { done = fix(); } catch (e) { done = ["failed: " + (e.message || e)]; } }
+      if (done.length) out.byHand = done;
+      return out;
+    }
+    var st = { ran: false };
+    try { out = rollback(p.before, p.revS, p.id, st); } catch (e) { out = failedRollback(p.id, e, st.ran); }
+    if (fix) { try { done = fix(); } catch (e) { done = ["failed: " + (e.message || e)]; } }
+    if (done.length) {
+      out.byHand = done;
+      // what the Undo didn't restore and was set back by hand: compare again
+      if (out.undone && out.problem === "not back" && p.before) {
+        try { var d = A.diff(p.before, snapshotAgain(p.before)); if (!listed(d)) { out.verified = true; delete out.problem; delete out.remaining; } else out.remaining = d; } catch (e) {}
+      }
+    }
+    return out;
+  };
   A.run = function (fn, args, opts) {
     opts = opts || {};
     var logs = [];
@@ -982,11 +1014,11 @@ aemcp = (function () {
         if (opts.report) { try { before = A.snapshot(opts.report, !!opts.checkOnly && rev0 !== null); } catch (e) { before = null; } }
         try {
           var r = fn(args || {}, log);
-          back = opts.rollback === "changes" || (opts.rollback === "requested" && !!r && r.rollback === true);
+          back = opts.rollback === "changes" || opts.rollback === "deferred" || (opts.rollback === "requested" && !!r && r.rollback === true);
           res = { ok: true, result: opts.raw ? r : A.serialize(r, opts.depth || 4), logs: logs };
           if (before) { try { res.changes = changesSince(before, rev0, opts.report); } catch (e) { res.changes = { error: e.message }; } }
         } catch (e) {
-          back = opts.rollback === "changes";
+          back = opts.rollback === "changes" || opts.rollback === "deferred"; // a failed render is undone at once
           res = { ok: false, error: { message: e.message || String(e), name: e.name, line: e.line, user: !!e.aemcpUser }, logs: logs };
           // the setting is off: the server adds a hint when the error is its "Permission denied"
           if (A.canWriteFiles() === false) res.writeAccess = false;
@@ -1008,6 +1040,11 @@ aemcp = (function () {
       if (back) {
         if (!undo) res.rollback = { undone: false, verified: false, problem: "no undo group" };
         else if (plan) res.rollback = plan;
+        else if (opts.rollback === "deferred" && res.ok) {
+          var tok = "r" + new Date().getTime() + "_" + Math.floor(Math.random() * 1000000000);
+          pending[tok] = { before: before, revS: revS, id: sentinel, rev: rev0 === null ? null : A.revision() };
+          res.pending = tok;
+        }
         else { var st = { ran: false }; try { res.rollback = rollback(before, revS, sentinel, st); } catch (e) { res.rollback = failedRollback(sentinel, e, st.ran); } }
       }
     } finally {

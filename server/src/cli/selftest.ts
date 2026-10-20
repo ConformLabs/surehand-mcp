@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { health } from "../bridge.js";
 import { loadConfig, VERSION } from "../config.js";
 import { runJsx } from "../jsx.js";
+import { RENDER_KIT_JSX, runRender, waitForFiles } from "../tools/core.js";
 import { WRITE_ACCESS_WHERE } from "../permissions.js";
 import { appFile, configPath, legacyDir, migrationPending } from "../paths.js";
 import { migrationLog } from "../migrate.js";
@@ -140,29 +141,28 @@ export async function quickChecks(print: boolean, beforeJob?: () => Promise<void
   const tmpDir = appFile("tmp");
   mkdirSync(tmpDir, { recursive: true });
   const png = join(tmpDir, `selftest_${Date.now()}.png`);
-  const job = await runJsx(
-    `var c = app.project.items.addComp("__aemcp_selftest", 640, 360, 1, 2, 30);
+  // a render like ae_render_frame: saveFrameToPng writes after the script returns, so the comp stays until the PNG
+  // is written, then the test's undo step is undone (runRender)
+  const { r: job } = await runRender(
+    `${RENDER_KIT_JSX}
+var c = tempComp("__aemcp_selftest", 640, 360, 1, 2, 30);
 var t = c.layers.addText("Surehand MCP OK");
 var p = t.property("ADBE Transform Group").property("ADBE Position");
 p.setValuesAtTimes([0, 1], [[100, 180], [540, 180]]);
 var fx = t.property("ADBE Effect Parade").addProperty("ADBE Drop Shadow");
 t.property("ADBE Transform Group").property("ADBE Opacity").expression = "50 + 50 * Math.sin(time)";
-var f = new File(args.png);
-var wrote = false;
 // saveFrameToPng works even when "Allow Scripts to Write Files" is off (confirmed on macOS and Windows)
-c.saveFrameToPng(1, f); var w = 0; while (!f.exists && w < 10000) { $.sleep(50); w += 50; } wrote = f.exists; $.sleep(100);
-var r = { keys: p.numKeys, effect: fx.matchName, exprError: t.property("ADBE Transform Group").property("ADBE Opacity").expressionError, wrote: wrote };
-c.remove();
-return r;`,
+c.saveFrameToPng(1, new File(args.png));
+return { keys: p.numKeys, effect: fx.matchName, exprError: t.property("ADBE Transform Group").property("ADBE Opacity").expressionError, cleanup: __clean };`,
     { png },
     { undoGroup: "Surehand MCP self-test", timeoutMs: 60000 },
+    () => waitForFiles([png]),
   );
   if (!job.ok) bad("test-job", `Test job failed: ${job.error?.message}`);
   else {
     const r = job.result as any;
     if (r.keys === 2 && r.effect === "ADBE Drop Shadow" && !r.exprError) pass("test-job", "Created a comp, text layer, keyframes, effect and expression (then removed it)");
     else bad("test-job", `Unexpected test result: ${JSON.stringify(r)}`);
-    for (let i = 0; i < 50 && !(existsSync(png) && statSync(png).size > 0); i++) await sleep(100);
     if (existsSync(png) && statSync(png).size > 0) {
       const sig = readFileSync(png).subarray(1, 4).toString();
       if (sig === "PNG") pass("preview", "Rendered a frame preview");

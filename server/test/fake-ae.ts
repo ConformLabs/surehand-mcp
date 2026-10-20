@@ -23,7 +23,7 @@ export const MaskFeatherFalloff = { FFO_LINEAR: 7213, FFO_SMOOTH: 7212 };
 export const MaskMotionBlur = { SAME_AS_LAYER: 7012, ON: 7013, OFF: 7014 };
 const TrackMatteType = { NO_TRACK_MATTE: 5012 };
 
-interface State { opacity: number[]; blend: number; layerLabel: number; compLabel: number; comment: string; folders: { id: number; name: string }[] }
+interface State { opacity: number[]; blend: number; layerLabel: number; compLabel: number; comment: string; folders: { id: number; name: string }[]; color: { bpc: number; lb: boolean } }
 
 export interface Fake {
   app: any;
@@ -54,11 +54,14 @@ export interface Fake {
  * default: app has no preferences, so the setting can't be told).
  */
 export function fakeAE(
-  opts: { revision?: boolean; undoWorks?: boolean; otherComp?: boolean; bigComp?: boolean; mask?: boolean; renameFails?: boolean; throwAfterUndo?: boolean; writeAccess?: boolean | "unreadable" } = {},
+  opts: { revision?: boolean; undoWorks?: boolean; otherComp?: boolean; bigComp?: boolean; mask?: boolean; renameFails?: boolean; throwAfterUndo?: boolean; colorNotUndone?: boolean; writeAccess?: boolean | "unreadable" } = {},
 ): Fake {
   const reads = { n: 0 };
   const undos = { n: 0 };
   let revision = 1;
+  // the project's bit depth and linear blending (colorNotUndone: Edit > Undo doesn't restore them)
+  let color = { bpc: 32, lb: true };
+  const setColor = (v: { bpc: number; lb: boolean }) => edit(() => (color = v));
   const opacityValues = [100, 100];
   const makeOpacity = (i: number): any => ({
     name: "Opacity",
@@ -138,7 +141,10 @@ export function fakeAE(
     item: (i: number) => items()[i - 1],
     itemByID: (id: number) => items().find((it) => it.id === id) ?? null,
     activeItem: comp,
-    bitsPerChannel: 8,
+    get bitsPerChannel() { return color.bpc; },
+    set bitsPerChannel(v: number) { setColor({ ...color, bpc: v }); },
+    get linearBlending() { return color.lb; },
+    set linearBlending(v: boolean) { setColor({ ...color, lb: v }); },
     items: {
       addFolder(name: string) {
         const f = { id: nextId++, name };
@@ -150,7 +156,7 @@ export function fakeAE(
   if (opts.revision !== false) Object.defineProperty(project, "revision", { get: () => revision });
 
   // ---------- undo ----------
-  const state = (): State => ({ opacity: [...opacityValues], blend: layer.blendingMode, layerLabel: layer.label, compLabel: comp.label, comment: comp.comment, folders: [...folders] });
+  const state = (): State => ({ opacity: [...opacityValues], blend: layer.blendingMode, layerLabel: layer.label, compLabel: comp.label, comment: comp.comment, folders: [...folders], color: opts.colorNotUndone ? { bpc: 0, lb: false } : { ...color } });
   const restore = (s: State) => {
     opacityValues.splice(0, 2, ...s.opacity);
     layer.blendingMode = s.blend;
@@ -158,6 +164,7 @@ export function fakeAE(
     comp.label = s.compLabel;
     comp.comment = s.comment;
     folders = [...s.folders];
+    if (!opts.colorNotUndone) color = { ...s.color };
   };
   const same = (a: State, b: State) => JSON.stringify(a) === JSON.stringify(b);
   const stack: { name: string; before: State; moved: boolean }[] = [];

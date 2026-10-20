@@ -22,9 +22,11 @@ export interface RunOptions {
   /**
    * Undo this call in the same script, only if it changed something, and check the project is back
    * (`RunResult.rollback`). "changes": whenever it changed something (read-only mode); "requested": only
-   * when the body returns `{ rollback: true }` (atomic batch). Needs an undo group.
+   * when the body returns `{ rollback: true }` (atomic batch); "deferred": like "changes", but a call that
+   * succeeded is undone later by aemcp.finishRollback (`RunResult.pending`), after Node has the files it saved
+   * (renders: saveFrameToPng writes after the script returns). Needs an undo group.
    */
-  rollback?: "changes" | "requested";
+  rollback?: "changes" | "requested" | "deferred";
   /** Serialization depth for the returned value. */
   depth?: number;
   timeoutMs?: number;
@@ -74,6 +76,8 @@ export interface Rollback {
   remaining?: Changes;
   /** the name of the rollback's temporary folder (sentinel) when it couldn't be removed */
   leftover?: string;
+  /** deferred rollbacks: what the caller's cleanup removed or set back by hand (after the Undo, or instead of it) */
+  byHand?: string[];
 }
 
 export interface RunResult {
@@ -85,6 +89,8 @@ export interface RunResult {
   projectFile?: string;
   changes?: Changes;
   rollback?: Rollback;
+  /** rollback "deferred": the token for aemcp.finishRollback (the call's undo step is still there) */
+  pending?: string;
   logs: string[];
   error?: { message: string; name?: string; line?: number; user?: boolean };
   /** false: the call failed while "Allow Scripts to Write Files and Access Network" is off (formatResult may say so) */
@@ -250,6 +256,12 @@ export function rollbackProblem(rb: Rollback, what: string): string {
   if (rb.verified) return "";
   const check = "Check the project before going on (Edit > Undo and Edit > Redo still work step by step).";
   const leftover = rb.leftover ? `\nA temporary folder "${rb.leftover}" (Surehand MCP's undo marker) couldn't be removed; it can be deleted.` : "";
+  const byHand = rb.byHand?.length ? `\nSet back by hand: ${rb.byHand.join("; ")}.` : "";
+  if (rb.problem === "changed meanwhile")
+    return (
+      `The project changed while After Effects was writing the image (another edit or call), so the undo step of ${what} was not undone: ` +
+      `Edit > Undo would have reverted that change instead. What ${what} added was removed by hand, and its step may be left in Edit > Undo.${byHand} ${check}${leftover}`
+    );
   if (!rb.undone)
     return `It couldn't be checked whether ${what} changed the project${rb.problem && rb.problem !== "unknown" ? ` (${rb.problem})` : ""}, so nothing was undone. ${check}${leftover}`;
   const remaining = rb.remaining ? (formatChanges(rb.remaining) ?? "").replace(/^Changes[^\n]*:\n/, "") : "";

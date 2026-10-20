@@ -241,6 +241,94 @@ describe("guarded rollback in aemcp.run", () => {
   });
 });
 
+// Renders: saveFrameToPng writes after the script returns (AE 26.5), so the render's undo step stays until Node has
+// the file; aemcp.finishRollback (a second call) then undoes it. Here the "render" adds a temporary folder and, as in a
+// 32 bpc project with linear blending, switches the project to 16 bpc without it.
+describe("deferred rollback (renders)", () => {
+  const RENDER = () => {
+    fake.app.project.items.addFolder("__aemcp_preview");
+    fake.app.project.bitsPerChannel = 16;
+    fake.app.project.linearBlending = false;
+    return "saved";
+  };
+  const run = (fn: () => unknown, opts: Record<string, unknown> = {}): RunResult =>
+    JSON.parse(helpers.run(fn, {}, { undoGroup: "Surehand MCP preview", report: ["*"], checkOnly: true, rollback: "deferred", ...opts }));
+  const color = () => [fake.app.project.bitsPerChannel, fake.app.project.linearBlending];
+
+  it("the render's changes stay until finishRollback; then its step is undone once and checked", () => {
+    withManualEdit();
+    const r = run(RENDER);
+    expect(r.ok).toBe(true);
+    expect(r.rollback).toBeUndefined();
+    expect(typeof r.pending).toBe("string");
+    // while AE writes the file: the folder and the settings are still there, nothing undone yet
+    expect(fake.folders()).toEqual(["__aemcp_preview", expect.stringMatching(/^__aemcp_rollback_/)]);
+    expect(color()).toEqual([16, false]);
+    expect(fake.undos.n).toBe(0);
+    const rb = helpers.finishRollback(r.pending, () => []);
+    expect(rb).toMatchObject({ undone: true, verified: "sentinel" });
+    expect(fake.undos.n).toBe(1);
+    expect(fake.folders()).toEqual([]);
+    expect(color()).toEqual([32, true]);
+    expect(opacity()).toBe(50);
+    expect(fake.undoStack()).toEqual(["user: opacity 50"]);
+    // a token is used once
+    expect(helpers.finishRollback(r.pending, () => [])).toEqual({ undone: false, verified: false, problem: "unknown" });
+  });
+
+  it("the project changed before finishRollback: nothing is undone (it would revert that change), the render is cleaned up by hand", () => {
+    withManualEdit();
+    const r = run(RENDER);
+    fake.app.beginUndoGroup("user: opacity 70");
+    fake.opacity.value = 70;
+    fake.app.endUndoGroup();
+    const rb = helpers.finishRollback(r.pending, () => {
+      fake.app.project.bitsPerChannel = 32;
+      fake.app.project.linearBlending = true;
+      return ["bit depth 32 bpc", "linear blending on"];
+    });
+    expect(rb).toEqual({ undone: false, verified: false, problem: "changed meanwhile", byHand: ["bit depth 32 bpc", "linear blending on"] });
+    expect(fake.undos.n).toBe(0);
+    expect(opacity()).toBe(70);
+    expect(fake.folders().some((n: string) => n.startsWith("__aemcp_rollback_"))).toBe(false);
+    expect(rollbackProblem(rb, "the render")).toMatch(/^The project changed while After Effects was writing the image .*Edit > Undo would have reverted that change instead[\s\S]*Set back by hand: bit depth 32 bpc; linear blending on\./);
+  });
+
+  it("settings the Undo didn't restore are set back by hand, and the project checked again", () => {
+    withManualEdit({ colorNotUndone: true });
+    const r = run(RENDER);
+    const rb = helpers.finishRollback(r.pending, () => {
+      const done: string[] = [];
+      if (fake.app.project.bitsPerChannel !== 32) (fake.app.project.bitsPerChannel = 32), done.push("bit depth 32 bpc");
+      if (!fake.app.project.linearBlending) (fake.app.project.linearBlending = true), done.push("linear blending on");
+      return done;
+    });
+    expect(rb).toMatchObject({ undone: true, verified: true, byHand: ["bit depth 32 bpc", "linear blending on"] });
+    expect(color()).toEqual([32, true]);
+  });
+
+  it("a render that fails is undone at once (nothing pending)", () => {
+    withManualEdit();
+    const r = run(() => {
+      RENDER();
+      throw new Error("no such comp");
+    });
+    expect(r.ok).toBe(false);
+    expect(r.pending).toBeUndefined();
+    expect(r.rollback).toMatchObject({ undone: true });
+    expect(color()).toEqual([32, true]);
+    expect(fake.folders()).toEqual([]);
+  });
+
+  it("a render that changed nothing (an 8 bpc frame of the comp itself) leaves nothing pending", () => {
+    withManualEdit();
+    const r = run(() => "saved");
+    expect(r.pending).toBeUndefined();
+    expect(r.rollback).toEqual({ undone: false, verified: true });
+    expect(fake.undos.n).toBe(0);
+  });
+});
+
 describe("ae_batch: atomic rollback", () => {
   const full = { mode: "full", allowShell: false };
   const script = (code: string) => ({ tool: "ae_run_script", args: { code } });
