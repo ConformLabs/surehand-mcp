@@ -7,7 +7,7 @@ import { aeLabel, BridgeError, health, listInstances, matchInstance, selectInsta
 import { lastSetup } from "../cli/setup.js";
 import { checkForUpdate, updateMessage } from "../update.js";
 import { VERSION } from "../config.js";
-import { codeExcerpt, ensureHelpers, errorHint, evalBody, formatChanges, rollbackProblem, runJsx, type RunOptions, type RunResult } from "../jsx.js";
+import { codeExcerpt, ensureHelpers, errorHint, evalBody, formatChanges, rollbackProblem, runJsx, type Rollback, type RunOptions, type RunResult } from "../jsx.js";
 import { reservedGlobalsHint, transpileUserCode, withoutComments } from "../transpile.js";
 import { approvalSummary, permissions, READ_ONLY_REFUSAL, scriptFileApproval, SHELL_REFUSAL, usesShell, WRITE_ACCESS_WHERE } from "../permissions.js";
 import { compRef, errorResult, formatResult, layerRef, reportScope } from "./registry.js";
@@ -20,8 +20,70 @@ const OUTPUT_GUARD_JSX = `
 if (args.outputPath && !args.overwrite && new File(args.outputPath).exists)
   aemcp.fail("A file already exists at " + new File(args.outputPath).fsName + ". Nothing was rendered. To replace it, pass overwrite: true (or choose another outputPath).");`;
 
+/**
+ * Shared by every render (preview, contact sheet, export, proof, the in-chat frame). saveFrameToPng is
+ * asynchronous (seen in AE 26.5: it returns at once and AE writes the PNG after the script ends), so a render
+ * leaves its temporary comps, the layers it switched off and the settings it changed in place, records them in
+ * __clean, and returns; Node waits for the files, then FINISH_JSX (aemcp.finishRollback) removes and sets back all of
+ * it by hand and compares the project with how it was. A render never runs Edit > Undo: seen in AE 26.5, that Undo
+ * could revert the user's own last step. If the render fails, cleanNow() puts everything back at once.
+ */
+export const RENDER_KIT_JSX = `
+var __clean = { comps: [], layers: [], res: [], color: null };
+// 32 bpc, or "Blend Colors Using 1.0 Gamma": saveFrameToPng writes such frames far too dark (seen in AE 26.5: white
+// text at about 40/255). Render at 16 bpc without linear blending, so colors look as in the viewer; the undo puts
+// the project settings back.
+function displayColor() {
+  var P = app.project, s;
+  try { s = { bpc: P.bitsPerChannel, lb: !!P.linearBlending }; } catch (e) { return null; }
+  if (s.bpc !== 32 && !s.lb) return null;
+  __clean.color = s;
+  if (s.bpc === 32) P.bitsPerChannel = 16;
+  if (s.lb) P.linearBlending = false;
+  return s;
+}
+function tempComp(name, w, h, par, dur, fps) { var t = app.project.items.addComp(name, w, h, par, dur, fps); __clean.comps.push(t.id); return t; }
+function hideLayer(comp, L) {
+  var lk = L.locked;
+  if (lk) L.locked = false;
+  L.enabled = false;
+  if (lk) L.locked = true;
+  __clean.layers.push({ comp: comp.id, i: L.index, locked: lk });
+}
+function fullRes(comp) {
+  var rf = comp.resolutionFactor;
+  if (rf[0] === 1 && rf[1] === 1) return;
+  __clean.res.push({ comp: comp.id, rf: [rf[0], rf[1]] });
+  comp.resolutionFactor = [1, 1];
+}
+// what a render left that is still there, put back (returns what it did); also FINISH_JSX's cleanup by hand
+function cleanNow(c) {
+  var done = [], P = app.project, k, it;
+  for (k = 0; k < c.layers.length; k++) {
+    try {
+      var x = c.layers[k], cc = P.itemByID(x.comp), L = cc ? cc.layer(x.i) : null;
+      if (L && !L.enabled) { if (x.locked) L.locked = false; L.enabled = true; if (x.locked) L.locked = true; done.push('layer "' + L.name + '" switched on again'); }
+    } catch (e) {}
+  }
+  for (k = 0; k < c.res.length; k++) {
+    try { var y = c.res[k], rc = P.itemByID(y.comp); if (rc && (rc.resolutionFactor[0] !== y.rf[0] || rc.resolutionFactor[1] !== y.rf[1])) { rc.resolutionFactor = y.rf; done.push('resolution of "' + rc.name + '"'); } } catch (e) {}
+  }
+  for (k = 0; k < c.comps.length; k++) { try { it = P.itemByID(c.comps[k]); if (it) { var nm = it.name; it.remove(); done.push('temporary comp "' + nm + '" removed'); } } catch (e) {} }
+  if (c.color) {
+    try { if (P.bitsPerChannel !== c.color.bpc) { P.bitsPerChannel = c.color.bpc; done.push("bit depth " + c.color.bpc + " bpc"); } } catch (e) {}
+    try { if (!!P.linearBlending !== c.color.lb) { P.linearBlending = c.color.lb; done.push("linear blending " + (c.color.lb ? "on" : "off")); } } catch (e) {}
+  }
+  return done;
+}`;
+
+/** The second call of a render: what it changed removed and set back by hand, then the project compared with how it was. */
+export const FINISH_JSX = `${RENDER_KIT_JSX}
+var c = args.cleanup || {};
+c.comps = c.comps || []; c.layers = c.layers || []; c.res = c.res || [];
+return aemcp.finishRollback(args.token, function () { return cleanNow(c); });`;
+
 // ExtendScript bodies of the preview tools (exported so tests can check them)
-export const RENDER_FRAME_JSX = `${OUTPUT_GUARD_JSX}
+export const RENDER_FRAME_JSX = `${OUTPUT_GUARD_JSX}${RENDER_KIT_JSX}
 var c = aemcp.findComp(args.comp);
 var t = args.time === undefined ? c.time : args.time;
 var max = args.maxSize || 1280, par = c.pixelAspect;
@@ -30,9 +92,10 @@ if (reg[2] <= 0 || reg[3] <= 0) aemcp.fail("region width and height must be posi
 var dispW = reg[2] * par, fit = max / Math.max(dispW, reg[3]);
 var zoom = args.region ? Math.min(8, fit) : Math.min(1, fit);
 var W = Math.max(4, Math.round(dispW * zoom)), H = Math.max(4, Math.round(reg[3] * zoom));
-var tmp = app.project.items.addComp("__aemcp_preview", W, H, 1, c.duration, c.frameRate);
-var restore = [], info = null, tmpLeft = false;
+var tmp = tempComp("__aemcp_preview", W, H, 1, c.duration, c.frameRate);
+var info = null, done = false;
 try {
+  displayColor();
   // a difference image needs an opaque black base, or "identical" areas show as transparent
   var bgSpec = args.background || (args.compareWith ? "#000000" : null);
   if (bgSpec) {
@@ -46,16 +109,14 @@ try {
       try { cb.property("ADBE Checkerboard-0004").setValue(Math.max(4, Math.round(Math.max(W, H) / 64))); cb.property("ADBE Checkerboard-0010").setValue([0.6, 0.6, 0.6]); } catch (e) {} // Width, Color
     }
   }
-  // only some layers: hide the others for the render (restored in finally)
+  // only some layers: hide the others for the render (put back by the undo)
   if (args.layers && args.layers.length) {
     var keep = {};
     for (var i = 0; i < args.layers.length; i++) keep[aemcp.findLayer(c, args.layers[i]).index] = true;
     for (var j = 1; j <= c.numLayers; j++) {
       var L = c.layer(j);
       if (keep[j] || !L.enabled) continue;
-      var wasLocked = L.locked; if (wasLocked) L.locked = false;
-      L.enabled = false; restore.push([L, wasLocked]);
-      if (wasLocked) L.locked = true;
+      hideLayer(c, L);
     }
   }
   var place = function (src, srcTime) { // (a function declaration inside a block isn't valid ES3)
@@ -78,19 +139,17 @@ try {
   }
   var f = new File(args.outputPath || (args.tmpDir + "/aemcp_frame_" + new Date().getTime() + ".png"));
   if (f.exists) f.remove();
+  // written after this script returns: Node waits for the file, then the render is undone
   tmp.saveFrameToPng(t, f);
-  var waited = 0; while (!f.exists && waited < 10000) { $.sleep(50); waited += 50; }
-  $.sleep(100);
-  info = { path: f.fsName, width: W, height: H, time: t, comp: c.name, zoom: aemcp.round(zoom), region: args.region || null, compare: cmp };
+  info = { path: f.fsName, width: W, height: H, time: t, comp: c.name, zoom: aemcp.round(zoom), region: args.region || null, compare: cmp, cleanup: __clean };
+  done = true;
 } finally {
-  // never leave anything behind, even if rendering fails
-  for (var k = 0; k < restore.length; k++) { try { var R = restore[k][0]; if (restore[k][1]) R.locked = false; R.enabled = true; if (restore[k][1]) R.locked = true; } catch (e) {} }
-  try { tmp.remove(); } catch (e) { tmpLeft = true; }
+  // a failed render leaves nothing behind
+  if (!done) cleanNow(__clean);
 }
-if (info && tmpLeft) info.tmpLeft = true;
 return info;`;
 
-export const CONTACT_SHEET_JSX = `${OUTPUT_GUARD_JSX}
+export const CONTACT_SHEET_JSX = `${OUTPUT_GUARD_JSX}${RENDER_KIT_JSX}
 var c = aemcp.findComp(args.comp);
 var fd = c.frameDuration, times = [];
 if (args.times) { for (var k = 0; k < args.times.length; k++) times.push(args.times[k]); }
@@ -109,8 +168,9 @@ var W = args.width || 1600, gap = 8, labelH = 26;
 var cellW = Math.floor((W - gap * (cols + 1)) / cols);
 var cellH = Math.round(cellW * c.height / (c.width * c.pixelAspect));
 var H = rows * (cellH + labelH + gap) + gap;
-var sheet = app.project.items.addComp("__aemcp_contact_sheet", W, H, 1, 1, c.frameRate);
+var sheet = tempComp("__aemcp_contact_sheet", W, H, 1, 1, c.frameRate), r = null, done = false;
 try {
+  displayColor();
   // opaque dark background (a shape layer, so no solid is left in the project)
   var bg = sheet.layers.addShape();
   var bgv = bg.property("ADBE Root Vectors Group").addProperty("ADBE Vector Group").property("ADBE Vectors Group");
@@ -142,11 +202,11 @@ try {
   }
   var f = new File(args.outputPath || (args.tmpDir + "/aemcp_sheet_" + new Date().getTime() + ".png"));
   if (f.exists) f.remove();
+  // written after this script returns: Node waits for the file, then the render is undone
   sheet.saveFrameToPng(0, f);
-  var waited = 0; while (!f.exists && waited < 20000) { $.sleep(50); waited += 50; }
-  $.sleep(150);
-  var r = { path: f.fsName, comp: c.name, times: times, columns: cols, rows: rows, width: W, height: H };
-} finally { sheet.remove(); }
+  r = { path: f.fsName, comp: c.name, times: times, columns: cols, rows: rows, width: W, height: H, cleanup: __clean };
+  done = true;
+} finally { if (!done) cleanNow(__clean); }
 return r;`;
 
 /** saveFrameToPng may finish writing asynchronously: wait (up to ~15 s) for a non-empty file whose size is stable. */
@@ -163,6 +223,50 @@ export async function waitForFile(path: string, tries = 150): Promise<boolean> {
   return existsSync(path);
 }
 
+/** Waits for each file (waitForFile); returns the ones that weren't written. */
+export async function waitForFiles(paths: string[]): Promise<string[]> {
+  const missing: string[] = [];
+  for (const p of paths) if (!(await waitForFile(p))) missing.push(p);
+  return missing;
+}
+
+/** The render's second call: what it changed removed and set back by hand (FINISH_JSX), then checked. Never cancelled: it is what puts the project back. */
+export async function finishRender(token: string, cleanup: unknown, step: string): Promise<Rollback> {
+  try {
+    // the cleanup by hand, in an undo step named like the render's own (never Edit > Undo)
+    const f = await runJsx(FINISH_JSX, { token, cleanup: cleanup ?? {} }, { undoGroup: step, timeoutMs: 120_000, bridge: { cancel: undefined } });
+    if (f.ok && f.result && typeof f.result === "object") return { ...(f.result as Rollback), step };
+    return { undone: false, verified: false, problem: `failed: ${f.error?.message ?? "no result"}` };
+  } catch (e: any) {
+    return { undone: false, verified: false, problem: `failed: ${e?.message ?? e}` };
+  }
+}
+
+/**
+ * A render in two calls: the body (in its undo group) sets up and calls saveFrameToPng, which writes after the
+ * script returns; Node waits until the files are written (`wait(result)`: the files it didn't get), then
+ * finishRender cleans up by hand, also when waiting fails. `missing`: files After Effects didn't write in time.
+ */
+export async function runRender(body: string, args: Record<string, unknown>, opts: { undoGroup: string; timeoutMs: number }, wait: (result: any) => Promise<string[]>): Promise<{ r: RunResult; missing: string[] }> {
+  const r = await runJsx(body, args, { ...RENDER_RUN_OPTIONS, depth: 8, ...opts });
+  let missing: string[] = [];
+  if (!r.ok) return { r, missing };
+  try {
+    missing = await wait(r.result);
+  } finally {
+    if (r.pending) r.rollback = await finishRender(r.pending, (r.result as any)?.cleanup, opts.undoGroup);
+  }
+  return { r, missing };
+}
+
+/** The note when a render used other color settings than the project's (32 bpc or linear blending). */
+export function colorNote(result: any): string {
+  const c = result?.cleanup?.color;
+  if (!c) return "";
+  const was = [c.bpc === 32 && "32 bpc", c.lb && "linear blending"].filter(Boolean).join(" with ");
+  return `Rendered at ${c.bpc === 32 ? "16" : c.bpc} bpc without linear blending (the project uses ${was}, which saveFrameToPng writes far too dark), so colors look as in the viewer; blended edges can differ slightly. The project settings were put back.`;
+}
+
 /**
  * Run a JSX body that saves a PNG (it receives args.tmpDir and returns {path, ...}),
  * wait until AE has finished writing it, and return it base64-encoded.
@@ -171,13 +275,12 @@ async function renderPng(body: string, args: Record<string, unknown>): Promise<{
   // A folder both AE and this process can access (system temp dirs can be sandboxed per app on macOS)
   const tmpDir = appFile("tmp");
   mkdirSync(tmpDir, { recursive: true });
-  // The temporary comp is created and removed in one undo group, which the guarded rollback then undoes
-  // again: Edit > Undo in AE keeps undoing the user's own last step, not an invisible preview step.
-  const r = await runJsx(body, { ...args, tmpDir }, { ...RENDER_RUN_OPTIONS, undoGroup: "Surehand MCP preview", timeoutMs: 180_000 });
+  // The temporary comp is created in one undo group and removed by hand once the PNG is written (never Edit > Undo).
+  const { r, missing } = await runRender(body, { ...args, tmpDir }, { undoGroup: "Surehand MCP preview", timeoutMs: 180_000 }, (x) => waitForFiles([x.path]));
   if (!r.ok) return { error: formatResult(r) };
   const info = r.result as any;
-  const note = renderCleanupNote(r, info?.tmpLeft, "__aemcp_preview");
-  if (!(await waitForFile(info.path))) return { error: errorResult(`After Effects did not write the image to ${info.path}`) };
+  const note = [colorNote(info), renderCleanupNote(r, info?.tmpLeft, "__aemcp_preview")].filter(Boolean).join("\n");
+  if (missing.length) return { error: errorResult(`After Effects did not write the image to ${info.path}${note ? `\n${note}` : ""}`) };
   const data = readFileSync(info.path).toString("base64");
   if (!args.outputPath) {
     try {
@@ -270,8 +373,11 @@ export function readOnlyScriptRefusal(code: string, transpiled?: string): string
  * compared over every comp, and undone in the same call if it changed anything (aemcp.jsxinc). Where AE
  * has app.project.revision only items and layer attributes are compared (checkOnly), not property values.
  */
-/** Rendering tools: their temporary comp leaves no undo step behind (rolled back and checked like read-only mode). */
-export const RENDER_RUN_OPTIONS: RunOptions = { report: ["*"], checkOnly: true, rollback: "changes" };
+/**
+ * Rendering tools: what they change is removed and set back by hand once the files are written, and the project
+ * compared with how it was (runRender: saveFrameToPng writes after the script returns); never Edit > Undo.
+ */
+export const RENDER_RUN_OPTIONS: RunOptions = { report: ["*"], checkOnly: true, rollback: "deferred" };
 
 /**
  * What a render left behind that the user should know about ("" when nothing): a temporary comp the
@@ -282,6 +388,8 @@ export function renderCleanupNote(r: RunResult, tmpLeft: unknown, tmpName: strin
   const rb = r.rollback, notes: string[] = [];
   if (tmpLeft && !(rb?.undone && rb.verified)) notes.push(`The temporary comp "${tmpName}" could not be removed; it can be deleted from the Project panel.`);
   if (rb && !rb.verified) notes.push(rollbackProblem(rb, "the render"));
+  else if (rb?.verified === "cleaned")
+    notes.push(`After Effects lists "${rb.step ?? "Surehand MCP preview"}" in Edit > Undo; undoing it only brings back the render's own temporary comp and settings, nothing of yours.`);
   return notes.join("\n");
 }
 export const READ_ONLY_RUN_OPTIONS: RunOptions = { undoGroup: "Surehand MCP Script (read-only check)", report: ["*"], checkOnly: true, rollback: "changes" };
