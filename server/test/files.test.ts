@@ -152,7 +152,7 @@ describe("ae_export_frames (ExtendScript)", () => {
 });
 
 describe("ae_export_frames (handler)", () => {
-  it("expands ~, waits for the files and lists them; leaves no undo step (rollback options)", async () => {
+  it("expands ~, waits for the files and lists them; then cleans up by hand (never Edit > Undo) and says so in one line", async () => {
     const dir = mkdtempSync(join(tmpdir(), "surehand-export-"));
     const file = join(dir, "f.png");
     let handler: any;
@@ -162,8 +162,8 @@ describe("ae_export_frames (handler)", () => {
       if (body === FINISH_JSX) {
         // the second call: only once the file is there
         calls.push(`finish ${args.token} ${existsSync(file)}`);
-        expect(opts.undoGroup).toBe(false);
-        return { ok: true, logs: [], result: { undone: true, verified: "sentinel", note: "values were not compared" } };
+        expect(opts.undoGroup).toBe("Surehand MCP export"); // the cleanup by hand, never Edit > Undo
+        return { ok: true, logs: [], result: { undone: false, verified: "cleaned", byHand: ['resolution of "Main"'] } };
       }
       expect(args.exports[0].outputPath.startsWith("~")).toBe(false);
       expect(opts).toMatchObject({ rollback: "deferred", checkOnly: true });
@@ -174,7 +174,9 @@ describe("ae_export_frames (handler)", () => {
     });
     const r = await handler({ exports: [{ frames: [3], outputPath: "~/f.png" }] });
     expect(r.isError).toBeUndefined();
-    expect(r.content[0].text).toBe(`Exported 1 PNG file:\n${file} (Main, frame 3, 1920x1080)`);
+    expect(r.content[0].text).toBe(
+      `Exported 1 PNG file:\n${file} (Main, frame 3, 1920x1080)\nAfter Effects lists "Surehand MCP export" in Edit > Undo; undoing it only brings back the render's own temporary comp and settings, nothing of yours.`,
+    );
     expect(calls).toEqual(["render", "finish r1 true"]);
   });
 });

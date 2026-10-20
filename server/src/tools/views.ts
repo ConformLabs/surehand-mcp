@@ -125,7 +125,7 @@ return { comp: c.name, id: c.id, time: c.time, fps: c.frameRate, dst: c.displayS
 
 // Saves the comp's own frame as a PNG (CompItem.saveFrameToPng, written after the script returns): no temporary
 // comp. Only in a 32 bpc / linear blending project are the color settings changed for it (as ae_render_frame),
-// and undone once the file is written (runRender); otherwise nothing changes and nothing is undone.
+// and set back by hand once the file is written (runRender); otherwise nothing changes.
 export const FRAME_JSX = `${RENDER_KIT_JSX}
 var c = aemcp.findComp(args.comp);
 var t = args.time === undefined || args.time === null ? c.time : args.time;

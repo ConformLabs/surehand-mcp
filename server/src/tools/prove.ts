@@ -23,8 +23,8 @@ export const MAX_AGE_MS = 7 * 24 * 3600 * 1000;
 const proofsRoot = () => appFile("proofs");
 
 /**
- * Renders frames of comps the way ae_render_frame does (a temporary comp in one undo group, undone once the
- * files are written: runRender), but always with the project's own color settings, so a capture and its
+ * Renders frames of comps the way ae_render_frame does (a temporary comp, removed by hand once the files are
+ * written: runRender), but always with the project's own color settings, so a capture and its
  * comparison are rendered the same way: the comp at full size (capped by maxSize), transparent background. args.comps: {ref}
  * to capture (times from args.times or args.frames over the work area, snapped to frames), or {id, times,
  * width, height, pixelAspect} to render again (a deleted comp or a changed size is reported, not rendered).
@@ -117,7 +117,7 @@ async function waitForFiles(paths: string[]) {
 
 async function render(comps: unknown[], extra: { times?: number[]; frames?: number; maxSize: number }, dir: string, prefix: string) {
   let waitError: unknown;
-  // all files together, with one deadline, before the render is undone (an error is thrown after the undo)
+  // all files together, with one deadline, before the cleanup (an error is thrown after it)
   const { r } = await runRender(PROVE_RENDER_JSX, { comps, ...extra, dir, prefix }, { undoGroup: "Surehand MCP proof", timeoutMs: 600_000 }, async (res) => {
     await waitForFiles((res.comps as Rendered[]).flatMap((c) => (c.frames ?? []).map((f) => f.path))).catch((e) => void (waitError = e));
     return [];

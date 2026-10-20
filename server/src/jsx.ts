@@ -22,9 +22,9 @@ export interface RunOptions {
   /**
    * Undo this call in the same script, only if it changed something, and check the project is back
    * (`RunResult.rollback`). "changes": whenever it changed something (read-only mode); "requested": only
-   * when the body returns `{ rollback: true }` (atomic batch); "deferred": like "changes", but a call that
-   * succeeded is undone later by aemcp.finishRollback (`RunResult.pending`), after Node has the files it saved
-   * (renders: saveFrameToPng writes after the script returns). Needs an undo group.
+   * when the body returns `{ rollback: true }` (atomic batch); "deferred" (renders): never Edit > Undo; a call that
+   * changed something is cleaned up by hand later by aemcp.finishRollback (`RunResult.pending`), after Node has the
+   * files it saved (saveFrameToPng writes after the script returns), and compared. Needs an undo group.
    */
   rollback?: "changes" | "requested" | "deferred";
   /** Serialization depth for the returned value. */
@@ -55,11 +55,13 @@ export interface Rollback {
   undone: boolean;
   /**
    * true: nothing changed (not undone), or undone and the project is back to how it was before the call.
+   * "cleaned" (renders, never undone): what the call changed was removed and set back by hand, and items, layer
+   * attributes and project settings are as before (property values are not compared).
    * "sentinel": undone, and Surehand MCP's undo marker shows the Undo reverted the undo step it was in, with items
    * and layer attributes back as before, but property values were not compared (read-only check's light
    * snapshot), so a call that split its own undo group could still have left edits behind. Truthy: not a problem.
    */
-  verified: boolean | "sentinel";
+  verified: boolean | "sentinel" | "cleaned";
   /** with verified "sentinel": "values were not compared" */
   note?: string;
   /**
@@ -78,8 +80,8 @@ export interface Rollback {
   leftover?: string;
   /** deferred rollbacks: what the caller's cleanup removed or set back by hand (after the Undo, or instead of it) */
   byHand?: string[];
-  /** deferred rollbacks: the Undo reverted another step, but after the cleanup by hand items, layers and settings are as before */
-  clean?: boolean;
+  /** renders: the undo step their cleanup by hand was made in (After Effects may list it in Edit > Undo) */
+  step?: string;
 }
 
 export interface RunResult {
@@ -259,24 +261,18 @@ export function rollbackProblem(rb: Rollback, what: string): string {
   const check = "Check the project before going on (Edit > Undo and Edit > Redo still work step by step).";
   const leftover = rb.leftover ? `\nA temporary folder "${rb.leftover}" (Surehand MCP's undo marker) couldn't be removed; it can be deleted.` : "";
   const byHand = rb.byHand?.length ? `\nSet back by hand: ${rb.byHand.join("; ")}.` : "";
-  if (rb.problem === "changed meanwhile")
-    return (
-      `The project changed while After Effects was writing the image (another edit or call), so the undo step of ${what} was not undone: ` +
-      `Edit > Undo would have reverted that change instead. What ${what} added was removed by hand, and its step may be left in Edit > Undo.${byHand} ${check}${leftover}`
-    );
-  if (!rb.undone)
-    return `It couldn't be checked whether ${what} changed the project${rb.problem && rb.problem !== "unknown" ? ` (${rb.problem})` : ""}, so nothing was undone. ${check}${leftover}`;
   // what still differs, listed; never a claim of differences with an empty list
   const listedText = rb.remaining ? formatChanges(rb.remaining) : null;
   const remaining =
     !listedText || listedText === "Changes: none" ? "" : rb.remaining?.unlisted ? "(changes this check can't list)" : listedText.replace(/^Changes[^\n]*:\n/, "");
   const notBack = `the project still isn't how it was before ${what}:\n${remaining}`;
-  if (rb.clean)
-    return (
-      `The project is unchanged: what ${what} added was removed and its items, layers and project settings are as before ` +
-      `(property values were not compared); After Effects marks the project as modified. Edit > Undo reverted a different step than ` +
-      `${what}'s own, so if your last change before this is missing, Edit > Redo brings it back.${byHand}${leftover}`
-    );
+  // renders: cleaned up by hand, never undone (aemcp.finishRollback)
+  if (rb.problem === "changed meanwhile")
+    return `The project changed while After Effects was writing the image (another edit or call), so it wasn't compared with how it was before ${what}; what ${what} changed was removed and set back by hand.${byHand} ${check}${leftover}`;
+  if (!rb.undone && rb.problem === "not back")
+    return `What ${what} changed was removed and set back by hand, but ${remaining ? notBack : `the project isn't quite how it was before ${what}.`}${byHand} ${check}${leftover}`;
+  if (!rb.undone)
+    return `It couldn't be checked whether ${what} changed the project${rb.problem && rb.problem !== "unknown" ? ` (${rb.problem})` : ""}, so nothing was undone. ${check}${leftover}`;
   if (rb.problem === "not this call" || rb.problem === "undo did nothing / not this call")
     return (
       `Edit > Undo was run once for ${what}, but the Undo did not revert ${what}'s changes as a whole ` +

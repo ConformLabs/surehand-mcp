@@ -24,8 +24,9 @@ if (args.outputPath && !args.overwrite && new File(args.outputPath).exists)
  * Shared by every render (preview, contact sheet, export, proof, the in-chat frame). saveFrameToPng is
  * asynchronous (seen in AE 26.5: it returns at once and AE writes the PNG after the script ends), so a render
  * leaves its temporary comps, the layers it switched off and the settings it changed in place, records them in
- * __clean, and returns; Node waits for the files, then FINISH_JSX undoes the render's undo step (aemcp.finishRollback)
- * and sets back by hand anything the Undo didn't. If the render fails, cleanNow() puts everything back at once.
+ * __clean, and returns; Node waits for the files, then FINISH_JSX (aemcp.finishRollback) removes and sets back all of
+ * it by hand and compares the project with how it was. A render never runs Edit > Undo: seen in AE 26.5, that Undo
+ * could revert the user's own last step. If the render fails, cleanNow() puts everything back at once.
  */
 export const RENDER_KIT_JSX = `
 var __clean = { comps: [], layers: [], res: [], color: null };
@@ -36,15 +37,13 @@ function displayColor() {
   var P = app.project, s;
   try { s = { bpc: P.bitsPerChannel, lb: !!P.linearBlending }; } catch (e) { return null; }
   if (s.bpc !== 32 && !s.lb) return null;
-  aemcp.renderMark();
   __clean.color = s;
   if (s.bpc === 32) P.bitsPerChannel = 16;
   if (s.lb) P.linearBlending = false;
   return s;
 }
-function tempComp(name, w, h, par, dur, fps) { aemcp.renderMark(); var t = app.project.items.addComp(name, w, h, par, dur, fps); __clean.comps.push(t.id); return t; }
+function tempComp(name, w, h, par, dur, fps) { var t = app.project.items.addComp(name, w, h, par, dur, fps); __clean.comps.push(t.id); return t; }
 function hideLayer(comp, L) {
-  aemcp.renderMark();
   var lk = L.locked;
   if (lk) L.locked = false;
   L.enabled = false;
@@ -54,7 +53,6 @@ function hideLayer(comp, L) {
 function fullRes(comp) {
   var rf = comp.resolutionFactor;
   if (rf[0] === 1 && rf[1] === 1) return;
-  aemcp.renderMark();
   __clean.res.push({ comp: comp.id, rf: [rf[0], rf[1]] });
   comp.resolutionFactor = [1, 1];
 }
@@ -78,7 +76,7 @@ function cleanNow(c) {
   return done;
 }`;
 
-/** The second call of a render: its undo step undone (if nothing changed since), what is left set back by hand. */
+/** The second call of a render: what it changed removed and set back by hand, then the project compared with how it was. */
 export const FINISH_JSX = `${RENDER_KIT_JSX}
 var c = args.cleanup || {};
 c.comps = c.comps || []; c.layers = c.layers || []; c.res = c.res || [];
@@ -232,11 +230,12 @@ export async function waitForFiles(paths: string[]): Promise<string[]> {
   return missing;
 }
 
-/** The render's second call: undo its step (FINISH_JSX). Never cancelled: it is what puts the project back. */
-export async function finishRender(token: string, cleanup: unknown): Promise<Rollback> {
+/** The render's second call: what it changed removed and set back by hand (FINISH_JSX), then checked. Never cancelled: it is what puts the project back. */
+export async function finishRender(token: string, cleanup: unknown, step: string): Promise<Rollback> {
   try {
-    const f = await runJsx(FINISH_JSX, { token, cleanup: cleanup ?? {} }, { undoGroup: false, timeoutMs: 120_000, bridge: { cancel: undefined } });
-    if (f.ok && f.result && typeof f.result === "object") return f.result as Rollback;
+    // the cleanup by hand, in an undo step named like the render's own (never Edit > Undo)
+    const f = await runJsx(FINISH_JSX, { token, cleanup: cleanup ?? {} }, { undoGroup: step, timeoutMs: 120_000, bridge: { cancel: undefined } });
+    if (f.ok && f.result && typeof f.result === "object") return { ...(f.result as Rollback), step };
     return { undone: false, verified: false, problem: `failed: ${f.error?.message ?? "no result"}` };
   } catch (e: any) {
     return { undone: false, verified: false, problem: `failed: ${e?.message ?? e}` };
@@ -246,7 +245,7 @@ export async function finishRender(token: string, cleanup: unknown): Promise<Rol
 /**
  * A render in two calls: the body (in its undo group) sets up and calls saveFrameToPng, which writes after the
  * script returns; Node waits until the files are written (`wait(result)`: the files it didn't get), then
- * finishRender undoes the render's step, also when waiting fails. `missing`: files After Effects didn't write in time.
+ * finishRender cleans up by hand, also when waiting fails. `missing`: files After Effects didn't write in time.
  */
 export async function runRender(body: string, args: Record<string, unknown>, opts: { undoGroup: string; timeoutMs: number }, wait: (result: any) => Promise<string[]>): Promise<{ r: RunResult; missing: string[] }> {
   const r = await runJsx(body, args, { ...RENDER_RUN_OPTIONS, depth: 8, ...opts });
@@ -255,7 +254,7 @@ export async function runRender(body: string, args: Record<string, unknown>, opt
   try {
     missing = await wait(r.result);
   } finally {
-    if (r.pending) r.rollback = await finishRender(r.pending, (r.result as any)?.cleanup);
+    if (r.pending) r.rollback = await finishRender(r.pending, (r.result as any)?.cleanup, opts.undoGroup);
   }
   return { r, missing };
 }
@@ -276,8 +275,7 @@ async function renderPng(body: string, args: Record<string, unknown>): Promise<{
   // A folder both AE and this process can access (system temp dirs can be sandboxed per app on macOS)
   const tmpDir = appFile("tmp");
   mkdirSync(tmpDir, { recursive: true });
-  // The temporary comp is created in one undo group, which is undone once the PNG is written: Edit > Undo in
-  // AE keeps undoing the user's own last step, not an invisible preview step.
+  // The temporary comp is created in one undo group and removed by hand once the PNG is written (never Edit > Undo).
   const { r, missing } = await runRender(body, { ...args, tmpDir }, { undoGroup: "Surehand MCP preview", timeoutMs: 180_000 }, (x) => waitForFiles([x.path]));
   if (!r.ok) return { error: formatResult(r) };
   const info = r.result as any;
@@ -376,8 +374,8 @@ export function readOnlyScriptRefusal(code: string, transpiled?: string): string
  * has app.project.revision only items and layer attributes are compared (checkOnly), not property values.
  */
 /**
- * Rendering tools: their temporary comp leaves no undo step behind (rolled back and checked like read-only mode),
- * undone after the files are written (runRender: saveFrameToPng writes after the script returns).
+ * Rendering tools: what they change is removed and set back by hand once the files are written, and the project
+ * compared with how it was (runRender: saveFrameToPng writes after the script returns); never Edit > Undo.
  */
 export const RENDER_RUN_OPTIONS: RunOptions = { report: ["*"], checkOnly: true, rollback: "deferred" };
 
@@ -390,7 +388,8 @@ export function renderCleanupNote(r: RunResult, tmpLeft: unknown, tmpName: strin
   const rb = r.rollback, notes: string[] = [];
   if (tmpLeft && !(rb?.undone && rb.verified)) notes.push(`The temporary comp "${tmpName}" could not be removed; it can be deleted from the Project panel.`);
   if (rb && !rb.verified) notes.push(rollbackProblem(rb, "the render"));
-  else if (rb?.byHand?.length) notes.push(`Edit > Undo didn't put back everything the render changed; set back by hand: ${rb.byHand.join("; ")}.`);
+  else if (rb?.verified === "cleaned")
+    notes.push(`After Effects lists "${rb.step ?? "Surehand MCP preview"}" in Edit > Undo; undoing it only brings back the render's own temporary comp and settings, nothing of yours.`);
   return notes.join("\n");
 }
 export const READ_ONLY_RUN_OPTIONS: RunOptions = { undoGroup: "Surehand MCP Script (read-only check)", report: ["*"], checkOnly: true, rollback: "changes" };

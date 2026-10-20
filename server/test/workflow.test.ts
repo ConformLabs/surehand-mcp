@@ -241,137 +241,116 @@ describe("guarded rollback in aemcp.run", () => {
   });
 });
 
-// Renders: saveFrameToPng writes after the script returns (AE 26.5), so the render's undo step stays until Node has
-// the file; aemcp.finishRollback (a second call) then undoes it. Here the "render" adds a temporary folder and, as in a
-// 32 bpc project with linear blending, switches the project to 16 bpc without it.
-describe("deferred rollback (renders)", () => {
+// Renders: saveFrameToPng writes after the script returns (AE 26.5), so what a render changes stays until Node has the
+// file; aemcp.finishRollback (a second call) then removes and sets it back BY HAND and compares. A render never runs
+// Edit > Undo: seen live, after a project was opened and its settings changed, that Undo reverted the user's own last
+// step. Here the "render" adds a temporary folder (its temporary comp) and, as in a 32 bpc project with linear
+// blending, switches the project to 16 bpc without it.
+describe("renders: cleaned up by hand, never undone", () => {
   const RENDER = () => {
     fake.app.project.items.addFolder("__aemcp_preview");
     fake.app.project.bitsPerChannel = 16;
     fake.app.project.linearBlending = false;
     return "saved";
   };
+  /** FINISH_JSX's cleanup (cleanNow): what is still there removed / set back; returns what it did */
+  const cleanNow = (opts: { keepFolder?: boolean } = {}) => () => {
+    const done: string[] = [];
+    const P = fake.app.project;
+    for (let i = P.numItems; i >= 1; i--) if (!opts.keepFolder && P.item(i).name === "__aemcp_preview") (P.item(i).remove(), done.push("temporary comp removed"));
+    if (P.bitsPerChannel !== 32) (P.bitsPerChannel = 32), done.push("bit depth 32 bpc");
+    if (!P.linearBlending) (P.linearBlending = true), done.push("linear blending on");
+    return done;
+  };
   const run = (fn: () => unknown, opts: Record<string, unknown> = {}): RunResult =>
     JSON.parse(helpers.run(fn, {}, { undoGroup: "Surehand MCP preview", report: ["*"], checkOnly: true, rollback: "deferred", ...opts }));
+  /** the second call, as finishRender makes it: in an undo group of the render's name */
+  const finish = (token: string, fix = cleanNow()) => JSON.parse(helpers.run(() => helpers.finishRollback(token, fix), {}, { undoGroup: "Surehand MCP preview" })).result;
   const color = () => [fake.app.project.bitsPerChannel, fake.app.project.linearBlending];
 
-  it("the render's changes stay until finishRollback; then its step is undone once and checked", () => {
+  it("the user's last step is a property edit right before the render: it is still there afterwards", () => {
     withManualEdit();
+    fake.app.beginUndoGroup("user: opacity 70");
+    fake.opacity.value = 70;
+    fake.app.endUndoGroup();
     const r = run(RENDER);
     expect(r.ok).toBe(true);
-    expect(r.rollback).toBeUndefined();
-    expect(typeof r.pending).toBe("string");
-    // while AE writes the file: the folder and the settings are still there, nothing undone yet
-    expect(fake.folders()).toEqual(["__aemcp_preview", expect.stringMatching(/^__aemcp_rollback_/)]);
+    // while AE writes the file, the render's changes stay
+    expect(fake.folders()).toEqual(["__aemcp_preview"]);
     expect(color()).toEqual([16, false]);
-    expect(fake.undos.n).toBe(0);
-    const rb = helpers.finishRollback(r.pending, () => []);
-    expect(rb).toMatchObject({ undone: true, verified: "sentinel" });
-    expect(fake.undos.n).toBe(1);
+    const rb = finish(r.pending!);
+    expect(rb).toEqual({ undone: false, verified: "cleaned", byHand: ["temporary comp removed", "bit depth 32 bpc", "linear blending on"] });
+    expect(fake.undos.n).toBe(0); // Edit > Undo never ran
+    expect(opacity()).toBe(70);
     expect(fake.folders()).toEqual([]);
     expect(color()).toEqual([32, true]);
-    expect(opacity()).toBe(50);
-    expect(fake.undoStack()).toEqual(["user: opacity 50"]);
+    // the user's steps are all still in Edit > Undo, below the render's own
+    expect(fake.undoStack().slice(0, 2)).toEqual(["user: opacity 50", "user: opacity 70"]);
+    expect(fake.undoStack().slice(2).every((s) => s === "Surehand MCP preview")).toBe(true);
     // a token is used once
     expect(helpers.finishRollback(r.pending, () => [])).toEqual({ undone: false, verified: false, problem: "unknown" });
   });
 
-  it("the project changed before finishRollback: nothing is undone (it would revert that change), the render is cleaned up by hand", () => {
+  it("the case seen live: the first render after the project's settings were changed and saved; the settings stay the user's", () => {
+    withManualEdit();
+    fake.app.beginUndoGroup("user: settings");
+    fake.app.project.bitsPerChannel = 8;
+    fake.app.project.linearBlending = false;
+    fake.app.endUndoGroup();
+    fake.app.beginUndoGroup("user: settings again");
+    fake.app.project.bitsPerChannel = 32;
+    fake.app.project.linearBlending = true;
+    fake.app.endUndoGroup();
+    const r = run(() => {
+      RENDER();
+      fake.app.endUndoGroup(); // saveFrameToPng may close the open undo group
+      return "saved";
+    });
+    expect(finish(r.pending!)).toMatchObject({ undone: false, verified: "cleaned" });
+    expect(fake.undos.n).toBe(0);
+    expect(color()).toEqual([32, true]);
+    expect(opacity()).toBe(50);
+    expect(fake.undoStack().slice(0, 3)).toEqual(["user: opacity 50", "user: settings", "user: settings again"]);
+  });
+
+  it("an edit while the image was written: kept, the render cleaned up by hand, the project not compared (it changed)", () => {
     withManualEdit();
     const r = run(RENDER);
     fake.app.beginUndoGroup("user: opacity 70");
     fake.opacity.value = 70;
     fake.app.endUndoGroup();
-    const rb = helpers.finishRollback(r.pending, () => {
-      fake.app.project.bitsPerChannel = 32;
-      fake.app.project.linearBlending = true;
-      return ["bit depth 32 bpc", "linear blending on"];
-    });
-    expect(rb).toEqual({ undone: false, verified: false, problem: "changed meanwhile", byHand: ["bit depth 32 bpc", "linear blending on"] });
+    const rb = finish(r.pending!);
+    expect(rb).toEqual({ undone: false, verified: false, problem: "changed meanwhile", byHand: ["temporary comp removed", "bit depth 32 bpc", "linear blending on"] });
     expect(fake.undos.n).toBe(0);
     expect(opacity()).toBe(70);
-    expect(fake.folders().some((n: string) => n.startsWith("__aemcp_rollback_"))).toBe(false);
-    expect(rollbackProblem(rb, "the render")).toMatch(/^The project changed while After Effects was writing the image .*Edit > Undo would have reverted that change instead[\s\S]*Set back by hand: bit depth 32 bpc; linear blending on\./);
+    expect(rollbackProblem(rb, "the render")).toMatch(/^The project changed while After Effects was writing the image .*so it wasn't compared with how it was before the render; what the render changed was removed and set back by hand\./);
   });
 
-  it("settings the Undo didn't restore are set back by hand, and the project checked again", () => {
-    withManualEdit({ colorNotUndone: true });
+  it("what the cleanup couldn't put back is listed (never an empty list)", () => {
+    withManualEdit();
     const r = run(RENDER);
-    const rb = helpers.finishRollback(r.pending, () => {
-      const done: string[] = [];
-      if (fake.app.project.bitsPerChannel !== 32) (fake.app.project.bitsPerChannel = 32), done.push("bit depth 32 bpc");
-      if (!fake.app.project.linearBlending) (fake.app.project.linearBlending = true), done.push("linear blending on");
-      return done;
-    });
-    expect(rb).toMatchObject({ undone: true, verified: true, byHand: ["bit depth 32 bpc", "linear blending on"] });
-    expect(color()).toEqual([32, true]);
+    const rb = finish(r.pending!, cleanNow({ keepFolder: true }));
+    expect(rb).toMatchObject({ undone: false, verified: false, problem: "not back" });
+    const msg = rollbackProblem(rb, "the render");
+    expect(msg).toMatch(/^What the render changed was removed and set back by hand, but the project still isn't how it was before the render:\n\+ folder "__aemcp_preview"/);
+    expect(fake.undos.n).toBe(0);
   });
 
-  it("a render that fails is undone at once (nothing pending)", () => {
+  it("a render that fails puts its changes back itself and is checked, not undone", () => {
     withManualEdit();
     const r = run(() => {
       RENDER();
+      cleanNow()(); // the render's own finally (cleanNow) when it fails
       throw new Error("no such comp");
     });
     expect(r.ok).toBe(false);
     expect(r.pending).toBeUndefined();
-    expect(r.rollback).toMatchObject({ undone: true });
-    expect(color()).toEqual([32, true]);
-    expect(fake.folders()).toEqual([]);
-  });
-
-  // Seen live (AE 26.5): the first render after a project was opened, its bit depth / linear blending changed and saved
-  // reported "Edit > Undo ... did not revert the render's changes as a whole". Modelled here as the hypothesis that fits
-  // it: saveFrameToPng closes the open undo group, so what comes after it is outside the render's undo step.
-  const RENDER_THAT_SPLITS = (mark: boolean) => () => {
-    if (mark) helpers.renderMark();
-    RENDER();
-    fake.app.endUndoGroup(); // saveFrameToPng closes the group
-    return "saved";
-  };
-
-  it("a render whose save closes the undo group: the marker placed before its edits makes the Undo revert all of it", () => {
-    withManualEdit();
-    const r = run(RENDER_THAT_SPLITS(true));
-    const rb = helpers.finishRollback(r.pending, () => []);
-    expect(rb).toMatchObject({ undone: true, verified: "sentinel" });
-    expect(fake.folders()).toEqual([]);
-    expect(color()).toEqual([32, true]);
-    expect(fake.undoStack()).toEqual(["user: opacity 50"]);
-  });
-
-  it("the same with the marker added after the body (as before): reproduces the live message; cleaned up by hand, it says the project is unchanged", () => {
-    withManualEdit();
-    const r = run(RENDER_THAT_SPLITS(false));
-    // the cleanup FINISH_JSX does by hand (here the folder stands for the temporary comp)
-    const cleanNow = () => {
-      const done: string[] = [];
-      const P = fake.app.project;
-      for (let i = P.numItems; i >= 1; i--) if (P.item(i).name === "__aemcp_preview") (P.item(i).remove(), done.push("temporary comp removed"));
-      if (P.bitsPerChannel !== 32) (P.bitsPerChannel = 32), done.push("bit depth 32 bpc");
-      if (!P.linearBlending) (P.linearBlending = true), done.push("linear blending on");
-      return done;
-    };
-    const rb = helpers.finishRollback(r.pending, cleanNow);
-    // the Undo reverted only the marker's rename (its own undo step), not the render; after the cleanup the project's
-    // items, layers and settings are as before: said plainly, not as a list of differences
-    expect(rb).toMatchObject({ undone: true, verified: false, problem: "not this call", clean: true, byHand: ["temporary comp removed", "bit depth 32 bpc", "linear blending on"] });
-    expect(rb.remaining).toBeUndefined();
-    expect(rollbackProblem(rb, "the render")).toMatch(/^The project is unchanged: .* After Effects marks the project as modified\./);
-    expect(fake.folders()).toEqual([]);
+    expect(r.rollback).toEqual({ undone: false, verified: true });
+    expect(fake.undos.n).toBe(0);
     expect(color()).toEqual([32, true]);
   });
 
-  it("the live message is never shown with an empty list: a clean project says so", () => {
-    expect(rollbackProblem({ undone: true, verified: false, problem: "not this call", clean: true, byHand: ["bit depth 32 bpc"] }, "the render")).toBe(
-      "The project is unchanged: what the render added was removed and its items, layers and project settings are as before (property values were not compared); " +
-        "After Effects marks the project as modified. Edit > Undo reverted a different step than the render's own, so if your last change before this is missing, Edit > Redo brings it back.\nSet back by hand: bit depth 32 bpc.",
-    );
-    const empty = rollbackProblem({ undone: true, verified: false, problem: "not this call", remaining: { items: [], layers: [], props: [], scope: [] } }, "the render");
-    expect(empty).not.toMatch(/still isn't how it was/);
-  });
-
-  it("a render that changed nothing (an 8 bpc frame of the comp itself) leaves nothing pending", () => {
+  it("a render that changed nothing (the in-chat frame of an 8 bpc project) leaves nothing to clean up", () => {
     withManualEdit();
     const r = run(() => "saved");
     expect(r.pending).toBeUndefined();

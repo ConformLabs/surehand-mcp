@@ -247,7 +247,7 @@ for (var i4 = 0; i4 < jobs.length; i4++) passes = Math.max(passes, jobs[i4].pass
 if (total > 500) aemcp.fail(total + " frames requested; at most 500 per call");
 if (exists.length) aemcp.fail("A file already exists at " + exists.slice(0, 5).join(", ") + (exists.length > 5 ? " and " + (exists.length - 5) + " more" : "") + ". Nothing was exported. To replace them, pass overwrite: true (or choose another outputPath).");
 // every frame is written after this script returns: the temporary comps, hidden layers and settings stay until
-// Node has the files, then the export's undo step is undone (runRender)
+// Node has the files, then they are removed and set back by hand (runRender)
 var out = [], done = false;
 try {
   displayColor();
@@ -350,9 +350,8 @@ export function registerFileTools(server: McpServer) {
     async (args) => {
       try {
         const exports = args.exports.map((e) => ({ ...e, outputPath: expandHome(e.outputPath) }));
-        // the temporary comp and layer switches are undone again: no undo step is left behind (as ae_render_frame)
-        // each pass: frames saved, Node waits for them, then the pass's undo step is undone (no undo step is left
-        // behind, as ae_render_frame); a later pass only for exports of one comp with other layers shown
+        // each pass: frames saved, Node waits for them, then what the pass changed is set back by hand (as
+        // ae_render_frame, never Edit > Undo); a later pass only for exports of one comp with other layers shown
         type Info = { files: { path: string; source: string; frame: number; width: number; height: number }[]; tmpLeft?: boolean; passes?: number; cleanup?: unknown };
         const files: Info["files"] = [], missing: string[] = [], notes = new Set<string>();
         let passes = 1;

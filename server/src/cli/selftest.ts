@@ -142,7 +142,7 @@ export async function quickChecks(print: boolean, beforeJob?: () => Promise<void
   mkdirSync(tmpDir, { recursive: true });
   const png = join(tmpDir, `selftest_${Date.now()}.png`);
   // a render like ae_render_frame: saveFrameToPng writes after the script returns, so the comp stays until the PNG
-  // is written, then the test's undo step is undone (runRender)
+  // is written, then removed by hand (runRender)
   const { r: job } = await runRender(
     `${RENDER_KIT_JSX}
 var c = tempComp("__aemcp_selftest", 640, 360, 1, 2, 30);
