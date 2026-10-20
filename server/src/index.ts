@@ -19,6 +19,7 @@ import { recordRuntime } from "./cli/setup.js";
 import { uninstall } from "./cli/uninstall.js";
 import { createMcpServer } from "./server.js";
 import { trackSession } from "./sessions.js";
+import { noteViewClient } from "./tools/views.js";
 import { env, migrationPending, SERVER_NAME } from "./paths.js";
 import { migrationLog } from "./migrate.js";
 import { movesLegacyBeforeRunning } from "./cli/commands.js";
@@ -73,6 +74,8 @@ function startHttp() {
 
     try {
       const body = await readBody(req);
+      // the AI app says at initialize whether it shows in-chat views; later requests get fresh servers (tools/views.ts)
+      for (const m of Array.isArray(body) ? body : [body]) if ((m as any)?.method === "initialize") noteViewClient((m as any).params?.capabilities);
       // Stateless: a fresh server + transport per request.
       const server = createMcpServer();
       const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });

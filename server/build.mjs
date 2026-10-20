@@ -2,6 +2,7 @@ import { build } from "esbuild";
 import { createHash } from "node:crypto";
 import { chmodSync, readFileSync, rmSync } from "node:fs";
 import { readCepFiles } from "./scripts/cep-files.mjs";
+import { packViews } from "./scripts/views.mjs";
 
 const pkg = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8"));
 
@@ -16,6 +17,8 @@ for (const [rel, content] of Object.entries(cepFiles)) {
   else cepBinary[rel] = content.toString("base64");
 }
 const cepHash = createHash("sha1").update(JSON.stringify(cepText)).update(JSON.stringify(cepBinary)).digest("hex").slice(0, 12);
+// The in-chat views (MCP Apps), each a self-contained HTML page (scripts/views.mjs)
+const views = packViews();
 
 await build({
   entryPoints: ["src/index.ts"],
@@ -32,6 +35,7 @@ await build({
     __AEMCP_CEP_FILES__: JSON.stringify(cepText),
     __AEMCP_CEP_BINARY__: JSON.stringify(cepBinary),
     __AEMCP_CEP_HASH__: JSON.stringify(cepHash),
+    __SUREHAND_VIEWS__: JSON.stringify(views),
   },
   banner: {
     js:

@@ -1,0 +1,79 @@
+/* In-chat views: the panel's Conform Labs tokens (extension/css/panel.css), dark, with the approved light set
+ * (notes/review-inchat-views). The AI app's theme picks one (data-theme on <html>, from hostContext.theme);
+ * without one, the system's. The fonts are inserted above at runtime, as data: URLs. */
+:root {
+  --paper: #14161A; --paper-raised: #1C1F24; --paper-sunk: #0D0E11;
+  --ink: #F2EFE8; --ink-muted: #A6A49D;
+  --rule: #2C3036; --rule-strong: #6E727A;
+  --focus: #FF8A5C;
+  --verified: #3DD68C; --changed: #E8B34A; --refused: #FF7A6B;
+  --product-surehand: #3DD68C; --on-product-surehand: #14161A;
+  --radius-sm: 2px;
+  --font-display: "Space Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --font-text: "IBM Plex Sans", -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+:root[data-theme="light"] {
+  --paper: #FAF8F4; --paper-raised: #FFFFFF; --paper-sunk: #F0EDE6;
+  --ink: #14161A; --ink-muted: #5E5C57;
+  --rule: #DDD8CE; --rule-strong: #8A8780;
+  --verified: #14945A; --changed: #A86F00; --refused: #C8392B;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --paper: #FAF8F4; --paper-raised: #FFFFFF; --paper-sunk: #F0EDE6;
+    --ink: #14161A; --ink-muted: #5E5C57;
+    --rule: #DDD8CE; --rule-strong: #8A8780;
+    --verified: #14945A; --changed: #A86F00; --refused: #C8392B;
+    color-scheme: light;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: transparent; }
+body { color: var(--ink); font: 400 13px/1.45 var(--font-text); -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:disabled { cursor: default; opacity: 0.6; }
+[hidden] { display: none !important; }
+/* focus ring for keyboard users */
+:focus { outline: none; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* the view's frame */
+.v { background: var(--paper); color: var(--ink); border: 1px solid var(--rule); font: 400 13px/1.45 var(--font-text); }
+.vh { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--rule); }
+.tile { width: 22px; height: 22px; background: var(--product-surehand); flex: none; display: grid; place-items: center; }
+.tile svg { width: 16px; height: 16px; }
+.vh .t { font: 600 15px/1.2 var(--font-display); }
+.vh .s { font: 11px var(--font-mono); color: var(--ink-muted); }
+.grow { flex: 1; min-width: 0; }
+
+/* buttons */
+.btn { height: 26px; padding: 0 10px; border: 1px solid var(--rule-strong); background: var(--paper); color: var(--ink); font: 600 12px var(--font-text); border-radius: var(--radius-sm); white-space: nowrap; display: inline-flex; align-items: center; }
+.btn.sm { height: 22px; padding: 0 7px; font-size: 11px; }
+
+/* type */
+.eyebrow { font: 500 11px/16px var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-muted); }
+.mono { font-family: var(--font-mono); }
+.num { font-variant-numeric: tabular-nums; }
+.ok { color: var(--verified); } .warn { color: var(--changed); } .bad { color: var(--refused); } .mut { color: var(--ink-muted); }
+
+/* status squares (12px), as in the panel */
+.g { width: 12px; height: 12px; display: inline-block; flex: none; }
+.g.ok { background: var(--verified); }
+.g.warn { border: 2px solid var(--changed); }
+.g.nr { border: 2px solid var(--ink-muted); background: linear-gradient(transparent 38%, var(--ink-muted) 38% 62%, transparent 62%); }
+.g.bad { border: 2px solid var(--refused); background: linear-gradient(45deg, transparent 42%, var(--refused) 42% 58%, transparent 58%), linear-gradient(-45deg, transparent 42%, var(--refused) 42% 58%, transparent 58%); }
+
+/* the verdict bar */
+.verdict { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--paper-sunk); border-top: 2px solid var(--ink); }
+.verdict .big { font: 600 22px/1 var(--font-display); }
+
+/* groups of rows, and the footer */
+.grp { border-top: 1px solid var(--rule); }
+.grp > .gh { display: flex; align-items: center; gap: 8px; padding: 10px 14px 4px; }
+.foot { display: flex; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--rule); align-items: center; }
+
+/* a short message when After Effects can't be reached or is busy */
+.err { font: 11px/16px var(--font-mono); color: var(--refused); }

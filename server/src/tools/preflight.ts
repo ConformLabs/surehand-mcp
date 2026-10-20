@@ -14,9 +14,12 @@ import { checkFile, type FileCheck } from "../preflight/media.js";
 import { jsxArgs, needsXray, PREFLIGHT_JSX, projectChecks, xrayChecks, type PData } from "../preflight/project.js";
 import { formatReport, type TimeBase } from "../preflight/report.js";
 import { loadSpec, specSchema, type Finding, type NotRun, type Spec } from "../preflight/spec.js";
+import { preflightView } from "../preflight/view.js";
+import { VIEW_META_KEY } from "../views/types.js";
 import type { XData } from "./xray-analyze.js";
 import { XRAY_JSX } from "./xray.js";
 import { compRef, errorResult, formatResult } from "./registry.js";
+import { PREFLIGHT_VIEW_URI, registerViewTool, viewError } from "./views.js";
 
 const SECTIONS = ["video", "safeAreas", "text", "project", "legalRange", "black", "frozen", "audio", "flash"] as const;
 const FILE_ONLY = ["legalRange", "black", "frozen", "audio", "flash"] as const;
@@ -97,6 +100,7 @@ async function runPreflight(args: Record<string, any>): Promise<CallToolResult> 
   if (target === "project" && args.file) notes.push(`file ${args.file} was not checked: target "project" checks the project only (target "both" checks the file too)`);
   const titleParts: string[] = [];
   let timeBase: TimeBase | undefined;
+  let comp: PData["comp"] | undefined;
 
   if (target !== "file") {
     const budget = typeof args.timeBudgetSeconds === "number" ? args.timeBudgetSeconds : 120;
@@ -115,6 +119,7 @@ async function runPreflight(args: Record<string, any>): Promise<CallToolResult> 
     notRun.push(...pr.notRun);
     notes.push(...pr.notes);
     timeBase = { fps: d.comp.fps, dropFrame: !!d.comp.df, offset: d.comp.dst ?? 0 };
+    comp = d.comp;
     titleParts.push(`comp "${d.comp.name}" (${d.comp.w}x${d.comp.h}, ${Math.round(d.comp.fps * 1000) / 1000} fps, ${fmtSecs(d.comp.dur)})`);
   }
 
@@ -188,13 +193,18 @@ async function runPreflight(args: Record<string, any>): Promise<CallToolResult> 
         } catch {}
     }
   }
-  return { content };
+  // the in-chat view's data: in _meta, so the text (what the AI reads) stays exactly the report
+  const view = preflightView({ spec, specArg: args.spec, target, verdictLine: text.split("\n")[0], findings, notRun, timeBase, comp, file: target !== "project" ? args.file : undefined, probe: fc?.probe });
+  return { content, _meta: { [VIEW_META_KEY]: view } };
 }
 
 export function registerPreflightTools(server: McpServer) {
-  server.registerTool(
+  // shown as the Preflight report view where the AI app has in-chat views (MCP Apps); text everywhere else
+  registerViewTool(
+    server,
     "ae_preflight",
     {
+      _meta: { ui: { resourceUri: PREFLIGHT_VIEW_URI } },
       title: "Preflight",
       description:
         "Check the delivered comp and/or its rendered file against the user's own delivery spec (a JSON file or inline object; " +
@@ -226,7 +236,7 @@ export function registerPreflightTools(server: McpServer) {
           return { content: [{ type: "text", text: `${SCHEMA_GUIDANCE}\n\nJSON schema:\n${JSON.stringify(z.toJSONSchema(specSchema))}` }] };
         return await runPreflight(args);
       } catch (e) {
-        return errorResult(e);
+        return viewError(e);
       }
     },
   );

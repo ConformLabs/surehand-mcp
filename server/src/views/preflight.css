@@ -1,0 +1,42 @@
+/* Preflight report view (the approved board "1 · Preflight report") */
+
+/* the timeline: the comp with each finding where it happens */
+.tl { padding: 12px 14px 6px; }
+.track { position: relative; height: 28px; background: var(--paper-sunk); border: 1px solid var(--rule); }
+.track .m { position: absolute; top: 4px; bottom: 4px; min-width: 3px; }
+.track .m.bad { background: var(--refused); } .track .m.warn { background: var(--changed); }
+/* findings without a time (the whole comp / file): a thin bar along the bottom */
+.track .m.whole { left: 0; width: 100%; top: 22px; bottom: 2px; opacity: 0.6; }
+.track .ph { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink); }
+.ticks { display: flex; justify-content: space-between; font: 10px var(--font-mono); color: var(--ink-muted); padding-top: 3px; }
+
+/* findings */
+.row { display: grid; grid-template-columns: 12px 92px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 7px 14px; }
+.row.open-able { cursor: pointer; }
+.row.sel { background: var(--paper-raised); box-shadow: inset 2px 0 0 var(--ink); }
+.row .tc { font: 12px var(--font-mono); color: var(--ink); overflow-wrap: anywhere; }
+.row .tc .mut { white-space: nowrap; }
+.row .msg { min-width: 0; }
+.row .where { font: 11px var(--font-mono); color: var(--ink-muted); }
+.row .fix { color: var(--ink-muted); font-size: 12px; }
+.row .g { margin-top: 4px; }
+
+/* an open row: its frame with the problem marked */
+.frame { margin: 4px 14px 10px 36px; display: grid; grid-template-columns: 240px 1fr; gap: 12px; align-items: start; }
+.frame.noimg { grid-template-columns: 1fr; }
+.still { background: var(--paper-sunk); position: relative; border: 1px solid var(--rule); overflow: hidden; }
+.still img { display: block; width: 100%; height: 100%; }
+.still .safe { position: absolute; border: 1px dashed rgba(255, 255, 255, 0.55); }
+.still .hit { position: absolute; outline: 2px solid var(--refused); outline-offset: 2px; }
+.still .hit.warn { outline-color: var(--changed); }
+.still .err { position: absolute; inset: 0; display: grid; place-items: center; padding: 8px; text-align: center; }
+.cap { font-size: 11px; }
+
+/* the footer's passed checks; a message for the whole report (Run again didn't work) */
+.foot .sum { font: 11px var(--font-mono); color: var(--ink-muted); }
+.err.note { padding: 8px 14px; }
+
+/* a narrow chat (phones): the frame above its caption */
+@media (max-width: 520px) {
+  .frame { grid-template-columns: 1fr; margin-left: 14px; }
+}

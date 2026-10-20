@@ -358,3 +358,12 @@ describe("Conform Labs style: status words, glyphs and texts", () => {
     expect(UI.feedItems([entry], { current: { ...here, revision: 813 }, undone: { [UI.entryKey(entry)]: true } })[0].undoBlocked).toBe(false);
   });
 });
+
+describe("the in-chat views' tools in the feed", () => {
+  it("are named readably and count as looking, not changing", () => {
+    const reveal = UI.describeEntry({ at: "2026-10-20T01:00:00Z", ok: true, tool: "ae_view_reveal", args: { comp: 12, time: 12.4, layer: 3 }, summary: 'Showed "Main" at 00:00:12:10 (12.4 s), layer "LT_Name" selected.' });
+    expect(reveal).toMatchObject({ kind: "read", title: "Show in After Effects", undoable: false });
+    const frame = UI.describeEntry({ at: "2026-10-20T01:00:00Z", ok: true, tool: "ae_view_frame", args: { comp: 12, time: 12.4 }, summary: 'Frame of "Main" at 12.4 s (480x270).' });
+    expect(frame).toMatchObject({ kind: "read", title: "Frame for the chat" });
+  });
+});
