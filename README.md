@@ -17,7 +17,7 @@
 
 Surehand MCP connects **Claude** (Desktop / Code), **ChatGPT** (desktop app or web), Cursor, Codex, VS Code (GitHub Copilot), Windsurf / Devin Desktop, LM Studio, or any MCP client to **Adobe® After Effects®**.
 The AI can run any script inside After Effects (modern JavaScript, converted for AE's ExtendScript engine automatically),
-read information back, and use up to 107 ready-made tools for projects, comps, layers, keyframes (Graph Editor level),
+read information back, and use up to 109 ready-made tools for projects, comps, layers, keyframes (Graph Editor level),
 text styling and animators, footage, effects, shapes, masks, 3D cameras/lights/materials, audio, color management,
 Essential Graphics and rendering (including background renders with aerender). Batch edits run many steps as one
 undo step, checkpoints keep safety copies of the project, structural changes can be proven not to change the render,
@@ -87,7 +87,7 @@ The installer:
   Copilot's Agent mode), **Windsurf / Devin Desktop** (`~/.config/devin/mcp_config.json`, `%APPDATA%\devin` on Windows,
   and Windsurf's `~/.codeium/windsurf/mcp_config.json` while that folder is there) and **LM Studio** (`~/.lmstudio/mcp.json`)
   if they are installed, under the name `surehand-ae`. Before a config file is changed, a timestamped backup is made next to it
-  (`*.surehand-<time>.bak`, the newest five are kept); the very first original also stays as `*.surehand.bak`. If Claude Desktop is open it offers to restart it,
+  (`*.surehand-<time>.bak`, the newest three are kept); the very first original also stays as `*.surehand.bak`. If Claude Desktop is open it offers to restart it,
   because a running Claude Desktop overwrites its config file
 - writes the Surehand skills (see "Skills" below) for the AI apps that read skill files, and the zips to upload in
   Claude Desktop chat
@@ -194,7 +194,7 @@ To rotate the token, delete `token` from `~/.surehand/ae/config.json` and re-run
 | `ae_get_scripting_guide` | ExtendScript cheat sheet for the model (also an MCP resource `aemcp://docs/extendscript`). |
 
 **Tool profiles.** Every tool description is sent to the AI in every chat, so by default only a **core set of
-29 tools** is loaded (about 9k tokens instead of 39k for all 107), and **every other tool stays available on demand**:
+29 tools** is loaded (about 9k tokens instead of 39k for all 109), and **every other tool stays available on demand**:
 `ae_tools` lists all tools by category (or gives full parameter details of chosen ones), and `ae_call` runs any tool by
 name with the same validation, permissions, change report and activity log. Loading everything up front is optional:
 switch to **All tools** in the Surehand panel in After Effects (**☰ › Tools the AI sees › All tools**), in Claude Desktop's
@@ -273,11 +273,16 @@ unknown effect name gets suggestions.
 - **Footage:** `ae_set_footage_interpretation` (conform frame rate, alpha, fields, pulldown, loop, pixel aspect),
   `ae_set_proxy`, `ae_relink_footage` (find missing files by name in a folder tree, keeps sequences)
 - **Essential Graphics:** `ae_essential_graphics` (add properties as controllers, template name), `ae_export_mogrt`
+- **Checks:** `ae_preflight` (check the delivered comp and its render against your own delivery spec; see Preflight below)
+- **Reformat:** `ae_reformat` (the comp at another size or aspect ratio, laid out by your own rules and checked on every
+  frame; see Reformat below)
 - **Checks:** `ae_preflight` (check the delivered comp and its render against your own delivery spec; see Preflight below),
   `ae_versions_from_data` (a CSV / JSON file becomes versions of a comp, then every row is checked; see Versions from data below)
 - **Project:** `ae_project_health` (missing footage/fonts/effects, expression errors, unused footage, empty comps/folders,
   duplicate comp names); `ae_project_xray` (explains an inherited project: what the render queue pulls in, what
-  every expression depends on and which links are fragile, what is missing, footage specs, what makes it heavy)
+  every expression depends on and which links are fragile, what is missing, footage specs, what makes it heavy);
+  `ae_handoff_package` (collect the project and its footage for someone else, with a manifest of what they need, and
+  proof that the package renders the same; see Handoff package below)
 - **Render:** `ae_list_render_queue`, `ae_add_to_render_queue`, `ae_get_render_settings` / `ae_set_render_settings` (every
   render-settings and output-module setting as editable key/value pairs), `ae_queue_in_media_encoder`,
   `ae_render_background` + `ae_render_jobs` (aerender in a separate process, with progress and cancel; After Effects stays
@@ -339,6 +344,29 @@ target). For files it also shows what ffprobe found and up to four frames at the
 nothing in the project and leaves no undo step, so it also runs in read-only mode. Long comps are checked within a
 time budget (`timeBudgetSeconds`, default 120 s); a partial check says so.
 
+### Reformat
+
+`ae_reformat` makes the comp at another size (16:9 to 9:16, 1:1, 4:5 or any size) by **rules you set**, then checks
+the result on every frame. Nothing is guessed for you: no presets and no "smart crop".
+
+- **Rules:** background layers that must cover or fit the new frame; layers that must stay inside title-safe,
+  action-safe or the frame (with your margins); layers pinned to an edge or corner with a margin in px; which layers
+  may scale and how far (a range in % of their size); a minimum text cap height; layers to switch off. Layers are
+  named exactly or with wildcards (`Logo*`). A layer no rule names keeps its offset from the frame centre, as After
+  Effects' own Composition Settings resize does with the centre anchor.
+- **The edit:** a duplicate of the comp (the source is never changed), in one undo step, with an optional checkpoint
+  first and the Changes list. Position and Scale keys are mapped by the same move and scale, with spatial tangents and
+  ease speeds scaled too, so the motion keeps its shape. Parented layers are moved in their parent's space, a track
+  matte moves with its layer, 3D layers move with the frame centre. Precomps are reused unless a rule names a layer
+  inside a full-frame precomp: then that precomp is duplicated and reformatted too, and the report says why
+  (`precomps: "reuse"` or `"duplicate"` to choose).
+- **The check:** Preflight's project checks on the new comp (your safe-area rules and cap height, on every frame or
+  every Nth), plus cover / fit and pins, plus the plan against what After Effects actually made. The verdict is
+  Preflight's: PASS, FAIL (n), INCOMPLETE or WARNINGS (n).
+- **When a rule can't be met** (a title too wide for 9:16 without going below the minimum cap height, a pin that
+  conflicts with title-safe), the layer keeps the best attempt and the report says FAIL, with the reason and what you
+  could decide: a shorter text, a line break, a smaller minimum, another scale limit. The AI doesn't pick one for you.
+- `dryRun: true` shows the plan and the predicted result without changing anything.
 ### Versions from data
 
 `ae_versions_from_data` turns a CSV or JSON file (or rows in the chat) into versions of a template comp, and then
@@ -450,6 +478,43 @@ Reference frames are stored in `~/.surehand/ae/proofs/` for 7 days (30 proofs at
 marks the project as changed); if the temporary comp can't be removed, the result says so. Capture and compare are
 allowed in read-only mode; `run` makes edits, so it follows the same permissions as `ae_batch`.
 
+### Handoff package
+
+Sending a project to a client, another studio or a render farm? `ae_handoff_package` collects it into a folder you
+choose, with the layout of **File > Dependencies > Collect Files**: the project, and the footage it uses in
+`(Footage)/<Project panel folders>/`, each image sequence in a folder of its own, proxies included. The project in the
+package is a copy relinked to the collected files (footage items keep their names, which expressions may use);
+`collect: "all"` copies unused footage too, and `reduce: true` leaves unused items out of the copy. Files that are
+already in the folder are never replaced without `overwrite: true`, and the package can never be written over your
+project or its footage.
+
+Next to the project it writes `handoff.json` (for tools) and `HANDOFF.txt` (for people): the fonts the project uses and
+the layers using each one (with version and Adobe Fonts where After Effects says so), every effect by match name with
+its display name, category and version (the version After Effects reports for a plug-in, where it reports one; it
+isn't the version in a plug-in's About box), the After Effects version, the bit depth and color settings (working space,
+OCIO config and color spaces, linearize, blending), the expressions engine, each footage item's specs and where it went,
+what is missing (footage, placeholders, fonts, plug-ins), and the total size. The first line says **Opens clean** and
+what the recipient needs (fonts, third-party plug-ins with their versions, an OCIO config), or what doesn't open
+clean: missing items, footage still pointing outside the package, unused footage that would show as missing, expression
+errors (every expression is evaluated in the copy).
+
+`verify: true` proves the package renders the same as your project. aerender, After Effects' command-line renderer,
+renders sample frames (default 5 per comp across the work area; the render queue's comps in any status, else the active comp, or `verifyComps`) from a
+copy of your project and from the package's copy, each in a process of its own, and the frames are compared pixel by
+pixel with the same comparison as `ae_prove_identical`. The verdict is **IDENTICAL**, **DIFFERS** (with the frames, the
+area and a difference image) or **NOT VERIFIED** with the reason (aerender not found, no PNG output module, a render
+that failed). It takes minutes: aerender starts its own After Effects twice. What it can't prove is listed every time:
+fonts and plug-ins on the recipient's machine (only this machine is checked), the package moved elsewhere (After
+Effects finds collected footage relative to the project, as with Collect Files), frames between the samples, audio,
+and expressions at other times than each comp's work area start. In the copies used for the proof, the render queue
+holds only the sample frames, so your own queued renders never run.
+
+Your open project is never edited, but scripts in After Effects can't save a copy of a project without opening it: the
+package is made with Save As, and your project is opened again from disk at the end. So the project must be saved (a
+project with unsaved changes is refused), its undo history starts fresh, and the result confirms the file on disk is
+unchanged (size, date and SHA-256) and that it reopened without unsaved changes. It follows the permission mode like
+any edit (refused in read-only; one approval in ask mode, before anything is written).
+
 ### Project history
 
 "What changed between v11 and v12?" `ae_project_history` answers it. A **snapshot** is a record of the open project:
@@ -485,6 +550,7 @@ mean opening the old `.aep` in place of your project, so it isn't done automatic
 - "List every expression in the active comp that has an error and fix them."
 - "Rename all layers in the selected comp to Title Case and color-label text layers yellow."
 - "Un-precompose 'Logo Precomp' into the main comp and prove the render didn't change."
+- "Package this project for the render farm in ~/Handoff/Spot, and prove the package renders the same."
 - "Import /Users/me/footage/*.mov, make a comp for each clip and add them all to the render queue as ProRes."
 - "Make a version of 'Score Card' for every row of scores.csv: City into the City layer, Score as $1,234.00, the bar 0-100 → 0-800 px, red below zero. Check every row before you queue them."
 
@@ -546,6 +612,11 @@ starts, replaces the installed one (the old one is kept as `surehand-ae.mjs.prev
 AI apps afterwards. If you use the Claude Desktop extension (.mcpb), install the new `Surehand-MCP.mcpb` from the release page
 instead.
 
+**Beta updates:** turn on **☰ › Settings › Beta updates** in the panel (or run `surehand-ae update --channel beta`;
+`"updateChannel": "beta"` in `config.json`) to be offered pre-releases too: the newest of the betas and the stable releases,
+checked and installed the same way. Turning it off (`--channel stable`) never goes back to an older version: a newer beta
+stays until a newer stable release is out.
+
 **Upgrading from 1.3: automatic.** Version 1.3 kept everything in `~/.aemcp`. The first time 1.4 runs (installer, update,
 or just starting), it moves it: settings, checkpoints, project history and your other files to `~/.surehand/ae`, the private
 Node.js and ffmpeg to `~/.surehand`, and points the AI apps that ran the old server at the new one (`after-effects` becomes
@@ -568,7 +639,7 @@ with an error): `clients` → `{clients: [{id, name, installed, configured, inUs
 `checkpoints [--project <path>]` → `{checkpoints: [{id, at, label, file, history?}]}`; `checkpoint-diff <id> [--project
 <path>]` → text (`{text}`; needs After Effects: it compares with the open project); `test --json` →
 `{checks: [{ok, name, message?, fix?: {connect, label?}}]}`; `update --check` → `{latest, current, updateAvailable, url,
-checkedAt, notes?}` (installs nothing). Errors come as `{error}`. The panel runs them with the Node and server named in
+checkedAt, channel, notes?, keptBeta?}` (installs nothing). Errors come as `{error}`. The panel runs them with the Node and server named in
 `~/.surehand/ae/runtime.json`. The activity log entries also carry `changeList`, `revision`, `undoGroup` and, for
 `ae_preflight` / `ae_prove_identical`, `result: {verdict, summary}`; background renders keep
 `~/.surehand/ae/renders/<id>.json` up to date.
@@ -588,7 +659,7 @@ checkedAt, notes?}` (installs nothing). Errors come as `{error}`. The panel runs
   everything Surehand can, including `config.json`; Surehand's permissions are guardrails against mistakes, not a
   sandbox against such a program.
 - Settings files of AI apps are only changed when they can be read (a file with a mistake in it is left as it is and
-  reported), with a timestamped backup first (the newest five are kept) and an atomic write.
+  reported), with a timestamped backup first (the newest three are kept) and an atomic write.
 
 ## Development
 

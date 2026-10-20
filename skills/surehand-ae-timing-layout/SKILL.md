@@ -1,6 +1,6 @@
 ---
 name: surehand-ae-timing-layout
-description: Sets exact After Effects keyframe timing and easing (frames, speed, influence) and aligns layers by measured bounds. Use for keyframes, easing, retiming or aligning layers in an AE comp.
+description: Sets exact After Effects keyframe timing and easing, aligns layers by measured bounds and reformats comps by the user's rules. Use for keyframes, easing, retiming, layout or reformats.
 license: MIT
 ---
 
@@ -59,6 +59,24 @@ consistent (ae_copy_ease from a conforming key) only when the user asks.
 - 3D layers, locked layers and Position with an expression are left alone and listed: report them.
 
 Measure at the frames that matter: a layout can change over time.
+
+## Reformat (another aspect ratio)
+
+ae_reformat {comp, width, height, name, ...rules} makes a new comp at the target size and checks it on every frame.
+
+- Every rule comes from the user. Ask for them; never invent a layout or a safe margin:
+  - background: [{layer, mode: "cover" | "fit"}];
+  - safe: [{layer, area}] with safeAreas {title, action} margins;
+  - pin: [{layer, to, margin}];
+  - scale: [{layer, min, max}] (% of the source size);
+  - minCapHeightPx;
+  - hide: [layer].
+- Layers no rule names keep their offset from the frame centre. Its INFO notes list layers that no longer cover the
+  frame or are pushed out: pass them on and ask.
+- Start with dryRun: true. Show the plan, then run it.
+- Report the verdict word as given. A rule that can't be met is a FAIL with its reason and the choices (shorter text,
+  a line break, a smaller minimum, another scale limit). Ask the user to choose; never pick one yourself.
+- precomps: "auto" (default) reformats a full-frame precomp only when a rule names a layer inside it.
 
 ## Verify
 

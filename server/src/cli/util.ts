@@ -42,39 +42,80 @@ export const windsurfLegacyConfig = () => join(HOME_(), ".codeium", "windsurf", 
 /** LM Studio's mcp.json (Cursor's notation; %USERPROFILE%\.lmstudio on Windows). */
 export const lmStudioConfig = () => join(HOME_(), ".lmstudio", "mcp.json");
 
-/** An app bundle in /Applications or ~/Applications (Mac), or one of these folders (Windows). */
-const appThere = (mac: string[], win: string[]) =>
-  isMac ? mac.some((a) => existsSync(join("/Applications", a)) || existsSync(join(HOME_(), "Applications", a)))
-  : isWin ? win.some((p) => existsSync(p))
-  : false;
+/** An app bundle in /Applications or ~/Applications (Mac). */
+const macApp = (names: string[]) => names.some((a) => existsSync(join("/Applications", a)) || existsSync(join(HOME_(), "Applications", a)));
+const programs = (name: string) => join(LOCALAPPDATA_(), "Programs", name);
+const programFiles = (name: string) => join(process.env.ProgramFiles || "C:\\Program Files", name);
 
-/** VS Code: its settings folder (made on its first start), else the app (user or system install). */
+/**
+ * Is an AI app on this computer: on a Mac and on Windows the app itself, because its data folder (~/.lmstudio,
+ * Code/User, ~/.codeium, ~/.cursor, ~/.codex, Application Support/Claude) stays behind when it is uninstalled;
+ * elsewhere (Linux: no one place for apps) its settings folder. An existing connection to Surehand is reported
+ * as connected either way (clients.ts).
+ */
+const installedApp = (mac: string[], win: () => string[], other: () => boolean) =>
+  isMac ? macApp(mac) : isWin ? win().some((p) => existsSync(p)) : other();
+
+/** Claude Desktop: the app (Windows: its own installer, or the Microsoft Store package). */
+export function claudeDesktopInstalled(): boolean {
+  if (isWin) {
+    if (existsSync(dirname(claudeDesktopExe()))) return true;
+    try {
+      return readdirSync(join(LOCALAPPDATA_(), "Packages")).some((n) => /^(Anthropic[\w.]*\.)?Claude_/i.test(n));
+    } catch {
+      return false;
+    }
+  }
+  return installedApp(["Claude.app"], () => [], () => existsSync(claudeDesktopDir()));
+}
+/** VS Code: the app (user or system install). */
 export function vscodeInstalled(): boolean {
-  return (
-    existsSync(dirname(vscodeUserDir())) ||
-    appThere(["Visual Studio Code.app"], [join(LOCALAPPDATA_(), "Programs", "Microsoft VS Code"), join(process.env.ProgramFiles || "C:\\Program Files", "Microsoft VS Code")])
-  );
+  return installedApp(["Visual Studio Code.app"], () => [programs("Microsoft VS Code"), programFiles("Microsoft VS Code")], () => existsSync(dirname(vscodeUserDir())));
 }
-/** Windsurf or Devin Desktop: their settings folders, else the app. */
+/** Windsurf or Devin Desktop: the app. */
 export function windsurfInstalled(): boolean {
-  const appData = isWin ? APPDATA_() : join(HOME_(), "Library", "Application Support");
-  return (
-    existsSync(dirname(windsurfLegacyConfig())) ||
-    existsSync(dirname(devinConfig())) ||
-    existsSync(join(appData, "Windsurf")) ||
-    appThere(["Windsurf.app", "Devin.app"], [join(LOCALAPPDATA_(), "Programs", "Windsurf"), join(LOCALAPPDATA_(), "Programs", "Devin")])
+  return installedApp(["Windsurf.app", "Devin.app"], () => [programs("Windsurf"), programs("Devin")], () =>
+    [dirname(windsurfLegacyConfig()), dirname(devinConfig()), join(HOME_(), ".config", "Windsurf")].some((d) => existsSync(d)),
   );
 }
-/** LM Studio: its ~/.lmstudio folder, else the app. */
+/**
+ * LM Studio: the app, or llmster, LM Studio without its window (installed by lmstudio.ai/install.sh or install.ps1
+ * into ~/.lmstudio/llmster/<version>). llmster is the app's core and serves the same REST API, whose chats can use
+ * the servers in ~/.lmstudio/mcp.json ("Allow calling servers from mcp.json"), so it counts. ~/.lmstudio alone
+ * (bin/, conversations/, an empty llmster/...) is what an uninstalled LM Studio leaves: it doesn't.
+ */
 export function lmStudioInstalled(): boolean {
-  return existsSync(dirname(lmStudioConfig())) || appThere(["LM Studio.app"], [join(LOCALAPPDATA_(), "Programs", "LM Studio"), join(LOCALAPPDATA_(), "Programs", "lm-studio")]);
+  if (installedApp(["LM Studio.app"], () => [programs("LM Studio"), programs("lm-studio")], () => existsSync(dirname(lmStudioConfig())))) return true;
+  try {
+    return readdirSync(join(dirname(lmStudioConfig()), "llmster"), { withFileTypes: true }).some((d) => d.isDirectory());
+  } catch {
+    return false;
+  }
+}
+/** Cursor: the app, or its command line (cursor-agent reads the same ~/.cursor/mcp.json). */
+export function cursorInstalled(): boolean {
+  if (installedApp(["Cursor.app"], () => [programs("cursor"), programFiles("Cursor")], () => existsSync(dirname(cursorConfig())))) return true;
+  return existsSync(join(HOME_(), ".local", "bin", "cursor-agent")) || !!which("cursor-agent");
+}
+/** The Codex command line where npm, Homebrew or its own installer put it (an installer's PATH may not have it). */
+function codexCliThere(): boolean {
+  const bins = isWin
+    ? [join(APPDATA_(), "npm", "codex.cmd")]
+    : ["/opt/homebrew/bin/codex", "/usr/local/bin/codex", join(HOME_(), ".local", "bin", "codex"), join(HOME_(), ".npm-global", "bin", "codex")];
+  if (bins.some((b) => existsSync(b))) return true;
+  try {
+    const nvm = join(HOME_(), ".nvm", "versions", "node");
+    return readdirSync(nvm).some((v) => existsSync(join(nvm, v, "bin", "codex")));
+  } catch {
+    return false;
+  }
 }
 /** ChatGPT desktop and Codex share this file (CODEX_HOME overrides ~/.codex). */
 export const codexConfig = () => join(process.env.CODEX_HOME || join(HOME_(), ".codex"), "config.toml");
 
 /** True if the ChatGPT desktop app or Codex is installed, even if it hasn't created ~/.codex yet. */
 export function chatgptDesktopInstalled(): boolean {
-  if (which("codex")) return true;
+  if (which("codex") || codexCliThere()) return true;
   if (isMac)
     return ["/Applications/ChatGPT.app", "/Applications/Codex.app", join(HOME_(), "Applications", "ChatGPT.app")].some((p) => existsSync(p));
   if (isWin) {
@@ -106,7 +147,7 @@ export function readJson<T = any>(file: string, fallback: T): T {
   }
 }
 
-/** A timestamped backup (the newest five are kept) before every change of a settings file. */
+/** A timestamped backup (the newest three are kept) before every change of a settings file. */
 export function backupBeforeWrite(file: string) {
   backupFile(file);
 }

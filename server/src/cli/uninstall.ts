@@ -12,7 +12,7 @@ import { bold, extensionDir, ok, warn } from "./util.js";
 // installer/run.sh and installer/run.ps1 (uninstall without Node.js) carry the same list: a test keeps them equal.
 export const OWN_FILES = [
   "server", "config.json", "runtime.json", "extension-hash", "bridge-status.json", "instances", "update-check.json",
-  "activity.jsonl", "tmp", "renders", "compat", "install.log", "install-result.json", "chatgpt.json", "chatgpt.lock", "sessions", "skills", MOVED_NOTE,
+  "activity.jsonl", "tmp", "renders", "compat", "install.log", "install-result.json", "chatgpt.json", "chatgpt.lock", "sessions", "skills", "xray", MOVED_NOTE,
 ];
 
 /**

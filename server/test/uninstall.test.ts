@@ -86,6 +86,14 @@ describe("uninstall", () => {
     expect(JSON.parse(readFileSync(cursor, "utf8")).mcpServers).toEqual({});
   });
 
+  it("removes the X-ray runs kept for the in-chat view (xray/), a cache of its own", () => {
+    const dir = setup();
+    mkdirSync(join(dir, "xray"), { recursive: true });
+    writeFileSync(join(dir, "xray", "20261020-120000123-ab12.json.gz"), "x");
+    uninstall([]);
+    expect(readdirSync(dir).sort()).toEqual(["backups", "checkpoints", "node", "notes.txt"]);
+  });
+
   it("never lists the user's data as its own", () => {
     expect(OWN_FILES).not.toContain("checkpoints");
     expect(OWN_FILES).not.toContain("node");

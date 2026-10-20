@@ -119,7 +119,9 @@ Usage:
   surehand-ae chatgpt --background|--status|--stop [--json]
                          the same in the background (the panel's ChatGPT screen): start, its state and address, stop
   surehand-ae update [--json]  install the latest release over this installation (and the AE extension)
-  surehand-ae update --check [--json]   only report: {latest, current, updateAvailable, url, checkedAt, notes}
+  surehand-ae update --check [--json]   only report: {latest, current, updateAvailable, url, checkedAt, channel, notes}
+  surehand-ae update --channel beta|stable [--check]   save the update channel first (beta: pre-releases too;
+                         back on stable, a newer beta stays until a newer stable release is out)
   surehand-ae clients [--json]          the AI apps on this computer and whether they are connected
   surehand-ae connect <app> [--json]    connect one: claude-desktop, claude-code, codex, cursor,
                                         vscode, windsurf, lm-studio

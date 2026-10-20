@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { ToolListChangedNotificationSchema } from "@modelcontextprotocol/sdk/types.js";
 import { RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps/server";
 
 // a temporary home and config, and a closed bridge port: nothing real is touched
@@ -112,6 +113,23 @@ describe("the core-profile switch", () => {
     expect(names).toEqual([...CORE_TOOLS].sort());
     expect(textOf(await client.callTool({ name: "ae_tools", arguments: {} }))).toMatch(/^ae_preflight\*: /m);
     await client.close();
+  });
+
+  it("turning the view tools on tells the AI app once (one tools/list_changed, not one per tool)", async () => {
+    for (const [profile, caps, want] of [[CORE, UI_CAPS, 1], [FULL, UI_CAPS, 1], [CORE, {}, 0]] as const) {
+      const server = createMcpServer(profile);
+      const client = new Client({ name: "views-test", version: "1" }, { capabilities: caps as any });
+      let changed = 0;
+      client.setNotificationHandler(ToolListChangedNotificationSchema, () => void changed++);
+      const [a, b] = InMemoryTransport.createLinkedPair();
+      await Promise.all([server.connect(a), client.connect(b)]);
+      const names = (await client.listTools()).tools.map((t) => t.name);
+      await new Promise((r) => setTimeout(r, 20));
+      expect(changed).toBe(want);
+      // the same tools as before
+      for (const n of APP_ONLY) expect(names.includes(n)).toBe(want === 1);
+      await client.close();
+    }
   });
 
   it("the full profile: app-only tools only for AI apps with views", async () => {

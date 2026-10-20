@@ -64,6 +64,22 @@ export function bigProject(): XData {
   return data("Big_Show.aep", comps, [file(900, "plate_missing.mov", [139], { missing: true })], [{ comp: 100, status: "QUEUED", render: true, file: "/out/Big_Show.mov" }]);
 }
 
+/**
+ * Wide rather than deep: one comp rendered, `scenes` precomps under it, each with `per` stills of its own (a
+ * slideshow template), every third one missing. Long names, as real projects have.
+ */
+export function wideProject(scenes: number, per: number): XData {
+  const comps: XComp[] = [], footage: XFootage[] = [];
+  for (let s = 0; s < scenes; s++) {
+    const ids = Array.from({ length: per }, (_, j) => 10_000 + s * per + j);
+    comps.push(comp(100 + s, `Scene_${String(s).padStart(3, "0")}_Product_Highlight_Slide`, ids.map((id, j) => L(j + 1, `IMG_${id}.jpg`, { src: id, t: "footage" })), [1]));
+    for (const [j, id] of ids.entries())
+      footage.push(file(id, `IMG_${id}_from_the_shoot_final_retouched.jpg`, [100 + s], { still: true, video: false, fps: undefined, ...(j % 3 === 0 ? { missing: true } : {}) }));
+  }
+  comps.unshift(comp(1, "Main", Array.from({ length: scenes }, (_, s) => L(s + 1, `Scene ${s}`, { src: 100 + s }))));
+  return data("Slideshow.aep", comps, footage, [{ comp: 1, status: "QUEUED", render: true, file: "/out/Slideshow.mov" }]);
+}
+
 /** Nothing in the render queue: the top-level comps are the roots. */
 export function emptyQueueProject(): XData {
   const d = mockupProject();

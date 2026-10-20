@@ -2,12 +2,35 @@
 // over stdio) writes sessions/<pid>.json when its app has said hello (MCP initialize) and removes it when it
 // exits. The panel shows "Connected · Claude Desktop" from these before the app's first request; a file whose
 // process is gone (a crash) is ignored there. No secrets: the app's name, its version, the server's version.
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { VERSION } from "./config.js";
 import { appFile } from "./paths.js";
 
 export const sessionsDir = () => appFile("sessions");
+
+const alive = (pid: number) => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e: any) {
+    return e?.code === "EPERM";
+  }
+};
+
+/**
+ * Removes the files of servers that no longer run. A server that is killed can't remove its own (on Windows, an AI
+ * app ending its servers ends them so), and once its process id is given to another program, the panel
+ * would take that file for a connected app.
+ */
+export function sweepSessions() {
+  try {
+    for (const f of readdirSync(sessionsDir())) {
+      const pid = Number(/^(\d+)\.json$/.exec(f)?.[1]);
+      if (pid && pid !== process.pid && !alive(pid)) rmSync(appFile("sessions", f), { force: true });
+    }
+  } catch {}
+}
 
 export function trackSession(server: McpServer) {
   const inner = server.server as any;
@@ -20,6 +43,7 @@ export function trackSession(server: McpServer) {
     try {
       const v = inner.getClientVersion?.() || {};
       mkdirSync(sessionsDir(), { recursive: true });
+      sweepSessions();
       file = appFile("sessions", `${process.pid}.json`);
       writeFileSync(file, JSON.stringify({ pid: process.pid, client: v.name || null, clientVersion: v.version || null, server: VERSION, at: new Date().toISOString() }) + "\n");
     } catch {}

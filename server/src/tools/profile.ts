@@ -145,13 +145,31 @@ export function applyProfile(server: McpServer, profile: ToolProfile): Map<strin
 const viewGated = new WeakMap<McpServer, { name: string; tool: { enable(): void; enabled: boolean } }[]>();
 const viewCatalogs = new WeakMap<McpServer, Map<string, CatalogEntry>>();
 
+/**
+ * Changes to several tools as one tools/list_changed: the SDK sends one per enable() / disable(), and each makes
+ * the AI app read the tool list again (VS Code read it 8 times for the view tools).
+ */
+export function batchToolChanges(server: McpServer, change: () => void) {
+  let changed = false;
+  const s = server as any;
+  s.sendToolListChanged = () => void (changed = true);
+  try {
+    change();
+  } finally {
+    delete s.sendToolListChanged; // McpServer's own again
+    if (changed) server.sendToolListChanged();
+  }
+}
+
 /** The AI app shows in-chat views: turn on the app-only tools and the tools with a view (once). */
 export function enableViewTools(server: McpServer) {
-  for (const g of viewGated.get(server) ?? []) {
-    if (!g.tool.enabled) g.tool.enable();
-    const entry = viewCatalogs.get(server)?.get(g.name);
-    if (entry) entry.direct = true;
-  }
+  batchToolChanges(server, () => {
+    for (const g of viewGated.get(server) ?? []) {
+      if (!g.tool.enabled) g.tool.enable();
+      const entry = viewCatalogs.get(server)?.get(g.name);
+      if (entry) entry.direct = true;
+    }
+  });
 }
 
 /** Tool categories for ae_tools (anything not listed falls under "other"). */
@@ -159,7 +177,7 @@ export const CATEGORIES: Record<string, string[]> = {
   "status & app": ["ae_status", "ae_system_info", "ae_execute_menu_command", "ae_undo", "ae_redo", "ae_purge", "ae_get_fonts", "ae_reload_helpers", "ae_get_scripting_guide"],
   scripts: ["ae_run_script", "ae_run_script_file", "ae_list_scripts", "ae_batch", "ae_checkpoint", "ae_prove_identical"],
   project: ["ae_get_project_info", "ae_list_items", "ae_get_item_info", "ae_import_files", "ae_create_folder", "ae_move_items", "ae_rename_item", "ae_remove_items", "ae_replace_footage", "ae_save_project", "ae_open_project", "ae_new_project", "ae_project_health", "ae_project_history", "ae_project_xray", "ae_color_settings"],
-  comps: ["ae_list_comps", "ae_get_comp_info", "ae_create_comp", "ae_set_comp_settings", "ae_duplicate_comp", "ae_open_comp", "ae_precompose", "ae_add_comp_marker", "ae_get_comp_map"],
+  comps: ["ae_list_comps", "ae_get_comp_info", "ae_create_comp", "ae_set_comp_settings", "ae_duplicate_comp", "ae_open_comp", "ae_precompose", "ae_add_comp_marker", "ae_get_comp_map", "ae_reformat"],
   layers: ["ae_get_layer_info", "ae_add_layer", "ae_set_layer_attributes", "ae_delete_layers", "ae_duplicate_layer", "ae_split_layer", "ae_get_selection", "ae_select_layers", "ae_set_time_remap", "ae_align_layers"],
   "properties & keyframes": ["ae_get_properties", "ae_find_properties", "ae_set_property", "ae_set_keyframes", "ae_edit_keyframes", "ae_copy_keyframes", "ae_remove_keyframes", "ae_get_keyframes", "ae_set_keyframe_table", "ae_copy_ease", "ae_audit_easing", "ae_retime_keyframes", "ae_set_expression", "ae_get_expressions", "ae_check_expression", "ae_replace_in_expressions"],
   "effects, shapes & masks": ["ae_list_available_effects", "ae_get_effect_params", "ae_apply_effect", "ae_set_effect_params", "ae_remove_effect", "ae_apply_preset", "ae_add_shape", "ae_add_mask"],
@@ -167,7 +185,7 @@ export const CATEGORIES: Record<string, string[]> = {
   "3D": ["ae_set_camera", "ae_set_light", "ae_set_material"],
   audio: ["ae_audio_to_keyframes", "ae_audio_markers"],
   footage: ["ae_set_footage_interpretation", "ae_set_proxy", "ae_relink_footage"],
-  "files & export": ["ae_find_files", "ae_export_frames"],
+  "files & export": ["ae_find_files", "ae_export_frames", "ae_handoff_package"],
   checks: ["ae_preflight", "ae_versions_from_data"],
   "see & measure": ["ae_render_frame", "ae_render_contact_sheet", "ae_get_layer_bounds", "ae_sample_pixels"],
   "essential graphics": ["ae_essential_graphics", "ae_export_mogrt"],

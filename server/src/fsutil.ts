@@ -137,12 +137,16 @@ export function readJsonFile<T = any>(file: string, opts: { jsonc?: boolean } = 
   }
 }
 
-export const BACKUPS_KEPT = 5;
+export const BACKUPS_KEPT = 3;
+
+/** Our timestamped backups of a file named `name`: <name>.surehand-20261020-101500-123.bak (-2, -3... in the same ms). */
+const ownBackup = (name: string) => new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\.surehand-\\d{8}-\\d{6}-\\d{3}(-\\d+)?\\.bak$`);
 
 /**
- * A copy of `file` before we change it: <file>.surehand-<time>.bak, keeping the newest five. The
- * very first original also stays as <file>.surehand.bak (1.3 wrote <file>.aemcp.bak; then that one
- * is the original). Returns the backup's path (null if the file doesn't exist).
+ * A copy of `file` before we change it: <file>.surehand-<time>.bak, keeping the newest three (only
+ * these are ever removed: any other .bak stays). The very first original also stays as
+ * <file>.surehand.bak (1.3 wrote <file>.aemcp.bak; then that one is the original). Returns the
+ * backup's path (null if the file doesn't exist).
  */
 export function backupFile(file: string, now = new Date()): string | null {
   if (!existsSync(file)) return null;
@@ -151,10 +155,10 @@ export function backupFile(file: string, now = new Date()): string | null {
   let to = `${file}.surehand-${stamp}.bak`;
   for (let i = 2; existsSync(to); i++) to = `${file}.surehand-${stamp}-${i}.bak`;
   copyFileSync(file, to);
-  const dir = dirname(file), base = basename(file) + ".surehand-";
+  const dir = dirname(file), ours = ownBackup(basename(file));
   try {
     const all = readdirSync(dir)
-      .filter((n) => n.startsWith(base) && n.endsWith(".bak"))
+      .filter((n) => ours.test(n))
       .sort();
     for (const n of all.slice(0, Math.max(0, all.length - BACKUPS_KEPT))) unlinkSync(join(dir, n));
   } catch {}

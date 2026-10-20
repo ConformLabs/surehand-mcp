@@ -100,6 +100,7 @@ const EXPECTED: Record<string, Hints> = {
   // files & export
   ae_find_files: R, // runs in the MCP server, reads the file system only
   ae_export_frames: DI, // overwrite replaces existing PNGs; the temporary comp leaves no undo step
+  ae_handoff_package: D, // writes the package (overwrite replaces files), closes and reopens the project: the undo history starts fresh
   // effects, shapes & masks
   ae_list_available_effects: R,
   ae_get_effect_params: EI, // temporary layer
@@ -155,6 +156,7 @@ const EXPECTED: Record<string, Hints> = {
   ae_project_history: E, // never changes the project, but writes (and prunes) its snapshot files under ~/.surehand/ae/history
   ae_list_scripts: R,
   // checks
+  ae_reformat: D, // a new comp (and precomp copies) in one undo step; checkpoint: true saves the project (overwrites the .aep) first
   ae_preflight: [false, false, true, true], // never changes the project; may download ffmpeg (with consent) and writes temporary thumbnails
   ae_versions_from_data: D, // builds comps (one undo step); with render and overwrite: true it replaces output files
   ae_tools: R,
