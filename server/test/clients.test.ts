@@ -9,6 +9,9 @@ import { dirname, join } from "node:path";
 // as on Linux on every machine: an app counts as there by its settings folder (on a Mac and Windows by the app
 // itself, which a temporary home can't fake: app-detection.test.ts)
 vi.mock("node:os", async (orig) => ({ ...(await orig<typeof import("node:os")>()), platform: () => "linux" }));
+// and never this machine's own apps and commands (Codex in /opt/homebrew/bin, cursor-agent on PATH...)
+vi.mock("node:fs", async (orig) => (await import("./hermetic-apps.js")).hermeticFs(orig as any));
+vi.mock("node:child_process", async (orig) => (await import("./hermetic-apps.js")).hermeticChildProcess(orig as any));
 vi.mock("../src/cli/util.js", async (orig) => ({ ...(await orig<typeof import("../src/cli/util.js")>()), findClaudeCli: () => null }));
 
 const util = await import("../src/cli/util.js");

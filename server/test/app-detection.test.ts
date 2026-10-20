@@ -1,7 +1,7 @@
 // Which AI apps are on this computer (`clients --json`, the installers' app lists, `install`): on a Mac and on
 // Windows the app itself, never a data folder an uninstalled app left behind (~/.lmstudio, Code/User, ~/.codeium,
 // ~/.cursor, ~/.codex, Application Support/Claude). Runs as a Mac and as Windows on any machine: the platform is
-// faked, the home folder is temporary and /Applications is a stand-in, so nothing real is looked at.
+// faked, the home folder is temporary and the system places are stand-ins, so nothing real is looked at.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -9,15 +9,10 @@ import { dirname, join } from "node:path";
 
 let plat: NodeJS.Platform = "darwin";
 vi.mock("node:os", async (orig) => ({ ...(await orig<typeof import("node:os")>()), platform: () => plat }));
-// /Applications: what this fake Mac has there
-const systemApps = new Set<string>();
-vi.mock("node:fs", async (orig) => {
-  const real = await orig<typeof import("node:fs")>();
-  const existsSync = (p: any) => (String(p).startsWith("/Applications/") ? systemApps.has(String(p)) : real.existsSync(p));
-  return { ...real, existsSync, default: { ...real, existsSync } };
-});
-// no command on PATH (`which` / `where`)
-vi.mock("node:child_process", async (orig) => ({ ...(await orig<typeof import("node:child_process")>()), spawnSync: () => ({ status: 1, stdout: "", stderr: "" }) }));
+// /Applications, Homebrew's and /usr/local's bin, and commands on PATH: stand-ins (hermetic-apps.ts)
+vi.mock("node:fs", async (orig) => (await import("./hermetic-apps.js")).hermeticFs(orig as any));
+vi.mock("node:child_process", async (orig) => (await import("./hermetic-apps.js")).hermeticChildProcess(orig as any));
+const { systemFiles: systemApps } = await import("./hermetic-apps.js");
 
 let home = "";
 const dir = (...p: string[]) => mkdirSync(join(home, ...p), { recursive: true });
