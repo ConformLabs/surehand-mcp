@@ -6,6 +6,9 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFil
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
+// as on Linux on every machine: an app counts as there by its settings folder (on a Mac and Windows by the app
+// itself, which a temporary home can't fake: app-detection.test.ts)
+vi.mock("node:os", async (orig) => ({ ...(await orig<typeof import("node:os")>()), platform: () => "linux" }));
 vi.mock("../src/cli/util.js", async (orig) => ({ ...(await orig<typeof import("../src/cli/util.js")>()), findClaudeCli: () => null }));
 
 const util = await import("../src/cli/util.js");

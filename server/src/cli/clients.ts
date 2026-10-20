@@ -13,7 +13,7 @@ import { readJsonFile, UnreadableFileError, updateJsonFile } from "../fsutil.js"
 import { lateMerge, mapLegacyPath, migrateLegacy, type LateMergeResult, type MigrationResult } from "../migrate.js";
 import { appFile, installedServer, LEGACY_SERVER_NAME, migrationPending, SERVER_NAME } from "../paths.js";
 import {
-  chatgptDesktopInstalled, claudeCodeConfig, claudeDesktopConfig, claudeDesktopDir, codexBlock, codexConfig, cursorConfig, devinConfig, findClaudeCli,
+  chatgptDesktopInstalled, claudeCodeConfig, claudeDesktopConfig, claudeDesktopDir, claudeDesktopInstalled, codexBlock, codexConfig, cursorConfig, cursorInstalled, devinConfig, findClaudeCli,
   hasCodexBlock, isMac, isWin, lmStudioConfig, lmStudioInstalled, removeCodexBlock, run, stableNodePath, vscodeConfig, vscodeInstalled,
   windsurfInstalled, windsurfLegacyConfig, writeTextWithBackup,
 } from "./util.js";
@@ -186,13 +186,14 @@ export function removeJsonEntries(file: string): boolean {
 export function clientInstalled(id: ClientId): boolean {
   switch (id) {
     case "claude-desktop":
-      return existsSync(claudeDesktopDir());
+      return claudeDesktopInstalled();
     case "claude-code":
       return !!findClaudeCli() || existsSync(claudeCodeConfig());
     case "codex":
-      return existsSync(dirname(codexConfig())) || chatgptDesktopInstalled();
+      // Linux: ~/.codex as before (on a Mac and Windows it outlives an uninstalled app)
+      return chatgptDesktopInstalled() || (!isMac && !isWin && existsSync(dirname(codexConfig())));
     case "cursor":
-      return existsSync(dirname(cursorConfig()));
+      return cursorInstalled();
     case "vscode":
       return vscodeInstalled();
     case "windsurf":
