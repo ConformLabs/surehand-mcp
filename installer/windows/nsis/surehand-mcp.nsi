@@ -91,6 +91,8 @@ VIAddVersionKey /LANG=1033 "Comments" "${HOMEPAGE}"
 !define CL_HELP_URL "${HOMEPAGE}"
 !define CL_HELP_TEXT "github.com/ConformLabs/surehand-mcp"
 !define CL_UNCONFIRM_SHOW un.ConfirmShow
+!define CL_UNINSTFILES_STEPS un.ListSteps
+!define CL_UNFINISH_SHOW un.FinishLines
 !include "${__FILEDIR__}\..\..\common\conformlabs.nsh"
 
 !define MUI_WELCOMEPAGE_TITLE "Install ${PRODUCT}"
@@ -110,6 +112,10 @@ Page custom AppsCreate AppsLeave ; Choose AI apps
 
 !insertmacro CL_UNPAGE_CONFIRM
 !insertmacro CL_UNPAGE_INSTFILES
+!define MUI_FINISHPAGE_TITLE "${PRODUCT} is uninstalled"
+!define MUI_FINISHPAGE_TEXT " "
+!define MUI_FINISHPAGE_NOREBOOTSUPPORT
+!insertmacro CL_UNPAGE_FINISH
 
 !insertmacro MUI_LANGUAGE "English"
 
@@ -126,6 +132,8 @@ Var Tunnel     ; 1: "Set up ChatGPT on the web" ticked (download cloudflared)
 Var Detected   ; 1 once the app list was read
 Var RtNode     ; the Node.js ExtractRuntime found or unpacked
 Var UnAll      ; uninstaller: 1 with /ALL (remove the settings and checkpoints too)
+Var UnAE       ; uninstaller: 1 when After Effects was open
+Var UnNodeKept ; uninstaller: 1 when the shared Node.js stayed for another Surehand app
 
 ; $0 = process image name -> $0 = 1 if running, else 0
 !macro IsRunning EXE
@@ -300,6 +308,7 @@ Function AppsCreate
 FunctionEnd
 
 Function DetectAppsVisibly
+  Call cl.HideLines ; MUI showed the separator and the branding line again when it left the welcome page
   ; the previous page out of the way, a note where this page will be
   FindWindow $1 "#32770" "" $HWNDPARENT
   ${If} $1 <> 0
@@ -583,6 +592,42 @@ Function un.ConfirmShow
   ${EndIf}
 FunctionEnd
 
+; the progress page's steps (the section runs them in this order)
+Function un.ListSteps
+  ${If} $UnAll == 1
+    Push "Removing ${PRODUCT}, your settings and checkpoints"
+  ${Else}
+    Push "Removing the server, the After Effects extension and the AI app connections"
+  ${EndIf}
+  Call un.cl.StepAdd
+  Push "Removing Node.js"
+  Call un.cl.StepAdd
+  Push "Removing the uninstaller"
+  Call un.cl.StepAdd
+FunctionEnd
+
+; the finish page's lines under its title (what was kept, what to do)
+Function un.FinishLines
+  ${If} $UnAll == 1
+    StrCpy $1 "Its settings, project checkpoints and everything else in .surehand\ae were removed too."
+  ${Else}
+    StrCpy $1 "Your settings and project checkpoints are kept in .surehand\ae, for when you install it again."
+  ${EndIf}
+  ${NSD_CreateLabel} 124u 38u 196u 28u "$1"
+  Pop $0
+  SetCtlColors $0 "${CL_INK}" "${CL_PAPER}"
+  ${If} $UnNodeKept == 1
+    ${NSD_CreateLabel} 124u 70u 196u 18u "Node.js stays in .surehand\node: another Surehand app uses it."
+    Pop $0
+    SetCtlColors $0 "${CL_MUTED}" "${CL_PAPER}"
+  ${EndIf}
+  ${If} $UnAE == 1
+    ${NSD_CreateLabel} 124u 94u 196u 18u "Restart After Effects (it is open) to finish removing ${PRODUCT}."
+    Pop $0
+    SetCtlColors $0 "${CL_INK}" "${CL_PAPER}"
+  ${EndIf}
+FunctionEnd
+
 ; It removes the server, the After Effects extension, the AI app entries and cloudflared if Surehand downloaded it
 ; (all done by `surehand-ae uninstall`, which also leaves any other files in .surehand\ae alone unless --all, and
 ; removes what 1.3's .aemcp kept for the move), the private Node.js and the uninstaller.
@@ -591,8 +636,12 @@ Section "Uninstall"
   SetDetailsPrint both
 
   !insertmacro IsRunning "AfterFX.exe"
-  StrCpy $R9 $0
+  StrCpy $UnAE $0
+  StrCpy $UnNodeKept 0
 
+  ; --- 1. the server's own uninstall: the extension, the AI app connections, its files (all of them with /ALL) ---
+  Call un.cl.StepStart
+  StrCpy $5 0
   ${If} ${FileExists} "${NODE_DIR}\node.exe"
   ${AndIf} ${FileExists} "${SERVER}"
     InitPluginsDir
@@ -607,6 +656,7 @@ Section "Uninstall"
     SetOutPath "$TEMP"
     ${If} $0 != 0
       DetailPrint "surehand-ae uninstall reported a problem (exit code $0)."
+      StrCpy $5 1
     ${EndIf}
   ${Else}
     ; no Node or server left (e.g. removed by hand): remove the extension; AI app settings are left as they are
@@ -615,8 +665,14 @@ Section "Uninstall"
     Delete "${SERVER}"
     RMDir "${SERVER_DIR}"
   ${EndIf}
+  ${If} $5 == 0
+    Push "done"
+  ${Else}
+    Push "failed"
+  ${EndIf}
+  Call un.cl.StepEnd
 
-  ; the private Node.js is shared by the Surehand apps: removed only when no other one (.surehand\<app>)
+  ; --- 2. the private Node.js is shared by the Surehand apps: removed only when no other one (.surehand\<app>)
   ; is installed (an AI app still running the server can keep node.exe in use). node, ffmpeg and bin are shared
   ; folders, not apps.
   StrCpy $1 0
@@ -637,24 +693,32 @@ Section "Uninstall"
     FindNext $2 $3
   ${Loop}
   FindClose $2
+  Call un.cl.StepStart
+  StrCpy $5 "done"
   ${If} $1 == 1
     DetailPrint "Kept ${NODE_DIR}: another Surehand app uses it."
+    StrCpy $UnNodeKept 1
   ${Else}
     RMDir /r "${NODE_DIR}"
     ${If} ${FileExists} "${NODE_DIR}\*.*"
       DetailPrint "Some of ${NODE_DIR} is in use; quit your AI apps and delete it by hand."
+      StrCpy $5 "failed"
     ${EndIf}
   ${EndIf}
+  Push $5
+  Call un.cl.StepEnd
   RMDir "${APPDIR}" ; only if empty (config.json and checkpoints are kept)
   RMDir "${SUREHAND}"
   RMDir "${LEGACY}"
 
+  ; --- 3. the uninstaller and the Add/Remove Programs entry ---
+  Call un.cl.StepStart
   DeleteRegKey HKCU "${UNINST_KEY}"
   Delete "$INSTDIR\surehand-mcp.ico"
   Delete "$INSTDIR\${UNINST_EXE}"
   RMDir "$INSTDIR"
-
-  ${If} $R9 == 1
-    MessageBox MB_ICONINFORMATION "Restart After Effects to finish removing ${PRODUCT}." /SD IDOK
-  ${EndIf}
+  Push "done"
+  Call un.cl.StepEnd
+  ; on to the finish page, which says what was kept and whether to restart After Effects
+  SetAutoClose true
 SectionEnd

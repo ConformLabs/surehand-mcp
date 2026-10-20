@@ -32,7 +32,7 @@ const macro = (text: string, name: string) => {
 describe("Windows installer: pages", () => {
   it("Update or uninstall / Welcome, Choose AI apps, progress, finish", () => {
     const pages = [...nsi.matchAll(/^(?:!insertmacro (CL_PAGE_\w+|CL_UNPAGE_\w+|MUI_PAGE_\w+|MUI_UNPAGE_\w+)|Page custom (\w+))/gm)].map((m) => m[1] ?? m[2]);
-    expect(pages).toEqual(["CL_PAGE_MAINTENANCE", "CL_PAGE_WELCOME", "AppsCreate", "CL_PAGE_INSTFILES", "CL_PAGE_FINISH", "CL_UNPAGE_CONFIRM", "CL_UNPAGE_INSTFILES"]);
+    expect(pages).toEqual(["CL_PAGE_MAINTENANCE", "CL_PAGE_WELCOME", "AppsCreate", "CL_PAGE_INSTFILES", "CL_PAGE_FINISH", "CL_UNPAGE_CONFIRM", "CL_UNPAGE_INSTFILES", "CL_UNPAGE_FINISH"]);
     expect(fn(nsi, ".onInit")).toMatch(/!insertmacro CL_ONINIT/);
     expect(fn(nsi, "un.onInit")).toMatch(/!insertmacro CL_UNONINIT/);
     for (const f of [".onGUIEnd", "un.onGUIEnd"]) expect(fn(nsi, f)).toMatch(/!insertmacro CL_ONGUIEND/);
@@ -155,12 +155,41 @@ describe("Windows installer: Choose AI apps (one list with the Mac Installer)", 
 describe("Windows installer: progress and finish pages", () => {
   it("the progress page shows plain steps; the raw log stays behind Show details", () => {
     expect(nsh).toMatch(/^ShowInstDetails hide/m);
-    const show = nsh.slice(nsh.indexOf("Function cl.InstFilesShow"), nsh.indexOf("FunctionEnd", nsh.indexOf("Function cl.InstFilesShow")));
+    expect(nsh).toMatch(/Function cl\.InstFilesShow\s*\n\s*Call cl\.StepsPageShow/);
+    const show = fn(nsh, "${UN}cl.StepsPageShow");
     expect(show).toMatch(/GetDlgItem \$0 \$cl\.InnerDlg 1006\s*\n\s*ShowWindow \$0 \$\{SW_HIDE\}/); // MUI's status line
     expect(show).toMatch(/Call \$\{CL_INSTFILES_STEPS\}/);
-    expect(show).toMatch(/GetDlgItem \$0 \$cl\.InnerDlg 1016[\s\S]*Call cl\.BringToTop/); // the log covers the steps when shown
-    expect(fn(nsh, "cl.StepEnd")).toMatch(/STR:DONE[\s\S]*STR:FAILED/);
-    expect(fn(nsh, "cl.StepStart")).toMatch(/STR:NOW/);
+    expect(show).toMatch(/GetDlgItem \$0 \$cl\.InnerDlg 1016[\s\S]*Call \$\{UN\}cl\.BringToTop/); // the log covers the steps when shown
+    expect(fn(nsh, "${UN}cl.StepEnd")).toMatch(/STR:DONE[\s\S]*STR:FAILED/);
+    expect(fn(nsh, "${UN}cl.StepStart")).toMatch(/STR:NOW/);
+  });
+
+  it("the uninstaller has the same plain steps, Uninstalling in the header, and a styled finish page with a green Finish", () => {
+    const un = macro(nsh, "CL_UNPAGE_INSTFILES");
+    expect(un).toMatch(/MUI_PAGE_CUSTOMFUNCTION_SHOW un\.cl\.StepsPageShow/);
+    expect(un).toMatch(/MUI_PAGE_HEADER_TEXT "Uninstalling"/);
+    expect(fn(nsh, "${UN}cl.StepsPageShow")).toMatch(/!else\s*\n\s*!ifdef CL_UNINSTFILES_STEPS\s*\n\s*Call \$\{CL_UNINSTFILES_STEPS\}/);
+    expect(nsh).toMatch(/^ShowUninstDetails hide/m);
+    expect(fn(nsi, "un.ListSteps").match(/Push "[^"]+"/g)).toEqual([
+      'Push "Removing ${PRODUCT}, your settings and checkpoints"', 'Push "Removing the server, the After Effects extension and the AI app connections"', 'Push "Removing Node.js"', 'Push "Removing the uninstaller"',
+    ]);
+    const section = nsi.slice(nsi.indexOf('Section "Uninstall"'));
+    expect(section.match(/Call un\.cl\.StepStart/g)).toHaveLength(3);
+    expect(section.match(/Call un\.cl\.StepEnd/g)).toHaveLength(3);
+    expect(section).toMatch(/SetAutoClose true\s*\nSectionEnd/);
+    expect(section).not.toMatch(/MessageBox/); // "restart After Effects" is on the finish page now
+    const finish = macro(nsh, "CL_UNPAGE_FINISH");
+    expect(finish).toMatch(/_CL_SIDEBAR "un\."[\s\S]*Call \$\{CL_UNFINISH_SHOW\}[\s\S]*StrCpy \$0 "both"[\s\S]*Call un\.cl\.SyncMainButton/);
+    expect(nsi).toContain('!define MUI_FINISHPAGE_TITLE "${PRODUCT} is uninstalled"');
+    expect(fn(nsi, "un.FinishLines")).toMatch(/\$UnAE == 1[\s\S]*Restart After Effects \(it is open\)/);
+    // the uninstaller extracts the sidebar art and the glyphs too
+    expect(fn(nsh, "${UN}cl.GUIInit")).toMatch(/File "\$\{CL_ART\}\\wizard-\*\.bmp"\s*\n\s*File "\$\{CL_ART\}\\glyph-\*\.bmp"/);
+  });
+
+  it("hides MUI's separators and branding line before the apps are read (MUI shows them again after the welcome page)", () => {
+    const hide = fn(nsh, "${UN}cl.HideLines");
+    for (const id of [1035, 1036, 1045, 1028, 1256]) expect(hide).toMatch(new RegExp(`GetDlgItem \\$0 \\$HWNDPARENT ${id}\\s*\\n\\s*ShowWindow \\$0 \\$\\{SW_HIDE\\}`));
+    expect(fn(nsi, "DetectAppsVisibly")).toMatch(/^\s*Call cl\.HideLines/);
   });
 
   it("the finish page shows the server's results (install-result.json as an INI) and its next steps", () => {
@@ -174,7 +203,7 @@ describe("Windows installer: progress and finish pages", () => {
     expect(results).toMatch(/SetCtlColors \$0 "" "\$\{CL_SUNK\}"/); // the box: strips and rows on paper-sunk
     expect(results).toMatch(/ReadINIStr \$R8 "\$\{CL_RESULTS_INI\}" "next" "count"/);
     // "restart After Effects" only comes from the results (the server says it only when After Effects is open)
-    expect(nsi.slice(nsi.indexOf('Section "Install"'), nsi.indexOf('Section "Uninstall"'))).not.toMatch(/Restart After Effects/);
+    expect(nsi.slice(nsi.indexOf('Section "Install"'), nsi.indexOf("Function un.ListSteps"))).not.toMatch(/Restart After Effects/);
   });
 
   it("the results box: rows that never overlap, below the title, each label tall enough for its lines", () => {

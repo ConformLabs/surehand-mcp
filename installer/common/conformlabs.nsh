@@ -124,7 +124,7 @@ Caption "${CL_APP_NAME} setup"
 UninstallCaption "${CL_APP_NAME} uninstall"
 BrandingText " "
 ShowInstDetails hide
-ShowUninstDetails show
+ShowUninstDetails hide
 
 !define MUI_BGCOLOR "${CL_PAPER}"
 !define MUI_TEXTCOLOR "${CL_INK}"
@@ -271,8 +271,9 @@ Function ${UN}cl.UnloadFonts
   System::Call "gdi32::RemoveFontResourceExW(w '$PLUGINSDIR\cl\IBMPlexMono-Medium.ttf', i ${CL_FR_PRIVATE}, p 0)"
 FunctionEnd
 
-; MUI's etched separators (under the header 1036, above the buttons 1035 and 1045) draw white on the dark frame,
-; and MUI shows them again on every page change: hide them on every page. The frame draws its own hairlines.
+; MUI's etched separators (under the header 1036, above the buttons 1035 and 1045) draw white on the dark frame, and
+; MUI shows them and the branding line again on page changes: hide them on every page. The frame draws its own
+; hairlines.
 Function ${UN}cl.HideLines
   Push $0
   GetDlgItem $0 $HWNDPARENT 1036
@@ -280,6 +281,11 @@ Function ${UN}cl.HideLines
   GetDlgItem $0 $HWNDPARENT 1035
   ShowWindow $0 ${SW_HIDE}
   GetDlgItem $0 $HWNDPARENT 1045
+  ShowWindow $0 ${SW_HIDE}
+  ; the branding text and its background (MUI shows them again when it leaves the welcome or finish page)
+  GetDlgItem $0 $HWNDPARENT 1028
+  ShowWindow $0 ${SW_HIDE}
+  GetDlgItem $0 $HWNDPARENT 1256
   ShowWindow $0 ${SW_HIDE}
   Pop $0
 FunctionEnd
@@ -353,10 +359,8 @@ Function ${UN}cl.GUIInit
   Push $4
   InitPluginsDir
   SetOutPath "$PLUGINSDIR\cl"
-  !if "${UN}" == ""
-    File "${CL_ART}\wizard-*.bmp"
-    File "${CL_ART}\glyph-*.bmp"
-  !endif
+  File "${CL_ART}\wizard-*.bmp"
+  File "${CL_ART}\glyph-*.bmp"
   File "${CL_ART}\header-*.bmp"
   SetOutPath "$TEMP"
 
@@ -514,16 +518,11 @@ Function ${UN}cl.InnerPageShow
   Pop $1
   Pop $0
 FunctionEnd
-!macroend
 
-!insertmacro _CL_SHARED_FUNCTIONS ""
-!insertmacro _CL_SHARED_FUNCTIONS "un."
-
-; ---------- installer-only helpers ----------
 ; A static control on dialog $cl.cP at $cl.cX $cl.cY $cl.cW $cl.cH (dialog units of that dialog), style bits
 ; $cl.cS, text $cl.cT, control id $cl.cI, in the dialog's font -> $cl.cOut. For pages that are not nsDialogs pages
 ; (the progress page) and for the outer window.
-Function cl.Static
+Function ${UN}cl.Static
   Push $0
   Push $1
   Push $2
@@ -549,7 +548,7 @@ Function cl.Static
 FunctionEnd
 
 ; $0 = control: one device pixel tall (a hairline), keeping its width
-Function cl.OnePixel
+Function ${UN}cl.OnePixel
   Push $1
   Push $2
   System::Call "*(i,i,i,i)p.r2"
@@ -562,7 +561,7 @@ Function cl.OnePixel
 FunctionEnd
 
 ; $0 = control: below its overlapping siblings, and never drawn over them (backgrounds, the sidebar image)
-Function cl.SendToBack
+Function ${UN}cl.SendToBack
   Push $1
   System::Call "user32::GetWindowLongW(p r0, i -16) i.r1"
   IntOp $1 $1 | ${CL_WS_CLIPSIBLINGS}
@@ -570,6 +569,249 @@ Function cl.SendToBack
   System::Call "user32::SetWindowPos(p r0, p 1, i 0, i 0, i 0, i 0, i ${CL_SWP_ZORDER_ONLY})"
   Pop $1
 FunctionEnd
+
+; $0 = control on $cl.InnerDlg: moved to $cl.cX $cl.cY $cl.cW $cl.cH (dialog units)
+Function ${UN}cl.PlaceDialogUnits
+  Push $1
+  Push $2
+  Push $3
+  Push $4
+  Push $5
+  System::Call "*(i $cl.cX, i $cl.cY, i $cl.cW, i $cl.cH)p.r5" ; x, y, width, height: each scaled on its own
+  System::Call "user32::MapDialogRect(p $cl.InnerDlg, p r5)"
+  System::Call "*$5(i.r1, i.r2, i.r3, i.r4)"
+  System::Free $5
+  System::Call "user32::MoveWindow(p r0, i r1, i r2, i r3, i r4, i 1)"
+  Pop $5
+  Pop $4
+  Pop $3
+  Pop $2
+  Pop $1
+FunctionEnd
+
+; Push "Installing Surehand MCP" / Call ${UN}cl.StepAdd: a step, waiting (from CL_INSTFILES_STEPS)
+Function ${UN}cl.StepAdd
+  Exch $1
+  Push $0
+  Push $2
+  IntOp $2 $cl.StepCount * 4
+  IntOp $2 $2 + 1300
+  StrCpy $cl.cP $cl.InnerDlg
+  StrCpy $cl.cX 0
+  StrCpy $cl.cY $cl.StepY
+  StrCpy $cl.cW 300
+  StrCpy $cl.cH 1
+  StrCpy $cl.cS 0
+  StrCpy $cl.cT ""
+  StrCpy $cl.cI $2
+  Call ${UN}cl.Static
+  SetCtlColors $cl.cOut "" "${CL_RULE}"
+  StrCpy $0 $cl.cOut
+  Call ${UN}cl.OnePixel
+  IntOp $cl.cY $cl.StepY + 4
+  StrCpy $cl.cW 5
+  StrCpy $cl.cH 5
+  StrCpy $cl.cS ${CL_SS_BITMAP_CENTER}
+  IntOp $cl.cI $2 + 1
+  Call ${UN}cl.Static
+  SetCtlColors $cl.cOut "" "${CL_PAPER}" ; what the centred bitmap leaves around it
+  SendMessage $cl.cOut ${CL_STM_SETIMAGE} 0 $cl.GNext
+  StrCpy $cl.cX 10
+  IntOp $cl.cY $cl.StepY + 3
+  StrCpy $cl.cW 228
+  StrCpy $cl.cH 9
+  StrCpy $cl.cS 0
+  StrCpy $cl.cT "$1"
+  IntOp $cl.cI $2 + 2
+  Call ${UN}cl.Static
+  SetCtlColors $cl.cOut "${CL_MUTED}" "${CL_PAPER}"
+  StrCpy $cl.cX 240
+  StrCpy $cl.cW 60
+  StrCpy $cl.cS ${CL_SS_RIGHT}
+  StrCpy $cl.cT "NEXT"
+  IntOp $cl.cI $2 + 3
+  Call ${UN}cl.Static
+  SetCtlColors $cl.cOut "${CL_MUTED}" "${CL_PAPER}"
+  SendMessage $cl.cOut ${WM_SETFONT} $cl.FontLabel 0
+  IntOp $cl.StepCount $cl.StepCount + 1
+  IntOp $cl.StepY $cl.StepY + 12
+  ; the closing hairline under the last step
+  System::Call "user32::GetDlgItem(p $cl.InnerDlg, i 1297) p.r0"
+  ${If} $0 <> 0
+    System::Call "user32::DestroyWindow(p r0)"
+  ${EndIf}
+  StrCpy $cl.cX 0
+  StrCpy $cl.cY $cl.StepY
+  StrCpy $cl.cW 300
+  StrCpy $cl.cH 1
+  StrCpy $cl.cS 0
+  StrCpy $cl.cT ""
+  StrCpy $cl.cI 1297
+  Call ${UN}cl.Static
+  SetCtlColors $cl.cOut "" "${CL_RULE}"
+  StrCpy $0 $cl.cOut
+  Call ${UN}cl.OnePixel
+  Pop $2
+  Pop $0
+  Pop $1
+FunctionEnd
+
+; Push "done" | "failed" / Call ${UN}cl.StepEnd: the current step's outcome; the next one starts (from the install
+; section; nothing happens when Setup is silent)
+Function ${UN}cl.StepEnd
+  Exch $1
+  Push $0
+  Push $2
+  Push $3
+  ${If} $cl.InnerDlg != ""
+  ${AndIf} $cl.StepNow < $cl.StepCount
+    IntOp $2 $cl.StepNow * 4
+    IntOp $2 $2 + 1300
+    IntOp $3 $2 + 1
+    GetDlgItem $0 $cl.InnerDlg $3
+    IntOp $3 $2 + 2
+    ${If} $1 == "done"
+      SendMessage $0 ${CL_STM_SETIMAGE} 0 $cl.GDone
+      GetDlgItem $0 $cl.InnerDlg $3
+      SetCtlColors $0 "${CL_INK}" "${CL_PAPER}"
+      SendMessage $cl.InnerDlg ${WM_GETFONT} 0 0 $1
+      SendMessage $0 ${WM_SETFONT} $1 1 ; back to the dialog font
+      IntOp $3 $2 + 3
+      GetDlgItem $0 $cl.InnerDlg $3
+      SetCtlColors $0 "${CL_ACCENT}" "${CL_PAPER}"
+      SendMessage $0 ${WM_SETTEXT} 0 "STR:DONE"
+    ${Else}
+      SendMessage $0 ${CL_STM_SETIMAGE} 0 $cl.GFailed
+      GetDlgItem $0 $cl.InnerDlg $3
+      SetCtlColors $0 "${CL_INK}" "${CL_PAPER}"
+      IntOp $3 $2 + 3
+      GetDlgItem $0 $cl.InnerDlg $3
+      SetCtlColors $0 "${CL_REFUSED}" "${CL_PAPER}"
+      SendMessage $0 ${WM_SETTEXT} 0 "STR:FAILED"
+    ${EndIf}
+    System::Call "user32::InvalidateRect(p $cl.InnerDlg, p 0, i 1)"
+  ${EndIf}
+  IntOp $cl.StepNow $cl.StepNow + 1
+  ${If} $cl.InnerDlg != ""
+  ${AndIf} $cl.StepNow >= $cl.StepCount
+    SendMessage $cl.Status ${WM_SETTEXT} 0 "STR:Done."
+  ${EndIf}
+  Pop $3
+  Pop $2
+  Pop $0
+  Pop $1
+FunctionEnd
+
+; Call ${UN}cl.StepStart: the current step is running: its glyph, its name in IBM Plex Sans SemiBold, the status line
+Function ${UN}cl.StepStart
+  Push $0
+  Push $1
+  Push $2
+  Push $3
+  ${If} $cl.InnerDlg != ""
+  ${AndIf} $cl.StepNow < $cl.StepCount
+    IntOp $2 $cl.StepNow * 4
+    IntOp $2 $2 + 1300
+    IntOp $3 $2 + 1
+    GetDlgItem $0 $cl.InnerDlg $3
+    SendMessage $0 ${CL_STM_SETIMAGE} 0 $cl.GNow
+    IntOp $3 $2 + 2
+    GetDlgItem $0 $cl.InnerDlg $3
+    SetCtlColors $0 "${CL_INK}" "${CL_PAPER}"
+    SendMessage $0 ${WM_SETFONT} $cl.FontStrong 1
+    System::Call "user32::GetWindowTextW(p r0, w .r1, i 256)"
+    SendMessage $cl.Status ${WM_SETTEXT} 0 "STR:$1…"
+    IntOp $3 $2 + 3
+    GetDlgItem $0 $cl.InnerDlg $3
+    SendMessage $0 ${WM_SETTEXT} 0 "STR:NOW"
+    System::Call "user32::InvalidateRect(p $cl.InnerDlg, p 0, i 1)"
+  ${EndIf}
+  Pop $3
+  Pop $2
+  Pop $1
+  Pop $0
+FunctionEnd
+
+; The progress page (install and uninstall): the status line, a thin progress bar, the steps the app lists
+; (CL_INSTFILES_STEPS / CL_UNINSTFILES_STEPS), "Show details" under them and the log over them when shown.
+Function ${UN}cl.StepsPageShow
+  Call ${UN}cl.InnerPageShow
+  FindWindow $cl.InnerDlg "#32770" "" $HWNDPARENT
+  StrCpy $cl.StepCount 0
+  StrCpy $cl.StepNow 0
+  StrCpy $cl.StepY 26
+  ; the status line (mono) in place of MUI's, the progress bar thin under it
+  GetDlgItem $0 $cl.InnerDlg 1006
+  ShowWindow $0 ${SW_HIDE}
+  StrCpy $cl.cP $cl.InnerDlg
+  StrCpy $cl.cX 0
+  StrCpy $cl.cY 0
+  StrCpy $cl.cW 300
+  StrCpy $cl.cH 12
+  StrCpy $cl.cS 0
+  StrCpy $cl.cT ""
+  StrCpy $cl.cI 1299
+  Call ${UN}cl.Static
+  StrCpy $cl.Status $cl.cOut
+  SetCtlColors $cl.Status "${CL_INK}" "${CL_PAPER}"
+  SendMessage $cl.Status ${WM_SETFONT} $cl.FontMono 0
+  GetDlgItem $0 $cl.InnerDlg 1004 ; progress bar
+  StrCpy $cl.cX 0
+  StrCpy $cl.cY 15
+  StrCpy $cl.cW 300
+  StrCpy $cl.cH 3
+  Call ${UN}cl.PlaceDialogUnits
+  ; the glyphs for this scaling (on paper)
+  StrCpy $cl.cY 0
+  StrCpy $cl.cW 5
+  StrCpy $cl.cH 5
+  StrCpy $cl.cS ${CL_SS_BITMAP_CENTER}
+  StrCpy $cl.cI 1298
+  Call ${UN}cl.Static
+  StrCpy $cl.ArtHwnd $cl.cOut
+  StrCpy $cl.Art "glyph"
+  Call ${UN}cl.PickArt
+  System::Call "user32::DestroyWindow(p $cl.cOut)"
+  System::Call 'user32::LoadImageW(p 0, w "$PLUGINSDIR\cl\glyph-done-paper-$cl.Art.bmp", i 0, i 0, i 0, i 0x10) p.s'
+  Pop $cl.GDone
+  System::Call 'user32::LoadImageW(p 0, w "$PLUGINSDIR\cl\glyph-skipped-paper-$cl.Art.bmp", i 0, i 0, i 0, i 0x10) p.s'
+  Pop $cl.GNow
+  System::Call 'user32::LoadImageW(p 0, w "$PLUGINSDIR\cl\glyph-failed-paper-$cl.Art.bmp", i 0, i 0, i 0, i 0x10) p.s'
+  Pop $cl.GFailed
+  System::Call 'user32::LoadImageW(p 0, w "$PLUGINSDIR\cl\glyph-waiting-paper-$cl.Art.bmp", i 0, i 0, i 0, i 0x10) p.s'
+  Pop $cl.GNext
+  !if "${UN}" == ""
+    !ifdef CL_INSTFILES_STEPS
+      Call ${CL_INSTFILES_STEPS}
+    !endif
+  !else
+    !ifdef CL_UNINSTFILES_STEPS
+      Call ${CL_UNINSTFILES_STEPS}
+    !endif
+  !endif
+  ; "Show details" under the steps; the details list, when shown, covers the steps
+  IntOp $1 $cl.StepY + 6
+  GetDlgItem $0 $cl.InnerDlg 1027
+  StrCpy $cl.cX 0
+  StrCpy $cl.cY $1
+  StrCpy $cl.cW 60
+  StrCpy $cl.cH 14
+  Call ${UN}cl.PlaceDialogUnits
+  GetDlgItem $0 $cl.InnerDlg 1016
+  StrCpy $cl.cX 0
+  StrCpy $cl.cY 24
+  StrCpy $cl.cW 300
+  StrCpy $cl.cH 116
+  Call ${UN}cl.PlaceDialogUnits
+  Call ${UN}cl.BringToTop
+FunctionEnd
+!macroend
+
+!insertmacro _CL_SHARED_FUNCTIONS ""
+!insertmacro _CL_SHARED_FUNCTIONS "un."
+
+
+
 
 
 ; ---------- start and end (call from .onInit / un.onInit, .onGUIEnd / un.onGUIEnd) ----------
@@ -919,22 +1161,22 @@ FunctionEnd
 
 ; The sidebar pages (welcome, finish): MUI's page with its image replaced by the size nearest the control, the
 ; version over it at the bottom (IBM Plex Mono, muted), and the page's own labels from 124u.
-!macro _CL_SIDEBAR IMAGE HANDLE
+!macro _CL_SIDEBAR UN IMAGE HANDLE
   StrCpy $cl.ArtHwnd ${IMAGE}
   StrCpy $cl.Art "wizard"
-  Call cl.PickArt
+  Call ${UN}cl.PickArt
   Push ${HANDLE}
   ${NSD_SetStretchedImage} ${IMAGE} "$cl.Art" ${HANDLE}
   Exch $0
   ${NSD_FreeImage} $0
   Pop $0
   StrCpy $0 ${IMAGE}
-  Call cl.SendToBack
+  Call ${UN}cl.SendToBack
   ${NSD_CreateLabel} 12u 178u 90u 9u "${CL_APP_VERSION}"
   Pop $0
   SetCtlColors $0 "${CL_MUTED}" "${CL_SUNK}"
   SendMessage $0 ${WM_SETFONT} $cl.FontMono 0
-  Call cl.BringToTop
+  Call ${UN}cl.BringToTop
 !macroend
 
 !macro CL_PAGE_WELCOME
@@ -948,7 +1190,7 @@ FunctionEnd
     ${EndIf}
   FunctionEnd
   Function cl.WelcomeShow
-    !insertmacro _CL_SIDEBAR $mui.WelcomePage.Image $mui.WelcomePage.Image.Bitmap
+    !insertmacro _CL_SIDEBAR "" $mui.WelcomePage.Image $mui.WelcomePage.Image.Bitmap
     ; the title in Space Grotesk; the text as the design's paragraphs (ink, then muted)
     ShowWindow $mui.WelcomePage.Text ${SW_HIDE}
     ShowWindow $mui.WelcomePage.Title ${SW_HIDE}
@@ -986,239 +1228,19 @@ FunctionEnd
   ; when the page stays open at the end (a failure), MUI's own "Installation Complete" title would show
   !define MUI_PAGE_HEADER_TEXT "Installing"
   !define MUI_PAGE_HEADER_SUBTEXT "This takes about a minute."
-  !define MUI_INSTFILESPAGE_FINISHHEADER_TEXT "Finished"
-  !define MUI_INSTFILESPAGE_FINISHHEADER_SUBTEXT "Next shows what happened."
-  !define MUI_INSTFILESPAGE_ABORTHEADER_TEXT "Stopped"
-  !define MUI_INSTFILESPAGE_ABORTHEADER_SUBTEXT "Click Show details for the reason."
+  !define /redef MUI_INSTFILESPAGE_FINISHHEADER_TEXT "Finished"
+  !define /redef MUI_INSTFILESPAGE_FINISHHEADER_SUBTEXT "Next shows what happened."
+  !define /redef MUI_INSTFILESPAGE_ABORTHEADER_TEXT "Stopped"
+  !define /redef MUI_INSTFILESPAGE_ABORTHEADER_SUBTEXT "Click Show details for the reason."
   !insertmacro MUI_PAGE_INSTFILES
   Function cl.InstFilesShow
-    Call cl.InnerPageShow
-    FindWindow $cl.InnerDlg "#32770" "" $HWNDPARENT
-    StrCpy $cl.StepCount 0
-    StrCpy $cl.StepNow 0
-    StrCpy $cl.StepY 26
-    ; the status line (mono) in place of MUI's, the progress bar thin under it
-    GetDlgItem $0 $cl.InnerDlg 1006
-    ShowWindow $0 ${SW_HIDE}
-    StrCpy $cl.cP $cl.InnerDlg
-    StrCpy $cl.cX 0
-    StrCpy $cl.cY 0
-    StrCpy $cl.cW 300
-    StrCpy $cl.cH 12
-    StrCpy $cl.cS 0
-    StrCpy $cl.cT ""
-    StrCpy $cl.cI 1299
-    Call cl.Static
-    StrCpy $cl.Status $cl.cOut
-    SetCtlColors $cl.Status "${CL_INK}" "${CL_PAPER}"
-    SendMessage $cl.Status ${WM_SETFONT} $cl.FontMono 0
-    GetDlgItem $0 $cl.InnerDlg 1004 ; progress bar
-    StrCpy $cl.cX 0
-    StrCpy $cl.cY 15
-    StrCpy $cl.cW 300
-    StrCpy $cl.cH 3
-    Call cl.PlaceDialogUnits
-    ; the glyphs for this scaling (on paper)
-    StrCpy $cl.cY 0
-    StrCpy $cl.cW 5
-    StrCpy $cl.cH 5
-    StrCpy $cl.cS ${CL_SS_BITMAP_CENTER}
-    StrCpy $cl.cI 1298
-    Call cl.Static
-    StrCpy $cl.ArtHwnd $cl.cOut
-    StrCpy $cl.Art "glyph"
-    Call cl.PickArt
-    System::Call "user32::DestroyWindow(p $cl.cOut)"
-    System::Call 'user32::LoadImageW(p 0, w "$PLUGINSDIR\cl\glyph-done-paper-$cl.Art.bmp", i 0, i 0, i 0, i 0x10) p.s'
-    Pop $cl.GDone
-    System::Call 'user32::LoadImageW(p 0, w "$PLUGINSDIR\cl\glyph-skipped-paper-$cl.Art.bmp", i 0, i 0, i 0, i 0x10) p.s'
-    Pop $cl.GNow
-    System::Call 'user32::LoadImageW(p 0, w "$PLUGINSDIR\cl\glyph-failed-paper-$cl.Art.bmp", i 0, i 0, i 0, i 0x10) p.s'
-    Pop $cl.GFailed
-    System::Call 'user32::LoadImageW(p 0, w "$PLUGINSDIR\cl\glyph-waiting-paper-$cl.Art.bmp", i 0, i 0, i 0, i 0x10) p.s'
-    Pop $cl.GNext
-    !ifdef CL_INSTFILES_STEPS
-      Call ${CL_INSTFILES_STEPS}
-    !endif
-    ; "Show details" under the steps; the details list, when shown, covers the steps
-    IntOp $1 $cl.StepY + 6
-    GetDlgItem $0 $cl.InnerDlg 1027
-    StrCpy $cl.cX 0
-    StrCpy $cl.cY $1
-    StrCpy $cl.cW 60
-    StrCpy $cl.cH 14
-    Call cl.PlaceDialogUnits
-    GetDlgItem $0 $cl.InnerDlg 1016
-    StrCpy $cl.cX 0
-    StrCpy $cl.cY 24
-    StrCpy $cl.cW 300
-    StrCpy $cl.cH 116
-    Call cl.PlaceDialogUnits
-    Call cl.BringToTop
+    Call cl.StepsPageShow
   FunctionEnd
 !macroend
 
-; $0 = control on $cl.InnerDlg: moved to $cl.cX $cl.cY $cl.cW $cl.cH (dialog units)
-Function cl.PlaceDialogUnits
-  Push $1
-  Push $2
-  Push $3
-  Push $4
-  Push $5
-  System::Call "*(i $cl.cX, i $cl.cY, i $cl.cW, i $cl.cH)p.r5" ; x, y, width, height: each scaled on its own
-  System::Call "user32::MapDialogRect(p $cl.InnerDlg, p r5)"
-  System::Call "*$5(i.r1, i.r2, i.r3, i.r4)"
-  System::Free $5
-  System::Call "user32::MoveWindow(p r0, i r1, i r2, i r3, i r4, i 1)"
-  Pop $5
-  Pop $4
-  Pop $3
-  Pop $2
-  Pop $1
-FunctionEnd
 
-; Push "Installing Surehand MCP" / Call cl.StepAdd: a step, waiting (from CL_INSTFILES_STEPS)
-Function cl.StepAdd
-  Exch $1
-  Push $0
-  Push $2
-  IntOp $2 $cl.StepCount * 4
-  IntOp $2 $2 + 1300
-  StrCpy $cl.cP $cl.InnerDlg
-  StrCpy $cl.cX 0
-  StrCpy $cl.cY $cl.StepY
-  StrCpy $cl.cW 300
-  StrCpy $cl.cH 1
-  StrCpy $cl.cS 0
-  StrCpy $cl.cT ""
-  StrCpy $cl.cI $2
-  Call cl.Static
-  SetCtlColors $cl.cOut "" "${CL_RULE}"
-  StrCpy $0 $cl.cOut
-  Call cl.OnePixel
-  IntOp $cl.cY $cl.StepY + 4
-  StrCpy $cl.cW 5
-  StrCpy $cl.cH 5
-  StrCpy $cl.cS ${CL_SS_BITMAP_CENTER}
-  IntOp $cl.cI $2 + 1
-  Call cl.Static
-  SetCtlColors $cl.cOut "" "${CL_PAPER}" ; what the centred bitmap leaves around it
-  SendMessage $cl.cOut ${CL_STM_SETIMAGE} 0 $cl.GNext
-  StrCpy $cl.cX 10
-  IntOp $cl.cY $cl.StepY + 3
-  StrCpy $cl.cW 228
-  StrCpy $cl.cH 9
-  StrCpy $cl.cS 0
-  StrCpy $cl.cT "$1"
-  IntOp $cl.cI $2 + 2
-  Call cl.Static
-  SetCtlColors $cl.cOut "${CL_MUTED}" "${CL_PAPER}"
-  StrCpy $cl.cX 240
-  StrCpy $cl.cW 60
-  StrCpy $cl.cS ${CL_SS_RIGHT}
-  StrCpy $cl.cT "NEXT"
-  IntOp $cl.cI $2 + 3
-  Call cl.Static
-  SetCtlColors $cl.cOut "${CL_MUTED}" "${CL_PAPER}"
-  SendMessage $cl.cOut ${WM_SETFONT} $cl.FontLabel 0
-  IntOp $cl.StepCount $cl.StepCount + 1
-  IntOp $cl.StepY $cl.StepY + 12
-  ; the closing hairline under the last step
-  System::Call "user32::GetDlgItem(p $cl.InnerDlg, i 1297) p.r0"
-  ${If} $0 <> 0
-    System::Call "user32::DestroyWindow(p r0)"
-  ${EndIf}
-  StrCpy $cl.cX 0
-  StrCpy $cl.cY $cl.StepY
-  StrCpy $cl.cW 300
-  StrCpy $cl.cH 1
-  StrCpy $cl.cS 0
-  StrCpy $cl.cT ""
-  StrCpy $cl.cI 1297
-  Call cl.Static
-  SetCtlColors $cl.cOut "" "${CL_RULE}"
-  StrCpy $0 $cl.cOut
-  Call cl.OnePixel
-  Pop $2
-  Pop $0
-  Pop $1
-FunctionEnd
 
-; Push "done" | "failed" / Call cl.StepEnd: the current step's outcome; the next one starts (from the install
-; section; nothing happens when Setup is silent)
-Function cl.StepEnd
-  Exch $1
-  Push $0
-  Push $2
-  Push $3
-  ${If} $cl.InnerDlg != ""
-  ${AndIf} $cl.StepNow < $cl.StepCount
-    IntOp $2 $cl.StepNow * 4
-    IntOp $2 $2 + 1300
-    IntOp $3 $2 + 1
-    GetDlgItem $0 $cl.InnerDlg $3
-    IntOp $3 $2 + 2
-    ${If} $1 == "done"
-      SendMessage $0 ${CL_STM_SETIMAGE} 0 $cl.GDone
-      GetDlgItem $0 $cl.InnerDlg $3
-      SetCtlColors $0 "${CL_INK}" "${CL_PAPER}"
-      SendMessage $cl.InnerDlg ${WM_GETFONT} 0 0 $1
-      SendMessage $0 ${WM_SETFONT} $1 1 ; back to the dialog font
-      IntOp $3 $2 + 3
-      GetDlgItem $0 $cl.InnerDlg $3
-      SetCtlColors $0 "${CL_ACCENT}" "${CL_PAPER}"
-      SendMessage $0 ${WM_SETTEXT} 0 "STR:DONE"
-    ${Else}
-      SendMessage $0 ${CL_STM_SETIMAGE} 0 $cl.GFailed
-      GetDlgItem $0 $cl.InnerDlg $3
-      SetCtlColors $0 "${CL_INK}" "${CL_PAPER}"
-      IntOp $3 $2 + 3
-      GetDlgItem $0 $cl.InnerDlg $3
-      SetCtlColors $0 "${CL_REFUSED}" "${CL_PAPER}"
-      SendMessage $0 ${WM_SETTEXT} 0 "STR:FAILED"
-    ${EndIf}
-    System::Call "user32::InvalidateRect(p $cl.InnerDlg, p 0, i 1)"
-  ${EndIf}
-  IntOp $cl.StepNow $cl.StepNow + 1
-  ${If} $cl.InnerDlg != ""
-  ${AndIf} $cl.StepNow >= $cl.StepCount
-    SendMessage $cl.Status ${WM_SETTEXT} 0 "STR:Done."
-  ${EndIf}
-  Pop $3
-  Pop $2
-  Pop $0
-  Pop $1
-FunctionEnd
 
-; Call cl.StepStart: the current step is running: its glyph, its name in IBM Plex Sans SemiBold, the status line
-Function cl.StepStart
-  Push $0
-  Push $1
-  Push $2
-  Push $3
-  ${If} $cl.InnerDlg != ""
-  ${AndIf} $cl.StepNow < $cl.StepCount
-    IntOp $2 $cl.StepNow * 4
-    IntOp $2 $2 + 1300
-    IntOp $3 $2 + 1
-    GetDlgItem $0 $cl.InnerDlg $3
-    SendMessage $0 ${CL_STM_SETIMAGE} 0 $cl.GNow
-    IntOp $3 $2 + 2
-    GetDlgItem $0 $cl.InnerDlg $3
-    SetCtlColors $0 "${CL_INK}" "${CL_PAPER}"
-    SendMessage $0 ${WM_SETFONT} $cl.FontStrong 1
-    System::Call "user32::GetWindowTextW(p r0, w .r1, i 256)"
-    SendMessage $cl.Status ${WM_SETTEXT} 0 "STR:$1…"
-    IntOp $3 $2 + 3
-    GetDlgItem $0 $cl.InnerDlg $3
-    SendMessage $0 ${WM_SETTEXT} 0 "STR:NOW"
-    System::Call "user32::InvalidateRect(p $cl.InnerDlg, p 0, i 1)"
-  ${EndIf}
-  Pop $3
-  Pop $2
-  Pop $1
-  Pop $0
-FunctionEnd
 
 ; ---------- the finish page: the results and the next steps ----------
 ; The results box: paper-sunk under a 2 px ink rule, one row per [summary.<i>] of CL_RESULTS_INI (a glyph, the text
@@ -1228,7 +1250,7 @@ FunctionEnd
   !define MUI_PAGE_CUSTOMFUNCTION_SHOW cl.FinishShow
   !insertmacro MUI_PAGE_FINISH
   Function cl.FinishShow
-    !insertmacro _CL_SIDEBAR $mui.FinishPage.Image $mui.FinishPage.Image.Bitmap
+    !insertmacro _CL_SIDEBAR "" $mui.FinishPage.Image $mui.FinishPage.Image.Bitmap
     ShowWindow $mui.FinishPage.Title ${SW_HIDE}
     ShowWindow $mui.FinishPage.Text ${SW_HIDE}
     ${NSD_CreateLabel} 124u 14u 196u 16u "${CL_FINISH_TITLE}"
@@ -1414,7 +1436,41 @@ FunctionEnd
   FunctionEnd
 !macroend
 
+; The uninstaller's progress page: the same plain steps (CL_UNINSTFILES_STEPS), "Uninstalling" in the header.
 !macro CL_UNPAGE_INSTFILES
-  !define MUI_PAGE_CUSTOMFUNCTION_SHOW un.cl.InnerPageShow
+  !define MUI_PAGE_CUSTOMFUNCTION_SHOW un.cl.StepsPageShow
+  !define MUI_PAGE_HEADER_TEXT "Uninstalling"
+  !define MUI_PAGE_HEADER_SUBTEXT "This takes a few seconds."
+  !define /redef MUI_INSTFILESPAGE_FINISHHEADER_TEXT "Finished"
+  !define /redef MUI_INSTFILESPAGE_FINISHHEADER_SUBTEXT "Next shows what happened."
+  !define /redef MUI_INSTFILESPAGE_ABORTHEADER_TEXT "Stopped"
+  !define /redef MUI_INSTFILESPAGE_ABORTHEADER_SUBTEXT "Click Show details for the reason."
   !insertmacro MUI_UNPAGE_INSTFILES
+!macroend
+
+; The uninstaller's finish page: the sidebar, the title (MUI_FINISHPAGE_TITLE) in Space Grotesk, the app's own
+; lines from CL_UNFINISH_SHOW (labels from 124u, 38u down), Finish alone and green. The uninstall section ends with
+; SetAutoClose true so it comes straight after the steps.
+!macro CL_UNPAGE_FINISH
+  !define CL_UNFINISH_TITLE "${MUI_FINISHPAGE_TITLE}"
+  !define MUI_PAGE_CUSTOMFUNCTION_SHOW un.cl.FinishShow
+  !insertmacro MUI_UNPAGE_FINISH
+  Function un.cl.FinishShow
+    !insertmacro _CL_SIDEBAR "un." $mui.FinishPage.Image $mui.FinishPage.Image.Bitmap
+    ShowWindow $mui.FinishPage.Title ${SW_HIDE}
+    ShowWindow $mui.FinishPage.Text ${SW_HIDE}
+    ${NSD_CreateLabel} 124u 14u 196u 16u "${CL_UNFINISH_TITLE}"
+    Pop $0
+    SetCtlColors $0 "${CL_INK}" "${CL_PAPER}"
+    SendMessage $0 ${WM_SETFONT} $cl.FontTitle 0
+    !ifdef CL_UNFINISH_SHOW
+      Call ${CL_UNFINISH_SHOW}
+    !endif
+    Call un.cl.HideLines
+    StrCpy $0 0
+    Call un.cl.HeaderRule
+    StrCpy $0 "both" ; Finish only
+    Call un.cl.FooterButtons
+    Call un.cl.SyncMainButton
+  FunctionEnd
 !macroend
