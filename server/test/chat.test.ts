@@ -260,8 +260,8 @@ describe("Antigravity (agy -p --output-format stream-json)", () => {
       { type: "session", id: "conv-1" },
       { type: "tool", phase: "start", id: "1", name: "ae_get_comp_info", args: { comp: "Main" } },
       { type: "tool", phase: "end", id: "1", name: "ae_get_comp_info", ok: true },
-      { type: "text", id: "agy-2", text: "Main has" },
-      { type: "text", id: "agy-2", text: "Main has 3 layers." },
+      { type: "text", delta: "Main has" },
+      { type: "text", delta: " 3 layers." },
       { type: "done", ok: true, session: "conv-1" },
     ]);
     let a: string[] = runs()[0].args;

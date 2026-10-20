@@ -112,27 +112,35 @@ export async function run(agent) {
     writeFileSync(file, JSON.stringify(cfg, null, 2));
     return;
   }
+  // the stream as agy v1.4.3 writes it live: {event, <event>: {...}} lines
   const conv = argAfter(args, "--conversation") || "conv-1";
-  out({ type: "init", conversation_id: conv });
+  const step = (s) => out({ event: "step_update", step_update: { conversation_id: conv, ...s } });
+  const mcp = (tool, args) => ({ name: "call_mcp_tool", parameters: { Arguments: args, ServerName: "surehand-ae", ToolName: tool } });
+  out({ event: "init", conversation_id: conv, init: { cwd: process.cwd(), tools: ["call_mcp_tool", "read_file"] } });
   if (scenario === "auth") {
     process.stderr.write("error: You are currently not signed in.\n");
     process.exit(1);
   }
   if (scenario === "slow") return hang();
-  // as seen live (v1.4.3): its own permission settings refused the tool in a headless run
+  step({ step_index: 0, state: "DONE", step_type: "user_input" });
+  // its own permission settings refused the tool in a headless run (before Connect added the allow rule)
   if (scenario === "denied") {
-    out({ type: "step_update", step: { step_index: 1, step_type: "MCP_TOOL", state: "ERROR", error: "user denied permission for mcp(surehand-ae/ae_get_project_info)" } });
-    out({ type: "result", conversation_id: conv, response: "", denied_actions: [{ action: "mcp", target: "surehand-ae/ae_get_project_info" }] });
+    step({ step_index: 1, state: "ACTIVE", step_type: "tool", tool_name: "call_mcp_tool", tool_info: mcp("ae_get_project_info", {}) });
+    step({ step_index: 1, state: "ERROR", step_type: "tool", tool_name: "call_mcp_tool", tool_info: { ...mcp("ae_get_project_info", {}), output: "user denied permission for mcp(surehand-ae/ae_get_project_info)" } });
+    out({ event: "result", result: { conversation_id: conv, status: "SUCCESS", response: "", denied_actions: [{ action: "mcp", target: "surehand-ae/ae_get_project_info" }] } });
     process.stderr.write("note: a tool required the 'mcp' permission that headless mode cannot prompt for, so it was auto-denied. Add an allow-rule under permissions.allow in settings.json (e.g. mcp(surehand-ae/ae_get_project_info))\n");
     return;
   }
   if (scenario === "empty") {
-    out({ type: "result", conversation_id: conv, response: "" });
+    out({ event: "result", result: { conversation_id: conv, status: "SUCCESS", response: "" } });
     return;
   }
-  out({ type: "step_update", step: { step_index: 1, step_type: "MCP_TOOL", tool_name: "surehand-ae_ae_get_comp_info", arguments: { comp: "Main" }, status: "RUNNING" } });
-  out({ type: "step_update", step: { step_index: 1, step_type: "MCP_TOOL", tool_name: "surehand-ae_ae_get_comp_info", status: "DONE" } });
-  out({ type: "step_update", step: { step_index: 2, step_type: "PLANNER_RESPONSE", text: "Main has" } });
-  out({ type: "step_update", step: { step_index: 2, step_type: "PLANNER_RESPONSE", text: "Main has 3 layers." } });
-  out({ type: "result", conversation_id: conv, result: "Main has 3 layers." });
+  step({ step_index: 1, state: "ACTIVE", step_type: "tool", tool_name: "call_mcp_tool", tool_info: mcp("ae_get_comp_info", { comp: "Main" }) });
+  step({ step_index: 1, state: "DONE", step_type: "tool", tool_name: "call_mcp_tool", duration_seconds: 0.1, tool_info: { ...mcp("ae_get_comp_info", { comp: "Main" }), output: "{\"name\":\"Main\"}" } });
+  step({ step_index: 2, state: "ACTIVE", step_type: "tool", tool_name: "read_file", tool_info: { name: "read_file", parameters: { Path: "/Users/me/.gemini/antigravity-cli/mcp/surehand-ae/ae_run_script.json" } } });
+  step({ step_index: 2, state: "DONE", step_type: "tool", tool_name: "read_file", tool_info: { name: "read_file", parameters: { Path: "/Users/me/.gemini/antigravity-cli/mcp/surehand-ae/ae_run_script.json" }, output: "1 lines" } });
+  step({ step_index: 3, state: "DONE", step_type: "agent_response", usage: { total_tokens: 10 } });
+  step({ step_index: 4, state: "ACTIVE", step_type: "agent_response", text_delta: "Main has" });
+  step({ step_index: 4, state: "DONE", step_type: "agent_response", text_delta: " 3 layers." });
+  out({ event: "result", result: { conversation_id: conv, status: "SUCCESS", response: "Main has 3 layers." } });
 }

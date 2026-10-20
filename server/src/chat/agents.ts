@@ -419,6 +419,13 @@ export function agyParser(): Parser {
   };
   /** The Surehand tool a step is about, wherever the step names it ("mcp(surehand-ae/ae_get_project_info)", a tool_name...). */
   const toolOf = (step: any): string => {
+    // agy 1.4: tool_info {name: "call_mcp_tool", parameters: {ServerName, ToolName}}; its own tools by tool_info.name
+    const info = step.tool_info;
+    if (info && typeof info === "object") {
+      const p = info.parameters || {};
+      if (typeof p.ToolName === "string" && p.ToolName) return p.ToolName;
+      if (typeof info.name === "string" && info.name) return info.name;
+    }
     const named = pick(step, ["tool_name", "toolName", "mcp_tool", "tool", "name"]) || (step.tool_call && pick(step.tool_call, ["name", "tool_name"])) || "";
     const m = new RegExp(`${SERVER_NAME}[/_.:]+(ae_[a-z0-9_]+)`).exec(named) || /\b(ae_[a-z0-9_]+)\b/.exec(named) ||
       new RegExp(`${SERVER_NAME}[/_.:]+(ae_[a-z0-9_]+)`).exec(JSON.stringify(step));
@@ -427,7 +434,10 @@ export function agyParser(): Parser {
   return {
     line(o) {
       const out: ChatEvent[] = [];
-      const t = String(o.type || "");
+      // agy 1.4 names the line's kind in "event" and nests its body under that name ({event: "result", result: {...}})
+      const t = String(o.type || o.event || "");
+      const body = o[t] && typeof o[t] === "object" && !Array.isArray(o[t]) ? o[t] : null;
+      if (body && t !== "step_update") o = { ...body, ...o, [t]: undefined };
       const sid = pick(o, ["conversation_id", "conversationId", "session_id", "sessionId"]);
       if (t === "init") {
         if (sid) out.push({ type: "session", id: sid });
@@ -439,19 +449,31 @@ export function agyParser(): Parser {
         const id = String(step.step_id ?? step.stepIndex ?? step.step_index ?? step.id ?? o.step_index ?? kind);
         const status = String(step.status || step.state || o.status || o.state || "");
         const done = /done|complete|finish|success|fail|error|cancel|denied/i.test(status);
-        const name = toolOf(step);
-        if (/tool|mcp/i.test(kind) || name) {
-          const shown = name || kind;
+        // the answer streams as text_delta pieces of one agent_response step
+        if (typeof step.text_delta === "string") {
+          if (step.text_delta) {
+            sawText = true;
+            out.push({ type: "text", delta: step.text_delta });
+          }
+          return out;
+        }
+        const name = /tool|mcp/i.test(kind) || step.tool_info ? toolOf(step) : "";
+        if (name) {
+          const shown = name.replace(SERVER_PREFIX, "");
+          const info = step.tool_info || {};
+          const ours = info.name === "call_mcp_tool" ? info.parameters?.ServerName === SERVER_NAME : /^ae_/.test(shown);
+          // agy reads the tool descriptions it keeps in its own folder before calling them: bookkeeping, not a step to show
+          if (!ours && /[\\/]antigravity-cli[\\/]mcp[\\/]/.test(String(info.parameters?.Path || ""))) return out;
           if (!tools.has(id)) {
             tools.set(id, shown);
-            out.push({ type: "tool", phase: "start", id, name: shown, args: step.arguments || step.args || step.input || step.tool_call?.arguments });
+            out.push({ type: "tool", phase: "start", id, name: shown, args: info.parameters?.Arguments ?? (step.arguments || step.args || step.input || step.tool_call?.arguments), ...(ours ? {} : { builtin: true }) });
           }
           if (done) {
             const failed = /fail|error|cancel|denied/i.test(status);
-            let why = pick(step, ["error", "error_message", "message", "reason"]) || (step.error && pick(step.error, ["message"])) || status;
+            let why = pick(step, ["error", "error_message", "message", "reason"]) || (step.error && pick(step.error, ["message"])) || (failed && typeof info.output === "string" && info.output) || status;
             // Antigravity's own permission settings refused it (not Surehand's)
             if (/denied permission|auto-denied|permission/i.test(why)) why = `Antigravity's own permission settings refused it (${why}).`;
-            out.push({ type: "tool", phase: "end", id, name: shown, ok: !failed, ...(failed ? { error: short(why) } : {}) });
+            out.push({ type: "tool", phase: "end", id, name: shown, ok: !failed, ...(failed ? { error: short(why) } : {}), ...(ours ? {} : { builtin: true }) });
           }
           return out;
         }

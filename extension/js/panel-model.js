@@ -599,7 +599,7 @@
       v.addLink = "Add another AI app ›";
     }
     if (a.id === "agy" && a.connected === false) {
-      v.note = { kind: "connect", title: "Connect Surehand to Antigravity first", text: "Antigravity has no setting for one chat, so Surehand adds itself to its MCP servers, after a backup. Uninstalling Surehand removes it again.",
+      v.note = { kind: "connect", title: "Connect Surehand to Antigravity first", text: "Antigravity has no setting for one chat, so Surehand adds itself to its MCP servers and allows only its own tools there, after a backup. Uninstalling Surehand removes both again.",
         steps: [], buttons: [{ id: "connect", text: "Connect", main: true }].concat(use) };
       v.input.placeholder = "Connect Surehand to Antigravity to chat";
       return v;
