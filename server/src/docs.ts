@@ -33,6 +33,8 @@ Also:
   before writing non-trivial ExtendScript.
 - For an unfamiliar or inherited project, ae_project_xray explains how it works: what the render queue pulls in,
   expression dependencies and fragile links, missing items, footage specs and what makes it heavy.
+- Sending a project to someone: ae_handoff_package collects it with its footage, lists what the recipient needs, and
+  with verify proves the package renders the same.
 - Exact timing: the keyframe table (ae_get_keyframes / ae_set_keyframe_table: frames or seconds, exact speed and
   influence), ae_copy_ease, ae_retime_keyframes (whole frames), ae_audit_easing. Layout: ae_align_layers moves layers by
   their measured on-screen bounds. ae_find_files locates files on disk; ae_export_frames saves PNG stills.

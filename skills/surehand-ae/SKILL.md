@@ -54,6 +54,11 @@ Read-only.
 - Never reach the same result another way: not with another tool, ae_run_script, ae_batch or a script file.
 - If the edit is needed, say which mode would allow it. Changing the mode is the user's decision.
 
+## Handing a project off
+
+To send the project to someone else, package and prove it with ae_handoff_package. Follow references/handoff.md in
+this skill.
+
 ## Files
 
 Tools never replace an existing file silently: ae_save_project, ae_export_frames and the outputPath of

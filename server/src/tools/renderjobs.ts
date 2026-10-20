@@ -68,7 +68,7 @@ export function pruneRenders(dir: string, keep = RENDERS_KEPT, active: Set<strin
 }
 
 /** aerender lives next to the After Effects app (macOS) or AfterFX.exe (Windows). */
-function aerenderPath(appPackage: string): string | null {
+export function aerenderPath(appPackage: string): string | null {
   const candidates =
     process.platform === "win32"
       ? [join(appPackage, "aerender.exe"), join(dirname(appPackage), "aerender.exe"), join(appPackage, "Support Files", "aerender.exe")]
