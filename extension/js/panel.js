@@ -254,8 +254,25 @@
     if (!isPausedNow() && !S.pending.length && UI.workingView(S.health, S.busySince ? Date.now() - S.busySince : null)) return { kind: "ready", tile: "green", text: "Working\u2026", short: "Working" };
     return UI.statusFor({
       bridgeError: S.bridgeError, paused: isPausedNow(), pendingCount: S.pending.length,
-      client: UI.lastClient(S.activity), everConnected: S.activity.length > 0,
+      client: UI.lastClient(S.activity), everConnected: S.activity.length > 0, apps: S.apps,
     });
+  }
+  /**
+   * The AI apps connected right now: each one's Surehand server writes sessions/<pid>.json when the app has
+   * said hello (and removes it when it quits); ChatGPT on the web counts while its secure link runs.
+   */
+  function alive(pid) {
+    try { process.kill(pid, 0); return true; } catch (e) { return e.code === "EPERM"; }
+  }
+  function readApps() {
+    var p = P(), list = [];
+    try {
+      fs.readdirSync(p.sessions).forEach(function (f) { if (/\.json$/.test(f)) list.push(readJson(path.join(p.sessions, f))); });
+    } catch (e) { return null; } // no folder yet (no app has connected since 1.4): not known
+    var apps = UI.connectedApps(list, alive);
+    var web = readJson(p.chatgpt);
+    if (web && web.state === "running" && web.pid && alive(web.pid) && apps.indexOf("ChatGPT (web)") < 0) apps.push("ChatGPT (web)");
+    return apps;
   }
   function isPausedNow() { return S.bridgePaused === null ? !!S.cfg.paused : S.bridgePaused; }
   function renderHeader() {
@@ -478,15 +495,23 @@
     var todo = list.filter(function (c) { return c.installed !== false && !c.configured && c.connectable !== false; });
     var pick = todo.filter(function (c) { return /claude.?desktop/i.test(c.id + " " + c.name); })[0] || todo[0];
     if (configured.length) {
-      $("setupText").textContent = configured[0].name + " is set up. Restart it to connect.";
+      var names = configured.map(function (c) { return c.name; });
+      $("setupText").textContent = (names.length > 2 ? names.slice(0, 2).join(", ") + " and others are" : names.join(" and ") + (names.length > 1 ? " are" : " is")) +
+        " set up. Open " + (names.length > 1 ? "one" : "it") + " (or restart it), then ask it something about your After Effects project, like \u201cWhat\u2019s in my project?\u201d";
       $("setupBtn").hidden = true;
-      $("setupHint").textContent = "Other apps: \u2630 \u203a Connect an AI app.";
+      $("setupHint").textContent = "It shows as connected here as soon as the app has started. Other apps: \u2630 \u203a Connect an AI app.";
     } else if (pick) {
       $("setupText").textContent = pick.name + " isn\u2019t set up yet.";
       $("setupBtn").hidden = false;
       $("setupBtn").textContent = "Set it up";
       $("setupBtn").onclick = function () { connectClient(pick, true); };
       $("setupHint").textContent = "Then restart " + pick.name + ". Other apps: \u2630 \u203a Connect an AI app.";
+    } else if (S.activity.length) {
+      $("setupText").textContent = "Open your AI app, then ask it something about your After Effects project.";
+      $("setupBtn").hidden = false;
+      $("setupBtn").textContent = "Connect an AI app";
+      $("setupBtn").onclick = function () { openScreen("connect"); };
+      $("setupHint").textContent = "It shows as connected here as soon as the app has started.";
     } else {
       $("setupText").textContent = "No AI app has used Surehand yet.";
       $("setupBtn").hidden = false;
@@ -609,14 +634,16 @@
     var running = {};
     S.renders.forEach(function (r) { running[r.id] = true; });
     var items = UI.feedItems(S.activity, { limit: Math.max(1, limit - S.renders.length), undone: S.undone, runningRenders: running, current: S.current });
-    var key = JSON.stringify([S.layout, S.renders, S.activity.length, items.map(function (i) { return [i.at, i.title, i.line, i.undoable, !!S.open[UI.entryKey(i.entry)]]; })]);
+    var key = JSON.stringify([S.layout, S.renders, S.activity.length, S.apps, items.map(function (i) { return [i.at, i.title, i.line, i.undoable, !!S.open[UI.entryKey(i.entry)]]; })]);
     if (!force && key === shownFeed) return;
     shownFeed = key;
     var feed = $("feed");
     feed.innerHTML = "";
     S.renders.forEach(function (r) { feed.appendChild(renderItem(r)); });
     items.forEach(function (it, k) { feed.appendChild(feedItem(it, k === 0)); });
-    if (!items.length && !S.renders.length) feed.appendChild(el("div", { cls: "empty", text: "What the AI does in After Effects shows up here." }));
+    if (!items.length && !S.renders.length) feed.appendChild(el("div", { cls: "empty", text: S.apps && S.apps.length
+      ? UI.appsText(S.apps) + (S.apps.length > 1 ? " are" : " is") + " connected. Ask it something about your After Effects project, like \u201cWhat\u2019s in my project?\u201d What it does shows up here."
+      : "What the AI does in After Effects shows up here." }));
     var shownEntries = items.reduce(function (n, i) { return n + (i.count || 1); }, 0);
     $("allActivity").hidden = S.layout === "narrow" || S.activity.length <= shownEntries;
   }
@@ -695,19 +722,21 @@
   }
 
   /**
-   * This After Effects and its open project ({ port, pid, project, revision }), for Undo: read only
-   * while the newest entry could be undone here (a tiny script, at most every 3 s, never while busy).
+   * This After Effects and its open project ({ port, pid, project, revision }), for Undo: read once for each
+   * newest entry that could be undone here, right after the AI's call (After Effects just took a script, so no
+   * dialog is open), never while busy. Not polled: a script sent while a dialog is open makes After Effects show
+   * "Cannot run a script while a modal dialog is waiting for response" (seen live). Undo checks again anyway.
    */
-  var lastCurrentAt = 0;
+  var checkedKey = null;
   function updateCurrent() {
     var e = S.activity[0], h = S.health;
     if (!e || !e.undoGroup || typeof e.revision !== "number" || e.undoSteps !== 1 || !e.instance || !h || S.undone[UI.entryKey(e)]) { S.current = null; return; }
     if (e.instance.port !== myPort || e.instance.pid !== h.pid) { S.current = null; return; }
-    if (h.busy || Date.now() - lastCurrentAt < 3000 || !secret()) return;
-    lastCurrentAt = Date.now();
+    if (h.busy || checkedKey === UI.entryKey(e) || !secret()) return;
+    checkedKey = UI.entryKey(e);
     var script = "(function(){var r='';try{r=String(app.project.revision);}catch(x){}return r+'|'+(app.project&&app.project.file?app.project.file.fsName:'');})()";
     evalAE(script, "panel: project state", function (err, r) {
-      if (err || typeof r !== "string" || r.indexOf("|") < 0) { S.current = null; return renderFeed(); }
+      if (err || typeof r !== "string" || r.indexOf("|") < 0) { S.current = null; return renderFeed(); } // no retry: it could be a dialog
       var i = r.indexOf("|"), rev = r.slice(0, i);
       S.current = { port: myPort, pid: h.pid, project: r.slice(i + 1), revision: rev === "" ? null : Number(rev) };
       renderFeed();
@@ -1368,6 +1397,7 @@
   function refresh() {
     S.cfg = readConfig();
     S.update = S.update || readJson(P().updateCheck);
+    S.apps = readApps();
     setMenu();
     renderModes();
     call("GET", "/health", null, function (err, h) {
