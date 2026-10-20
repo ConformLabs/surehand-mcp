@@ -14,6 +14,8 @@ export interface AemcpConfig {
   toolProfile?: string;
   /** set to false to disable the GitHub update check */
   updateCheck?: boolean;
+  /** "stable" (default) | "beta": beta updates also offer GitHub pre-releases */
+  updateChannel?: string;
   /** set to false to turn off the change report after edits */
   changeReport?: boolean;
   /** "full" | "ask" | "read-only", and whether scripts may run shell commands */
@@ -74,6 +76,7 @@ export function loadConfig(): AemcpConfig {
     httpPort: Number(env("HTTP_PORT") || file.httpPort || 8766),
     toolProfile: file.toolProfile,
     updateCheck: file.updateCheck,
+    updateChannel: file.updateChannel,
     changeReport: file.changeReport,
     permissions: file.permissions,
     instance: file.instance,
