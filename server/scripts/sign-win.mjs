@@ -29,7 +29,8 @@ function checkCertificate() {
   if (!existsSync(PROVIDER)) die(`missing ${PROVIDER} (brew install libp11)`);
   if (!existsSync(MODULE)) die(`missing ${MODULE} (install SimplySign Desktop)`);
   const r = spawnSync("pkcs11-tool", ["--module", MODULE, "--list-objects", "--type", "cert"], { encoding: "utf8", timeout: 60_000 });
-  const ids = [...`${r.stdout}`.matchAll(/^\s*ID:\s*([0-9a-f]+)/gim)].map((m) => m[1].toLowerCase());
+  // newer pkcs11-tool prints the id as "27:c2:15:...", older ones as "27C215..."
+  const ids = [...`${r.stdout}`.matchAll(/^\s*ID:\s*([0-9a-f:]+)/gim)].map((m) => m[1].replace(/:/g, "").toLowerCase());
   if (r.status !== 0 || !ids.includes(CERT_ID)) die("the code signing certificate is not available. Log in to SimplySign Desktop first.");
 }
 
