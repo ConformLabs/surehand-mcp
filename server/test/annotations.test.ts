@@ -100,6 +100,7 @@ const EXPECTED: Record<string, Hints> = {
   // files & export
   ae_find_files: R, // runs in the MCP server, reads the file system only
   ae_export_frames: DI, // overwrite replaces existing PNGs; the temporary comp leaves no undo step
+  ae_handoff_package: D, // writes the package (overwrite replaces files), closes and reopens the project: the undo history starts fresh
   // effects, shapes & masks
   ae_list_available_effects: R,
   ae_get_effect_params: EI, // temporary layer

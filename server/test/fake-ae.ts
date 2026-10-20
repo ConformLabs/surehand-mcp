@@ -5,8 +5,8 @@
 // that is already set moves the revision but leaves no undo step), an edit outside a group is a step of
 // its own, an extra endUndoGroup() closes the group early, and Edit > Undo moves the revision forward
 // (it doesn't restore it).
-import { existsSync } from "node:fs";
-import { basename, resolve as resolvePath } from "node:path";
+import { existsSync, writeFileSync } from "node:fs";
+import { basename, dirname, resolve as resolvePath } from "node:path";
 import { helperSource } from "../src/jsx.js";
 
 class CompItem {}
@@ -310,6 +310,8 @@ export interface FakeFootageSpec {
   still?: boolean;
   alpha?: boolean;
   proxy?: string;
+  /** project panel folders, outermost first */
+  folder?: string[];
 }
 export interface FakeProjectSpec {
   comps: FakeCompSpec[];
@@ -319,7 +321,7 @@ export interface FakeProjectSpec {
   /** null: an After Effects without the font API */
   fonts?: { postScriptName: string; familyName: string; styleName: string; isSubstitute: boolean }[] | null;
   /** app.project.usedFonts: a font and the layers (by name) that use it; noIds: usedAt entries without layerID */
-  usedFonts?: { ps: string; layers: string[]; noIds?: boolean }[];
+  usedFonts?: { ps: string; layers: string[]; noIds?: boolean; family?: string; style?: string; version?: string; adobe?: boolean }[];
   activeComp?: string;
   /** characters each font (PostScript name) has no glyph for, when a layer's font changes (hasGlyphsFor) */
   fontGlyphsMissing?: Record<string, string>;
@@ -327,6 +329,13 @@ export interface FakeProjectSpec {
   noRtlApi?: boolean;
   /** output module templates applyTemplate accepts (default: any) */
   outputModuleTemplates?: string[];
+  /** the project file (default /jobs/Inherited.aep); unsaved changes */
+  file?: string;
+  dirty?: boolean;
+  /** Folder.appPackage (where aerender is looked for) */
+  appPackage?: string;
+  /** how an output module becomes PNG: setSettings({Format}) (default), only by a template's name, or not at all */
+  png?: "settings" | "template" | "none";
 }
 
 /** PropertyValueType with After Effects' own values. */
@@ -361,6 +370,10 @@ export function fakeProject(spec: FakeProjectSpec) {
     ImportOptions: function (this: any, file: any) {
       this.file = file;
     },
+    // Folder.appPackage: the After Effects application (where aerender is looked for)
+    Folder: { appPackage: { fsName: spec.appPackage ?? "/Applications/Adobe After Effects/Adobe After Effects.app" } },
+    CloseOptions: { DO_NOT_SAVE_CHANGES: 1213, PROMPT_TO_SAVE_CHANGES: 1214, SAVE_CHANGES: 1212 },
+    GetSettingsFormat: { STRING: 2, NUMBER: 1, STRING_SETTABLE: 3 },
     Item, CompItem, FootageItem, FolderItem, FootageSource, FileSource, SolidSource, PlaceholderSource, Layer, AVLayer, TextLayer, ShapeLayer, CameraLayer, LightLayer, PropertyBase,
     PropertyType, PropertyValueType: PVT_FULL, BlendingMode, TrackMatteType,
     AlphaMode: { IGNORE: 5412, STRAIGHT: 5413, PREMULTIPLIED: 5414 },
@@ -380,14 +393,19 @@ export function fakeProject(spec: FakeProjectSpec) {
   };
   const writes: string[] = [];
   const calls: string[] = [];
-  const watch = <T extends object>(o: T, label: string): T =>
-    new Proxy(o, {
+  /** the object behind each watched proxy: the fake's own bookkeeping (save, open) changes it without recording a write */
+  const raw = new Map<any, any>();
+  const watch = <T extends object>(o: T, label: string): T => {
+    const px = new Proxy(o, {
       set(t, k, v) {
         writes.push(`${label}.${String(k)}`);
         (t as any)[k] = v;
         return true;
       },
     });
+    raw.set(px, o);
+    return px;
+  };
   const prop = (name: string, matchName: string, extra: Record<string, unknown> = {}, anim?: (t: number) => unknown) =>
     watch(
       Object.assign(new PropertyBase(), {
@@ -415,6 +433,22 @@ export function fakeProject(spec: FakeProjectSpec) {
   let nextId = 1;
   const root: any = Object.assign(new FolderItem(), { id: 0, name: "Root" });
   const byName = (n: string) => items.find((i) => i.name === n);
+  // project panel folders of footage (only as parents: not items of their own here)
+  const folders = new Map<string, any>();
+  const folderOf = (path: string[] = []) => {
+    let f = root;
+    for (const [k, n] of path.entries()) {
+      const id = path.slice(0, k + 1).join("/");
+      if (!folders.has(id)) folders.set(id, Object.assign(new FolderItem(), { id: 500 + folders.size, name: n, parentFolder: f }));
+      f = folders.get(id);
+    }
+    return f;
+  };
+  // the source changes the way After Effects' replace() changes it: the item also takes the file's name
+  const relink = (it: any, p: string, label: string) => {
+    writes.push(`${label}.replace`);
+    Object.assign(raw.get(it) ?? it, { file: { fsName: p, exists: existsSync(p) }, name: basename(p), footageMissing: !existsSync(p) });
+  };
   for (const f of spec.footage ?? []) {
     const kind = f.kind ?? "file";
     const src = kind === "solid" ? new SolidSource() : kind === "placeholder" ? new PlaceholderSource() : new FileSource();
@@ -422,9 +456,16 @@ export function fakeProject(spec: FakeProjectSpec) {
     const it: any = Object.assign(new FootageItem(), {
       id: nextId++, name: f.name, width: f.width ?? 1920, height: f.height ?? 1080, pixelAspect: 1, duration: f.duration ?? 10, frameRate: f.fps ?? 25,
       hasVideo: true, hasAudio: false, footageMissing: !!f.missing, file: f.file && !f.missing ? { fsName: f.file, exists: true } : null, mainSource: watch(src, "source"),
-      useProxy: !!f.proxy, proxySource: f.proxy ? { file: { fsName: f.proxy, exists: false } } : null, usedIn: [],
+      useProxy: !!f.proxy, proxySource: f.proxy ? { file: { fsName: f.proxy, exists: existsSync(f.proxy) } } : null, usedIn: [], parentFolder: folderOf(f.folder),
     });
-    items.push(watch(it, f.name));
+    const px = watch(it, f.name);
+    it.replace = (file: any) => relink(px, file.fsName, f.name);
+    it.replaceWithSequence = (file: any) => relink(px, file.fsName, f.name);
+    it.setProxy = it.setProxyWithSequence = (file: any) => {
+      writes.push(`${f.name}.setProxy`);
+      Object.assign(it, { proxySource: { file: { fsName: file.fsName, exists: existsSync(file.fsName) } }, useProxy: true });
+    };
+    items.push(px);
   }
   const comps: any[] = [];
   const omTemplates = spec.outputModuleTemplates;
@@ -604,20 +645,77 @@ export function fakeProject(spec: FakeProjectSpec) {
   writes.length = 0; // setting up parents is not the tool's doing
   const imported: string[] = [];
   const RQS = globals.RQItemStatus as any;
+  // output modules: templates by name, and a format that becomes PNG as spec.png says (setSettings, a template, or never)
   const rqItem = (comp: any, render: boolean, file: any): any => {
-    const om: any = { name: "Lossless", file, applyTemplate(n: string) {
+    const om: any = { name: "Lossless", file, format: "QuickTime", templates: ["High Quality", "PNG Sequence"], applyTemplate(n: string) {
       if (omTemplates && !omTemplates.includes(n)) throw new Error(`After Effects error: no output module template named "${n}"`);
       om.name = n;
+      if (spec.png === "template" && /png/i.test(n)) om.format = "PNG Sequence";
     } };
-    const q: any = { comp, status: render ? RQS.QUEUED : RQS.UNQUEUED, outputModule: () => om, applyTemplate() {}, remove: () => rqItems.splice(rqItems.indexOf(q), 1) };
+    om.setSettings = (o: any) => {
+      if (o.Format && (spec.png ?? "settings") === "settings") om.format = o.Format;
+    };
+    om.getSettings = () => ({ Format: om.format });
+    const q: any = { comp, om, status: render ? RQS.QUEUED : RQS.UNQUEUED, timeSpanStart: 0, timeSpanDuration: comp?.duration, outputModule: () => om, applyTemplate() {},
+      remove: () => (writes.push("renderQueue.remove"), rqItems.splice(rqItems.indexOf(q), 1)) };
     Object.defineProperty(q, "render", { get: () => q.status === RQS.QUEUED, set: (v: boolean) => (q.status = v ? RQS.QUEUED : RQS.UNQUEUED), enumerable: true });
     return q;
   };
   const rqItems: any[] = (spec.rq ?? []).map((r) => rqItem(byName(r.comp), r.render, { fsName: `/renders/${r.comp}.mov` }));
   const rendered: string[] = [];
-  const project: any = watch(
-    {
-      file: { name: "Inherited.aep", fsName: "/jobs/Inherited.aep" }, bitsPerChannel: 16, expressionEngine: "javascript-1.0",
+
+  // the project on disk: save writes the open project's state (also as JSON a fake aerender can read), open restores it
+  const fileOf = (p: string) => ({ name: basename(p), fsName: p });
+  let cleanAt = 0, closed = false;
+  const saves: string[] = [], opens: string[] = [];
+  const disk = new Map<string, any>();
+  const state = () => ({
+    items: [...items],
+    footage: items.filter((i) => i instanceof FootageItem).map((i) => ({ it: i, s: { ...(raw.get(i) ?? i) } })),
+    rq: rqItems.map((r) => ({ comp: r.comp, render: r.render, start: r.timeSpanStart, dur: r.timeSpanDuration, format: r.om.format, file: r.om.file?.fsName ?? null })),
+  });
+  const restore = (st: any) => {
+    items.splice(0, items.length, ...st.items);
+    for (const f of st.footage) Object.assign(raw.get(f.it) ?? f.it, f.s);
+    rqItems.splice(0, rqItems.length, ...st.rq.map((r: any) => {
+      const q = rqItem(r.comp, r.render, r.file ? { fsName: r.file } : null);
+      Object.assign(q, { timeSpanStart: r.start, timeSpanDuration: r.dur });
+      q.om.format = r.format;
+      return q;
+    }));
+  };
+  const toJson = (p: string) => ({
+    fakeAep: 1,
+    file: p,
+    footage: items.filter((i) => i instanceof FootageItem).map((i: any) => ({ id: i.id, name: i.name, file: i.file?.fsName ?? null, missing: !!i.footageMissing, proxy: i.proxySource?.file?.fsName ?? null })),
+    comps: comps.map((c) => ({ id: c.id, name: c.name, fps: c.frameRate, sources: c.layers.map((l: any) => l.source?.id).filter((x: any) => x !== undefined) })),
+    rq: rqItems.map((r) => ({ compId: r.comp.id, comp: r.comp.name, fps: r.comp.frameRate, start: r.timeSpanStart, dur: r.timeSpanDuration, render: r.render, format: r.om.format, out: r.om.file?.fsName ?? null })),
+  });
+  const projRaw: any = {
+      file: fileOf(spec.file ?? "/jobs/Inherited.aep"), bitsPerChannel: 16, expressionEngine: "javascript-1.0", rootFolder: root,
+      colorManagementSystem: 0, workingSpace: "Rec.709 Gamma 2.4", linearizeWorkingSpace: false, linearBlending: true,
+      get dirty() { return !!spec.dirty || writes.length > cleanAt; },
+      save(f?: any) {
+        if (closed) throw new Error("no project");
+        if (f) projRaw.file = fileOf(f.fsName);
+        const p = projRaw.file.fsName;
+        saves.push(p);
+        disk.set(p, state());
+        // a real file only where the test made a folder for it (the default /jobs/... is never written)
+        if (existsSync(dirname(p))) writeFileSync(p, JSON.stringify(toJson(p)));
+        cleanAt = writes.length;
+        spec.dirty = false;
+      },
+      close() {
+        closed = true;
+        cleanAt = writes.length;
+      },
+      reduceProject(keep: any[]) {
+        writes.push("project.reduceProject");
+        const kept = items.filter((i) => keep.includes(i) || !(i instanceof FootageItem) || (i as any).usedIn.length > 0);
+        items.splice(0, items.length, ...kept);
+        return 0;
+      },
       get numItems() { return items.length; },
       item: (i: number) => items[i - 1],
       itemByID: (id: number) => items.find((i) => i.id === id) ?? null,
@@ -625,7 +723,7 @@ export function fakeProject(spec: FakeProjectSpec) {
       renderQueue: {
         get numItems() { return rqItems.length; },
         item: (i: number) => rqItems[i - 1],
-        items: { add: (comp: any) => { const q = rqItem(comp, true, null); rqItems.push(q); return q; } },
+        items: { add: (comp: any) => { writes.push("renderQueue.add"); const q = rqItem(comp, true, null); rqItems.push(q); return q; } },
         render: () => { for (const q of rqItems) if (q.render) { rendered.push(q.comp.name); q.status = RQS.DONE; } },
       },
       items: {
@@ -645,11 +743,23 @@ export function fakeProject(spec: FakeProjectSpec) {
         imported.push(f.fsName);
         return it;
       },
-    },
-    "project",
-  );
+    };
+  const project: any = watch(projRaw, "project");
+  disk.set(projRaw.file.fsName, state());
   const app: any = {
     version: "25.0.0", project, effects: spec.installedEffects ?? [],
+    // as in After Effects: with unsaved changes, open() does nothing (its save prompt is suppressed)
+    open(f: any) {
+      if (projRaw.dirty && !closed) return null;
+      const st = disk.get(f.fsName);
+      if (!st) throw new Error(`File not found: ${f.fsName}`);
+      opens.push(f.fsName);
+      restore(st);
+      projRaw.file = fileOf(f.fsName);
+      closed = false;
+      cleanAt = writes.length;
+      return project;
+    },
     beginSuppressDialogs: () => calls.push("beginSuppressDialogs"),
     endSuppressDialogs: () => calls.push("endSuppressDialogs"),
     beginUndoGroup: () => calls.push("beginUndoGroup"),
@@ -659,7 +769,7 @@ export function fakeProject(spec: FakeProjectSpec) {
   if (spec.fonts !== null) app.fonts = { missingOrSubstitutedFonts: spec.fonts ?? [] };
   if (spec.usedFonts) {
     const layerId = (n: string) => comps.flatMap((c) => c.layers).find((l: any) => l.name === n)?.id;
-    project.usedFonts = spec.usedFonts.map((u) => ({ font: { postScriptName: u.ps }, usedAt: u.layers.map((n) => (u.noIds ? { layerTimeD: {} } : { layerID: layerId(n), layerTimeD: {} })) }));
+    project.usedFonts = spec.usedFonts.map((u) => ({ font: { postScriptName: u.ps, familyName: u.family, styleName: u.style, version: u.version, isFromAdobeFonts: u.adobe }, usedAt: u.layers.map((n) => (u.noIds ? { layerTimeD: {} } : { layerID: layerId(n), layerTimeD: {} })) }));
     writes.length = 0;
   }
   const names = Object.keys(globals);
@@ -670,5 +780,5 @@ export function fakeProject(spec: FakeProjectSpec) {
     const fn = new Function("aemcp", "app", ...names, `return function (args, log) {\n${jsx}\n};`)(aemcp, app, ...values);
     return JSON.parse(aemcp.run(fn, args, { undoGroup: false }));
   };
-  return { app, comps, items, writes, calls, run, rqItems, rendered, imported };
+  return { app, comps, items, writes, calls, run, rqItems, rendered, imported, saves, opens, disk, rq: () => rqItems };
 }

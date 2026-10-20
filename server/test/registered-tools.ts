@@ -9,6 +9,7 @@ import { registerReformatTools } from "../src/tools/reformat.js";
 import { registerVersionsTools } from "../src/tools/versions.js";
 import { registerLocalizeTools } from "../src/tools/localize.js";
 import { registerFileTools } from "../src/tools/files.js";
+import { registerHandoffTools } from "../src/tools/handoff.js";
 import { registerOnDemandTools } from "../src/tools/ondemand.js";
 import { registerJsxTools } from "../src/tools/registry.js";
 import { ALL_JSX_TOOLS } from "../src/tools/all.js";
@@ -34,6 +35,7 @@ export function registeredTools(): Set<string> {
   registerVersionsTools(stub);
   registerLocalizeTools(stub);
   registerFileTools(stub);
+  registerHandoffTools(stub);
   stub.registerTool("ae_get_scripting_guide", {}, async () => ({}));
   registerOnDemandTools(stub, catalog);
   return names;

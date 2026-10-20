@@ -185,7 +185,7 @@ export const CATEGORIES: Record<string, string[]> = {
   "3D": ["ae_set_camera", "ae_set_light", "ae_set_material"],
   audio: ["ae_audio_to_keyframes", "ae_audio_markers"],
   footage: ["ae_set_footage_interpretation", "ae_set_proxy", "ae_relink_footage"],
-  "files & export": ["ae_find_files", "ae_export_frames"],
+  "files & export": ["ae_find_files", "ae_export_frames", "ae_handoff_package"],
   checks: ["ae_preflight", "ae_versions_from_data", "ae_localize"],
   "see & measure": ["ae_render_frame", "ae_render_contact_sheet", "ae_get_layer_bounds", "ae_sample_pixels"],
   "essential graphics": ["ae_essential_graphics", "ae_export_mogrt"],
