@@ -540,6 +540,11 @@ starts, replaces the installed one (the old one is kept as `surehand-ae.mjs.prev
 AI apps afterwards. If you use the Claude Desktop extension (.mcpb), install the new `Surehand-MCP.mcpb` from the release page
 instead.
 
+**Beta updates:** turn on **☰ › Settings › Beta updates** in the panel (or run `surehand-ae update --channel beta`;
+`"updateChannel": "beta"` in `config.json`) to be offered pre-releases too: the newest of the betas and the stable releases,
+checked and installed the same way. Turning it off (`--channel stable`) never goes back to an older version: a newer beta
+stays until a newer stable release is out.
+
 **Upgrading from 1.3: automatic.** Version 1.3 kept everything in `~/.aemcp`. The first time 1.4 runs (installer, update,
 or just starting), it moves it: settings, checkpoints, project history and your other files to `~/.surehand/ae`, the private
 Node.js and ffmpeg to `~/.surehand`, and points the AI apps that ran the old server at the new one (`after-effects` becomes
@@ -562,7 +567,7 @@ with an error): `clients` → `{clients: [{id, name, installed, configured, inUs
 `checkpoints [--project <path>]` → `{checkpoints: [{id, at, label, file, history?}]}`; `checkpoint-diff <id> [--project
 <path>]` → text (`{text}`; needs After Effects: it compares with the open project); `test --json` →
 `{checks: [{ok, name, message?, fix?: {connect, label?}}]}`; `update --check` → `{latest, current, updateAvailable, url,
-checkedAt, notes?}` (installs nothing). Errors come as `{error}`. The panel runs them with the Node and server named in
+checkedAt, channel, notes?, keptBeta?}` (installs nothing). Errors come as `{error}`. The panel runs them with the Node and server named in
 `~/.surehand/ae/runtime.json`. The activity log entries also carry `changeList`, `revision`, `undoGroup` and, for
 `ae_preflight` / `ae_prove_identical`, `result: {verdict, summary}`; background renders keep
 `~/.surehand/ae/renders/<id>.json` up to date.

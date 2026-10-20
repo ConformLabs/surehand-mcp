@@ -8,7 +8,8 @@
 //            --skip-windows   don't run the Windows test (scripts/test-windows.mjs)
 //            --draft          create the GitHub release as a draft
 //            --skip-installers  don't build the installers (no SimplySign / Apple notarization needed)
-//   A pre-release version (1.4.0-beta.1) becomes a GitHub pre-release: `surehand-ae update` ignores those.
+//   A pre-release version (1.4.0-beta.1) becomes a GitHub pre-release: `surehand-ae update` ignores those
+//   unless Beta updates is on (panel ☰ › Settings, or `surehand-ae update --channel beta`).
 //   The installers need SimplySign Desktop logged in (Windows signing) and the "aemcp-notary" keychain
 //   profile (Apple notarization, which can take a while); both are checked before anything changes.
 //

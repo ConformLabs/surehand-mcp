@@ -11,7 +11,7 @@ import { appFile, configPath, legacyDir, migrationPending } from "../paths.js";
 import { migrationLog } from "../migrate.js";
 import { diagnostics } from "./diagnostics.js";
 import { fullSelftest, projectState } from "./fulltest.js";
-import { checkForUpdate, compareVersions, updateCheckEnabled, updateMessage } from "../update.js";
+import { checkForUpdate, compareVersions, keptBetaNote, updateCheckEnabled, updateMessage } from "../update.js";
 import { bundledExtensionSigned, debugModeEnabled, installedExtensionHash, installedExtensionSignature, installedExtensionVersion } from "./setup.js";
 import { clientInfo } from "./clients.js";
 import { CSXS_VERSIONS, bold, extensionDir, fail, green, ok, readJson, red, sleep, warn } from "./util.js";
@@ -60,7 +60,10 @@ export async function quickChecks(print: boolean, beforeJob?: () => Promise<void
     const u = await checkForUpdate(true);
     const msg = updateMessage(u);
     if (msg) note("update", msg, "Install it with: surehand-ae update (or the panel's Update button).");
-    else if (u?.latest) pass("update", `Up to date (latest release v${u.latest})`);
+    else if (u?.latest) {
+      const kept = keptBetaNote(u.channel ?? "stable", u.latest);
+      pass("update", `Up to date (latest release v${u.latest}${u.channel === "beta" ? ", beta channel" : ""})${kept ? `. ${kept}` : ""}`);
+    }
   }
 
   // --- installation ---

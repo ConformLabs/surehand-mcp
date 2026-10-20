@@ -6,7 +6,7 @@ import { evalRaw, health } from "../bridge.js";
 import { VERSION } from "../config.js";
 import { HELPER_VERSION } from "../jsx.js";
 import { resolveProfile } from "../tools/profile.js";
-import { knownUpdate } from "../update.js";
+import { knownUpdate, updateChannel } from "../update.js";
 import { installedExtensionHash, installedExtensionSignature } from "./setup.js";
 import { appDir, appFile, configPath, installedServer, legacyDir, migrationPending, MOVED_NOTE } from "../paths.js";
 import { migrationLog } from "../migrate.js";
@@ -53,7 +53,7 @@ export async function diagnostics(): Promise<string> {
   for (const id of CLIENT_IDS) L.push(clientLine(id));
   L.push(`bridge status file: ${JSON.stringify(readJson(appFile("bridge-status.json"), null))}`);
   const u = knownUpdate();
-  L.push(`update: ${u ? `latest v${u.latest}${u.updateAvailable ? " (UPDATE AVAILABLE)" : ""}` : "unknown"}`);
+  L.push(`update: ${u ? `latest v${u.latest}${u.updateAvailable ? " (UPDATE AVAILABLE)" : ""}` : "unknown"} · channel ${updateChannel()}`);
   try {
     const h = await health();
     L.push(`bridge: reachable · ${h.host?.appName} ${h.host?.appVersion} · bridge v${h.version} · authorized ${(h as any).authorized}`);
