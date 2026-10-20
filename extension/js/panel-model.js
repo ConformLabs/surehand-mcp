@@ -106,7 +106,7 @@
     ae_render_background: "Background render", ae_render_jobs: "Render jobs", ae_project_xray: "Project X-ray",
     ae_project_history: "Project history", ae_get_scripting_guide: "Read the scripting guide", ae_tools: "List tools", ae_call: "Tool",
     // called by the in-chat views (MCP Apps), not the AI: navigation and looking only
-    ae_view_reveal: "Show in After Effects", ae_view_frame: "Frame for the chat", ae_view_proof_frame: "Proof frames for the chat",
+    ae_view_reveal: "Show in After Effects", ae_view_frame: "Frame for the chat", ae_view_proof_frame: "Proof frames for the chat", ae_view_xray_node: "X-ray details for the chat",
   };
   function toolName(tool, args) {
     if (tool === "ae_call" && args && args.tool) return toolName(String(args.tool), args.args);

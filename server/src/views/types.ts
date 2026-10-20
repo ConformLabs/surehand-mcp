@@ -7,6 +7,9 @@ export const VIEW_META_KEY = "surehand/view";
 /** An app-only tool's error kind, for a short message in the view ("AE isn't open", "AE is busy"). */
 export const VIEW_ERROR_KEY = "surehand/error";
 
+/** The X-ray view's resource (here, not in tools/views.ts: the JSX tool list can't import that module). */
+export const XRAY_VIEW_URI = "ui://surehand/xray.html";
+
 /** A comp-pixel rectangle [x0, y0, x1, y1]. */
 export type Rect = [number, number, number, number];
 
@@ -105,6 +108,69 @@ export interface ChangesView {
   moreChanges: number;
   /** under the list: "One undo step in After Effects", or the history diff's summary */
   footnote: string;
+}
+
+/** X-ray problem kinds: the chips, the tags in the tree and the detail pane's sections. */
+export type XrayTag = "missing" | "fragile" | "heavy" | "unused";
+
+/** A node of the "What renders" tree: a render queue item, a comp, a footage item, or a group of roots. */
+export interface XrayNode {
+  /** "q1" (render queue item 1), "c12" (comp id 12), "f33" (footage id 33), "g:unused" / "g:top" (groups) */
+  key: string;
+  kind: "rq" | "comp" | "footage" | "group";
+  name: string;
+  /** after the name: "30 s · 14 layers", "→ Main_16x9.mov" */
+  meta?: string;
+  tags: XrayTag[];
+  childCount: number;
+  /** loaded children (with how many layers use each); undefined until loaded (ae_view_xray_node) */
+  children?: { key: string; n?: number }[];
+  /** for Show in AE: open this comp, or select this project item */
+  comp?: number;
+  item?: number;
+}
+
+/** One problem of a node, as the detail pane shows it. */
+export interface XrayProblem {
+  tag: XrayTag;
+  /** "An expression finds a layer by its name" */
+  title: string;
+  /** "Endcard › CTA_Text › Opacity" */
+  where?: string;
+  /** the expression, and the part of it to mark */
+  code?: string;
+  mark?: string;
+  text: string;
+  /** Show in AE */
+  reveal?: { comp?: number; layer?: number; item?: number };
+  /** the "Ask the AI to …" button and what it writes into the chat */
+  ask?: { label: string; text: string };
+}
+
+export interface XrayView {
+  view: "xray";
+  /** this X-ray's analysis is kept under this id for ae_view_xray_node */
+  run: string;
+  title: string;
+  subtitle: string;
+  chips: { tag: XrayTag; count: number }[];
+  roots: string[];
+  /** the tree's first levels (more come from ae_view_xray_node) */
+  nodes: Record<string, XrayNode>;
+  /** for each problem: paths (root first) to the nodes that have it, so a chip can filter the tree */
+  paths: Partial<Record<XrayTag, string[][]>>;
+  /** the scan stopped early: why */
+  partial?: string;
+}
+
+/** ae_view_xray_node: a node's children and its problems. */
+export interface XrayNodeView {
+  view: "xrayNode";
+  node: XrayNode;
+  children: XrayNode[];
+  problems: XrayProblem[];
+  /** problems left out (the view lists at most MAX_NODE_PROBLEMS) */
+  moreProblems: number;
 }
 
 /** One still from ae_view_frame (the image itself is the result's image content). */

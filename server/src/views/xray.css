@@ -1,0 +1,38 @@
+/* Project X-ray view (the approved board "2 · Project X-ray") */
+
+/* the problems, counted; a chip filters the tree */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 14px; border-bottom: 1px solid var(--rule); }
+.chip { font: 500 11px/20px var(--font-mono); padding: 0 8px; border: 1px solid var(--rule-strong); background: transparent; color: var(--ink); letter-spacing: 0.04em; }
+.chip.bad { border-color: var(--refused); } .chip.warn { border-color: var(--changed); }
+button.chip { cursor: pointer; }
+button.chip[aria-pressed="true"] { background: var(--paper-raised); box-shadow: inset 0 -2px 0 var(--ink); }
+
+.split { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); }
+.split > div + div { border-left: 1px solid var(--rule); }
+@media (max-width: 560px) { .split { grid-template-columns: 1fr; } .split > div + div { border-left: 0; border-top: 1px solid var(--rule); } }
+
+/* "What renders" */
+.tree { padding: 6px 0; font: 12px/1.5 var(--font-mono); max-height: 520px; overflow: auto; }
+.tree .eyebrow { padding: 4px 14px 6px; }
+.node { display: flex; align-items: center; gap: 8px; padding: 3px 14px; cursor: pointer; min-width: 0; }
+.node .ind { display: inline-block; flex: none; }
+.node .car { flex: none; width: 10px; color: var(--ink); }
+.node .nm { color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 0 1 auto; }
+.node .meta { color: var(--ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 0 100 auto; }
+.node .tag, .legend .tag { font: 500 10px/16px var(--font-mono); padding: 0 5px; border: 1px solid; letter-spacing: 0.06em; flex: none; }
+.node.sel { background: var(--paper-raised); box-shadow: inset 2px 0 0 var(--ink); }
+.tree .more { padding: 3px 14px; color: var(--ink-muted); }
+
+/* the selected node */
+.detail { padding: 12px 14px; font-size: 12.5px; min-width: 0; }
+.detail .pb + .pb { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rule); }
+.detail h4 { margin: 0 0 6px; font: 600 14px var(--font-display); }
+.detail .where { font-size: 11px; overflow-wrap: anywhere; }
+.detail p { margin: 0 0 10px; }
+.code { background: var(--paper-sunk); border: 1px solid var(--rule); padding: 8px 10px; font: 11.5px/1.5 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; margin: 8px 0; max-height: 180px; overflow: auto; }
+.code mark { background: transparent; color: var(--refused); text-decoration: underline; }
+.btns { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font: 11px var(--font-mono); color: var(--ink-muted); padding: 8px 14px; border-top: 1px solid var(--rule); }
+.err.note, .mut.note { padding: 8px 14px; }
+.mut.note { font: 11px/16px var(--font-mono); }

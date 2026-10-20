@@ -18,6 +18,9 @@ const chrome = process.argv[3] || (process.platform === "darwin" ? "/Application
 mkdirSync(out, { recursive: true });
 const work = join(tmpdir(), `surehand-preview-${process.pid}`);
 mkdirSync(work, { recursive: true });
+// the fixtures' code keeps X-ray runs under ~/.surehand: a temporary home, never the real one (Chrome keeps its own)
+const chromeEnv = { ...process.env };
+process.env.HOME = process.env.USERPROFILE = join(work, "home");
 
 // the fixtures' view data, made-up frames (JPEG, as the app-only tools send them) and the fonts, by the real code
 const entry = `
@@ -27,6 +30,8 @@ import { preflightView } from "./src/preflight/view.ts";
 import { proofView } from "./src/tools/prove.ts";
 import { historyView } from "./src/tools/history.ts";
 import { diffSnapshots } from "./src/history-diff.ts";
+import { mockupProject, emptyQueueProject } from "./test/fixtures/xray-view.ts";
+import { xrayView, xrayNodeView } from "./src/tools/xray-view.ts";
 import { withFonts } from "./src/views/fonts.ts";
 import { encodeJpeg } from "./src/jpeg.ts";
 import { readFileSync } from "node:fs";
@@ -35,6 +40,17 @@ export const preflightArgs = fixtureArgs;
 export const proofIdentical = proofView(identical, { changes: editChanges });
 export const proofDiffers = proofView(differs, { changes: editChanges });
 export const history = historyView("/Jobs/Promo_Q4_v12.aep", { snapshot: historyFrom, current: false }, { snapshot: historyTo, current: true }, diffSnapshots(historyFrom, historyTo));
+// an X-ray, and ae_view_xray_node's answer for every node of it
+const xrayPage = (d) => {
+  const v = xrayView(d), byNode = {};
+  for (const key of Object.keys(v.nodes)) {
+    const n = xrayNodeView(v.run, key);
+    byNode[key] = { content: [{ type: "text", text: "node" }], _meta: { "surehand/view": n } };
+  }
+  return { data: v, byNode };
+};
+export const xray = xrayPage(mockupProject());
+export const xrayEmptyQueue = xrayPage(emptyQueueProject());
 export const fonts = (html) => withFonts(html, (f) => readFileSync(new URL("../extension/fonts/" + f, ${JSON.stringify(pathToFileURL(process.cwd() + "/").href)})).toString("base64"));
 const jpeg = (w, h, f) => {
   const px = new Uint8Array(w * h * 4);
@@ -75,6 +91,8 @@ const PAGES = [
   { name: "proof", view: "changes", ask: "Un-precompose Logo_Lockup and prove nothing changed on screen.", tool: "ae_prove_identical", data: fx.proofIdentical, calls: { ae_view_proof_frame: stills(false) } },
   { name: "proof-differs", view: "changes", ask: "Un-precompose Logo_Lockup and prove nothing changed on screen.", tool: "ae_prove_identical", data: fx.proofDiffers, calls: { ae_view_proof_frame: stills(true) } },
   { name: "history", view: "changes", ask: "What changed since the checkpoint?", tool: "ae_project_history", data: fx.history, calls: {} },
+  { name: "xray", view: "xray", ask: "I inherited this project. How does it work, and what will break?", tool: "ae_project_xray", data: fx.xray.data, calls: { ae_view_xray_node: { byNode: fx.xray.byNode } } },
+  { name: "xray-empty-queue", view: "xray", ask: "How does this project work?", tool: "ae_project_xray", data: fx.xrayEmptyQueue.data, calls: { ae_view_xray_node: { byNode: fx.xrayEmptyQueue.byNode } } },
 ];
 
 // the fake AI app: answers ui/initialize, sends the tool input and result, answers the view's tool calls
@@ -100,7 +118,10 @@ window.addEventListener("message", (e) => {
     // headless Chrome's virtual time doesn't always deliver the view's size-changed: measure it too
     for (const ms of [700, 2000]) setTimeout(() => (f.style.height = f.contentDocument.documentElement.scrollHeight + "px"), ms);
   } else if (m.method === "ui/notifications/size-changed") f.style.height = m.params.height + "px";
-  else if (m.method === "tools/call" && calls[m.params.name]) post({ id: m.id, result: calls[m.params.name] });
+  else if (m.method === "tools/call" && calls[m.params.name]) {
+    const c = calls[m.params.name];
+    post({ id: m.id, result: c.byNode ? c.byNode[m.params.arguments.node] ?? { isError: true, content: [{ type: "text", text: "not in the preview" }] } : c });
+  }
   else if (m.id !== undefined) post({ id: m.id, result: {} });
 });
 </script></body></html>`;
@@ -109,7 +130,7 @@ for (const p of PAGES)
   for (const theme of ["dark", "light"]) {
     const page = join(work, `${p.name}-${theme}.html`), png = join(out, `${p.name}-${theme}.png`);
     writeFileSync(page, host(p, theme));
-    const r = spawnSync(chrome, ["--headless=new", "--disable-gpu", "--enable-logging=stderr", "--v=0", "--hide-scrollbars", "--force-device-scale-factor=2", "--window-size=760,1080", "--virtual-time-budget=4000", `--screenshot=${png}`, pathToFileURL(page).href], { encoding: "utf8" });
+    const r = spawnSync(chrome, ["--headless=new", "--disable-gpu", "--enable-logging=stderr", "--v=0", "--hide-scrollbars", "--force-device-scale-factor=2", "--window-size=760,1080", "--virtual-time-budget=4000", `--screenshot=${png}`, pathToFileURL(page).href], { encoding: "utf8", env: chromeEnv });
     if (r.status !== 0) throw new Error(`Chrome failed: ${r.stderr}`);
     // the pages' console errors (e.g. a view that didn't start)
     for (const l of r.stderr.split("\n")) if (process.env.PREVIEW_DEBUG ? /CONSOLE/.test(l) : /CONSOLE.*(error|Uncaught)/i.test(l)) console.error(l.slice(0, 500));

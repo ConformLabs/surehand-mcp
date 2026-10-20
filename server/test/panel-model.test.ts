@@ -367,5 +367,7 @@ describe("the in-chat views' tools in the feed", () => {
     expect(frame).toMatchObject({ kind: "read", title: "Frame for the chat" });
     const proof = UI.describeEntry({ at: "2026-10-20T01:00:00Z", ok: true, tool: "ae_view_proof_frame", args: { id: "p", compared: "c", comp: 7, index: 3 }, summary: 'Before, after and difference ×50 of "Endcard" at 26.48 s (320x180).' });
     expect(proof).toMatchObject({ kind: "read", title: "Proof frames for the chat" });
+    const node = UI.describeEntry({ at: "2026-10-20T01:00:00Z", ok: true, tool: "ae_view_xray_node", args: { run: "r", node: "c3" }, summary: "Endcard: 2 children, 4 problems." });
+    expect(node).toMatchObject({ kind: "read", title: "X-ray details for the chat" });
   });
 });

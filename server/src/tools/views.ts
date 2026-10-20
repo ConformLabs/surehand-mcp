@@ -18,7 +18,8 @@ import { appFile } from "../paths.js";
 import { decodePng } from "../png.js";
 import { timecode } from "../preflight/report.js";
 import { withFonts } from "../views/fonts.js";
-import { VIEW_ERROR_KEY, VIEW_META_KEY, type FrameView } from "../views/types.js";
+import { VIEW_ERROR_KEY, VIEW_META_KEY, XRAY_VIEW_URI, type FrameView } from "../views/types.js";
+import { xrayNodeView } from "./xray-view.js";
 import { waitForFile } from "./core.js";
 import { enableViewTools } from "./profile.js";
 import { afterDir, loadManifest, proofDir } from "./prove.js";
@@ -30,6 +31,11 @@ export const CHANGES_VIEW_URI = "ui://surehand/changes.html";
 /** The views: name (src/views/<name>.ts) -> resource. */
 export const VIEWS: Record<string, { uri: string; title: string; description: string }> = {
   preflight: { uri: PREFLIGHT_VIEW_URI, title: "Preflight report", description: "The Preflight verdict, a timeline of the findings, and each finding's frame." },
+  xray: {
+    uri: XRAY_VIEW_URI,
+    title: "Project X-ray",
+    description: "What renders, from the render queue down to the footage, with what's missing, fragile, heavy while hidden or unused.",
+  },
   changes: {
     uri: CHANGES_VIEW_URI,
     title: "What changed, and the proof",
@@ -91,9 +97,21 @@ export function watchViewClient(server: McpServer) {
 
 // ---------- the app-only tools: navigation and looking only ----------
 
-// Opens the comp, moves its time indicator, selects one layer. Read-only for the project (as ae_open_comp /
-// ae_select_layers): no undo group, nothing that Edit > Undo would list.
+// Opens the comp, moves its time indicator, selects one layer; or selects one project item (footage) in the
+// Project panel. Read-only for the project (as ae_open_comp / ae_select_layers): no undo group, nothing that
+// Edit > Undo would list.
 export const REVEAL_JSX = `
+if (args.item !== undefined && args.item !== null) {
+  var P = app.project, found = null;
+  for (var k = 1; k <= P.numItems; k++) {
+    var x = P.item(k);
+    if (x.id === args.item) found = x;
+    else { try { if (x.selected) x.selected = false; } catch (e) {} }
+  }
+  if (!found) aemcp.fail("No project item with id " + args.item + " (it may have been removed).");
+  found.selected = true;
+  return { item: found.name, id: found.id };
+}
 var c = aemcp.findComp(args.comp);
 c.openInViewer();
 if (args.time !== undefined && args.time !== null) c.time = Math.max(0, Math.min(c.duration, args.time));
@@ -135,11 +153,14 @@ export function registerViews(server: McpServer) {
     "ae_view_reveal",
     {
       title: "Show in After Effects",
-      description: "For the in-chat views: open a comp in the viewer, move to a time and select a layer. Navigation only; changes nothing in the project.",
+      description:
+        "For the in-chat views: open a comp in the viewer, move to a time and select a layer; or select a project item (footage) in the " +
+        "Project panel. Navigation only; changes nothing in the project.",
       inputSchema: {
         comp: compRef,
         time: z.number().optional().describe("Time in seconds from the comp's start."),
         layer: layerRef.optional(),
+        item: z.number().int().optional().describe("Select this project item (id) in the Project panel instead of opening a comp."),
       },
       // changes what the user sees (viewer, time, selection), never the project
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -149,6 +170,7 @@ export function registerViews(server: McpServer) {
       try {
         const r = await runJsx(REVEAL_JSX, args, { undoGroup: false, timeoutMs: 30_000 });
         if (!r.ok) return formatResult(r);
+        if (args.item !== undefined) return { content: [{ type: "text", text: `Selected "${(r.result as { item: string }).item}" in the Project panel.` }] };
         const x = r.result as { comp: string; time: number; fps: number; dst: number; df: boolean; layer: string | null };
         const at = `${timecode(x.time, x.fps, x.df, x.dst)} (${secs(x.time)})`;
         return { content: [{ type: "text", text: `Showed "${x.comp}" at ${at}${x.layer ? `, layer "${x.layer}" selected` : ""}.` }] };
@@ -227,6 +249,40 @@ export function registerViews(server: McpServer) {
     async (args: { id: string; compared: string; comp: number; index: number; maxSize?: number }) => {
       try {
         return proofFrames(args);
+      } catch (e) {
+        return viewError(e);
+      }
+    },
+  );
+
+  registerXrayNode(server);
+}
+
+export { XRAY_VIEW_URI };
+
+/** Registers ae_view_xray_node (called from registerViews). */
+function registerXrayNode(server: McpServer) {
+  registerViewTool(
+    server,
+    "ae_view_xray_node",
+    {
+      title: "X-ray node for a view",
+      description: "For the in-chat views: one node of a Project X-ray's tree (render queue item, comp, footage) with its children and problems. Reads the X-ray's kept analysis; doesn't use After Effects.",
+      inputSchema: {
+        run: z.string().regex(/^[\w-]+$/).describe("The X-ray run (from its result)."),
+        node: z.string().max(40).describe('The node: "q1", "c12", "f33", "g:unused", "g:top".'),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      _meta: { ui: { visibility: ["app"] } },
+    },
+    async (args: { run: string; node: string }) => {
+      try {
+        const v = xrayNodeView(args.run, args.node);
+        if (typeof v === "string") return errorResult(v);
+        return {
+          content: [{ type: "text", text: `${v.node.name}: ${v.children.length} children, ${v.problems.length + v.moreProblems} problems.` }],
+          _meta: { [VIEW_META_KEY]: v },
+        };
       } catch (e) {
         return viewError(e);
       }

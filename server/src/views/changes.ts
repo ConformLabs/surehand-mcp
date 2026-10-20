@@ -3,6 +3,7 @@
 // a slider through the compared frames, then what changed in the project. Show in AE only navigates
 // (ae_view_reveal); there is no Undo here (undo stays in After Effects, or goes through the chat).
 import { el, errorText, startView, tile, viewData, type ToolResult, type View } from "./shared.js";
+import { prettyChange } from "./format.js";
 import type { ChangesView, ProofFrame, ViewChange } from "./types.js";
 
 /** rows listed before "Show all" */
@@ -91,7 +92,9 @@ function changesHead(list: ViewChange[], total: number): string {
 
 function changeRow(c: ViewChange, i: number): HTMLElement {
   const what = c.what.charAt(0).toUpperCase() + c.what.slice(1);
-  const main = c.from !== undefined && c.to !== undefined ? el("div", { class: "val" }, `${what} `, el("s", {}, c.from), ` → ${c.to}`) : el("div", { class: "txt" }, what);
+  // values in the panel's units (80 %, 960, 540 px, 45°, #FF8A5C); the text report keeps them raw
+  const v = c.from !== undefined && c.to !== undefined ? prettyChange(c.what, c.from, c.to) : undefined;
+  const main = v ? el("div", { class: "val" }, `${what} `, el("s", {}, v.from), ` → ${v.to}`) : el("div", { class: "txt" }, what);
   const where = [c.comp, c.layer, c.path].filter(Boolean).join(" › ");
   const err = state.rowError.get(i);
   const show = c.comp

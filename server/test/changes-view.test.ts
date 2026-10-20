@@ -57,6 +57,7 @@ vi.mock("../src/jsx.js", async (orig) => {
 });
 
 const { changesFromReport, splitChange, splitField } = await import("../src/view-changes.js");
+const { prettyChange, prettyValue } = await import("../src/views/format.js");
 const { diffSnapshots, formatDiff } = await import("../src/history-diff.js");
 const { historyView } = await import("../src/tools/history.js");
 const { proofView } = await import("../src/tools/prove.js");
@@ -80,6 +81,21 @@ beforeEach(() => {
   scene.square = 10;
   scene.shade = 200;
   setMode("full");
+});
+
+describe("values in the panel's units (view only)", () => {
+  it("scale, position, opacity, rotation, colour; z only for 3D; anything else as it is", () => {
+    expect(prettyChange("Scale", "[80,80,100]", "[70,70,100]")).toEqual({ from: "80 %", to: "70 %" });
+    expect(prettyChange("Scale", "[80,60,100]", "[70,70,50]")).toEqual({ from: "80 × 60 × 100 %", to: "70 × 70 × 50 %" });
+    expect(prettyChange("Position", "default", "[1210,388,0]")).toEqual({ from: "default", to: "1210, 388 px" });
+    expect(prettyChange("Position", "[960,540,0]", "[960,540,-200]")).toEqual({ from: "960, 540, 0 px", to: "960, 540, -200 px" });
+    expect(prettyChange("Opacity", "100", "37.5")).toEqual({ from: "100 %", to: "37.5 %" });
+    expect(prettyChange("Z Rotation", "0", "-12.25")).toEqual({ from: "0°", to: "-12.25°" });
+    expect(prettyChange("Fill Color", "[1,0.541,0.361,1]", "[0,0,0,1]")).toEqual({ from: "#FF8A5C", to: "#000000" });
+    expect(prettyChange("parent", "none", "Logo_Null")).toEqual({ from: "none", to: "Logo_Null" });
+    expect(prettyChange("Source Text", '"Hello"', '"Hi"')).toEqual({ from: '"Hello"', to: '"Hi"' });
+    expect(prettyValue("Opacity", "[1,2]")).toBe("[1,2]");
+  });
 });
 
 describe("changes as view rows", () => {
@@ -239,7 +255,9 @@ describe("the changes view in a fake AI app (jsdom)", () => {
     expect(doc.querySelector(".ch .val s")).toBeNull(); // the first six are layers added / removed
     (doc.querySelector('[data-k="all"]') as any).click();
     expect(doc.querySelectorAll(".ch").length).toBe(11);
-    expect([...doc.querySelectorAll(".ch .val")].map((e) => e.textContent)).toContain("Scale [100,100] → [64,64]");
+    const vals = [...doc.querySelectorAll(".ch .val")].map((e) => e.textContent);
+    expect(vals).toContain("Scale 100 % → 64 %");
+    expect(vals).toContain("Position 960, 540 px → 1210, 388 px");
     expect(doc.querySelector(".foot .sum")!.textContent).toBe("One undo step in After Effects");
     // a removed layer: Show in AE opens its comp
     (doc.querySelector('[data-k="show0"]') as any).click();

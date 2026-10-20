@@ -6,7 +6,7 @@ import { buildSync } from "esbuild";
 import { readFileSync } from "node:fs";
 import { brotliCompressSync, constants } from "node:zlib";
 
-export const VIEW_NAMES = ["preflight", "changes"];
+export const VIEW_NAMES = ["preflight", "changes", "xray"];
 const SRC = new URL("../src/views/", import.meta.url);
 /** must match FONT_SLOT in src/views/fonts.ts */
 const FONT_SLOT = "/*surehand:fonts*/";
