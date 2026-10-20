@@ -37,7 +37,8 @@ Also:
   with verify proves the package renders the same.
 - Exact timing: the keyframe table (ae_get_keyframes / ae_set_keyframe_table: frames or seconds, exact speed and
   influence), ae_copy_ease, ae_retime_keyframes (whole frames), ae_audit_easing. Layout: ae_align_layers moves layers by
-  their measured on-screen bounds. ae_find_files locates files on disk; ae_export_frames saves PNG stills.
+  their measured on-screen bounds; ae_reformat makes the comp at another size by the user's rules and checks every frame.
+  ae_find_files locates files on disk; ae_export_frames saves PNG stills.
 - Tools never replace an existing file silently: ae_save_project (Save As), ae_render_frame and ae_render_contact_sheet
   (outputPath) and ae_export_frames refuse and say so. Pass overwrite: true only when replacing it is intended.`;
 }

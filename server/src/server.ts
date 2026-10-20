@@ -8,6 +8,7 @@ import { registerWorkflowTools } from "./tools/workflow.js";
 import { registerProveTools } from "./tools/prove.js";
 import { registerHistoryTools } from "./tools/history.js";
 import { registerPreflightTools } from "./tools/preflight.js";
+import { registerReformatTools } from "./tools/reformat.js";
 import { registerVersionsTools } from "./tools/versions.js";
 import { registerFileTools } from "./tools/files.js";
 import { registerHandoffTools } from "./tools/handoff.js";
@@ -30,6 +31,7 @@ export function createMcpServer(profile: ToolProfile = resolveProfile()): McpSer
   registerProveTools(server);
   registerHistoryTools(server);
   registerPreflightTools(server);
+  registerReformatTools(server);
   registerVersionsTools(server);
   registerFileTools(server);
   registerHandoffTools(server);

@@ -5,6 +5,7 @@ import { registerWorkflowTools } from "../src/tools/workflow.js";
 import { registerProveTools } from "../src/tools/prove.js";
 import { registerHistoryTools } from "../src/tools/history.js";
 import { registerPreflightTools } from "../src/tools/preflight.js";
+import { registerReformatTools } from "../src/tools/reformat.js";
 import { registerVersionsTools } from "../src/tools/versions.js";
 import { registerFileTools } from "../src/tools/files.js";
 import { registerHandoffTools } from "../src/tools/handoff.js";
@@ -29,6 +30,7 @@ export function registeredTools(): Set<string> {
   registerProveTools(stub);
   registerHistoryTools(stub);
   registerPreflightTools(stub);
+  registerReformatTools(stub);
   registerVersionsTools(stub);
   registerFileTools(stub);
   registerHandoffTools(stub);

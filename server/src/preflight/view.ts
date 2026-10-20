@@ -49,7 +49,7 @@ export function requestedChecks(spec: Spec): Requested[] {
   const sa = spec.safeAreas;
   if (sa) {
     const textArea = sa.textMustBeIn ?? "title";
-    if (areaMargins(spec, textArea) || sa.textMustBeIn) add("project", `text ${AREA_LABEL[textArea]}`, [`safeAreas.${textArea}`, "safeAreas.textMustBeIn", ...FRAME_PARTIAL]);
+    if (textArea !== "none" && (areaMargins(spec, textArea) || sa.textMustBeIn)) add("project", `text ${AREA_LABEL[textArea]}`, [`safeAreas.${textArea}`, "safeAreas.textMustBeIn", ...FRAME_PARTIAL]);
     for (const p of sa.layersMustBeIn ?? [])
       add("project", `${p.layer} ${AREA_LABEL[p.area]}`, [`safeAreas.${p.area}`, `safeAreas.layersMustBeIn "${p.layer}"`, "safeAreas.layersMustBeIn", ...FRAME_PARTIAL]);
   }
