@@ -16,13 +16,16 @@ describe("extension signature", () => {
   });
 
   it("stamps the release version into the manifest (what ZXP installers and Adobe show)", () => {
+    // CEP manifest versions are numeric: a pre-release (1.4.0-beta.1) is stamped as 1.4.0 there
+    const v = version.replace(/[-+].*$/, "");
     const manifest = readCepFiles(version)["CSXS/manifest.xml"];
-    expect(manifest).toContain(`ExtensionBundleVersion="${version}"`);
+    expect(manifest).toContain(`ExtensionBundleVersion="${v}"`);
     expect(manifest.match(/<Extension Id="[^"]+" Version="([^"]+)"/g)).toEqual([
-      `<Extension Id="com.aemcp.bridge" Version="${version}"`,
-      `<Extension Id="com.aemcp.panel" Version="${version}"`,
-      `<Extension Id="com.aemcp.approval" Version="${version}"`,
+      `<Extension Id="com.aemcp.bridge" Version="${v}"`,
+      `<Extension Id="com.aemcp.panel" Version="${v}"`,
+      `<Extension Id="com.aemcp.approval" Version="${v}"`,
     ]);
+    expect(readCepFiles("1.4.0-beta.1")["CSXS/manifest.xml"]).toContain('ExtensionBundleVersion="1.4.0"');
   });
 
   it("detects changed, extra and missing files", () => {
