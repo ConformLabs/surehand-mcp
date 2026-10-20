@@ -110,6 +110,19 @@ describe("Windows", () => {
   });
 });
 
+describe("LM Studio without its app: llmster, the headless LM Studio", () => {
+  for (const p of ["darwin", "win32"] as const)
+    it(`${p}: llmster installed counts (it runs mcp.json's servers for the REST API); an empty llmster folder doesn't`, async () => {
+      const { clients, util } = await load(p);
+      leftovers(util);
+      dir(".lmstudio", "bin");
+      dir(".lmstudio", "llmster");
+      expect(clients.clientInstalled("lm-studio")).toBe(false);
+      dir(".lmstudio", "llmster", "0.0.12-3");
+      expect(clients.clientInstalled("lm-studio")).toBe(true);
+    });
+});
+
 describe("Linux (no one place for apps)", () => {
   it("the settings folders, as before", async () => {
     const { clients, util } = await load("linux");

@@ -78,9 +78,19 @@ export function windsurfInstalled(): boolean {
     [dirname(windsurfLegacyConfig()), dirname(devinConfig()), join(HOME_(), ".config", "Windsurf")].some((d) => existsSync(d)),
   );
 }
-/** LM Studio: the app. */
+/**
+ * LM Studio: the app, or llmster, LM Studio without its window (installed by lmstudio.ai/install.sh or install.ps1
+ * into ~/.lmstudio/llmster/<version>). llmster is the app's core and serves the same REST API, whose chats can use
+ * the servers in ~/.lmstudio/mcp.json ("Allow calling servers from mcp.json"), so it counts. ~/.lmstudio alone
+ * (bin/, conversations/, an empty llmster/...) is what an uninstalled LM Studio leaves: it doesn't.
+ */
 export function lmStudioInstalled(): boolean {
-  return installedApp(["LM Studio.app"], () => [programs("LM Studio"), programs("lm-studio")], () => existsSync(dirname(lmStudioConfig())));
+  if (installedApp(["LM Studio.app"], () => [programs("LM Studio"), programs("lm-studio")], () => existsSync(dirname(lmStudioConfig())))) return true;
+  try {
+    return readdirSync(join(dirname(lmStudioConfig()), "llmster"), { withFileTypes: true }).some((d) => d.isDirectory());
+  } catch {
+    return false;
+  }
 }
 /** Cursor: the app, or its command line (cursor-agent reads the same ~/.cursor/mcp.json). */
 export function cursorInstalled(): boolean {
