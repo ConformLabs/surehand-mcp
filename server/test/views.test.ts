@@ -38,7 +38,7 @@ const { fixtureInput, fixtureArgs } = await import("./fixtures/preflight-view.js
 const UI_CAPS = { extensions: { "io.modelcontextprotocol/ui": { mimeTypes: [RESOURCE_MIME_TYPE] } } };
 const CORE = resolveProfile(["node", "surehand-ae", "--tools", "core"]);
 const FULL = resolveProfile(["node", "surehand-ae", "--tools", "full"]);
-const APP_ONLY = ["ae_view_frame", "ae_view_reveal"];
+const APP_ONLY = ["ae_view_frame", "ae_view_proof_frame", "ae_view_reveal"];
 const WITH_VIEW = ["ae_preflight", "ae_project_xray", "ae_project_history"];
 
 async function connect(profile = CORE, capabilities: Record<string, unknown> = UI_CAPS) {

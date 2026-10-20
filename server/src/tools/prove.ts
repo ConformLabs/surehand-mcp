@@ -3,13 +3,17 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { randomBytes } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { z } from "zod";
-import { runJsx } from "../jsx.js";
+import { runJsx, type Changes } from "../jsx.js";
 import { permissions, READ_ONLY_REFUSAL } from "../permissions.js";
 import { decodePng, encodePng, type Image } from "../png.js";
+import { timecode } from "../preflight/report.js";
+import { capChanges, changesFromReport } from "../view-changes.js";
+import { VIEW_META_KEY, type ChangesView, type ProofFrame } from "../views/types.js";
 import { errorResult } from "./registry.js";
+import { CHANGES_VIEW_URI, registerViewTool, viewError } from "./views.js";
 import { RENDER_RUN_OPTIONS, renderCleanupNote } from "./core.js";
 import { runBatch } from "./workflow.js";
 import { appFile } from "../paths.js";
@@ -294,7 +298,44 @@ export function otherProject(m: Pick<Manifest, "project" | "comps">, res: { proj
   return null;
 }
 
-export interface Comparison { verdict: "identical" | "identical within tolerance" | "differs" | "incomplete"; text: string; image?: { data: string; label: string } }
+export interface Comparison {
+  verdict: "identical" | "identical within tolerance" | "differs" | "incomplete";
+  text: string;
+  image?: { data: string; label: string };
+  /** for the in-chat view: every reference frame and how it compared, and this comparison's stamp */
+  view?: { id: string; createdAt: string; compared: string; head: string; tolerance: number; maxDiff: number; comps: string[]; frames: ProofFrame[] };
+}
+
+/**
+ * The frames of a proof's latest comparison, kept beside its reference frames (proofs/<id>/after/, replaced by
+ * the next comparison, removed with the proof after 7 days or beyond 30 proofs): the in-chat view shows them on
+ * demand (ae_view_proof_frame). compared.json names the comparison they belong to.
+ */
+export const afterDir = (id: string) => join(proofsRoot(), id, "after");
+export const proofDir = (id: string) => join(proofsRoot(), id);
+export { loadManifest };
+
+/** Move a comparison's rendered frames into the proof (afterDir), replacing the last comparison's; updates their paths. */
+function keepAfterFrames(id: string, compared: string, comps: Rendered[]) {
+  const dir = afterDir(id);
+  try {
+    rmSync(dir, { recursive: true, force: true });
+    mkdirSync(dir, { recursive: true });
+    for (const c of comps)
+      for (const [i, f] of (c.frames ?? []).entries()) {
+        const to = join(dir, `${c.id}_${i}.png`);
+        try {
+          renameSync(f.path, to);
+          f.path = to;
+        } catch {
+          // left in the temp folder (removed after the comparison): the view can't show this frame
+        }
+      }
+    writeFileSync(join(dir, "compared.json"), JSON.stringify({ compared }));
+  } catch {
+    // the comparison itself doesn't depend on it
+  }
+}
 
 /** Render the proof's comps and times again and compare them with the stored reference frames. */
 export async function compareProof(input: { id?: string; tolerance?: number }): Promise<Comparison | string> {
@@ -313,22 +354,28 @@ export async function compareProof(input: { id?: string; tolerance?: number }): 
   const notes: string[] = [];
   let frames = 0, top = 0;
   let worst: { score: [number, number]; a: Image; b: Image; label: string } | null = null;
+  const viewFrames: ProofFrame[] = [], compared = `${stamp()}-${randomBytes(2).toString("hex")}`;
+  const vf = (c: CompProof, i: number, more: Partial<ProofFrame>) =>
+    viewFrames.push({ comp: c.name, compId: c.id, index: i, time: c.frames[i].time, tc: timecode(c.frames[i].time, c.frameRate), differs: false, ...more });
   try {
     const res = await render(specs, { maxSize: m.maxSize }, tmp, prefix);
     if (res.note) notes.push(res.note);
+    keepAfterFrames(m.id, compared, res.comps);
     const other = otherProject(m, res);
-    if (other) problems.push(other);
+    if (other) problems.push(other), m.comps.forEach((c) => c.frames.forEach((_, i) => vf(c, i, { missing: true })));
     else if (!m.project) notes.push("Note: the reference was captured in an unsaved project, so it can't be confirmed that this is the same project; the comps were matched by id, and their names are unchanged.");
     for (const c of other ? [] : m.comps) {
       const now = res.comps.find((r) => r.id === c.id);
       const title = `"${c.name}" (id ${c.id})`;
       if (!now || now.missing) {
+        c.frames.forEach((_, i) => vf(c, i, { missing: true }));
         problems.push(`${title} was deleted since the capture`);
         lines.push(`${title}: deleted since the capture (no comp with this id), not compared.`);
         continue;
       }
       const renamed = now.name !== c.name ? ` (renamed to "${now.name}")` : "";
       if (now.sizeChanged) {
+        c.frames.forEach((_, i) => vf(c, i, { missing: true }));
         problems.push(`${title} changed size`);
         lines.push(`${title}${renamed}: size changed from ${c.width}x${c.height} (pixel aspect ${c.pixelAspect}) to ${now.width}x${now.height} (pixel aspect ${now.pixelAspect}), so its frames can't be compared pixel for pixel.`);
         continue;
@@ -343,18 +390,21 @@ export async function compareProof(input: { id?: string; tolerance?: number }): 
           a = decodePng(readFileSync(join(proofsRoot(), m.id, ref.file)));
           b = decodePng(readFileSync(path!));
         } catch (e: any) {
+          vf(c, i, { missing: true });
           problems.push(`${title} at ${label} could not be read`);
           lines.push(`  ${label}: could not compare: ${e?.message ?? e}`);
           continue;
         }
         frames++;
         if (a.width !== b.width || a.height !== b.height) {
+          vf(c, i, { differs: true });
           differing.push(`"${c.name}" at ${label}`);
           lines.push(`  ${label}: DIFFERS: rendered ${b.width}x${b.height}, the reference is ${a.width}x${a.height}.`);
           continue;
         }
         const d = diffImages(a, b, tol);
         top = Math.max(top, d.maxDiff);
+        vf(c, i, { differs: d.over > 0, maxDiff: r2(d.maxDiff) });
         if (!d.changed) lines.push(`  ${label}: identical`);
         else if (!d.over) lines.push(`  ${label}: identical within tolerance (max channel difference ${r2(d.maxDiff)}/255 on ${d.changed} px, max ΔE ${r2(d.maxDeltaE)})`);
         else {
@@ -393,11 +443,13 @@ export async function compareProof(input: { id?: string; tolerance?: number }): 
     head = `Verdict: IDENTICAL WITHIN TOLERANCE: all ${frames} frames match within ${tol}/255 per channel (largest difference ${r2(top)}/255${top < 1 ? ": high-bit-depth rounding, invisible in 8-bit output; pass tolerance 0 to require bit-identical" : ""}).`;
   }
   const text = [head, `Proof ${m.id} (reference captured ${m.createdAt}).`, ...lines, ...notes].join("\n");
-  if (!worst) return { verdict, text };
+  const view = { id: m.id, createdAt: m.createdAt, compared, head, tolerance: tol, maxDiff: r2(top), comps: m.comps.map((c) => c.name), frames: viewFrames };
+  if (!worst) return { verdict, text, view };
   const pic = diffPicture(worst.a, worst.b, tol);
   return {
     verdict,
     text,
+    view,
     image: {
       data: pic.png.toString("base64"),
       label: `Difference image of ${worst.label} (${pic.width}x${pic.height}): black = identical, dark blue = within the tolerance, gray to white = beyond it (brighter = larger).`,
@@ -405,11 +457,36 @@ export async function compareProof(input: { id?: string; tolerance?: number }): 
   };
 }
 
-function comparisonResult(c: Comparison, extra?: string): CallToolResult {
+const VERDICT_WORD = { identical: "IDENTICAL", "identical within tolerance": "IDENTICAL", differs: "DIFFERS", incomplete: "NOT PROVEN" } as const;
+const hhmm = (iso: string) => {
+  const d = new Date(iso), now = new Date(), p2 = (n: number) => String(n).padStart(2, "0");
+  const time = `${p2(d.getHours())}:${p2(d.getMinutes())}`;
+  return d.toDateString() === now.toDateString() ? time : `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())} ${time}`;
+};
+
+/** The in-chat view's data for a comparison, with the edit's changes when it was a run. */
+export function proofView(c: Comparison, edit?: { changes?: Changes; name?: string }): ChangesView | undefined {
+  const v = c.view;
+  if (!v) return undefined;
+  const compared = v.frames.filter((f) => !f.missing).length;
+  return {
+    view: "changes",
+    source: "proof",
+    title: `${edit ? "Proven edit" : "Proof"} · ${v.comps.join(", ")}`,
+    subtitle: `reference ${hhmm(v.createdAt)} → now · ${compared} frame${compared === 1 ? "" : "s"} compared`,
+    proof: { id: v.id, compared: v.compared, verdict: VERDICT_WORD[c.verdict], verdictLine: v.head.replace(/^Verdict: /, ""), tolerance: v.tolerance, maxDiff: v.maxDiff, frames: v.frames },
+    ...capChanges(edit ? changesFromReport(edit.changes) : []),
+    footnote: edit ? "One undo step in After Effects" : "",
+  };
+}
+
+function comparisonResult(c: Comparison, extra?: string, edit?: { changes?: Changes }): CallToolResult {
   const content: CallToolResult["content"] = [{ type: "text", text: c.text }];
   if (c.image) content.push({ type: "image", data: c.image.data, mimeType: "image/png" }, { type: "text", text: c.image.label });
   if (extra) content.push({ type: "text", text: extra });
-  return { content };
+  // the in-chat view's data: in _meta, so the text and images stay exactly as they are
+  const view = proofView(c, edit);
+  return view ? { content, _meta: { [VIEW_META_KEY]: view } } : { content };
 }
 
 const describeCapture = (m: Manifest) =>
@@ -445,14 +522,15 @@ export async function prove(input: ProveInput, perm: { mode: string; allowShell:
   if (perm.mode === "read-only") return errorResult(READ_ONLY_REFUSAL);
   const m = await captureProof(input);
   // ae_batch exactly: shell check, approval in "ask" mode, one undo step, atomic rollback
-  const b = await runBatch({ steps: input.steps, atomic: input.atomic, name: input.name, checkpoint: input.checkpoint, verbose: input.verbose }, perm);
+  const edit: { changes?: Changes } = {};
+  const b = await runBatch({ steps: input.steps, atomic: input.atomic, name: input.name, checkpoint: input.checkpoint, verbose: input.verbose }, perm, edit);
   const batchText = b.content.map((c) => (c.type === "text" ? c.text : "")).join("\n");
   if (b.isError)
     return { isError: true, content: [{ type: "text", text: `${batchText}\n\nNothing was compared: the batch did not complete. The reference frames are kept as proof ${m.id}.` }] };
   try {
     const c = await compareProof({ id: m.id, tolerance: input.tolerance });
     if (typeof c === "string") throw new Error(c);
-    return comparisonResult(c, `Edits (one undo step):\n${batchText}${m.note ? `\n${m.note}` : ""}`);
+    return comparisonResult(c, `Edits (one undo step):\n${batchText}${m.note ? `\n${m.note}` : ""}`, edit);
   } catch (e: any) {
     // whatever fails after the batch, never let it look as if the edits were not made
     return {
@@ -463,9 +541,12 @@ export async function prove(input: ProveInput, perm: { mode: string; allowShell:
 }
 
 export function registerProveTools(server: McpServer) {
-  server.registerTool(
+  // compare and run are shown as the "What changed, and the proof" view where the AI app has in-chat views
+  registerViewTool(
+    server,
     "ae_prove_identical",
     {
+      _meta: { ui: { resourceUri: CHANGES_VIEW_URI } },
       title: "Prove the render is unchanged",
       description:
         "Prove a structural change (un-precompose, bake expressions, reorder effects, simplify a rig) left the render unchanged, or show which " +
@@ -490,11 +571,11 @@ export function registerProveTools(server: McpServer) {
       // run executes ae_batch steps, which can be ae_run_script
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },
-    async (input) => {
+    async (input: ProveInput) => {
       try {
         return await prove(input, permissions());
       } catch (e) {
-        return errorResult(e);
+        return viewError(e);
       }
     },
   );

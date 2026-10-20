@@ -8,7 +8,7 @@ import { basename, dirname, extname, join } from "node:path";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { loadConfig } from "../config.js";
-import { evalBody, formatChanges, rollbackProblem, runJsx } from "../jsx.js";
+import { evalBody, formatChanges, rollbackProblem, runJsx, type Changes } from "../jsx.js";
 import { approvalSummary, permissions, READ_ONLY_REFUSAL, SHELL_REFUSAL, usesShell } from "../permissions.js";
 import { reservedGlobalsHint, transpileUserCode } from "../transpile.js";
 import { ALL_JSX_TOOLS } from "./all.js";
@@ -175,7 +175,8 @@ const batchable = new Map(ALL_JSX_TOOLS.filter((t) => !t.noUndo).map((t) => [t.n
 export interface BatchInput { steps: { tool: string; args?: Record<string, unknown> }[]; atomic?: boolean; name?: string; checkpoint?: boolean; verbose?: boolean }
 
 /** ae_batch: every step in one undo group; atomic = a failed step rolls the whole batch back (guarded, see aemcp.jsxinc). */
-export async function runBatch({ steps, atomic, name, checkpoint, verbose }: BatchInput, perm: { mode: string; allowShell: boolean }): Promise<CallToolResult> {
+/** `out.changes`: the batch's change report as data (ae_prove_identical's in-chat view lists it). */
+export async function runBatch({ steps, atomic, name, checkpoint, verbose }: BatchInput, perm: { mode: string; allowShell: boolean }, out?: { changes?: Changes }): Promise<CallToolResult> {
   const bodies: string[] = [];
   const stepArgs: unknown[] = [];
   const hints: (string | null)[] = [];
@@ -227,6 +228,7 @@ return { steps: __out, failed: __failed, rollback: args.atomic && __failed >= 0 
     bridge: edits && perm.mode === "ask" ? { approval: { tool: `Batch (${steps.length} steps)`, summary: steps.map((s, i) => `${i + 1}. ${s.tool} ${approvalSummary(s.tool, s.args)}`).join("\n") } } : undefined,
   });
   if (!r.ok) return formatResult(r);
+  if (out) out.changes = r.changes;
   const res = r.result as { steps: { ok: boolean; result?: unknown; error?: string; line?: number }[]; failed: number };
   const lines = res.steps.map((s, i) => {
     if (!s.ok) return `${i + 1}. ${steps[i].tool}: FAILED: ${s.error}${s.line ? ` (line ${s.line})` : ""}${hints[i] ? `\n   Hint: ${hints[i]}` : ""}`;

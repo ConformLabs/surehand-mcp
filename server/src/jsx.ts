@@ -35,7 +35,8 @@ export interface RunOptions {
 export interface Changes {
   items: [string, string, string, unknown?][];
   layers: [string, string, string, string?][];
-  props: [string, string, string, string?][];
+  /** [op, layer, property path, what changed, comp] */
+  props: [string, string, string, (string | null)?, string?][];
   scope: string[];
   partial?: boolean;
   truncated?: boolean;

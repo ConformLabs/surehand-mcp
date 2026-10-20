@@ -8,11 +8,12 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { getUiCapability, registerAppResource, registerAppTool, RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps/server";
 import { mkdirSync, readFileSync, unlinkSync } from "node:fs";
+import { join } from "node:path";
 import { brotliDecompressSync } from "node:zlib";
 import { z } from "zod";
 import { BridgeError } from "../bridge.js";
 import { runJsx } from "../jsx.js";
-import { downscale, encodeJpeg } from "../jpeg.js";
+import { amplifiedDiff, downscale, encodeJpeg } from "../jpeg.js";
 import { appFile } from "../paths.js";
 import { decodePng } from "../png.js";
 import { timecode } from "../preflight/report.js";
@@ -20,13 +21,20 @@ import { withFonts } from "../views/fonts.js";
 import { VIEW_ERROR_KEY, VIEW_META_KEY, type FrameView } from "../views/types.js";
 import { waitForFile } from "./core.js";
 import { enableViewTools } from "./profile.js";
+import { afterDir, loadManifest, proofDir } from "./prove.js";
 import { compRef, errorResult, formatResult, layerRef } from "./registry.js";
 
 export const PREFLIGHT_VIEW_URI = "ui://surehand/preflight.html";
+export const CHANGES_VIEW_URI = "ui://surehand/changes.html";
 
 /** The views: name (src/views/<name>.ts) -> resource. */
 export const VIEWS: Record<string, { uri: string; title: string; description: string }> = {
   preflight: { uri: PREFLIGHT_VIEW_URI, title: "Preflight report", description: "The Preflight verdict, a timeline of the findings, and each finding's frame." },
+  changes: {
+    uri: CHANGES_VIEW_URI,
+    title: "What changed, and the proof",
+    description: "A proven edit's verdict with before, after and difference frames, and what changed in the project (also for the history diff).",
+  },
 };
 
 let unpacked: Record<string, string> | undefined;
@@ -196,4 +204,61 @@ export function registerViews(server: McpServer) {
       }
     },
   );
+
+  registerViewTool(
+    server,
+    "ae_view_proof_frame",
+    {
+      title: "Proof frames for a view",
+      description:
+        "For the in-chat views: one compared frame of a proof as three small stills (JPEG): the reference (before), the latest comparison (after) " +
+        "and their difference amplified ×50. Reads the proof's stored frames; doesn't use After Effects.",
+      inputSchema: {
+        id: z.string().regex(/^[\w-]+$/).describe("The proof id."),
+        compared: z.string().regex(/^[\w-]+$/).describe("The comparison the view shows (a later comparison replaces its frames)."),
+        comp: z.number().int().describe("The comp's id in the proof."),
+        index: z.number().int().min(0).describe("The frame's index in that comp's reference frames."),
+        maxSize: z.number().int().min(64).max(640).optional().describe("Longest side of each still in pixels (default 320)."),
+      },
+      // reads files under ~/.surehand/ae/proofs only
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      _meta: { ui: { visibility: ["app"] } },
+    },
+    async (args: { id: string; compared: string; comp: number; index: number; maxSize?: number }) => {
+      try {
+        return proofFrames(args);
+      } catch (e) {
+        return viewError(e);
+      }
+    },
+  );
+}
+
+/** Before, after and the difference ×50 of one compared frame, from the proof's own files. */
+export function proofFrames(args: { id: string; compared: string; comp: number; index: number; maxSize?: number }): CallToolResult {
+  const m = loadManifest(args.id);
+  if (typeof m === "string") return errorResult(m);
+  const c = m.comps.find((x) => x.id === args.comp), ref = c?.frames[args.index];
+  if (!c || !ref) return errorResult(`Proof ${m.id} has no frame ${args.index} of comp id ${args.comp}.`);
+  let now: string | undefined;
+  try {
+    now = JSON.parse(readFileSync(join(afterDir(m.id), "compared.json"), "utf8")).compared;
+  } catch {}
+  if (now !== args.compared) return errorResult("A later comparison replaced these frames. Compare again to see them.");
+  let after;
+  try {
+    after = decodePng(readFileSync(join(afterDir(m.id), `${c.id}_${args.index}.png`)));
+  } catch {
+    return errorResult("This frame wasn't rendered in the comparison.");
+  }
+  const before = decodePng(readFileSync(join(proofDir(m.id), ref.file)));
+  const size = stillSize(before.width, before.height, 1, args.maxSize ?? 320);
+  const jpeg = (px: Uint8Array) => ({ type: "image" as const, data: encodeJpeg(size.width, size.height, px, 80).toString("base64"), mimeType: "image/jpeg" });
+  const content: CallToolResult["content"] = [jpeg(downscale(before, size.width, size.height))];
+  const same = before.width === after.width && before.height === after.height;
+  content.push(jpeg(downscale(after, size.width, size.height)));
+  if (same) content.push(jpeg(downscale(amplifiedDiff(before, after, 50), size.width, size.height, "max")));
+  content.push({ type: "text", text: `Before, after${same ? " and difference ×50" : ""} of "${c.name}" at ${secs(ref.time)} (${size.width}x${size.height}).` });
+  const view: FrameView = { view: "frame", comp: c.name, time: ref.time, compWidth: c.width, compHeight: c.height, ...size };
+  return { content, _meta: { [VIEW_META_KEY]: view } };
 }

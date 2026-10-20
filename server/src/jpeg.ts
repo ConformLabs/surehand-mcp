@@ -195,10 +195,29 @@ export function encodeJpeg(width: number, height: number, rgba: Uint8Array, qual
 }
 
 /**
- * Downscale a decoded PNG to `width` x `height` (area average), as 8-bit RGBA with the alpha composited over
- * black (how a transparent comp shows in the viewer).
+ * The difference of two frames amplified: |a - b| per channel times `gain` (a difference in alpha only shows as
+ * gray), 8-bit and opaque; black where they're identical. Pixels transparent in both count as identical.
  */
-export function downscale(img: Image, width: number, height: number): Uint8Array {
+export function amplifiedDiff(a: Image, b: Image, gain = 50): Image {
+  if (a.width !== b.width || a.height !== b.height) throw new Error("The frames have different sizes.");
+  const n = a.width * a.height, out = new Uint8Array(n * 4), sa = 255 / a.max, sb = 255 / b.max;
+  for (let i = 0; i < n; i++) {
+    const o = i * 4;
+    out[o + 3] = 255;
+    if (a.data[o + 3] === 0 && b.data[o + 3] === 0) continue;
+    const da = Math.abs(a.data[o + 3] * sa - b.data[o + 3] * sb);
+    for (let c = 0; c < 3; c++) out[o + c] = Math.min(255, Math.round(Math.max(da, Math.abs(a.data[o + c] * sa - b.data[o + c] * sb)) * gain));
+  }
+  return { width: a.width, height: a.height, max: 255, data: out };
+}
+
+/**
+ * Downscale a decoded PNG to `width` x `height`, as 8-bit RGBA with the alpha composited over black (how a
+ * transparent comp shows in the viewer). "average" for pictures; "max" keeps the largest value of each block
+ * (a difference picture: one changed pixel stays visible).
+ */
+export function downscale(img: Image, width: number, height: number, mode: "average" | "max" = "average"): Uint8Array {
+  if (mode === "max") return downscaleMax(img, width, height);
   const out = new Uint8Array(width * height * 4);
   const sx = img.width / width, sy = img.height / height, k = 255 / img.max;
   for (let y = 0; y < height; y++) {
@@ -217,6 +236,25 @@ export function downscale(img: Image, width: number, height: number): Uint8Array
       out[o] = Math.round((r / n) * k);
       out[o + 1] = Math.round((g / n) * k);
       out[o + 2] = Math.round((b / n) * k);
+      out[o + 3] = 255;
+    }
+  }
+  return out;
+}
+
+function downscaleMax(img: Image, width: number, height: number): Uint8Array {
+  const out = new Uint8Array(width * height * 4);
+  const sx = img.width / width, sy = img.height / height, k = 255 / img.max;
+  for (let y = 0; y < height; y++) {
+    const y0 = Math.floor(y * sy), y1 = Math.max(y0 + 1, Math.min(img.height, Math.ceil((y + 1) * sy)));
+    for (let x = 0; x < width; x++) {
+      const x0 = Math.floor(x * sx), x1 = Math.max(x0 + 1, Math.min(img.width, Math.ceil((x + 1) * sx)));
+      const o = (y * width + x) * 4;
+      for (let yy = y0; yy < y1; yy++)
+        for (let xx = x0; xx < x1; xx++) {
+          const p = (yy * img.width + xx) * 4;
+          for (let c = 0; c < 3; c++) out[o + c] = Math.max(out[o + c], Math.round(img.data[p + c] * k));
+        }
       out[o + 3] = 255;
     }
   }

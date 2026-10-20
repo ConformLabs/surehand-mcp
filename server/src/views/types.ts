@@ -49,6 +49,64 @@ export interface PreflightView {
   passed: string[];
 }
 
+/**
+ * One change to the project, as the views list it: "Scale 100 % → 64 %" under "Endcard › Logo_Mark › Transform".
+ * Built from the change report (an edit's "Changes") or the history diff, beside their text lines.
+ */
+export interface ViewChange {
+  op: "+" | "-" | "~";
+  /** where: comp, layer, the property's group path (display names); comp and layer also serve Show in AE */
+  comp?: string;
+  layer?: string;
+  /** the layer's index when the source knows it (the history diff) */
+  layerIndex?: number;
+  path?: string;
+  /** what changed: a property or field name with its old and new value, or a whole phrase */
+  what: string;
+  from?: string;
+  to?: string;
+}
+
+/** A compared frame of a proof (ae_prove_identical). */
+export interface ProofFrame {
+  comp: string;
+  compId: number;
+  /** the frame's index in its comp's reference frames (what ae_view_proof_frame takes) */
+  index: number;
+  time: number;
+  tc: string;
+  /** beyond the tolerance; maxDiff is the largest channel difference (0-255) */
+  differs: boolean;
+  maxDiff?: number;
+  /** not compared: the comp was deleted, changed size, or a frame couldn't be read */
+  missing?: boolean;
+}
+
+/** ae_prove_identical (verdict, frames, the edit's changes) or ae_project_history diff (changes only). */
+export interface ChangesView {
+  view: "changes";
+  source: "proof" | "history";
+  /** the header: "Proven edit · Endcard" / "What changed · Spot.aep", and the line under it */
+  title: string;
+  subtitle: string;
+  proof?: {
+    id: string;
+    /** this comparison (its "after" frames are kept with the proof until the next comparison) */
+    compared: string;
+    verdict: "IDENTICAL" | "DIFFERS" | "NOT PROVEN";
+    /** the text's verdict line */
+    verdictLine: string;
+    tolerance: number;
+    maxDiff: number;
+    frames: ProofFrame[];
+  };
+  changes: ViewChange[];
+  /** changes left out of the view (it lists at most MAX_VIEW_CHANGES) or of the source's own list */
+  moreChanges: number;
+  /** under the list: "One undo step in After Effects", or the history diff's summary */
+  footnote: string;
+}
+
 /** One still from ae_view_frame (the image itself is the result's image content). */
 export interface FrameView {
   view: "frame";
