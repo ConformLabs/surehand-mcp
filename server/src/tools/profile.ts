@@ -145,13 +145,31 @@ export function applyProfile(server: McpServer, profile: ToolProfile): Map<strin
 const viewGated = new WeakMap<McpServer, { name: string; tool: { enable(): void; enabled: boolean } }[]>();
 const viewCatalogs = new WeakMap<McpServer, Map<string, CatalogEntry>>();
 
+/**
+ * Changes to several tools as one tools/list_changed: the SDK sends one per enable() / disable(), and each makes
+ * the AI app read the tool list again (VS Code read it 8 times for the view tools).
+ */
+export function batchToolChanges(server: McpServer, change: () => void) {
+  let changed = false;
+  const s = server as any;
+  s.sendToolListChanged = () => void (changed = true);
+  try {
+    change();
+  } finally {
+    delete s.sendToolListChanged; // McpServer's own again
+    if (changed) server.sendToolListChanged();
+  }
+}
+
 /** The AI app shows in-chat views: turn on the app-only tools and the tools with a view (once). */
 export function enableViewTools(server: McpServer) {
-  for (const g of viewGated.get(server) ?? []) {
-    if (!g.tool.enabled) g.tool.enable();
-    const entry = viewCatalogs.get(server)?.get(g.name);
-    if (entry) entry.direct = true;
-  }
+  batchToolChanges(server, () => {
+    for (const g of viewGated.get(server) ?? []) {
+      if (!g.tool.enabled) g.tool.enable();
+      const entry = viewCatalogs.get(server)?.get(g.name);
+      if (entry) entry.direct = true;
+    }
+  });
 }
 
 /** Tool categories for ae_tools (anything not listed falls under "other"). */

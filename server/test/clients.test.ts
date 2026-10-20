@@ -6,6 +6,12 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFil
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
+// as on Linux on every machine: an app counts as there by its settings folder (on a Mac and Windows by the app
+// itself, which a temporary home can't fake: app-detection.test.ts)
+vi.mock("node:os", async (orig) => ({ ...(await orig<typeof import("node:os")>()), platform: () => "linux" }));
+// and never this machine's own apps and commands (Codex in /opt/homebrew/bin, cursor-agent on PATH...)
+vi.mock("node:fs", async (orig) => (await import("./hermetic-apps.js")).hermeticFs(orig as any));
+vi.mock("node:child_process", async (orig) => (await import("./hermetic-apps.js")).hermeticChildProcess(orig as any));
 vi.mock("../src/cli/util.js", async (orig) => ({ ...(await orig<typeof import("../src/cli/util.js")>()), findClaudeCli: () => null }));
 
 const util = await import("../src/cli/util.js");
@@ -255,7 +261,7 @@ describe("AI app settings files are never lost (unreadable, BOM, comments)", () 
     expect(readFileSync(util.cursorConfig() + ".surehand.bak", "utf8")).toMatch(/\/\/ my servers/); // the original, comments and all
   });
 
-  it("every change is backed up first (timestamped, the newest five kept) and written atomically", () => {
+  it("every change is backed up first (timestamped, the newest three kept) and written atomically", () => {
     put(util.cursorConfig(), { mcpServers: { other: FOREIGN } });
     for (let i = 0; i < 4; i++) {
       clients.connectClient("cursor", ENTRY());
@@ -263,7 +269,7 @@ describe("AI app settings files are never lost (unreadable, BOM, comments)", () 
     }
     const dir = dirname(util.cursorConfig());
     const names = readdirSync(dir);
-    expect(names.filter((n) => /^mcp\.json\.surehand-\d{8}-\d{6}-\d{3}(-\d+)?\.bak$/.test(n))).toHaveLength(5);
+    expect(names.filter((n) => /^mcp\.json\.surehand-\d{8}-\d{6}-\d{3}(-\d+)?\.bak$/.test(n))).toHaveLength(3);
     expect(names.filter((n) => n.endsWith(".tmp"))).toEqual([]);
     expect(json(util.cursorConfig()).mcpServers).toEqual({ other: FOREIGN });
   });

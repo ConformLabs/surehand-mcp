@@ -14,6 +14,9 @@ import { FRAGILE_LEGEND, xrayLinks, type XComp, type XData, type XFootage, type 
 /** the first levels of the tree that go into the result (the rest is loaded node by node) */
 const INITIAL_DEPTH = 3;
 const INITIAL_NODES = 400;
+/** about how much of the result (JSON characters) the tree's first levels, and the paths to problems, may take */
+const TREE_CHARS = 50_000;
+const PATH_CHARS = 30_000;
 /** paths per problem kind in the result; children and problems per node from ae_view_xray_node */
 const MAX_PATHS = 100;
 const MAX_CHILDREN = 500;
@@ -324,26 +327,41 @@ export function xrayView(raw: unknown): XrayView {
   keep(run, d);
   const m = runs.get(run)!;
   const nodes: Record<string, XrayNode> = {};
-  // breadth first: every node to INITIAL_DEPTH, with its children listed
+  let size = 0, count = 0;
+  const add = (n: XrayNode) => ((nodes[n.key] = n), (size += JSON.stringify(n).length), count++);
+  for (const r of m.roots()) add(m.node(r));
+  // breadth first to INITIAL_DEPTH: a node's children are listed only with every one of them in the result (the
+  // view draws what a node lists), and only while the result stays small; any other node loads when it's opened
   const queue: [string, number][] = m.roots().map((r) => [r, 0]);
-  for (let i = 0; i < queue.length && Object.keys(nodes).length < INITIAL_NODES; i++) {
-    const [key, depth] = queue[i];
-    if (nodes[key]) continue;
-    const n = m.node(key);
-    if (depth < INITIAL_DEPTH) {
-      n.children = m.children(key).slice(0, MAX_CHILDREN);
-      for (const ch of n.children) queue.push([ch.key, depth + 1]);
-    }
-    nodes[key] = n;
+  for (let i = 0; i < queue.length; i++) {
+    const [key, depth] = queue[i], n = nodes[key];
+    if (depth >= INITIAL_DEPTH || n.children) continue;
+    const children = m.children(key).slice(0, MAX_CHILDREN);
+    const fresh = children.filter((ch) => !nodes[ch.key]).map((ch) => m.node(ch.key));
+    const cost = JSON.stringify(children).length + JSON.stringify(fresh).length;
+    if (count + fresh.length > INITIAL_NODES || size + cost > TREE_CHARS) continue;
+    n.children = children;
+    size += JSON.stringify(children).length;
+    for (const f of fresh) add(f);
+    for (const ch of children) queue.push([ch.key, depth + 1]);
   }
   const counts = m.counts();
   const tags: XrayTag[] = ["missing", "placeholder", "fragile", "heavy", "unused"];
   const paths: XrayView["paths"] = {};
+  // the paths to each problem, with the nodes on them so a chip can show them at once; at least one per problem
+  // kind, the rest while they fit (the chips' counts are complete either way)
+  let pathChars = 0;
   for (const t of tags) {
     if (!counts[t]) continue;
-    paths[t] = m.pathsTo(t);
-    // the nodes on them, so a chip can show them at once
-    for (const p of paths[t]!) for (const k of p) nodes[k] ??= m.node(k);
+    paths[t] = [];
+    for (const p of m.pathsTo(t)) {
+      const fresh = [...new Set(p.filter((k) => !nodes[k]))].map((k) => m.node(k));
+      const cost = JSON.stringify(p).length + JSON.stringify(fresh).length;
+      if (paths[t]!.length && pathChars + cost > PATH_CHARS) break;
+      paths[t]!.push(p);
+      pathChars += cost;
+      for (const f of fresh) nodes[f.key] = f;
+    }
   }
   const p = d.project ?? {};
   const layers = d.comps.reduce((n, c) => n + c.nl, 0), files = d.footage.filter((f) => f.kind !== "solid").length;

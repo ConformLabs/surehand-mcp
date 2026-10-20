@@ -49,17 +49,21 @@ describe("writing settings files", () => {
     }
   });
 
-  it("backs up before every write, keeping the original and the newest five", () => {
+  it("backs up before every write, keeping the original and the newest three; backups it did not make stay", () => {
     const d = dir();
     const f = join(d, "claude_desktop_config.json");
     writeFileSync(f, "v0");
+    // backups the user (or another tool) made, whose names start like ours: never removed
+    const theirs = [f + ".surehand-mine.bak", f + ".surehand-before-plugins.bak", f + ".bak"];
+    for (const t of theirs) writeFileSync(t, "theirs");
     for (let i = 1; i <= 8; i++) {
       backupFile(f, new Date(Date.UTC(2026, 9, 20, 10, 0, i)));
       writeFileSync(f, `v${i}`);
     }
-    const backups = readdirSync(d).filter((n) => /\.surehand-.*\.bak$/.test(n)).sort();
+    for (const t of theirs) expect(readFileSync(t, "utf8")).toBe("theirs");
+    const backups = readdirSync(d).filter((n) => /\.surehand-\d{8}-.*\.bak$/.test(n)).sort();
     expect(backups).toHaveLength(BACKUPS_KEPT);
-    expect(backups.map((n) => readFileSync(join(d, n), "utf8"))).toEqual(["v3", "v4", "v5", "v6", "v7"]);
+    expect(backups.map((n) => readFileSync(join(d, n), "utf8"))).toEqual(["v5", "v6", "v7"]);
     expect(readFileSync(f + ".surehand.bak", "utf8")).toBe("v0"); // the very first original
   });
 
