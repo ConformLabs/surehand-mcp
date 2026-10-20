@@ -1,7 +1,7 @@
 // The MCP server itself: every tool, resource and prompt (no transport; see index.ts).
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { VERSION } from "./config.js";
-import { EXTENDSCRIPT_DOC, INSTRUCTIONS } from "./docs.js";
+import { EXTENDSCRIPT_DOC, serverInstructions } from "./docs.js";
 import { registerCoreTools } from "./tools/core.js";
 import { registerRenderJobs } from "./tools/renderjobs.js";
 import { registerWorkflowTools } from "./tools/workflow.js";
@@ -17,13 +17,8 @@ import { applyProfile, resolveProfile, type ToolProfile } from "./tools/profile.
 import { SERVER_NAME } from "./paths.js";
 
 export function createMcpServer(profile: ToolProfile = resolveProfile()): McpServer {
-  const instructions =
-    INSTRUCTIONS +
-    (profile.name === "full"
-      ? ""
-      : "\n- This chat has the core tools loaded. Many more (3D, audio, text styling, footage, render settings, masks, Essential Graphics, " +
-        "project management...) are available on demand: ae_tools lists them, ae_tools {describe: [...]} gives parameters, ae_call runs them. " +
-        "ae_run_script can do anything else.");
+  // with only some tools loaded, the instructions say how to reach the others (ae_tools / ae_call)
+  const instructions = serverInstructions(profile.name !== "full");
   const server = new McpServer({ name: SERVER_NAME, title: "Surehand MCP for Adobe After Effects", version: VERSION }, { instructions });
   const catalog = applyProfile(server, profile);
   registerCoreTools(server);
@@ -57,7 +52,7 @@ export function createMcpServer(profile: ToolProfile = resolveProfile()): McpSer
   server.registerPrompt(
     "after-effects-assistant",
     { title: "After Effects assistant", description: "Primes the model with how to work with this server." },
-    async () => ({ messages: [{ role: "user", content: { type: "text", text: INSTRUCTIONS + "\n\n" + EXTENDSCRIPT_DOC } }] }),
+    async () => ({ messages: [{ role: "user", content: { type: "text", text: instructions + "\n\n" + EXTENDSCRIPT_DOC } }] }),
   );
   return server;
 }

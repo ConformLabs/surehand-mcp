@@ -12,7 +12,8 @@ import { chatgpt } from "./cli/chatgpt.js";
 import { checkpointDiffCommand, checkpointSaveCommand, checkpointsCommand } from "./cli/checkpoints.js";
 import { CLIENT_IDS, clientsJson, connectClient, disconnectClient, listClients, moveFromLegacy } from "./cli/clients.js";
 import { diagnostics } from "./cli/diagnostics.js";
-import { install } from "./cli/install.js";
+import { install, reportSkills } from "./cli/install.js";
+import { installSkills, skillsStatus, uninstallSkills } from "./cli/skills.js";
 import { selftest, selftestJson } from "./cli/selftest.js";
 import { updateCommand } from "./cli/update-cmd.js";
 import { recordRuntime } from "./cli/setup.js";
@@ -126,7 +127,11 @@ Usage:
   surehand-ae checkpoints [--json] [--project <path.aep>]      a project's checkpoints (default: the open one)
   surehand-ae checkpoint-diff <id> [--json] [--project <path>]  what changed since a checkpoint (needs After Effects)
   surehand-ae checkpoint-save [--label <text>] [--project <path>] [--json]   save the open project and checkpoint it
-  surehand-ae setup           only install/update the After Effects extension and config
+  surehand-ae skills [--json]           where the Surehand skills (how AI apps use Surehand well) are installed
+  surehand-ae skills install|uninstall [--json]
+                         write them for the AI apps found (~/.claude/skills, ~/.agents/skills) and the zips to
+                         upload in Claude Desktop chat (~/.surehand/ae/skills), or remove exactly those
+  surehand-ae setup           only install/update the After Effects extension, the config and the skills
 
 Files: ~/.surehand/ae (config.json, checkpoints, history...); shared: ~/.surehand/node, ~/.surehand/ffmpeg.
 Version 1.3's ~/.aemcp moves there automatically.
@@ -223,9 +228,37 @@ async function main() {
     case "update":
       return updateCommand(rest);
     case "setup": {
+      // `update` runs the new server's setup: the skills are updated with it
       const r = ensureAeSetup({ forceExtension: rest.includes("--force") });
-      console.log(JSON.stringify(r, null, 2));
+      console.log(JSON.stringify({ ...r, skills: installSkills() }, null, 2));
       return;
+    }
+    case "skills": {
+      const sub = rest.find((a) => !a.startsWith("--"));
+      if (sub === "install") {
+        const r = installSkills();
+        if (json) console.log(JSON.stringify({ ok: !r.zipError && !r.targets.some((t) => t.error), ...r }));
+        else reportSkills(r);
+        process.exitCode = r.zipError || r.targets.some((t) => t.error) ? 1 : 0;
+        return;
+      }
+      if (sub === "uninstall") {
+        const removed = uninstallSkills();
+        return print({ ok: true, removed }, removed.length ? `Removed:\n${removed.map((p) => `  ${p}`).join("\n")}` : "No Surehand skills were installed.");
+      }
+      if (sub) {
+        print({ ok: false, error: `usage: surehand-ae skills [install|uninstall] [--json]` }, "usage: surehand-ae skills [install|uninstall] [--json]");
+        process.exitCode = 2;
+        return;
+      }
+      const s = skillsStatus();
+      return print(
+        s,
+        [
+          ...s.targets.map((t) => `${t.dir}  ${t.installed.length ? `${t.installed.length} of ${s.skills.length} installed${t.outdated.length ? ` (${t.outdated.length} outdated)` : ""}` : "not installed"}  (${t.apps.join(", ")})`),
+          `${s.zips.dir}  ${s.zips.files.length} of ${s.skills.length} zips (Claude Desktop chat: Customize › Skills › Upload a skill)`,
+        ].join("\n"),
+      );
     }
   }
   // anything else that isn't an option is a mistake: never start the server (the panel spawns commands and would wait)

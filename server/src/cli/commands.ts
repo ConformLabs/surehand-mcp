@@ -6,6 +6,8 @@
 const MOVING_COMMANDS = new Set(["setup", "connect", "disconnect", "chatgpt"]);
 
 export function movesLegacyBeforeRunning(cmd: string | undefined, args: string[] = []): boolean {
+  // `skills install` / `uninstall` write or remove the zips in ~/.surehand/ae; `skills` alone only reads
+  if (cmd === "skills") return args.includes("install") || args.includes("uninstall");
   // `chatgpt --status` / `--stop` only read or stop what runs
   if (cmd === "chatgpt" && (args.includes("--status") || args.includes("--stop"))) return false;
   return !cmd || cmd.startsWith("-") || MOVING_COMMANDS.has(cmd);

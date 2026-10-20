@@ -77,7 +77,8 @@ const CRC = new Int32Array(256).map((_, n) => {
   for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
   return c;
 });
-function crc32(buf: Uint8Array) {
+/** CRC-32 (PNG chunks; the skills' zip files). */
+export function crc32(buf: Uint8Array) {
   let c = -1;
   for (let i = 0; i < buf.length; i++) c = CRC[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
   return (c ^ -1) >>> 0;

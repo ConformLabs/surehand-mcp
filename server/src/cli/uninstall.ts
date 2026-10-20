@@ -5,13 +5,14 @@ import { appDir, legacyDir, MOVED_NOTE, newAppDir, surehandRoot } from "../paths
 import { stopBackground } from "./chatgpt.js";
 import { CLIENT_IDS, disconnectClient } from "./clients.js";
 import { removeOwnCloudflared } from "./tunnel-install.js";
+import { uninstallSkills } from "./skills.js";
 import { bold, extensionDir, ok, warn } from "./util.js";
 
 // Files and folders in ~/.surehand/ae (and, from 1.3, ~/.aemcp) that Surehand MCP creates. Everything else there is the user's.
 // installer/run.sh and installer/run.ps1 (uninstall without Node.js) carry the same list: a test keeps them equal.
 export const OWN_FILES = [
   "server", "config.json", "runtime.json", "extension-hash", "bridge-status.json", "instances", "update-check.json",
-  "activity.jsonl", "tmp", "renders", "compat", "install.log", "install-result.json", "chatgpt.json", "chatgpt.lock", "sessions", MOVED_NOTE,
+  "activity.jsonl", "tmp", "renders", "compat", "install.log", "install-result.json", "chatgpt.json", "chatgpt.lock", "sessions", "skills", MOVED_NOTE,
 ];
 
 /** Removes our own entries of `dir` (all with `all`); returns what was kept. `node` is left to the launcher. */
@@ -51,6 +52,12 @@ export function uninstall(argv: string[]) {
   try {
     if (stopBackground().stopped) ok("Stopped ChatGPT on the web");
   } catch {}
+  // our Agent Skills (only our own folders in ~/.claude/skills and ~/.agents/skills, and the zips)
+  try {
+    if (uninstallSkills().length) ok("Removed the Surehand skills");
+  } catch (e: any) {
+    warn(`Could not remove the Surehand skills: ${e.message}`);
+  }
   const dir = appDir();
   const kept = clean(dir, keepConfig, all);
   // after the move from 1.3, ~/.aemcp only holds compatibility files (and whatever of the user's was left there);

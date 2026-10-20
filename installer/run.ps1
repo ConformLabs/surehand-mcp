@@ -18,7 +18,9 @@ Get-ChildItem -Path $root -Recurse -File -ErrorAction SilentlyContinue | Unblock
 
 # Surehand MCP's own entries in .surehand\ae and .aemcp: the same list as OWN_FILES in
 # server/src/cli/uninstall.ts (a test keeps them equal). Everything else there is the user's.
-$ownFiles = @("server", "config.json", "runtime.json", "extension-hash", "bridge-status.json", "instances", "update-check.json", "activity.jsonl", "tmp", "renders", "compat", "install.log", "install-result.json", "chatgpt.json", "chatgpt.lock", "sessions", "MOVED.txt")
+$ownFiles = @("server", "config.json", "runtime.json", "extension-hash", "bridge-status.json", "instances", "update-check.json", "activity.jsonl", "tmp", "renders", "compat", "install.log", "install-result.json", "chatgpt.json", "chatgpt.lock", "sessions", "skills", "MOVED.txt")
+# Our Agent Skills in .claude\skills and .agents\skills: the same list as SKILL_NAMES in server/src/cli/skills.ts.
+$skills = @("surehand-ae", "surehand-ae-delivery", "surehand-ae-safe-restructure", "surehand-ae-timing-layout")
 $legacyDir = Join-Path $env:USERPROFILE ".aemcp"
 
 # Another Surehand app (.surehand\<app>) is installed: the shared Node.js stays for it.
@@ -80,6 +82,7 @@ if (-not $node) {
     Remove-Item -Recurse -Force -ErrorAction SilentlyContinue (Join-Path $env:APPDATA "Adobe\CEP\extensions\com.aemcp")
     Remove-Own (Join-Path $surehand "ae")
     Remove-Own $legacyDir
+    foreach ($s in $skills) { foreach ($d in @(".claude", ".agents")) { Remove-Item -Recurse -Force -ErrorAction SilentlyContinue (Join-Path $env:USERPROFILE "$d\skills\$s") } }
     Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $surehand "migration.log")
     Remove-OwnCloudflared
     if (Test-OtherApps) { Write-Host "Kept $privateNode (another Surehand app uses it)." } else { Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $privateNode }

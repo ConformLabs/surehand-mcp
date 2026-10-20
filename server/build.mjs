@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { chmodSync, readFileSync, rmSync } from "node:fs";
 import { readCepFiles } from "./scripts/cep-files.mjs";
 import { packViews } from "./scripts/views.mjs";
+import { readSkillFiles } from "./scripts/skill-files.mjs";
 
 const pkg = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8"));
 
@@ -19,6 +20,8 @@ for (const [rel, content] of Object.entries(cepFiles)) {
 const cepHash = createHash("sha1").update(JSON.stringify(cepText)).update(JSON.stringify(cepBinary)).digest("hex").slice(0, 12);
 // The in-chat views (MCP Apps), each a self-contained HTML page (scripts/views.mjs)
 const views = packViews();
+// The Agent Skills (skills/), which `install` writes for the AI apps that read them (src/cli/skills.ts)
+const skillFiles = readSkillFiles();
 
 await build({
   entryPoints: ["src/index.ts"],
@@ -36,6 +39,7 @@ await build({
     __AEMCP_CEP_BINARY__: JSON.stringify(cepBinary),
     __AEMCP_CEP_HASH__: JSON.stringify(cepHash),
     __SUREHAND_VIEWS__: JSON.stringify(views),
+    __AEMCP_SKILLS__: JSON.stringify(skillFiles),
   },
   banner: {
     js:
@@ -51,4 +55,4 @@ await build({
 chmodSync("dist/surehand-ae.mjs", 0o755);
 // up to 1.3 the bundle was dist/ae-mcp.mjs (releases still carry that name too: scripts/release.mjs)
 rmSync("dist/ae-mcp.mjs", { force: true });
-console.log(`built dist/surehand-ae.mjs v${pkg.version} (extension ${Object.keys(cepFiles).length} files, ${cepHash})`);
+console.log(`built dist/surehand-ae.mjs v${pkg.version} (extension ${Object.keys(cepFiles).length} files, ${cepHash}; skills ${Object.keys(skillFiles).length} files)`);

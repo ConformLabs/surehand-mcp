@@ -31,6 +31,7 @@ if (phase === "installed") {
   expect(!existsSync(join(ext, ".aemcp-hash")), "no extra files inside the signed extension");
   expect(existsSync(join(ext, "META-INF", "signatures.xml")) && existsSync(join(ext, "mimetype")), "extension signature installed");
   expect(!readFileSync(join(ext, "js", "bridge-core.js"), "utf8").includes("__AEMCP_VERSION__"), "extension version stamped");
+  expect(existsSync(join(app, "skills", "surehand-ae.zip")), "skill zips for Claude Desktop chat written to ~/.surehand/ae/skills");
   if (process.env.SUREHAND_AE_FORCE_NODE_DOWNLOAD || process.env.AEMCP_FORCE_NODE_DOWNLOAD)
     expect(existsSync(join(surehand, "node", isWin ? "node.exe" : "bin/node")), "private Node.js downloaded to ~/.surehand/node");
   if (selftestOutput) {
@@ -46,6 +47,7 @@ if (phase === "installed") {
   expect(!existsSync(join(app, "server")), "server removed");
   expect(!existsSync(join(app, "config.json")), "config removed");
   expect(!existsSync(join(surehand, "node")), "private Node.js removed");
+  expect(![".claude", ".agents"].some((d) => existsSync(join(home, d, "skills", "surehand-ae"))), "Surehand skills removed");
   expect(!existsSync(surehand), "~/.surehand removed (nothing of the user's was in it)");
 } else {
   console.error("usage: ci-check.mjs installed [selftest-output] | uninstalled");

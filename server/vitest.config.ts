@@ -1,6 +1,7 @@
 import { defineConfig } from "vitest/config";
 import { readFileSync } from "node:fs";
 import { packViews } from "./scripts/views.mjs";
+import { readSkillFiles } from "./scripts/skill-files.mjs";
 
 export default defineConfig({
   define: {
@@ -10,6 +11,8 @@ export default defineConfig({
     __AEMCP_CEP_HASH__: JSON.stringify("testhash"),
     // the real views, built as for the bundle
     __SUREHAND_VIEWS__: JSON.stringify(packViews()),
+    // the real skills (skills/ in the repo)
+    __AEMCP_SKILLS__: JSON.stringify(readSkillFiles()),
   },
   plugins: [
     {
