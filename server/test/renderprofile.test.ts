@@ -21,14 +21,18 @@ let checkpointFile: string;
 /** switch calls that fail (1-based: the n-th switch call of the test) */
 let failSwitch: Set<number>;
 
-// the virtual clock: a call costs CALL_MS; a render's file is written its cost after the call that started it returned
+// the virtual clock: a call costs CALL_MS; a render's PNG is written in two parts, as seen live: the first half at 60% of
+// its cost, then nothing for a while (a size that holds still), then the rest at its cost after the call returned
 const CALL_MS = 2;
+const PNG = encodePng(4, 4, new Uint8Array(4 * 4 * 3).fill(90), 3);
 let vnow = 0;
-let pending: { path: string; at: number }[] = [];
+let pending: { path: string; at: number; data: Buffer }[] = [];
 function flush() {
-  for (const p of pending.filter((x) => x.at <= vnow)) writeFileSync(p.path, "png-bytes");
+  for (const p of pending.filter((x) => x.at <= vnow)) writeFileSync(p.path, p.data);
   pending = pending.filter((x) => x.at > vnow);
 }
+const scheduleRender = (path: string, ms: number) =>
+  pending.push({ path, at: vnow + ms * 0.6, data: PNG.subarray(0, PNG.length >> 1) }, { path, at: vnow + ms, data: PNG });
 
 function picture(comp: any, t: number, bpc: number): Buffer {
   const seen = comp.layers
@@ -83,7 +87,8 @@ vi.mock("../src/jsx.js", async (original) => {
   };
 });
 
-const { measure, optimize, median, heatMap, slowestRanges, timing, PROFILE_INFO_JSX, PROFILE_TRIGGER_JSX, PROFILE_SWITCH_JSX } = await import("../src/tools/renderprofile.js");
+const { completePngSize } = await import("../src/png.js");
+const { measure, optimize, median, heatMap, slowestRanges, costNote, timing, PROFILE_INFO_JSX, PROFILE_TRIGGER_JSX, PROFILE_SWITCH_JSX } = await import("../src/tools/renderprofile.js");
 const FULL = { mode: "full", allowShell: false };
 const text = (r: any) => r.content.map((c: any) => c.text).join("\n");
 
@@ -110,7 +115,7 @@ afterAll(() => {
 /** a fake project whose renders write their file `cost` ms after the call that started them returned */
 function project(spec: FakeProjectSpec) {
   const f = fakeProject(spec);
-  f.clock.onRender = (path, ms) => pending.push({ path, at: vnow + ms });
+  f.clock.onRender = scheduleRender;
   // the fake marks the project as changed once anything is written (as After Effects does)
   expect(f.app.project.dirty).toBe(false);
   return f;
@@ -158,8 +163,24 @@ describe("ae_render_profile helpers", () => {
     const path = join(home, "trigger-test.png");
     const r = fake.run(PROFILE_TRIGGER_JSX, { comp: fake.comps[1].id, time: 1, path });
     expect(r.ok).toBe(true);
-    expect(pending.map((p) => p.path)).toEqual([path]);
+    expect(pending.map((p) => p.path)).toEqual([path, path]);
     expect(fake.calls.filter((c) => c.startsWith("purge"))).toEqual(["purge 4"]);
+  });
+
+  it("a PNG counts as written only when it is complete (a half-written file whose size holds still doesn't)", () => {
+    const path = join(home, "half.png");
+    writeFileSync(path, PNG.subarray(0, PNG.length >> 1));
+    expect(completePngSize(path)).toBe(-1);
+    writeFileSync(path, PNG);
+    expect(completePngSize(path)).toBe(PNG.length);
+    expect(completePngSize(join(home, "none.png"))).toBe(-1);
+  });
+
+  it("a measured cost: within the spread, a real cost, or switching it off made the frame slower", () => {
+    expect(costNote(3, 7)).toBe(" (within the ±14 ms spread)");
+    expect(costNote(-10, 7)).toBe(" (within the ±14 ms spread)");
+    expect(costNote(40, 7)).toBe("");
+    expect(costNote(-66, 7)).toBe(": switching it off made the frame slower here (caching or interaction, not a saving)");
   });
 
   it("median, heat map rows and the slowest ranges", () => {
@@ -217,6 +238,32 @@ describe("ae_render_profile measure", () => {
     fake = project({ ...spot(), jitter: [0, 0, 500] });
     const t = text(await measure({ action: "measure", frames: 3, runs: 3, layers: false }));
     expect(t).toMatch(/fastest 330 ms at f0/);
+  });
+
+  it("renders a sample far below the frame's others again, and says so", async () => {
+    fake = project({ ...spot(), jitter: [0, 0, -320] });
+    const t = text(await measure({ action: "measure", frames: 3, runs: 3, layers: false }));
+    // every frame's third render comes in 320 ms early (under half of 330 / 620 ms); its redo is right, so the medians are exact
+    expect(t).toMatch(/fastest 330 ms at f0/);
+    expect(t).toMatch(/slowest 620 ms/);
+    // one redo lands on the next early render too, so it is left out instead
+    expect(t).toMatch(/3 renders far below the other renders of the same frame were rendered again; 1 still too low was left out of the medians\./);
+    expect(t).toMatch(/repeat renders vary by about ±0 ms/);
+  });
+
+  it("says when switching something off made the frame slower, and when a cost is within the spread", async () => {
+    fake = project(spot({}, {
+      renderMs: 100,
+      layers: [
+        { name: "Cache helper", costMs: -66 },
+        { name: "Tiny", costMs: 0.5 },
+        { name: "Heavy", costMs: 200 },
+      ],
+    }));
+    const t = text(await measure({ action: "measure", frames: 4, runs: 3 }));
+    expect(t).toMatch(/"Cache helper" \(footage\): -66 ms, -\d+(\.\d+)?%: switching it off made the frame slower here \(caching or interaction, not a saving\)/);
+    expect(t).toMatch(/"Tiny" \(footage\): 1 ms, [\d.]+% \(within the ±1 ms spread\)/);
+    expect(t).toMatch(/"Heavy" \(footage\): 200 ms, [\d.]+%\n/);
   });
 
   it("stops at the time budget and reports only what was measured", async () => {
@@ -339,6 +386,17 @@ describe("ae_render_profile optimize", () => {
     expect(t).toMatch(/KEPT: IDENTICAL/);
     const op = fake.comps[1].layers[0].property("ADBE Transform Group").property("ADBE Opacity");
     expect([op.value, op.expression, op.expressionEnabled]).toEqual([60, "100", false]);
+  });
+
+  it("a kept change that saves nothing measurable says so, instead of a time saved", async () => {
+    fake = project(spot({}, { layers: [{ name: "BG", costMs: 100 }, { name: "Ghost", opacity: 0, costMs: 0 }] }));
+    // layers not measured: the invisible layer is a finding with its cost unknown
+    const m = text(await measure({ action: "measure", frames: 4, runs: 3, layers: false }));
+    const id = /Render profile (\S+) of/.exec(m)![1];
+    const t = text(await optimize({ action: "optimize", id, findings: ["F1"] }, FULL));
+    expect(t).toMatch(/1 of 1 finding kept/);
+    expect(t).toMatch(/No measurable speed-up at the 4 sampled frames \(median of 3, cache purged, before and after in this run\): the difference is 0 ms per frame, within the ±1 ms spread of repeat renders\./);
+    expect(t).not.toMatch(/Time saved/);
   });
 
   it("refuses read-only mode, advice, unknown ids and a profile from another comp", async () => {

@@ -16,6 +16,7 @@ import { join } from "node:path";
 import { z } from "zod";
 import { runJsx } from "../jsx.js";
 import { appFile } from "../paths.js";
+import { completePngSize } from "../png.js";
 import { permissions, READ_ONLY_REFUSAL } from "../permissions.js";
 import { captureProof, compareProof } from "./prove.js";
 import { errorResult } from "./registry.js";
@@ -205,6 +206,16 @@ export const median = (a: number[]) => {
 const r1 = (n: number) => Math.round(n * 10) / 10;
 export const ms = (n: number) => (Math.abs(n) >= 1000 ? `${r1(n / 1000)} s` : `${Math.round(n)} ms`);
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
+
+/** A difference counts only beyond twice the spread of repeat renders of the same frame (at least 1 ms). */
+export const spreadOf = (noise: number) => Math.max(1, 2 * noise);
+
+/** What a measured cost means: within the spread, a real cost (""), or switching it off made the frame slower. */
+export function costNote(v: number, noise: number): string {
+  const s = spreadOf(noise);
+  if (Math.abs(v) <= s) return ` (within the ±${ms(s)} spread)`;
+  return v < 0 ? ": switching it off made the frame slower here (caching or interaction, not a saving)" : "";
+}
 const quote = (s: string) => `"${s}"`;
 
 /** Heat map rows: each sampled frame stands for the frames up to halfway to its neighbours. */
@@ -287,14 +298,6 @@ async function readInfo(args: Record<string, unknown>): Promise<Info> {
 /** Clock and wait, replaceable in tests (the fake After Effects writes its frames on a virtual clock). */
 export const timing = { now: () => performance.now(), sleep: (ms: number) => new Promise<void>((r) => setTimeout(r, ms)) };
 
-const sizeOf = (p: string) => {
-  try {
-    return statSync(p).size;
-  } catch {
-    return -1;
-  }
-};
-
 interface Toggle { layer?: number; effect?: number; bpc?: number; back?: number }
 let timers = 0;
 
@@ -320,16 +323,22 @@ class Timer {
     this.overhead = median(rt);
   }
 
-  /** One render: from the start of the call that starts it until the file has the size it keeps, minus the round trip. */
+  /**
+   * One render: from the start of the call that starts it until its PNG is completely written (signature and IEND,
+   * then the same size one poll later), minus the round trip. A new path for every render, removed before it starts:
+   * a file from an earlier render can't count. Measured live: a size that holds still for 5 ms can still be a half
+   * written PNG, and stopping there let the next render queue behind the rest of the write.
+   */
   async render(time: number): Promise<number> {
     mkdirSync(this.dir, { recursive: true });
     const path = join(this.dir, `${this.prefix}${this.n++}.png`);
+    rmSync(path, { force: true });
     const t0 = timing.now();
     const r = await runJsx(PROFILE_TRIGGER_JSX, { comp: this.comp, time, path }, { undoGroup: false, timeoutMs: 60_000 });
     if (!r.ok) throw new Error(r.error?.message || "After Effects could not start the render.");
     let size = -1, at = 0;
     for (;;) {
-      const now = timing.now(), s = sizeOf(path);
+      const now = timing.now(), s = completePngSize(path);
       if (s > 0 && s === size) break;
       if (s !== size) {
         size = s;
@@ -341,6 +350,29 @@ class Timer {
     }
     rmSync(path, { force: true });
     return Math.round(Math.max(0, at - t0 - this.overhead) * 100) / 100;
+  }
+
+  /** samples redone because they were far below the frame's other samples, and those still too low after the redo (dropped) */
+  redone = 0;
+  dropped = 0;
+
+  /**
+   * With 3 or more samples of a frame: one far below the others (under half their median) is a render that wasn't
+   * measured right (a file seen too early, a cache hit): it is rendered again once, and dropped if it is still low.
+   */
+  private async clean(samples: number[], again: () => Promise<number>): Promise<number[]> {
+    if (samples.length < 3) return samples;
+    const low = (i: number, a: number[]) => a[i] < 0.5 * median(a.filter((_, j) => j !== i));
+    const out = [...samples];
+    for (let i = 0; i < out.length; i++) {
+      if (!low(i, out)) continue;
+      this.redone++;
+      out[i] = await again();
+      if (low(i, out)) out[i] = NaN;
+    }
+    const kept = out.filter((x) => !Number.isNaN(x));
+    this.dropped += out.length - kept.length;
+    return kept;
   }
 
   async set(args: { set?: { layer: number; effect?: number; on: boolean }[]; bpc?: number }) {
@@ -373,7 +405,8 @@ class Timer {
         base.push(await this.render(t));
         if (toggle && r % 2 === 0) alt.push(await off(t));
       }
-      out.push(toggle ? { t, base, off: alt } : { t, base });
+      const b = await this.clean(base, () => this.render(t));
+      out.push(toggle ? { t, base: b, off: await this.clean(alt, () => off(t)) } : { t, base: b });
     }
     return { frames: out, stopped: false };
   }
@@ -524,7 +557,7 @@ export async function measure(input: ProfileInput, perm: { mode: string } = { mo
     timer.cleanup();
   }
   const costOf = (id: number) => costs.find((c) => c.layer === id && c.effect === undefined);
-  const real = (c?: Cost) => !!c && c.ms > Math.max(1, noise);
+  const real = (c?: Cost) => !!c && c.ms > spreadOf(noise);
   const costText = (c?: Cost) => (c ? `${ms(c.ms)} (${c.pct}% of the frame) at ${c.frames.map((f) => `f${f}`).join(", ")}` : "cost not measured");
 
   // 4. findings
@@ -620,10 +653,10 @@ export async function measure(input: ProfileInput, perm: { mode: string } = { mo
     findings,
   };
   saveProfile(profile);
-  return { content: [{ type: "text", text: report(profile, info, { noise, notes, skipped, bitDepth, unchanged, overhead: timer.overhead, seconds: (timing.now() - t0) / 1000 }) }] };
+  return { content: [{ type: "text", text: report(profile, info, { noise, notes, skipped, bitDepth, unchanged, overhead: timer.overhead, redone: timer.redone, dropped: timer.dropped, seconds: (timing.now() - t0) / 1000 }) }] };
 }
 
-function report(p: Profile, info: Info, o: { noise: number; notes: string[]; skipped: string[]; bitDepth: string | null; unchanged: string; overhead: number; seconds: number }) {
+function report(p: Profile, info: Info, o: { noise: number; notes: string[]; skipped: string[]; bitDepth: string | null; unchanged: string; overhead: number; redone: number; dropped: number; seconds: number }) {
   const C = info.comp, L: string[] = [];
   const count = C.f1 - C.f0 + 1;
   L.push(
@@ -645,10 +678,9 @@ function report(p: Profile, info: Info, o: { noise: number; notes: string[]; ski
     const layerCosts = p.costs.filter((c) => c.effect === undefined).sort((a, b) => b.ms - a.ms);
     for (const c of layerCosts) {
       const l = info.layers.find((x) => x.id === c.layer);
-      const tiny = c.ms <= Math.max(1, o.noise) ? " (within noise)" : "";
-      L.push(`  ${String(l?.i ?? "?").padStart(3)}. ${quote(c.name)}${l ? ` (${l.t})` : ""}: ${ms(c.ms)}, ${c.pct}%${tiny}`);
+      L.push(`  ${String(l?.i ?? "?").padStart(3)}. ${quote(c.name)}${l ? ` (${l.t})` : ""}: ${ms(c.ms)}, ${c.pct}%${costNote(c.ms, o.noise)}`);
       for (const e of p.costs.filter((x) => x.layer === c.layer && x.effect !== undefined).sort((a, b) => b.ms - a.ms))
-        L.push(`         effect ${quote(e.effectName!)}: ${ms(e.ms)}, ${e.pct}%${e.ms <= Math.max(1, o.noise) ? " (within noise)" : ""}`);
+        L.push(`         effect ${quote(e.effectName!)}: ${ms(e.ms)}, ${e.pct}%${costNote(e.ms, o.noise)}`);
     }
     L.push("  Costs overlap (layers interact: mattes, adjustment layers, expressions), so they don't add up to the frame time.");
   }
@@ -662,6 +694,7 @@ function report(p: Profile, info: Info, o: { noise: number; notes: string[]; ski
       "polled every 1-10 ms; After Effects' disk cache and plug-in caches are not purged; " +
       "times between the sampled frames are estimates; another app using the CPU or GPU shows up as noise.",
   );
+  if (o.redone) L.push(`${plural(o.redone, "render")} far below the other renders of the same frame ${o.redone === 1 ? "was" : "were"} rendered again${o.dropped ? `; ${o.dropped} still too low ${o.dropped === 1 ? "was" : "were"} left out of the medians` : ""}.`);
   if (o.notes.length) L.push(...o.notes);
   const ids = p.findings.filter((f) => f.applicable).map((f) => f.id);
   if (ids.length) L.push(`Apply with proof: ae_render_profile {action: "optimize", id: "${p.id}", findings: ${JSON.stringify(ids)}}.`);
@@ -829,12 +862,21 @@ export async function optimize(input: ProfileInput, perm: { mode: string; allowS
   else if (!pairs.length) head.push(`Time saved: not measured (${beforeProblem ? `the measurement before failed${beforeProblem}` : afterProblem ? `the re-measure failed${afterProblem}` : "time budget"}). The kept changes are proven identical; measure again to see the time.`);
   else {
     const b = pairs.reduce((s, x) => s + x.before, 0), a = pairs.reduce((s, x) => s + x.after, 0), count = p.comp.f1 - p.comp.f0 + 1;
-    head.push(
-      `Time saved at ${plural(pairs.length, "measured frame")} (median of ${runs}, cache purged, before and after in this run): ${ms(b - a)} of ${ms(b)} (${r1((100 * (b - a)) / b)}%), ` +
-        `${ms((b - a) / pairs.length)} per frame; about ${ms(((b - a) / pairs.length) * count)} over all ${count} frames (estimate from the sampled frames).`,
-      ...pairs.sort((x, y) => x.t - y.t).map((x) => `  f${Math.round(x.t / fd)}: ${ms(x.before)} → ${ms(x.after)}`),
-    );
+    const per = (b - a) / pairs.length, how = `median of ${runs}, cache purged, before and after in this run`;
+    // spread of repeat renders of the same frame, before and after: a smaller difference per frame is no measured change
+    const spread = spreadOf(median([...before.frames, ...after.frames].map((f) => (f.base.length > 1 ? (Math.max(...f.base) - Math.min(...f.base)) / 2 : 0))));
+    if (Math.abs(per) <= spread)
+      head.push(`No measurable speed-up at the ${plural(pairs.length, "sampled frame")} (${how}): the difference is ${ms(per)} per frame, within the ±${ms(spread)} spread of repeat renders.`);
+    else if (per < 0)
+      head.push(`Not faster at the ${plural(pairs.length, "sampled frame")} (${how}): ${ms(-per)} per frame slower, beyond the ±${ms(spread)} spread of repeat renders (caching or other work on this computer can do that; the kept changes are still proven identical).`);
+    else
+      head.push(
+        `Time saved at ${plural(pairs.length, "measured frame")} (${how}): ${ms(b - a)} of ${ms(b)} (${r1((100 * (b - a)) / b)}%), ` +
+          `${ms(per)} per frame (repeat renders vary by ±${ms(spread)}); about ${ms(per * count)} over all ${count} frames (estimate from the sampled frames).`,
+      );
+    head.push(...pairs.sort((x, y) => x.t - y.t).map((x) => `  f${Math.round(x.t / fd)}: ${ms(x.before)} → ${ms(x.after)}`));
   }
+  if (timer.redone) head.push(`${plural(timer.redone, "render")} far below the other renders of the same frame rendered again${timer.dropped ? `, ${timer.dropped} still too low left out` : ""}.`);
   return { content: [{ type: "text", text: [...head, "", ...lines, "", "Every kept change was proven with ae_prove_identical at the default tolerance (only the sampled frames are compared; not audio or the times between them)."].join("\n") }] };
 }
 

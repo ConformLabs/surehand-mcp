@@ -1,9 +1,34 @@
 // A small PNG decoder and encoder (no dependencies), for comparing frames that After Effects rendered.
 // Decodes non-interlaced 8- and 16-bit grayscale, gray+alpha, RGB and RGBA (what saveFrameToPng writes)
 // to RGBA; anything else (palette, interlaced, other bit depths) fails with a clear message.
+import { closeSync, fstatSync, openSync, readSync } from "node:fs";
 import { deflateSync, inflateSync } from "node:zlib";
 
 const SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+/** The empty IEND chunk every complete PNG ends with: length 0, "IEND", its CRC. */
+const IEND = Buffer.from([0, 0, 0, 0, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82]);
+
+/**
+ * The size of a PNG file once it is completely written (it starts with the signature and ends with IEND),
+ * else -1: a file that exists, or has a size that holds still, can still be half written.
+ */
+export function completePngSize(path: string): number {
+  let fd: number | undefined;
+  try {
+    fd = openSync(path, "r");
+    const size = fstatSync(fd).size;
+    if (size < SIGNATURE.length + IEND.length) return -1;
+    const head = Buffer.alloc(SIGNATURE.length), tail = Buffer.alloc(IEND.length);
+    readSync(fd, head, 0, head.length, 0);
+    readSync(fd, tail, 0, tail.length, size - tail.length);
+    return head.equals(SIGNATURE) && tail.equals(IEND) ? size : -1;
+  } catch {
+    return -1;
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+  }
+}
+
 const CHANNELS: Record<number, number> = { 0: 1, 2: 3, 4: 2, 6: 4 };
 
 export interface Image {
