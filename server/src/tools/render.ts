@@ -1,6 +1,27 @@
 import { z } from "zod";
 import { compRef, type JsxTool } from "./registry.js";
 
+/**
+ * Renders the queued items. args.only (render queue indexes; ae_versions_from_data, not in the tool's schema):
+ * render just those; the other queued items are switched off while it renders, then queued again as they were.
+ */
+export const RENDER_QUEUE_JSX = `
+var rq = app.project.renderQueue; if (rq.numItems === 0) aemcp.fail("Render queue is empty");
+var off = [], want = null;
+if (args.only) {
+  want = {};
+  for (var k = 0; k < args.only.length; k++) want["i" + args.only[k]] = true;
+  for (var i0 = 1; i0 <= rq.numItems; i0++) { var q = rq.item(i0); if (!want["i" + i0] && q.render) { q.render = false; off.push(i0); } }
+}
+try { rq.render(); } finally { for (var j = 0; j < off.length; j++) { try { rq.item(off[j]).render = true; } catch (e) {} } }
+var out = [];
+for (var i = 1; i <= rq.numItems; i++) {
+  if (want && !want["i" + i]) continue;
+  var it = rq.item(i), f = it.outputModule(1).file;
+  out.push({ index: i, comp: it.comp.name, status: aemcp.enumName(RQItemStatus, it.status), file: f ? f.fsName : null });
+}
+return out;`;
+
 export const renderTools: JsxTool[] = [
   {
     name: "ae_list_render_queue",
@@ -31,12 +52,7 @@ return out;`,
       workAreaOnly: z.boolean().optional(),
     },
     jsx: `
-var c = aemcp.findComp(args.comp), it = app.project.renderQueue.items.add(c);
-if (args.renderSettingsTemplate) it.applyTemplate(args.renderSettingsTemplate);
-var om = it.outputModule(1);
-if (args.outputModuleTemplate) om.applyTemplate(args.outputModuleTemplate);
-if (args.outputPath) om.file = new File(args.outputPath);
-if (args.workAreaOnly === false) { it.timeSpanStart = 0; it.timeSpanDuration = c.duration; }
+var c = aemcp.findComp(args.comp), om = aemcp.addToRenderQueue(c, args).om;
 return { index: app.project.renderQueue.numItems, comp: c.name, output: om.file ? om.file.fsName : null, template: om.name };`,
   },
   {
@@ -106,11 +122,7 @@ return { sentToMediaEncoder: true, started: !!args.start };`,
     destructive: true,
     timeoutMs: 3600 * 1000,
     noUndo: true,
-    jsx: `
-var rq = app.project.renderQueue; if (rq.numItems === 0) aemcp.fail("Render queue is empty");
-rq.render();
-var out = []; for (var i = 1; i <= rq.numItems; i++) out.push({ comp: rq.item(i).comp.name, status: aemcp.enumName(RQItemStatus, rq.item(i).status), file: rq.item(i).outputModule(1).file ? rq.item(i).outputModule(1).file.fsName : null });
-return out;`,
+    jsx: RENDER_QUEUE_JSX,
   },
   {
     name: "ae_clear_render_queue",
