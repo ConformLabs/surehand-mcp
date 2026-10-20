@@ -35,6 +35,7 @@ Also:
   expression dependencies and fragile links, missing items, footage specs and what makes it heavy.
 - Sending a project to someone: ae_handoff_package collects it with its footage, lists what the recipient needs, and
   with verify proves the package renders the same.
+- Slow render? ae_render_profile measures where the time goes over the timeline and proves speed-ups before keeping them.
 - Exact timing: the keyframe table (ae_get_keyframes / ae_set_keyframe_table: frames or seconds, exact speed and
   influence), ae_copy_ease, ae_retime_keyframes (whole frames), ae_audit_easing. Layout: ae_align_layers moves layers by
   their measured on-screen bounds; ae_reformat makes the comp at another size by the user's rules and checks every frame.

@@ -6,6 +6,7 @@ import { registerCoreTools } from "./tools/core.js";
 import { registerRenderJobs } from "./tools/renderjobs.js";
 import { registerWorkflowTools } from "./tools/workflow.js";
 import { registerProveTools } from "./tools/prove.js";
+import { registerRenderProfileTools } from "./tools/renderprofile.js";
 import { registerHistoryTools } from "./tools/history.js";
 import { registerPreflightTools } from "./tools/preflight.js";
 import { registerReformatTools } from "./tools/reformat.js";
@@ -30,6 +31,7 @@ export function createMcpServer(profile: ToolProfile = resolveProfile()): McpSer
   registerRenderJobs(server);
   registerWorkflowTools(server);
   registerProveTools(server);
+  registerRenderProfileTools(server);
   registerHistoryTools(server);
   registerPreflightTools(server);
   registerReformatTools(server);
