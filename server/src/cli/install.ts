@@ -57,7 +57,7 @@ export interface InstallResult {
   /** cloudflared for ChatGPT on the web, when it was asked for (--tunnel) */
   tunnel?: { outcome: TunnelOutcome; path?: string; error?: string };
   /** the Agent Skills: the folders written and the zips for Claude Desktop chat (a full run; skills.ts) */
-  skills?: { dirs: string[]; zips: string[]; error?: string };
+  skills?: { dirs: string[]; zips: string[]; error?: string; /** Claude Desktop is on this computer: the next steps say to upload the zips */ claudeDesktop?: boolean };
   /** the results as the installers show them (installResultView) */
   summary: SummaryRow[];
   /** the numbered next steps */
@@ -127,7 +127,7 @@ export function installResultView(r: Omit<InstallResult, "summary" | "next">): {
     next.push(`Restart ${list(connected)}.`);
     next.push(`Ask ${connected.length > 1 ? "one of them" : "it"} “What's in my project?” The Surehand panel (Window › Extensions › Surehand MCP) shows when it's connected.`);
   } else next.push("Open After Effects and connect an AI app in the Surehand panel (Window › Extensions › Surehand MCP).");
-  if (r.skills?.zips.length) next.push(CLAUDE_CHAT_SKILLS);
+  if (r.skills?.zips.length && r.skills.claudeDesktop) next.push(CLAUDE_CHAT_SKILLS);
   return { summary, next };
 }
 
@@ -376,7 +376,7 @@ export async function install(argv: string[]) {
     // the Agent Skills, for the apps on this computer that read them (whether or not they were chosen above)
     const sk = installSkills();
     reportSkills(sk);
-    result.skills = { dirs: sk.targets.filter((t) => t.written).map((t) => t.dir), zips: sk.zips, ...(sk.zipError ? { error: sk.zipError } : {}) };
+    result.skills = { dirs: sk.targets.filter((t) => t.written).map((t) => t.dir), zips: sk.zips, ...(sk.zipError ? { error: sk.zipError } : {}), claudeDesktop: clientInstalled("claude-desktop") };
   }
   writeResult();
   if (connectOnly) {
@@ -393,7 +393,7 @@ export async function install(argv: string[]) {
 
   Then open your AI app and ask it something about your After Effects project, like ${bold('"What\'s in my project?"')}
   Check the installation any time with ${fromInstaller ? bold(`"${nodePath}" "${INSTALLED_SERVER}" selftest`) : `${bold("2. Test Installation")} (in the ${isWin ? "Windows" : "Mac"} folder)`}.
-${registered.includes("ChatGPT desktop") ? `  ChatGPT desktop app: restart it; ${SERVER_NAME} appears under Settings > Plugins > Servers.\n` : ""}${result.skills?.zips.length ? `  ${CLAUDE_CHAT_SKILLS}\n` : ""}  ChatGPT on the web: run ${fromInstaller ? bold(`"${nodePath}" "${INSTALLED_SERVER}" chatgpt`) : `${bold("3. Connect ChatGPT")} from the same folder`}.
+${registered.includes("ChatGPT desktop") ? `  ChatGPT desktop app: restart it; ${SERVER_NAME} appears under Settings > Plugins > Servers.\n` : ""}${result.skills?.zips.length && result.skills.claudeDesktop ? `  ${CLAUDE_CHAT_SKILLS}\n` : ""}  ChatGPT on the web: run ${fromInstaller ? bold(`"${nodePath}" "${INSTALLED_SERVER}" chatgpt`) : `${bold("3. Connect ChatGPT")} from the same folder`}.
 
   Other MCP apps can use:  command ${nodePath}
                            args    ["${INSTALLED_SERVER}"]

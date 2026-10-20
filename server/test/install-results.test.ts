@@ -57,6 +57,27 @@ describe("install results and --clients", () => {
   });
   afterAll(() => rmSync(home, { recursive: true, force: true }));
 
+  it("writes the skill zips either way, but says to upload them only when Claude Desktop is on this computer", async () => {
+    const upload = (r: any) => r.next.filter((n: string) => n.startsWith("For Claude Desktop chat: upload the skills")).length;
+    await install(["--clients", "none"]);
+    expect(result().skills.zips).toHaveLength(4);
+    expect(existsSync(result().skills.zips[0])).toBe(true);
+    expect(upload(result())).toBe(1);
+    apps.installed.delete("claude-desktop");
+    try {
+      await install(["--clients", "none"]);
+      expect(result().skills.zips).toHaveLength(4); // claude.ai on the web takes them too
+      expect(existsSync(result().skills.zips[0])).toBe(true);
+      expect(result().skills.claudeDesktop).toBe(false);
+      expect(upload(result())).toBe(0);
+      // a later --connect-only step keeps it that way
+      await install(["--connect-only", "--clients", "cursor"]);
+      expect(upload(result())).toBe(0);
+    } finally {
+      apps.installed.add("claude-desktop");
+    }
+  });
+
   it("connects only the apps given with --clients, and says what happened to every app", async () => {
     apps.fail.set("cursor", "could not update its settings: EACCES");
     await install(["--clients", "claude-desktop,cursor"]);
