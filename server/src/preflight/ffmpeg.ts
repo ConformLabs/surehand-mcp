@@ -287,8 +287,8 @@ async function fetchHttps(url: string, signal: AbortSignal): Promise<Response> {
   throw new Error(`too many redirects for ${url}`);
 }
 
-/** Downloads `url` to `dest` while hashing it; refuses a wrong hash or an oversized file. */
-async function download(a: FfmpegArchive, dest: string, signal?: AbortSignal): Promise<void> {
+/** Downloads `url` to `dest` while hashing it; refuses a wrong hash or an oversized file. Also used for cloudflared. */
+export async function download(a: Pick<FfmpegArchive, "url" | "sha256" | "maxBytes">, dest: string, signal?: AbortSignal): Promise<void> {
   if (!allowedUrl(a.url, isLocalHttp(a.url))) throw new Error(`refusing a non-HTTPS download: ${a.url}`);
   // the caller's signal and a timeout, both
   const res = await fetchHttps(a.url, anySignal([signal, AbortSignal.timeout(15 * 60_000)]));
@@ -308,8 +308,17 @@ async function download(a: FfmpegArchive, dest: string, signal?: AbortSignal): P
       hash.update(chunk);
       if (!out.write(chunk))
         await new Promise<void>((r, j) => {
-          out.once("drain", () => r());
-          out.once("error", j);
+          // remove the other listener too: one left per wait piles up over a large download
+          const onDrain = () => {
+            out.off("error", onError);
+            r();
+          };
+          const onError = (e: Error) => {
+            out.off("drain", onDrain);
+            j(e);
+          };
+          out.once("drain", onDrain);
+          out.once("error", onError);
         });
     }
   } finally {
@@ -320,8 +329,8 @@ async function download(a: FfmpegArchive, dest: string, signal?: AbortSignal): P
   if (got !== a.sha256.toLowerCase()) throw new Error(`checksum mismatch for ${basename(a.url)} (expected ${a.sha256.slice(0, 12)}…, got ${got.slice(0, 12)}…)`);
 }
 
-/** Unzips with the system tar (bsdtar: macOS, Windows 10+), else PowerShell's Expand-Archive. Async: the server keeps answering. */
-async function unzip(zip: string, into: string): Promise<void> {
+/** Unzips (or untars a .tgz) with the system tar (bsdtar: macOS, Windows 10+), else PowerShell's Expand-Archive. Async: the server keeps answering. */
+export async function unzip(zip: string, into: string): Promise<void> {
   const tar = process.platform === "win32" ? join(process.env.SystemRoot || "C:\\Windows", "System32", "tar.exe") : "/usr/bin/tar";
   let why = "";
   try {

@@ -28,7 +28,7 @@ other_apps() {
   for d in "$SUREHAND"/*/; do
     [ -d "$d" ] || continue
     n="$(basename "$d")"
-    case "$n" in ae|node|ffmpeg) ;; *) return 0 ;; esac
+    case "$n" in ae|node|ffmpeg|bin) ;; *) return 0 ;; esac
   done
   return 1
 }

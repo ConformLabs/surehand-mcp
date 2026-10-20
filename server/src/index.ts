@@ -99,7 +99,7 @@ Usage:
   surehand-ae [--tools core|full]   core (default, 29 tools) or every tool
   surehand-ae --http [--port 8766] [--host 127.0.0.1] [--no-auth]
                          run over Streamable HTTP at /mcp (ChatGPT via a tunnel)
-  surehand-ae install [--skip-clients] [--no-claude-desktop|--no-claude-code|--no-cursor|--no-codex]
+  surehand-ae install [--skip-clients] [--no-claude-desktop|--no-claude-code|--no-cursor|--no-codex] [--clients <ids>] [--result <file.json>]
                          install the server + After Effects extension and connect AI apps
   surehand-ae uninstall [--keep-config] [--all]   (keeps checkpoints and files that are not ours unless --all)
   surehand-ae selftest [--full]  check the installation and the connection to After Effects;
@@ -109,6 +109,7 @@ Usage:
   surehand-ae activity [n]    the last n tool calls (default 30); full log in ~/.surehand/ae/activity.jsonl
   surehand-ae chatgpt [--local]
                          HTTP server + public tunnel for ChatGPT (in this window; Ctrl+C stops it)
+  surehand-ae chatgpt --install-tunnel [--json]   download Cloudflare's cloudflared (pinned, verified) into ~/.surehand/bin
   surehand-ae chatgpt --background|--status|--stop [--json]
                          the same in the background (the panel's ChatGPT screen): start, its state and address, stop
   surehand-ae update [--json]  install the latest release over this installation (and the AE extension)

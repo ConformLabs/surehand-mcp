@@ -243,6 +243,7 @@ Section "Uninstall"
     ${AndIf} $3 != "ae"
     ${AndIf} $3 != "node"
     ${AndIf} $3 != "ffmpeg"
+    ${AndIf} $3 != "bin"
       StrCpy $4 $3 1
       ${If} $4 != "."
         StrCpy $1 1

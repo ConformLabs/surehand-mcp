@@ -4,6 +4,7 @@ import { migrationLog } from "../migrate.js";
 import { appDir, legacyDir, MOVED_NOTE, newAppDir, surehandRoot } from "../paths.js";
 import { stopBackground } from "./chatgpt.js";
 import { CLIENT_IDS, disconnectClient } from "./clients.js";
+import { removeOwnCloudflared } from "./tunnel-install.js";
 import { bold, extensionDir, ok, warn } from "./util.js";
 
 // Files and folders in ~/.surehand/ae (and, from 1.3, ~/.aemcp) that Surehand MCP creates. Everything else there is the user's.
@@ -58,12 +59,17 @@ export function uninstall(argv: string[]) {
   const otherKept = clean(dir === legacyDir() ? newAppDir() : legacyDir(), false, all);
   rmSync(migrationLog(), { force: true });
   if (all) rmSync(join(surehandRoot(), "ffmpeg"), { recursive: true, force: true });
+  // cloudflared in the shared ~/.surehand/bin: only when Surehand downloaded it (its marker matches the file)
+  try {
+    if (removeOwnCloudflared()) ok("Removed cloudflared (downloaded for ChatGPT on the web)");
+  } catch {}
   // the private Node.js is shared by the Surehand apps: removed here only when no other one is installed and it
   // isn't running this process (then the launcher removes it after we exit)
   const R = surehandRoot(), node = join(R, "node");
   let others: string[] = [];
   try {
-    others = readdirSync(R).filter((n) => !["ae", "node", "ffmpeg"].includes(n) && !n.startsWith("."));
+    // shared folders (node, ffmpeg, bin) aren't apps
+    others = readdirSync(R).filter((n) => !["ae", "node", "ffmpeg", "bin"].includes(n) && !n.startsWith("."));
   } catch {}
   if (!others.length && existsSync(node) && !process.execPath.startsWith(node + sep)) rmSync(node, { recursive: true, force: true });
   try {

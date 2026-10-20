@@ -1019,10 +1019,30 @@
     } else if (st === "needs-tunnel") {
       var cmd = installCommand(s);
       box.appendChild(el("div", { cls: "lead", text: "ChatGPT needs a free tunnel tool, cloudflared." }));
-      box.appendChild(el("div", { cls: "line", text: "Install it in a terminal with:" }));
+      box.appendChild(el("div", { cls: "line", text: "Surehand can download Cloudflare’s official cloudflared into its own folder. No administrator rights needed." }));
+      var progress = el("div", { cls: "line", role: "status", hidden: true });
+      box.appendChild(progress);
+      box.appendChild(el("div", { cls: "acts" }, [button("primary pill sm", "Install it for me", function (ev) {
+        var b = ev.target;
+        b.disabled = true;
+        progress.hidden = false;
+        progress.className = "line";
+        progress.textContent = "Downloading cloudflared… This can take a minute.";
+        // `chatgpt --install-tunnel`: pinned and checked (SHA-256) download into ~/.surehand/bin; then start
+        runCli(["chatgpt", "--install-tunnel", "--json"], still(token, function (err, r) {
+          if (err || !r || !r.ok) {
+            b.disabled = false;
+            progress.className = "line bad";
+            progress.textContent = "Could not install cloudflared: " + (err ? err.friendly : (r && r.error) || "no answer") + ". Try again, or install it yourself (below).";
+            return;
+          }
+          toast("cloudflared is installed.");
+          start();
+        }), { since: "1.4.0", timeout: 600000 });
+      }), button("link", "Step-by-step guide", function () { openUrl(TUNNEL_HELP_URL); })]));
+      box.appendChild(el("div", { cls: "line", text: "Or install it yourself in a terminal:" }));
       box.appendChild(copyBox(cmd, function () { if (copyText(cmd)) toast("Command copied."); else toast("Could not copy to the clipboard.", true); }));
-      box.appendChild(el("div", { cls: "acts" }, [button("primary pill sm", "Try again", start),
-        button("link", "Step-by-step guide", function () { openUrl(TUNNEL_HELP_URL); })]));
+      box.appendChild(el("div", { cls: "acts" }, [button("secondary pill sm", "Try again", start)]));
     } else if (st === "error") {
       box.appendChild(el("div", { cls: "lead bad", text: "The secure link didn\u2019t start." }));
       if (s.error) box.appendChild(el("div", { cls: "line", text: s.error }));

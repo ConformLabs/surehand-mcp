@@ -28,6 +28,9 @@ const NAMES: Record<ClientId | "chatgpt-web", string> = {
   "chatgpt-web": "ChatGPT (web)",
 };
 
+/** The display names (installers and panel use the same). */
+export const CLIENT_NAMES = NAMES;
+
 export interface ClientInfo {
   id: ClientId | "chatgpt-web";
   name: string;
@@ -155,7 +158,8 @@ export function removeJsonEntries(file: string): boolean {
 
 // ---------- status ----------
 
-function installed(id: ClientId): boolean {
+/** Is the app on this computer? The same test for `clients`, the install and the installers' app lists. */
+export function clientInstalled(id: ClientId): boolean {
   switch (id) {
     case "claude-desktop":
       return existsSync(claudeDesktopDir());
@@ -169,7 +173,7 @@ function installed(id: ClientId): boolean {
 }
 
 export function clientInfo(id: ClientId): ClientInfo {
-  const base = { id, name: NAMES[id], installed: installed(id) };
+  const base = { id, name: NAMES[id], installed: clientInstalled(id) };
   if (id === "codex") {
     const file = codexConfig();
     let text = "";

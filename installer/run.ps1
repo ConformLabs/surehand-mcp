@@ -24,7 +24,7 @@ $legacyDir = Join-Path $env:USERPROFILE ".aemcp"
 # Another Surehand app (.surehand\<app>) is installed: the shared Node.js stays for it.
 function Test-OtherApps {
   if (-not (Test-Path $surehand)) { return $false }
-  return [bool](Get-ChildItem $surehand -Directory -Force -ErrorAction SilentlyContinue | Where-Object { @("ae", "node", "ffmpeg") -notcontains $_.Name -and -not $_.Name.StartsWith(".") })
+  return [bool](Get-ChildItem $surehand -Directory -Force -ErrorAction SilentlyContinue | Where-Object { @("ae", "node", "ffmpeg", "bin") -notcontains $_.Name -and -not $_.Name.StartsWith(".") })
 }
 
 # Removes only our own entries of a folder (never the user's data) and says what was kept.

@@ -5,6 +5,8 @@
 //                                 panel (or reuses the running one), prints {ok, state} and exits
 //   chatgpt --status --json       {ok, state: "starting"|"running"|"needs-tunnel"|"error"|"stopped", url?, ...}
 //   chatgpt --stop --json         stops it (the whole process group) and removes the status file
+//   chatgpt --install-tunnel [--json]   downloads Cloudflare's cloudflared (pinned, verified) into ~/.surehand/bin
+//                                 (tunnel-install.ts): {ok, path?, version?, already?, error?}
 //
 // The background one is a small supervisor (`chatgpt --supervise`) that runs the HTTP server and the tunnel
 // (cloudflared, else ngrok) as its children and keeps ~/.surehand/ae/chatgpt.json up to date:
@@ -17,6 +19,7 @@ import { loadConfig } from "../config.js";
 import { readJsonFile, sleepSync, writeFileAtomic } from "../fsutil.js";
 import { appFile, env } from "../paths.js";
 import { ensureConfig } from "./setup.js";
+import { CLOUDFLARED_VERSION, cloudflaredPath, installCloudflared } from "./tunnel-install.js";
 import { bold, dim, fail, isWin, warn, which, yellow } from "./util.js";
 
 export type ChatgptState = "starting" | "running" | "needs-tunnel" | "error" | "stopped";
@@ -37,10 +40,14 @@ const START_TIMEOUT_MS = 60_000;
 
 export const CLOUDFLARED_INSTALL = isWin ? "winget install --id Cloudflare.cloudflared" : "brew install cloudflared";
 
-/** cloudflared (no account needed), else ngrok; null when neither is installed. */
+/**
+ * cloudflared (no account needed), else ngrok; null when neither is installed. cloudflared: on the PATH, in
+ * Homebrew's folders, else the copy `chatgpt --install-tunnel` put in ~/.surehand/bin.
+ */
 export function tunnelTool(): { kind: "cloudflared" | "ngrok"; path: string } | null {
   // Homebrew's folders aren't always on the PATH of a program started by After Effects
   const extra = isWin || env("TUNNEL_PATH_ONLY") ? [] : ["/opt/homebrew/bin/cloudflared", "/usr/local/bin/cloudflared"];
+  if (!env("TUNNEL_PATH_ONLY")) extra.push(cloudflaredPath());
   const cloudflared = which("cloudflared") || extra.find((p) => existsSync(p)) || null;
   if (cloudflared) return { kind: "cloudflared", path: cloudflared };
   const ngrok = which("ngrok");
@@ -271,6 +278,13 @@ export function chatgpt(argv: string[]) {
   const json = argv.includes("--json");
   const print = (o: object, text: string) => console.log(json ? JSON.stringify(o) : text);
   if (argv.includes("--supervise")) return supervise();
+  if (argv.includes("--install-tunnel")) {
+    if (!json) console.log(`Downloading Cloudflare's cloudflared ${CLOUDFLARED_VERSION} (github.com/cloudflare/cloudflared)...`);
+    return installCloudflared().then((r) => {
+      process.exitCode = r.ok ? 0 : 1;
+      print(r, r.ok ? `${r.already ? "Already installed" : "Installed"}: ${r.path}` : `Could not install cloudflared: ${r.error}`);
+    });
+  }
   if (argv.includes("--status")) {
     const s = statusJson(chatgptStatus());
     return print(s, s.state === "running" ? `Running (${s.tunnel}). Connector URL (keep it private): ${s.url}` : s.state + (s.error ? `: ${s.error}` : ""));
