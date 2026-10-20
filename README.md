@@ -232,7 +232,13 @@ unknown effect name gets suggestions.
 
 - **Seeing the result:** `ae_render_frame` (a frame as an image; options: zoom into a region, render only some layers,
   transparency on a checkerboard or a color, difference image against another time or comp), `ae_render_contact_sheet`
-  (a grid of frames across time, labelled with time and frame number, to judge motion and easing)
+  (a grid of frames across time, labelled with time and frame number, to judge motion and easing). The temporary comp
+  stays until After Effects has written the image, then it is removed and anything switched for the render set back by
+  hand, and the project is compared with how it was. They never use Edit > Undo (it could revert your own last step);
+  After Effects may list a "Surehand MCP preview" step, which only brings the preview's own changes back. In a 32 bpc
+  project, or one with "Blend Colors Using 1.0 Gamma", frames are rendered at 16 bpc without it, so colors look as in
+  the viewer (After Effects writes such frames far too dark); the project settings are put back. `ae_export_frames` does
+  the same. `ae_prove_identical` always renders with the project's own settings, so a capture and its comparison match.
 - **Existing files are not replaced silently:** Save As in `ae_save_project`, the `outputPath` of `ae_render_frame` and
   `ae_render_contact_sheet`, and `ae_export_frames` refuse when a file is already there, and the error says to pass `overwrite: true` to replace it
 - **Measuring:** `ae_get_layer_bounds` (exact on-screen boxes after transforms, parenting, 3D and camera; in-frame and

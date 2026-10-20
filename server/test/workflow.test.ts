@@ -241,6 +241,124 @@ describe("guarded rollback in aemcp.run", () => {
   });
 });
 
+// Renders: saveFrameToPng writes after the script returns (AE 26.5), so what a render changes stays until Node has the
+// file; aemcp.finishRollback (a second call) then removes and sets it back BY HAND and compares. A render never runs
+// Edit > Undo: seen live, after a project was opened and its settings changed, that Undo reverted the user's own last
+// step. Here the "render" adds a temporary folder (its temporary comp) and, as in a 32 bpc project with linear
+// blending, switches the project to 16 bpc without it.
+describe("renders: cleaned up by hand, never undone", () => {
+  const RENDER = () => {
+    fake.app.project.items.addFolder("__aemcp_preview");
+    fake.app.project.bitsPerChannel = 16;
+    fake.app.project.linearBlending = false;
+    return "saved";
+  };
+  /** FINISH_JSX's cleanup (cleanNow): what is still there removed / set back; returns what it did */
+  const cleanNow = (opts: { keepFolder?: boolean } = {}) => () => {
+    const done: string[] = [];
+    const P = fake.app.project;
+    for (let i = P.numItems; i >= 1; i--) if (!opts.keepFolder && P.item(i).name === "__aemcp_preview") (P.item(i).remove(), done.push("temporary comp removed"));
+    if (P.bitsPerChannel !== 32) (P.bitsPerChannel = 32), done.push("bit depth 32 bpc");
+    if (!P.linearBlending) (P.linearBlending = true), done.push("linear blending on");
+    return done;
+  };
+  const run = (fn: () => unknown, opts: Record<string, unknown> = {}): RunResult =>
+    JSON.parse(helpers.run(fn, {}, { undoGroup: "Surehand MCP preview", report: ["*"], checkOnly: true, rollback: "deferred", ...opts }));
+  /** the second call, as finishRender makes it: in an undo group of the render's name */
+  const finish = (token: string, fix = cleanNow()) => JSON.parse(helpers.run(() => helpers.finishRollback(token, fix), {}, { undoGroup: "Surehand MCP preview" })).result;
+  const color = () => [fake.app.project.bitsPerChannel, fake.app.project.linearBlending];
+
+  it("the user's last step is a property edit right before the render: it is still there afterwards", () => {
+    withManualEdit();
+    fake.app.beginUndoGroup("user: opacity 70");
+    fake.opacity.value = 70;
+    fake.app.endUndoGroup();
+    const r = run(RENDER);
+    expect(r.ok).toBe(true);
+    // while AE writes the file, the render's changes stay
+    expect(fake.folders()).toEqual(["__aemcp_preview"]);
+    expect(color()).toEqual([16, false]);
+    const rb = finish(r.pending!);
+    expect(rb).toEqual({ undone: false, verified: "cleaned", byHand: ["temporary comp removed", "bit depth 32 bpc", "linear blending on"] });
+    expect(fake.undos.n).toBe(0); // Edit > Undo never ran
+    expect(opacity()).toBe(70);
+    expect(fake.folders()).toEqual([]);
+    expect(color()).toEqual([32, true]);
+    // the user's steps are all still in Edit > Undo, below the render's own
+    expect(fake.undoStack().slice(0, 2)).toEqual(["user: opacity 50", "user: opacity 70"]);
+    expect(fake.undoStack().slice(2).every((s) => s === "Surehand MCP preview")).toBe(true);
+    // a token is used once
+    expect(helpers.finishRollback(r.pending, () => [])).toEqual({ undone: false, verified: false, problem: "unknown" });
+  });
+
+  it("the case seen live: the first render after the project's settings were changed and saved; the settings stay the user's", () => {
+    withManualEdit();
+    fake.app.beginUndoGroup("user: settings");
+    fake.app.project.bitsPerChannel = 8;
+    fake.app.project.linearBlending = false;
+    fake.app.endUndoGroup();
+    fake.app.beginUndoGroup("user: settings again");
+    fake.app.project.bitsPerChannel = 32;
+    fake.app.project.linearBlending = true;
+    fake.app.endUndoGroup();
+    const r = run(() => {
+      RENDER();
+      fake.app.endUndoGroup(); // saveFrameToPng may close the open undo group
+      return "saved";
+    });
+    expect(finish(r.pending!)).toMatchObject({ undone: false, verified: "cleaned" });
+    expect(fake.undos.n).toBe(0);
+    expect(color()).toEqual([32, true]);
+    expect(opacity()).toBe(50);
+    expect(fake.undoStack().slice(0, 3)).toEqual(["user: opacity 50", "user: settings", "user: settings again"]);
+  });
+
+  it("an edit while the image was written: kept, the render cleaned up by hand, the project not compared (it changed)", () => {
+    withManualEdit();
+    const r = run(RENDER);
+    fake.app.beginUndoGroup("user: opacity 70");
+    fake.opacity.value = 70;
+    fake.app.endUndoGroup();
+    const rb = finish(r.pending!);
+    expect(rb).toEqual({ undone: false, verified: false, problem: "changed meanwhile", byHand: ["temporary comp removed", "bit depth 32 bpc", "linear blending on"] });
+    expect(fake.undos.n).toBe(0);
+    expect(opacity()).toBe(70);
+    expect(rollbackProblem(rb, "the render")).toMatch(/^The project changed while After Effects was writing the image .*so it wasn't compared with how it was before the render; what the render changed was removed and set back by hand\./);
+  });
+
+  it("what the cleanup couldn't put back is listed (never an empty list)", () => {
+    withManualEdit();
+    const r = run(RENDER);
+    const rb = finish(r.pending!, cleanNow({ keepFolder: true }));
+    expect(rb).toMatchObject({ undone: false, verified: false, problem: "not back" });
+    const msg = rollbackProblem(rb, "the render");
+    expect(msg).toMatch(/^What the render changed was removed and set back by hand, but the project still isn't how it was before the render:\n\+ folder "__aemcp_preview"/);
+    expect(fake.undos.n).toBe(0);
+  });
+
+  it("a render that fails puts its changes back itself and is checked, not undone", () => {
+    withManualEdit();
+    const r = run(() => {
+      RENDER();
+      cleanNow()(); // the render's own finally (cleanNow) when it fails
+      throw new Error("no such comp");
+    });
+    expect(r.ok).toBe(false);
+    expect(r.pending).toBeUndefined();
+    expect(r.rollback).toEqual({ undone: false, verified: true });
+    expect(fake.undos.n).toBe(0);
+    expect(color()).toEqual([32, true]);
+  });
+
+  it("a render that changed nothing (the in-chat frame of an 8 bpc project) leaves nothing to clean up", () => {
+    withManualEdit();
+    const r = run(() => "saved");
+    expect(r.pending).toBeUndefined();
+    expect(r.rollback).toEqual({ undone: false, verified: true });
+    expect(fake.undos.n).toBe(0);
+  });
+});
+
 describe("ae_batch: atomic rollback", () => {
   const full = { mode: "full", allowShell: false };
   const script = (code: string) => ({ tool: "ae_run_script", args: { code } });

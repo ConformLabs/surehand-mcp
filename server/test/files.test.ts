@@ -1,7 +1,7 @@
 // ae_find_files (Node, real temp folders), ae_export_frames (its ExtendScript on the fake After Effects, and the
 // handler with a mocked bridge), and ae_import_files reporting a rejected "import as".
 import { describe, expect, it, vi } from "vitest";
-import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -11,6 +11,7 @@ vi.mock("../src/jsx.js", async (orig) => ({ ...(await orig<typeof import("../src
 const { EXPORT_FRAMES_JSX, expandHome, findFiles, globToRegExp, registerFileTools } = await import("../src/tools/files.js");
 const { ALL_JSX_TOOLS } = await import("../src/tools/all.js");
 const { fakeKeysAE } = await import("./fake-keys.js");
+const { FINISH_JSX, RENDER_KIT_JSX } = await import("../src/tools/core.js");
 
 describe("globs", () => {
   const m = (g: string, p: string) => globToRegExp(g).test(p.normalize("NFC").toLowerCase());
@@ -76,24 +77,59 @@ describe("ae_find_files", () => {
 
 describe("ae_export_frames (ExtendScript)", () => {
   const comp = () => fakeKeysAE({ layers: [{ name: "Title" }, { name: "BG" }], footage: [{ name: "clip.mov", width: 3840, height: 2160, fps: 50, duration: 2 }] });
-  it("writes several frames with a frame token, at full resolution, only the chosen layers, restoring everything", () => {
+  // what the export's undo puts back (no undo model in this fake): the cleanup FINISH_JSX does by hand
+  const cleanup = (ae: ReturnType<typeof comp>, c: unknown) => ae.run(`${RENDER_KIT_JSX}\nreturn cleanNow(args.c);`, { c }).result;
+  it("writes several frames with a frame token, at full resolution, only the chosen layers; all of it stays until the files are written", () => {
     const ae = comp();
     const r = ae.run(EXPORT_FRAMES_JSX, { exports: [{ layers: ["Title"], frameRange: { start: 0, end: 20, step: 10 }, outputPath: "/out/title_[###].png" }] });
     expect(r.ok, JSON.stringify(r.error)).toBe(true);
+    // written after the script returned (saveFrameToPng is asynchronous), still with only Title, at full resolution
     expect(ae.saved.map((s) => [s.path, s.t, s.enabled, s.res])).toEqual([
       ["/out/title_000.png", 0, ["Title"], [1, 1]],
       ["/out/title_010.png", 0.4, ["Title"], [1, 1]],
       ["/out/title_020.png", 0.8, ["Title"], [1, 1]],
     ]);
+    expect(r.result.passes).toBe(1);
+    expect(ae.comp.layer("BG").enabled).toBe(false);
+    expect(cleanup(ae, r.result.cleanup)).toEqual(['layer "BG" switched on again', 'resolution of "Main"']);
     expect(ae.comp.layer("BG").enabled).toBe(true);
     expect(ae.comp.resolutionFactor).toEqual([2, 2]);
   });
-  it("footage goes through a temporary comp at its own size, which is removed", () => {
+  it("one comp with different layers shown: a pass each (the frames are written with the project's last state)", () => {
+    const ae = comp();
+    const exports = [{ layers: ["Title"], frames: [0], outputPath: "/out/t.png" }, { frames: [0], outputPath: "/out/all.png" }, { layers: ["BG"], frames: [0], outputPath: "/out/bg.png" }];
+    const p0 = ae.run(EXPORT_FRAMES_JSX, { exports, pass: 0 });
+    expect(p0.result).toMatchObject({ passes: 3, files: [{ path: "/out/t.png" }] });
+    cleanup(ae, p0.result.cleanup);
+    // a later pass doesn't refuse the files of the earlier ones
+    for (const pass of [1, 2]) {
+      const p = ae.run(EXPORT_FRAMES_JSX, { exports, pass });
+      expect(p.ok, JSON.stringify(p.error)).toBe(true);
+      expect(p.result.files).toHaveLength(1);
+      cleanup(ae, p.result.cleanup);
+    }
+    expect(ae.saved.map((s) => [s.path, s.enabled])).toEqual([["/out/t.png", ["Title"]], ["/out/all.png", ["Title", "BG"]], ["/out/bg.png", ["BG"]]]);
+  });
+  it("footage goes through a temporary comp at its own size, removed after the file is written", () => {
     const ae = comp();
     const r = ae.run(EXPORT_FRAMES_JSX, { exports: [{ item: "clip.mov", frames: [99], outputPath: "/out/clip_{frame}.png" }] });
     expect(r.ok, JSON.stringify(r.error)).toBe(true);
     expect(r.result.files[0]).toMatchObject({ path: "/out/clip_00099.png", width: 3840, height: 2160, frame: 99 });
+    expect(ae.saved.map((s) => s.path)).toEqual(["/out/clip_00099.png"]);
+    expect(cleanup(ae, r.result.cleanup)).toContain('temporary comp "__aemcp_export" removed');
     expect(ae.items.some((i: any) => i.name === "__aemcp_export")).toBe(false);
+  });
+  it("a 32 bpc project with linear blending is written at 16 bpc without it, and set back afterwards", () => {
+    const ae = fakeKeysAE({ layers: [{ name: "Title" }], color: { bpc: 32, lb: true } });
+    const r = ae.run(EXPORT_FRAMES_JSX, { exports: [{ frames: [0], outputPath: "/out/a.png" }] });
+    expect(ae.saved[0].color).toEqual({ bpc: 16, lb: false });
+    expect(r.result.cleanup.color).toEqual({ bpc: 32, lb: true });
+    expect(cleanup(ae, r.result.cleanup)).toEqual(['resolution of "Main"', "bit depth 32 bpc", "linear blending on"]);
+    expect([ae.app.project.bitsPerChannel, ae.app.project.linearBlending]).toEqual([32, true]);
+    // an 8 bpc project without linear blending is left alone
+    const plain = fakeKeysAE({ layers: [{ name: "Title" }] });
+    expect(plain.run(EXPORT_FRAMES_JSX, { exports: [{ frames: [0], outputPath: "/out/b.png" }] }).result.cleanup.color).toBeNull();
+    expect(plain.saved[0].color).toEqual({ bpc: 8, lb: false });
   });
   it("refuses before writing anything: existing files, missing frame token, duplicates, frames outside", () => {
     const ae = fakeKeysAE({ layers: [{ name: "a" }], files: ["/out/b.png"] });
@@ -116,20 +152,32 @@ describe("ae_export_frames (ExtendScript)", () => {
 });
 
 describe("ae_export_frames (handler)", () => {
-  it("expands ~, waits for the files and lists them; leaves no undo step (rollback options)", async () => {
+  it("expands ~, waits for the files and lists them; then cleans up by hand (never Edit > Undo) and says so in one line", async () => {
     const dir = mkdtempSync(join(tmpdir(), "surehand-export-"));
     const file = join(dir, "f.png");
     let handler: any;
     registerFileTools({ registerTool: (n: string, _c: unknown, h: unknown) => void (n === "ae_export_frames" && (handler = h)) } as any);
-    jsx.runJsx.mockImplementation(async (_body: string, args: any, opts: any) => {
+    const calls: string[] = [];
+    jsx.runJsx.mockImplementation(async (body: string, args: any, opts: any) => {
+      if (body === FINISH_JSX) {
+        // the second call: only once the file is there
+        calls.push(`finish ${args.token} ${existsSync(file)}`);
+        expect(opts.undoGroup).toBe("Surehand MCP export"); // the cleanup by hand, never Edit > Undo
+        return { ok: true, logs: [], result: { undone: false, verified: "cleaned", byHand: ['resolution of "Main"'] } };
+      }
       expect(args.exports[0].outputPath.startsWith("~")).toBe(false);
-      expect(opts).toMatchObject({ rollback: "changes", checkOnly: true });
-      writeFileSync(file, "png");
-      return { ok: true, logs: [], result: { files: [{ path: file, source: "Main", frame: 3, width: 1920, height: 1080 }] }, rollback: { undone: true, verified: true } };
+      expect(opts).toMatchObject({ rollback: "deferred", checkOnly: true });
+      calls.push("render");
+      // written a moment after the script returned
+      setTimeout(() => writeFileSync(file, "png"), 250);
+      return { ok: true, logs: [], result: { files: [{ path: file, source: "Main", frame: 3, width: 1920, height: 1080 }], cleanup: {}, passes: 1 }, pending: "r1" };
     });
     const r = await handler({ exports: [{ frames: [3], outputPath: "~/f.png" }] });
     expect(r.isError).toBeUndefined();
-    expect(r.content[0].text).toBe(`Exported 1 PNG file:\n${file} (Main, frame 3, 1920x1080)`);
+    expect(r.content[0].text).toBe(
+      `Exported 1 PNG file:\n${file} (Main, frame 3, 1920x1080)\nAfter Effects lists "Surehand MCP export" in Edit > Undo; undoing it only brings back the render's own temporary comp and settings, nothing of yours.`,
+    );
+    expect(calls).toEqual(["render", "finish r1 true"]);
   });
 });
 

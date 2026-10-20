@@ -279,9 +279,12 @@ describe("strict ES3 parse (what After Effects' engine accepts)", () => {
     }
   });
   it("preview tools (frame, contact sheet)", async () => {
-    const { RENDER_FRAME_JSX, CONTACT_SHEET_JSX } = await import("../src/tools/core.js");
+    const { RENDER_FRAME_JSX, CONTACT_SHEET_JSX, FINISH_JSX } = await import("../src/tools/core.js");
     await parseES3(`(function(args, log){${RENDER_FRAME_JSX}\n})`);
     await parseES3(`(function(args, log){${CONTACT_SHEET_JSX}\n})`);
+    await parseES3(`(function(args, log){${FINISH_JSX}\n})`);
+    // nothing waits for saveFrameToPng inside a script (it writes after the script returns)
+    for (const body of [RENDER_FRAME_JSX, CONTACT_SHEET_JSX]) expect(body).not.toMatch(/\$\.sleep|\.exists && waited/);
   });
   it("transpiled modern code", async () => {
     const { transpileUserCode } = await import("../src/transpile.js");

@@ -961,6 +961,36 @@ aemcp = (function () {
     if (still) { try { still.remove(); } catch (e2) { fail.leftover = String(still.name); } }
     return fail;
   }
+  // Renders (rollback "deferred"): never Edit > Undo. Seen in AE 26.5: after a project was opened and its settings
+  // changed, the Undo run for a render reverted the user's own last step instead. And saveFrameToPng is asynchronous
+  // (the PNG is written after the script returns), so the temporary comp, hidden layers and color settings stay until
+  // Node has the file. Then A.finishRollback (a second call, in an undo group of the same name) removes and sets back
+  // by hand what the render changed (`fix`, the caller's cleanup) and compares the project with how it was before.
+  // After Effects may list the render's steps in Edit > Undo; undoing them only brings the render's own changes back.
+  var pending = {};
+  function cleanedCheck(before, done) {
+    var out = { undone: false, verified: false };
+    if (done.length) out.byHand = done;
+    if (!before) { out.problem = "not checked"; return out; }
+    try {
+      var d = A.diff(before, snapshotAgain(before));
+      if (listed(d)) { out.problem = "not back"; out.remaining = d; }
+      else out.verified = done.length ? "cleaned" : true;
+    } catch (e) { out.problem = "not checked: " + (e.message || e); }
+    return out;
+  }
+  A.finishRollback = function (token, fix) {
+    var p = pending[token], done = [];
+    if (!p) return { undone: false, verified: false, problem: "unknown" };
+    delete pending[token];
+    // another edit or call while the image was written: the project can't be compared with how it was
+    var moved = p.rev !== null && A.revision() !== p.rev;
+    if (fix) { try { done = fix(); } catch (e) { done = ["failed: " + (e.message || e)]; } }
+    if (!moved) return cleanedCheck(p.before, done);
+    var out = { undone: false, verified: false, problem: "changed meanwhile" };
+    if (done.length) out.byHand = done;
+    return out;
+  };
   A.run = function (fn, args, opts) {
     opts = opts || {};
     var logs = [];
@@ -980,13 +1010,14 @@ aemcp = (function () {
         rev0 = opts.report || opts.rollback ? A.revision() : null;
         // checkOnly (read-only mode): with project.revision, no property snapshot at all
         if (opts.report) { try { before = A.snapshot(opts.report, !!opts.checkOnly && rev0 !== null); } catch (e) { before = null; } }
+        var deferred = opts.rollback === "deferred";
         try {
           var r = fn(args || {}, log);
-          back = opts.rollback === "changes" || (opts.rollback === "requested" && !!r && r.rollback === true);
+          back = opts.rollback === "changes" || opts.rollback === "deferred" || (opts.rollback === "requested" && !!r && r.rollback === true);
           res = { ok: true, result: opts.raw ? r : A.serialize(r, opts.depth || 4), logs: logs };
           if (before) { try { res.changes = changesSince(before, rev0, opts.report); } catch (e) { res.changes = { error: e.message }; } }
         } catch (e) {
-          back = opts.rollback === "changes";
+          back = opts.rollback === "changes" || deferred;
           res = { ok: false, error: { message: e.message || String(e), name: e.name, line: e.line, user: !!e.aemcpUser }, logs: logs };
           // the setting is off: the server adds a hint when the error is its "Permission denied"
           if (A.canWriteFiles() === false) res.writeAccess = false;
@@ -994,10 +1025,10 @@ aemcp = (function () {
           if (before) { try { res.changes = changesSince(before, rev0, opts.report); } catch (e2) {} }
         }
         rev1 = rev0 === null ? null : A.revision();
-        // to be undone: the sentinel goes in while this call's undo group is still open
+        // to be undone: the sentinel goes in while this call's undo group is still open (never for a render: it is not undone)
         if (back && undo) {
           try { plan = rollbackPlan(before, rev0, rev1, res.changes, opts.report, opts.rollback === "requested"); } catch (e) { plan = { undone: false, verified: false, problem: "failed: " + (e.message || e) }; }
-          if (!plan) {
+          if (!plan && !deferred) {
             try { sentinel = addSentinel(); revS = A.revision(); }
             catch (e) { plan = { undone: false, verified: false, problem: "failed: couldn't prepare the undo (" + (e.message || e) + ")" }; }
           }
@@ -1008,6 +1039,14 @@ aemcp = (function () {
       if (back) {
         if (!undo) res.rollback = { undone: false, verified: false, problem: "no undo group" };
         else if (plan) res.rollback = plan;
+        else if (deferred && res.ok) {
+          // cleaned up and checked in a second call, once the files are written (A.finishRollback)
+          var tok = "r" + new Date().getTime() + "_" + Math.floor(Math.random() * 1000000000);
+          pending[tok] = { before: before, rev: rev0 === null ? null : A.revision() };
+          res.pending = tok;
+        }
+        // a render that failed has put back what it changed (its own finally): checked, not undone
+        else if (deferred) res.rollback = cleanedCheck(before, []);
         else { var st = { ran: false }; try { res.rollback = rollback(before, revS, sentinel, st); } catch (e) { res.rollback = failedRollback(sentinel, e, st.ran); } }
       }
     } finally {

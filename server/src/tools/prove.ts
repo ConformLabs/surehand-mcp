@@ -14,7 +14,7 @@ import { capChanges, changesFromReport } from "../view-changes.js";
 import { VIEW_META_KEY, type ChangesView, type ProofFrame } from "../views/types.js";
 import { errorResult } from "./registry.js";
 import { CHANGES_VIEW_URI, registerViewTool, viewError } from "./views.js";
-import { RENDER_RUN_OPTIONS, renderCleanupNote } from "./core.js";
+import { RENDER_KIT_JSX, renderCleanupNote, runRender } from "./core.js";
 import { runBatch } from "./workflow.js";
 import { appFile } from "../paths.js";
 
@@ -23,12 +23,13 @@ export const MAX_AGE_MS = 7 * 24 * 3600 * 1000;
 const proofsRoot = () => appFile("proofs");
 
 /**
- * Renders frames of comps the way ae_render_frame does (a temporary comp, removed in `finally`, all in
- * one undo group): the comp at full size (capped by maxSize), transparent background. args.comps: {ref}
+ * Renders frames of comps the way ae_render_frame does (a temporary comp, removed by hand once the files are
+ * written: runRender), but always with the project's own color settings, so a capture and its
+ * comparison are rendered the same way: the comp at full size (capped by maxSize), transparent background. args.comps: {ref}
  * to capture (times from args.times or args.frames over the work area, snapped to frames), or {id, times,
  * width, height, pixelAspect} to render again (a deleted comp or a changed size is reported, not rendered).
  */
-export const PROVE_RENDER_JSX = `
+export const PROVE_RENDER_JSX = `${RENDER_KIT_JSX}
 var out = [], seen = {}, max = args.maxSize || 1920, tmpLeft = false;
 var byId = function (id) {
   for (var i = 1; i <= app.project.numItems; i++) { var it = app.project.item(i); if (it.id === id) return it; }
@@ -61,7 +62,7 @@ for (var ci = 0; ci < args.comps.length; ci++) {
   seen[c.id] = true;
   var par = c.pixelAspect, dispW = c.width * par, fit = Math.min(1, max / Math.max(dispW, c.height));
   var W = Math.max(4, Math.round(dispW * fit)), H = Math.max(4, Math.round(c.height * fit)), frames = [];
-  var tmp = app.project.items.addComp("__aemcp_proof", W, H, 1, c.duration, c.frameRate);
+  var tmp = tempComp("__aemcp_proof", W, H, 1, c.duration, c.frameRate), done = false;
   try {
     try { tmp.motionBlur = c.motionBlur; tmp.shutterAngle = c.shutterAngle; tmp.shutterPhase = c.shutterPhase; tmp.motionBlurSamplesPerFrame = c.motionBlurSamplesPerFrame; tmp.motionBlurAdaptiveSampleLimit = c.motionBlurAdaptiveSampleLimit; tmp.frameBlending = c.frameBlending; } catch (e) {}
     var l = tmp.layers.add(c), tr = l.property("ADBE Transform Group");
@@ -72,14 +73,15 @@ for (var ci = 0; ci < args.comps.length; ci++) {
     for (var j = 0; j < times.length; j++) {
       var f = new File(args.dir + "/" + args.prefix + c.id + "_" + j + ".png");
       if (f.exists) f.remove();
+      // written after this script returns: Node waits for the files, then the render is undone
       tmp.saveFrameToPng(times[j], f);
-      var waited = 0; while (!f.exists && waited < 10000) { $.sleep(50); waited += 50; }
       frames.push({ time: times[j], path: f.fsName });
     }
-  } finally { try { tmp.remove(); } catch (e) { tmpLeft = true; } }
+    done = true;
+  } finally { if (!done) cleanNow(__clean); }
   out.push({ id: c.id, name: c.name, width: c.width, height: c.height, pixelAspect: par, frameRate: c.frameRate, renderW: W, renderH: H, frames: frames });
 }
-return { project: app.project.file ? app.project.file.fsName : null, comps: out, tmpLeft: tmpLeft };`;
+return { project: app.project.file ? app.project.file.fsName : null, comps: out, tmpLeft: tmpLeft, cleanup: __clean };`;
 
 interface Rendered {
   id: number;
@@ -114,11 +116,16 @@ async function waitForFiles(paths: string[]) {
 }
 
 async function render(comps: unknown[], extra: { times?: number[]; frames?: number; maxSize: number }, dir: string, prefix: string) {
-  const r = await runJsx(PROVE_RENDER_JSX, { comps, ...extra, dir, prefix }, { ...RENDER_RUN_OPTIONS, undoGroup: "Surehand MCP proof", timeoutMs: 600_000, depth: 6 });
+  let waitError: unknown;
+  // all files together, with one deadline, before the cleanup (an error is thrown after it)
+  const { r } = await runRender(PROVE_RENDER_JSX, { comps, ...extra, dir, prefix }, { undoGroup: "Surehand MCP proof", timeoutMs: 600_000 }, async (res) => {
+    await waitForFiles((res.comps as Rendered[]).flatMap((c) => (c.frames ?? []).map((f) => f.path))).catch((e) => void (waitError = e));
+    return [];
+  });
   if (!r.ok) throw new Error(r.error?.message || "After Effects could not render the frames.");
   const res = r.result as { project: string | null; comps: Rendered[]; tmpLeft?: boolean };
   const note = renderCleanupNote(r, res.tmpLeft, "__aemcp_proof");
-  await waitForFiles(res.comps.flatMap((c) => (c.frames ?? []).map((f) => f.path)));
+  if (waitError) throw waitError;
   return { ...res, note };
 }
 

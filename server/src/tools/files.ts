@@ -6,7 +6,7 @@ import { homedir } from "node:os";
 import { join, relative, sep } from "node:path";
 import { z } from "zod";
 import { runJsx } from "../jsx.js";
-import { RENDER_RUN_OPTIONS, renderCleanupNote, waitForFile } from "./core.js";
+import { colorNote, RENDER_KIT_JSX, renderCleanupNote, runRender, waitForFiles } from "./core.js";
 import { errorResult, formatResult, itemRef, layerRef } from "./registry.js";
 
 // ---------- paths and globs ----------
@@ -192,7 +192,7 @@ export function findFiles(roots: string[], o: FindOptions = {}) {
 // ---------- PNG export ----------
 
 /** Plans every file first (frame tokens, existing files, duplicates); renders only when the whole plan is valid. */
-export const EXPORT_FRAMES_JSX = `
+export const EXPORT_FRAMES_JSX = `${RENDER_KIT_JSX}
 function pad(n, w) { var s = String(Math.abs(n)); while (s.length < w) s = "0" + s; return (n < 0 ? "-" : "") + s; }
 function fileFor(tpl, frame, many) {
   var m = /\\[(#+)\\]/.exec(tpl);
@@ -218,6 +218,14 @@ for (var i = 0; i < args.exports.length; i++) {
   else if (e.times) { for (var tt = 0; tt < e.times.length; tt++) frames.push(e.times[tt] / fd); }
   else frames.push(Math.round((src ? src.time : 0) / fd));
   if (!frames.length) aemcp.fail("Export " + (i + 1) + ": no frames");
+  // saveFrameToPng writes after the script ends, with the project as it is then: exports of one comp with other
+  // layers shown go in a later pass (a call of their own); args.pass is the one this call writes
+  var sig = e.layers ? e.layers.join("|") + "#" : "", pass = 0;
+  if (src) for (;; pass++) {
+    var clash = false;
+    for (var i3 = 0; i3 < jobs.length; i3++) if (jobs[i3].pass === pass && jobs[i3].src && jobs[i3].src.id === src.id && jobs[i3].sig !== sig) { clash = true; break; }
+    if (!clash) break;
+  }
   var name = footage ? footage.name : src.name, list = [];
   for (var k = 0; k < frames.length; k++) {
     var t = frames[k] * fd, fn = Math.round(frames[k]);
@@ -227,35 +235,39 @@ for (var i = 0; i < args.exports.length; i++) {
     var file = new File(path), key = "f:" + file.fsName.toLowerCase();
     if (seen[key]) aemcp.fail("Two exports would write the same file: " + file.fsName);
     seen[key] = true;
-    if (file.exists && !args.overwrite) exists.push(file.fsName);
+    // (the files of earlier passes are this export's own)
+    if (file.exists && !args.overwrite && pass >= (args.pass || 0)) exists.push(file.fsName);
     list.push({ t: t, frame: fn, file: file });
   }
   total += list.length;
-  jobs.push({ src: src, footage: footage, layers: e.layers, list: list, name: name });
+  jobs.push({ src: src, footage: footage, layers: e.layers, list: list, name: name, sig: sig, pass: pass });
 }
+var passes = 0;
+for (var i4 = 0; i4 < jobs.length; i4++) passes = Math.max(passes, jobs[i4].pass + 1);
 if (total > 500) aemcp.fail(total + " frames requested; at most 500 per call");
 if (exists.length) aemcp.fail("A file already exists at " + exists.slice(0, 5).join(", ") + (exists.length > 5 ? " and " + (exists.length - 5) + " more" : "") + ". Nothing was exported. To replace them, pass overwrite: true (or choose another outputPath).");
-var out = [], tmpLeft = false;
-for (var j = 0; j < jobs.length; j++) {
-  var J = jobs[j], comp = J.src, tmp = null, restore = [], rf = null;
-  try {
+// every frame is written after this script returns: the temporary comps, hidden layers and settings stay until
+// Node has the files, then they are removed and set back by hand (runRender)
+var out = [], done = false;
+try {
+  displayColor();
+  for (var j = 0; j < jobs.length; j++) {
+    var J = jobs[j], comp = J.src;
+    if (J.pass !== (args.pass || 0)) continue;
     if (J.footage) {
       var F = J.footage;
-      tmp = app.project.items.addComp("__aemcp_export", F.width, F.height, F.pixelAspect, Math.max(F.duration, 1 / (F.frameRate > 0 ? F.frameRate : 25)), F.frameRate > 0 ? F.frameRate : 25);
-      tmp.layers.add(F);
-      comp = tmp;
+      comp = tempComp("__aemcp_export", F.width, F.height, F.pixelAspect, Math.max(F.duration, 1 / (F.frameRate > 0 ? F.frameRate : 25)), F.frameRate > 0 ? F.frameRate : 25);
+      comp.layers.add(F);
     }
-    // full resolution for the export (restored afterwards)
-    try { rf = comp.resolutionFactor; if (rf[0] !== 1 || rf[1] !== 1) comp.resolutionFactor = [1, 1]; else rf = null; } catch (er) { rf = null; }
+    // full resolution for the export
+    try { fullRes(comp); } catch (er) {}
     if (J.layers && J.layers.length) {
       var keep = {};
       for (var a = 0; a < J.layers.length; a++) keep[aemcp.findLayer(comp, J.layers[a]).index] = true;
       for (var b = 1; b <= comp.numLayers; b++) {
         var L = comp.layer(b);
         if (keep[b] || !L.enabled) continue;
-        var wasLocked = L.locked; if (wasLocked) L.locked = false;
-        L.enabled = false; restore.push([L, wasLocked]);
-        if (wasLocked) L.locked = true;
+        hideLayer(comp, L);
       }
     }
     for (var q = 0; q < J.list.length; q++) {
@@ -263,16 +275,12 @@ for (var j = 0; j < jobs.length; j++) {
       if (parent && !parent.exists) parent.create();
       if (job.file.exists) job.file.remove();
       comp.saveFrameToPng(job.t, job.file);
-      var waited = 0; while (!job.file.exists && waited < 10000) { $.sleep(50); waited += 50; }
       out.push({ path: job.file.fsName, source: J.name, frame: job.frame, time: job.t, width: comp.width, height: comp.height, layers: J.layers || undefined });
     }
-  } finally {
-    for (var r = 0; r < restore.length; r++) { try { var R = restore[r][0]; if (restore[r][1]) R.locked = false; R.enabled = true; if (restore[r][1]) R.locked = true; } catch (e2) {} }
-    if (rf) { try { comp.resolutionFactor = rf; } catch (e3) {} }
-    if (tmp) { try { tmp.remove(); } catch (e4) { tmpLeft = true; } }
   }
-}
-return { files: out, tmpLeft: tmpLeft };`;
+  done = true;
+} finally { if (!done) cleanNow(__clean); }
+return { files: out, cleanup: __clean, passes: passes };`;
 
 const exportSpec = z.object({
   comp: z.union([z.number().int(), z.string()]).optional().describe("Composition id or name (default: the active comp)."),
@@ -342,15 +350,27 @@ export function registerFileTools(server: McpServer) {
     async (args) => {
       try {
         const exports = args.exports.map((e) => ({ ...e, outputPath: expandHome(e.outputPath) }));
-        // the temporary comp and layer switches are undone again: no undo step is left behind (as ae_render_frame)
-        const r = await runJsx(EXPORT_FRAMES_JSX, { ...args, exports }, { ...RENDER_RUN_OPTIONS, undoGroup: "Surehand MCP export", timeoutMs: 600_000 });
-        if (!r.ok) return formatResult(r);
-        const info = r.result as { files: { path: string; source: string; frame: number; width: number; height: number }[]; tmpLeft?: boolean };
-        const missing: string[] = [];
-        for (const f of info.files) if (!(await waitForFile(f.path))) missing.push(f.path);
-        const note = renderCleanupNote(r, info.tmpLeft, "__aemcp_export");
-        const lines = info.files.map((f) => `${f.path} (${f.source}, frame ${f.frame}, ${f.width}x${f.height})`);
-        let text = `Exported ${info.files.length - missing.length} PNG file${info.files.length === 1 ? "" : "s"}:\n${lines.join("\n")}`;
+        // each pass: frames saved, Node waits for them, then what the pass changed is set back by hand (as
+        // ae_render_frame, never Edit > Undo); a later pass only for exports of one comp with other layers shown
+        type Info = { files: { path: string; source: string; frame: number; width: number; height: number }[]; tmpLeft?: boolean; passes?: number; cleanup?: unknown };
+        const files: Info["files"] = [], missing: string[] = [], notes = new Set<string>();
+        let passes = 1;
+        for (let pass = 0; pass < passes; pass++) {
+          const { r, missing: miss } = await runRender(EXPORT_FRAMES_JSX, { ...args, exports, pass }, { undoGroup: "Surehand MCP export", timeoutMs: 600_000 }, (x: Info) => waitForFiles(x.files.map((f) => f.path)));
+          if (!r.ok) {
+            if (!files.length) return formatResult(r);
+            const fail = formatResult(r).content[0] as { text: string };
+            return { isError: true, content: [{ type: "text", text: `Exported ${files.length} PNG files, then the rest failed: ${fail.text}\n${files.map((f) => f.path).join("\n")}` }] };
+          }
+          const info = r.result as Info;
+          passes = info.passes ?? 1;
+          files.push(...info.files);
+          missing.push(...miss);
+          for (const n of [colorNote(info), renderCleanupNote(r, info.tmpLeft, "__aemcp_export")]) if (n) notes.add(n);
+        }
+        const note = [...notes].join("\n");
+        const lines = files.map((f) => `${f.path} (${f.source}, frame ${f.frame}, ${f.width}x${f.height})`);
+        let text = `Exported ${files.length - missing.length} PNG file${files.length === 1 ? "" : "s"}:\n${lines.join("\n")}`;
         if (missing.length) text += `\nAfter Effects did not write: ${missing.join(", ")}`;
         if (note) text += `\n${note}`;
         return { ...(missing.length ? { isError: true } : {}), content: [{ type: "text", text }] };

@@ -20,7 +20,7 @@ import { timecode } from "../preflight/report.js";
 import { withFonts } from "../views/fonts.js";
 import { VIEW_ERROR_KEY, VIEW_META_KEY, XRAY_VIEW_URI, type FrameView } from "../views/types.js";
 import { xrayNodeView } from "./xray-view.js";
-import { waitForFile } from "./core.js";
+import { RENDER_KIT_JSX, renderCleanupNote, runRender, waitForFiles } from "./core.js";
 import { enableViewTools } from "./profile.js";
 import { afterDir, loadManifest, proofDir } from "./prove.js";
 import { compRef, errorResult, formatResult, layerRef } from "./registry.js";
@@ -123,16 +123,18 @@ if (args.layer !== undefined && args.layer !== null) {
 }
 return { comp: c.name, id: c.id, time: c.time, fps: c.frameRate, dst: c.displayStartTime, df: !!c.dropFrame, layer: sel };`;
 
-// Saves the comp's own frame as a PNG (CompItem.saveFrameToPng): no temporary comp, no undo step, nothing to roll back.
-export const FRAME_JSX = `
+// Saves the comp's own frame as a PNG (CompItem.saveFrameToPng, written after the script returns): no temporary
+// comp. Only in a 32 bpc / linear blending project are the color settings changed for it (as ae_render_frame),
+// and set back by hand once the file is written (runRender); otherwise nothing changes.
+export const FRAME_JSX = `${RENDER_KIT_JSX}
 var c = aemcp.findComp(args.comp);
 var t = args.time === undefined || args.time === null ? c.time : args.time;
 t = Math.max(0, Math.min(c.duration - c.frameDuration, t));
 var f = new File(args.tmpDir + "/aemcp_view_" + new Date().getTime() + ".png");
 if (f.exists) f.remove();
+displayColor();
 c.saveFrameToPng(t, f);
-var waited = 0; while (!f.exists && waited < 10000) { $.sleep(50); waited += 50; }
-return { path: f.fsName, comp: c.name, time: t, width: c.width, height: c.height, par: c.pixelAspect };`;
+return { path: f.fsName, comp: c.name, time: t, width: c.width, height: c.height, par: c.pixelAspect, cleanup: __clean };`;
 
 /** The still's size: the comp's display aspect (pixel aspect applied), its longest side at most `max`. */
 export function stillSize(w: number, h: number, par: number, max: number): { width: number; height: number } {
@@ -201,18 +203,19 @@ export function registerViews(server: McpServer) {
         // a folder both AE and this process can access (as ae_render_frame)
         const tmpDir = appFile("tmp");
         mkdirSync(tmpDir, { recursive: true });
-        const r = await runJsx(FRAME_JSX, { comp: args.comp, time: args.time, tmpDir }, { undoGroup: false, timeoutMs: 120_000 });
+        const { r, missing } = await runRender(FRAME_JSX, { comp: args.comp, time: args.time, tmpDir }, { undoGroup: "Surehand MCP frame", timeoutMs: 120_000 }, (x) => waitForFiles([x.path]));
         if (!r.ok) return formatResult(r);
         const x = r.result as { path: string; comp: string; time: number; width: number; height: number; par: number };
         path = x.path;
-        if (!(await waitForFile(x.path))) return errorResult(`After Effects did not write the frame to ${x.path}`);
+        const note = renderCleanupNote(r, false, "");
+        if (missing.length) return errorResult(`After Effects did not write the frame to ${x.path}${note ? `\n${note}` : ""}`);
         const size = stillSize(x.width, x.height, x.par, args.maxSize ?? 480);
         const jpeg = encodeJpeg(size.width, size.height, downscale(decodePng(readFileSync(x.path)), size.width, size.height), 80);
         const view: FrameView = { view: "frame", comp: x.comp, time: x.time, compWidth: x.width, compHeight: x.height, ...size };
         return {
           content: [
             { type: "image", data: jpeg.toString("base64"), mimeType: "image/jpeg" },
-            { type: "text", text: `Frame of "${x.comp}" at ${secs(x.time)} (${size.width}x${size.height}).` },
+            { type: "text", text: `Frame of "${x.comp}" at ${secs(x.time)} (${size.width}x${size.height}).${note ? `\n${note}` : ""}` },
           ],
           _meta: { [VIEW_META_KEY]: view },
         };

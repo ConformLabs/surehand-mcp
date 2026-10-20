@@ -2,7 +2,23 @@
 // Babel keeps line numbers (retainLines), so error lines still match the code the AI wrote.
 // Runtime built-ins the output needs (map, bind, Object.defineProperty...) are polyfilled by
 // the aemcp helper library inside After Effects.
-import * as Babel from "@babel/standalone";
+import { createRequire } from "node:module";
+import { brotliDecompressSync } from "node:zlib";
+import type * as BabelTypes from "@babel/standalone";
+
+declare const __AEMCP_BABEL__: string;
+let babel: typeof BabelTypes | undefined;
+/**
+ * Babel is the biggest dependency (about 2.3 MB minified), so the bundle stores it brotli-compressed (build.mjs) and
+ * unpacks it the first time a script needs transpiling. Outside the bundle (tests) it loads from node_modules.
+ */
+function Babel(): typeof BabelTypes {
+  if (babel) return babel;
+  if (typeof __AEMCP_BABEL__ === "undefined") return (babel = createRequire(import.meta.url)("@babel/standalone"));
+  const mod: { exports: any } = { exports: {} };
+  new Function("module", "exports", brotliDecompressSync(Buffer.from(__AEMCP_BABEL__, "base64")).toString("utf8"))(mod, mod.exports);
+  return (babel = mod.exports as typeof BabelTypes);
+}
 
 export interface TranspileResult {
   /** Function-expression source to eval in AE: "(function(args, log){ ... })" */
@@ -25,7 +41,7 @@ export function transpileUserCode(code: string, enabled = true): TranspileResult
   const plain = PREFIX + code + "\n})";
   if (!enabled || extendScriptOnly(code)) return { source: plain, transpiled: false };
   try {
-    const out = Babel.transform(plain, {
+    const out = Babel().transform(plain, {
       presets: [["env", { targets: { ie: "11" }, modules: false }]],
       assumptions: {
         iterableIsArray: true, // for...of / spread over arrays -> plain index loops
@@ -62,7 +78,7 @@ export function withoutComments(code: string): string {
   const plain = PREFIX + code + "\n})";
   let comments: { start: number; end: number }[];
   try {
-    comments = (Babel.transform(plain, { ast: true, code: false, sourceType: "script", babelrc: false, configFile: false } as any) as any).ast.comments;
+    comments = (Babel().transform(plain, { ast: true, code: false, sourceType: "script", babelrc: false, configFile: false } as any) as any).ast.comments;
   } catch {
     return code;
   }
@@ -108,7 +124,7 @@ function es3Pass(code: string): { code: string; reservedGlobals: string[] } {
       },
     },
   });
-  const out = Babel.transform(code, {
+  const out = Babel().transform(code, {
     plugins: [parenthesize, "transform-reserved-words", "transform-member-expression-literals", "transform-property-literals", findReservedGlobals],
     sourceType: "script",
     retainLines: true,
