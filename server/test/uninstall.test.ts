@@ -101,6 +101,51 @@ describe("uninstall", () => {
     expect(existsSync(join(L, "config.json"))).toBe(false);
     expect(existsSync(L)).toBe(false);
   });
+
+  // after a move whose Node.js was in use (Windows), ~/.aemcp/node is a real copy, not a link: an uninstall that left
+  // it made the next install take ~/.aemcp for a 1.3 installation (1.4.0-beta.3)
+  for (const args of [["--keep-config"], ["--all"]]) {
+    it(`after the move, a real copy of Node.js and ffmpeg in ~/.aemcp goes too (${args[0]}): nothing is left there`, () => {
+      const dir = setup();
+      const R = join(home, ".surehand"), L = join(home, ".aemcp");
+      for (const d of [join(R, "node"), join(R, "ffmpeg"), join(L, "node"), join(L, "ffmpeg"), join(L, "instances")]) mkdirSync(d, { recursive: true });
+      for (const f of [join(R, "node", "node.exe"), join(R, "ffmpeg", "ffmpeg.exe"), join(L, "node", "node.exe"), join(L, "ffmpeg", "ffmpeg.exe"), join(L, "MOVED.txt"), join(L, "config.json")]) writeFileSync(f, "x");
+      uninstall(args);
+      expect(existsSync(L)).toBe(false);
+      expect(existsSync(join(dir, "config.json"))).toBe(args[0] === "--keep-config");
+      expect(existsSync(join(dir, "checkpoints"))).toBe(args[0] === "--keep-config");
+    });
+  }
+
+  it("a Node.js in ~/.aemcp that runs the uninstall stays (the launcher removes it after us), and is no reason to work from ~/.aemcp", async () => {
+    setup();
+    const L = join(home, ".aemcp");
+    mkdirSync(join(L, "node"), { recursive: true });
+    for (const f of ["node/node.exe", "MOVED.txt", "config.json", "runtime.json"]) writeFileSync(join(L, f), "x");
+    const execPath = process.execPath;
+    Object.defineProperty(process, "execPath", { value: join(L, "node", "node.exe"), configurable: true });
+    try {
+      uninstall(["--keep-config"]);
+    } finally {
+      Object.defineProperty(process, "execPath", { value: execPath, configurable: true });
+    }
+    expect(readdirSync(L)).toEqual(["node"]);
+    const { appDir, migrationPending, newAppDir } = await import("../src/paths.js");
+    expect(migrationPending()).toBe(false);
+    expect(appDir()).toBe(newAppDir());
+    rmSync(L, { recursive: true, force: true });
+  });
+
+  it("before the move (1.3 data still in ~/.aemcp): its own files go, the user's stay, and so does the only copy of ffmpeg without --all", () => {
+    rmSync(join(home, ".surehand"), { recursive: true, force: true });
+    const L = join(home, ".aemcp");
+    for (const d of ["server", "node", "ffmpeg", "checkpoints/abc"]) mkdirSync(join(L, d), { recursive: true });
+    for (const f of ["server/ae-mcp.mjs", "config.json", "node/node.exe", "ffmpeg/ffmpeg.exe", "checkpoints/abc/v1.aep"]) writeFileSync(join(L, f), "x");
+    uninstall([]);
+    expect(readdirSync(L).sort()).toEqual(["checkpoints", "ffmpeg"]);
+    uninstall(["--all"]);
+    expect(existsSync(L)).toBe(false);
+  });
 });
 
 // The launchers' uninstall without Node.js (installer/run.sh, run.ps1) must remove only what the server's

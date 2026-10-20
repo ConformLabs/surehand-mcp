@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path, { join } from "node:path";
-import { lateMerge, mapLegacyPath, migrateLegacy, migrationBusy } from "../src/migrate.js";
+import { forwarder, lateMerge, mapLegacyPath, migrateLegacy, migrationBusy } from "../src/migrate.js";
 import { appDir, configPath, installedServer, legacyDir, migrationInProgress, migrationMarker, migrationPending, newAppDir, privateFfmpegDir, privateNodeDir, surehandRoot } from "../src/paths.js";
 import { ensureConfig } from "../src/cli/setup.js";
 import { movesLegacyBeforeRunning } from "../src/cli/commands.js";
@@ -89,6 +89,30 @@ describe("paths", () => {
     mkdirSync(L());
     expect(migrationPending()).toBe(false);
     expect(appDir()).toBe(A());
+  });
+
+  it("leftovers that aren't data (Node.js, ffmpeg, status files, registrations, the forwarder) are nothing to move either", () => {
+    put(join(L(), "node", "node.exe"), "a copy of Node.js an uninstall left");
+    put(join(L(), "ffmpeg", "ffmpeg.exe"));
+    put(join(L(), "instances", "8765.json"));
+    put(join(L(), "bridge-status.json"));
+    put(join(L(), "server", "ae-mcp.mjs"), forwarder(join(A(), "server", "surehand-ae.mjs")));
+    expect(migrationPending()).toBe(false);
+    expect(appDir()).toBe(A());
+    expect(privateNodeDir()).toBe(join(R(), "node"));
+    // a 1.3 server, a config or any other file is 1.3 data
+    for (const [file, text] of [["server/ae-mcp.mjs", "server 1.3.4"], ["config.json", "{}"], ["notes.txt", "x"]] as const) {
+      const saved = existsSync(join(L(), file)) ? readFileSync(join(L(), file), "utf8") : null;
+      put(join(L(), file), text);
+      expect(migrationPending(), file).toBe(true);
+      if (saved === null) rmSync(join(L(), file));
+      else writeFileSync(join(L(), file), saved);
+      expect(migrationPending(), file).toBe(false);
+    }
+    // a whole 1.3 installation, of course
+    legacyInstall();
+    expect(migrationPending()).toBe(true);
+    expect(appDir()).toBe(L());
   });
 });
 
