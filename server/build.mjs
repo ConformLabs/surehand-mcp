@@ -1,6 +1,7 @@
 import { build } from "esbuild";
 import { createHash } from "node:crypto";
 import { chmodSync, readFileSync, rmSync } from "node:fs";
+import { brotliCompressSync, constants as zlibConstants } from "node:zlib";
 import { readCepFiles } from "./scripts/cep-files.mjs";
 import { packViews } from "./scripts/views.mjs";
 import { readSkillFiles } from "./scripts/skill-files.mjs";
@@ -22,6 +23,11 @@ const cepHash = createHash("sha1").update(JSON.stringify(cepText)).update(JSON.s
 const views = packViews();
 // The Agent Skills (skills/), which `install` writes for the AI apps that read them (src/cli/skills.ts)
 const skillFiles = readSkillFiles();
+// Babel (modern JS -> ExtendScript, src/transpile.ts) is the biggest dependency: its minified build is stored
+// brotli-compressed and unpacked on first use (about 2.3 MB -> 0.5 MB)
+const babelPacked = brotliCompressSync(readFileSync("node_modules/@babel/standalone/babel.min.js"), {
+  params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 11, [zlibConstants.BROTLI_PARAM_LGWIN]: 24 },
+}).toString("base64");
 
 await build({
   entryPoints: ["src/index.ts"],
@@ -31,8 +37,6 @@ await build({
   target: "node18",
   outfile: "dist/surehand-ae.mjs",
   loader: { ".jsxinc": "text" },
-  // Babel (modern JS -> ExtendScript) is the biggest dependency: use its minified build
-  alias: { "@babel/standalone": "@babel/standalone/babel.min.js" },
   define: {
     __AEMCP_VERSION__: JSON.stringify(pkg.version),
     __AEMCP_CEP_FILES__: JSON.stringify(cepText),
@@ -40,6 +44,7 @@ await build({
     __AEMCP_CEP_HASH__: JSON.stringify(cepHash),
     __SUREHAND_VIEWS__: JSON.stringify(views),
     __AEMCP_SKILLS__: JSON.stringify(skillFiles),
+    __AEMCP_BABEL__: JSON.stringify(babelPacked),
   },
   banner: {
     js:
