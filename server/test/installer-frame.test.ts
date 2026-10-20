@@ -496,13 +496,21 @@ describe("Mac installer: choices on Installation Type", () => {
   it("greys out the apps that aren't on this Mac (the installer script's found())", async () => {
     const xml = await gen();
     const script = /<script><!\[CDATA\[([\s\S]*?)\]\]><\/script>/.exec(xml)![1];
-    const there = new Set(["/Users/me/Library/Application Support/Claude", "/opt/homebrew/bin/codex"]);
+    const there = new Set(["/Applications/Claude.app", "/opt/homebrew/bin/codex"]);
     const system = { env: { HOME: "/Users/me" }, files: { fileExistsAtPath: (p: string) => there.has(p) }, version: { ProductVersion: "15.1" }, compareVersions: () => 1 };
     const found = new Function("system", "my", `${script}; return found;`)(system, { result: {} });
     expect(found("claude-desktop")).toBe(true);
     expect(found("codex")).toBe(true);
     expect(found("cursor")).toBe(false);
     expect(found("claude-code")).toBe(false);
+    // the data folders uninstalled apps leave behind: not found (as the server's clientInstalled)
+    for (const p of ["Library/Application Support/Claude", ".lmstudio", ".cursor", ".codex", "Library/Application Support/Code", ".codeium/windsurf", ".config/devin"]) there.add(`/Users/me/${p}`);
+    for (const id of ["cursor", "lm-studio", "vscode", "windsurf"]) expect([id, found(id)]).toEqual([id, false]);
+  });
+
+  it("looks for the app itself (or its command line), never a data folder it leaves behind", () => {
+    for (const a of aiApps.apps)
+      for (const p of a.mac as string[]) expect([a.id, p]).toEqual([a.id, expect.stringMatching(a.id === "claude-code" ? /./ : /\.app$|\/bin\/[\w-]+$/)]);
   });
 
   it("each choice is a payload-free step that runs after the main package: connect the app, get cloudflared, the summary", async () => {
