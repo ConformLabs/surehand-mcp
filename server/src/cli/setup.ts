@@ -165,6 +165,13 @@ export function ensureAeSetup(opts: { forceExtension?: boolean } = {}): SetupRes
   } catch (e: any) {
     res.errors.push(`config: ${e.message}`);
   }
+  // the panel reads which AI apps are connected from sessions/: with the folder there, none means none
+  // (without it, an older server, it can't tell)
+  if (!migrationBusy()) {
+    try {
+      mkdirSync(appFile("sessions"), { recursive: true });
+    } catch {}
+  }
   try {
     const r = ensureExtension(opts.forceExtension);
     res.extensionInstalled = r.installed;
