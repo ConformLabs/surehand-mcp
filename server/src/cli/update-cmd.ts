@@ -1,6 +1,8 @@
 // `surehand-ae update`: installs the latest GitHub release over the standalone install
 // (~/.surehand/ae/server/surehand-ae.mjs) and updates the After Effects extension. The Surehand MCP
 // panel's Update button runs this too (with --json); `update --check --json` only reports.
+// "Latest" is on the update channel (config.json updateChannel, or `--channel beta|stable`): beta also
+// takes pre-releases. An older release is never installed, so a beta stays after going back to stable.
 //
 // Each release carries the single-file server as surehand-ae.mjs, and the same file as ae-mcp.mjs
 // (the name 1.3's updater downloads). This updater takes surehand-ae.mjs, else ae-mcp.mjs (older
@@ -13,8 +15,8 @@ import { copyFileSync, existsSync, mkdirSync, renameSync, rmSync, writeFileSync 
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { VERSION } from "../config.js";
-import { env, installedServer, LEGACY_SERVER_FILE, SERVER_FILE } from "../paths.js";
-import { checkForUpdate, compareVersions, RELEASES_URL, REPO } from "../update.js";
+import { installedServer, LEGACY_SERVER_FILE, SERVER_FILE } from "../paths.js";
+import { compareVersions, ghGet as get, keptBetaNote, newestRelease, recordCheck, RELEASES_URL, setUpdateChannel, updateChannel, updateCheckEnabled, type Release, type UpdateChannel } from "../update.js";
 import { moveFromLegacy, repointLegacyClients } from "./clients.js";
 import { bold, fail, ok, warn } from "./util.js";
 
@@ -31,13 +33,6 @@ export interface UpdateResult {
   restartAfterEffects?: boolean;
 }
 
-interface Release {
-  tag_name: string;
-  html_url: string;
-  body?: string | null;
-  assets: { name: string; browser_download_url: string; digest?: string | null }[];
-}
-
 /** The server file to download from a release: surehand-ae.mjs, else ae-mcp.mjs; null if neither. */
 export function chooseAsset(rel: Pick<Release, "assets">): Release["assets"][number] | null {
   for (const name of SERVER_ASSETS) {
@@ -47,29 +42,38 @@ export function chooseAsset(rel: Pick<Release, "assets">): Release["assets"][num
   return null;
 }
 
-async function latestRelease(): Promise<Release> {
-  // SUREHAND_AE_RELEASES_API / AEMCP_RELEASES_API: for tests only (a local stand-in for the GitHub API)
-  const api = env("RELEASES_API") || `https://api.github.com/repos/${REPO}/releases/latest`;
-  return (await (await get(api)).json()) as Release;
+/** The newest release on the channel; the cached check (the panel's banner) is refreshed with it. */
+async function latestRelease(channel: UpdateChannel): Promise<Release> {
+  const rel = await newestRelease(channel);
+  if (typeof rel?.tag_name !== "string") throw new Error("GitHub's answer has no release");
+  if (updateCheckEnabled()) recordCheck(rel, channel);
+  return rel;
 }
 
-/** `update --check --json`: {latest, current, updateAvailable, url, checkedAt, notes?} (error when GitHub can't be reached). */
+/** `update --check --json`: {latest, current, updateAvailable, url, checkedAt, channel, notes?, keptBeta?} (error when GitHub can't be reached). */
 export interface UpdateCheck {
   latest: string | null;
   current: string;
   updateAvailable: boolean;
   url: string;
   checkedAt: string;
+  channel: UpdateChannel;
+  /** on stable with a newer beta installed: says it stays */
+  keptBeta?: string;
   /** the release notes, one line each (markdown bullets and heading marks removed) */
   notes?: string[];
   error?: string;
 }
 
-/** Release notes as lines for the panel. */
+/**
+ * Release notes as lines for the panel: bullet marks removed, a heading kept as "### title" (the panel
+ * shows it as a bold line). Inline **bold** and `code` stay; the panel renders them as text, never HTML.
+ */
 export function noteLines(body: string | null | undefined): string[] {
   return (body ?? "")
     .split(/\r?\n/)
-    .map((l) => l.replace(/^\s*(?:#{1,6}\s+|[-*+]\s+)/, "").trim())
+    .map((l) => (/^\s*#{1,6}\s+/.test(l) ? l.replace(/^\s*#{1,6}\s+/, "### ") : l.replace(/^\s*[-*+]\s+/, "")).trim())
+    .filter((l) => l && l !== "###")
     .filter(Boolean)
     .slice(0, 60);
 }
@@ -77,21 +81,19 @@ export function noteLines(body: string | null | undefined): string[] {
 /** `update --check`: what the latest release is, without installing anything. */
 export async function checkUpdate(): Promise<UpdateCheck> {
   const checkedAt = new Date().toISOString();
+  const channel = updateChannel();
   try {
-    const rel = await latestRelease();
+    const rel = await latestRelease(channel);
     const latest = rel.tag_name.replace(/^v/, "");
-    void checkForUpdate(true); // refresh the cached banner state
     const notes = noteLines(rel.body);
-    return { latest, current: VERSION, updateAvailable: compareVersions(latest, VERSION) > 0, url: rel.html_url || RELEASES_URL, checkedAt, ...(notes.length ? { notes } : {}) };
+    const keptBeta = keptBetaNote(channel, latest);
+    return {
+      latest, current: VERSION, updateAvailable: compareVersions(latest, VERSION) > 0, url: rel.html_url || RELEASES_URL, checkedAt, channel,
+      ...(notes.length ? { notes } : {}), ...(keptBeta ? { keptBeta } : {}),
+    };
   } catch (e: any) {
-    return { latest: null, current: VERSION, updateAvailable: false, url: RELEASES_URL, checkedAt, error: `Could not reach GitHub to check for updates (${e.message}).` };
+    return { latest: null, current: VERSION, updateAvailable: false, url: RELEASES_URL, checkedAt, channel, error: `Could not reach GitHub to check for updates (${e.message}).` };
   }
-}
-
-async function get(url: string): Promise<Response> {
-  const res = await fetch(url, { headers: { "user-agent": `surehand-ae/${VERSION}`, accept: "application/vnd.github+json" }, signal: AbortSignal.timeout(60_000) });
-  if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
-  return res;
 }
 
 /** The expected SHA-256 (hex) of the server asset: GitHub's own digest, else the .sha256 file. */
@@ -107,15 +109,19 @@ async function expectedDigest(rel: Release, asset: Release["assets"][number]): P
 
 export async function runUpdate(): Promise<UpdateResult> {
   const base = { from: VERSION, to: null, updated: false };
+  const channel = updateChannel();
   let rel: Release;
   try {
-    rel = await latestRelease();
+    rel = await latestRelease(channel);
   } catch (e: any) {
     return { ...base, ok: false, message: `Could not reach GitHub to check for updates (${e.message}).` };
   }
   const latest = rel.tag_name.replace(/^v/, "");
-  void checkForUpdate(true); // refresh the cached banner state
-  if (compareVersions(latest, VERSION) <= 0) return { ...base, ok: true, to: latest, message: `Surehand MCP is up to date (v${VERSION}).` };
+  // never older: on stable, a newer beta stays until a newer stable release is out
+  if (compareVersions(latest, VERSION) <= 0) {
+    const kept = keptBetaNote(channel, latest);
+    return { ...base, ok: true, to: latest, message: `Surehand MCP is up to date (v${VERSION}).${kept ? ` ${kept}` : ""}` };
+  }
   const asset = chooseAsset(rel);
   if (!asset) return { ...base, ok: false, to: latest, url: rel.html_url, message: `v${latest} can't be installed automatically. Download it from ${rel.html_url}` };
 
@@ -161,18 +167,46 @@ export async function runUpdate(): Promise<UpdateResult> {
     restartAfterEffects: extension,
     message:
       `Updated Surehand MCP from v${VERSION} to v${latest}. ` +
-      (extension ? "Restart After Effects and your AI apps to use it." : "Restart your AI apps to use it.") +
+      (extension ? "Restart After Effects and your AI apps to finish." : "Restart your AI apps to finish.") +
       (running ? " (If you use the Claude Desktop extension (.mcpb), install the new Surehand-MCP.mcpb from the release page as well.)" : ""),
   };
 }
 
+/** `--channel beta|stable` (or `--channel=beta`): the value, "" when the flag has none, undefined when absent. */
+export function channelArg(args: string[]): string | undefined {
+  const i = args.findIndex((a) => a === "--channel" || a.startsWith("--channel="));
+  if (i < 0) return undefined;
+  return args[i].includes("=") ? args[i].slice("--channel=".length) : args[i + 1] && !args[i + 1].startsWith("--") ? args[i + 1] : "";
+}
+
 export async function updateCommand(args: string[]) {
+  const json = args.includes("--json");
+  // `--channel beta|stable` saves the channel first, then checks or updates on it
+  const ch = channelArg(args);
+  if (ch !== undefined) {
+    if (ch !== "beta" && ch !== "stable") {
+      const message = "usage: surehand-ae update [--check] [--channel beta|stable] [--json]";
+      if (json) console.log(JSON.stringify({ ok: false, message }));
+      else fail(message);
+      process.exitCode = 2;
+      return;
+    }
+    try {
+      setUpdateChannel(ch);
+    } catch (e: any) {
+      if (json) console.log(JSON.stringify({ ok: false, message: `Could not save the update channel: ${e.message}` }));
+      else fail(`Could not save the update channel: ${e.message}`);
+      process.exitCode = 1;
+      return;
+    }
+    if (!json) ok(ch === "beta" ? "Update channel: beta (pre-releases included)." : "Update channel: stable.");
+  }
   if (args.includes("--check")) {
     const c = await checkUpdate();
-    if (args.includes("--json")) console.log(JSON.stringify(c));
+    if (json) console.log(JSON.stringify(c));
     else if (c.error) fail(c.error);
-    else if (c.updateAvailable) warn(`v${c.latest} is available (you have v${c.current}): ${c.url}. Install it with: surehand-ae update`);
-    else ok(`Surehand MCP is up to date (v${c.current}).`);
+    else if (c.updateAvailable) warn(`v${c.latest} is available on the ${c.channel} channel (you have v${c.current}): ${c.url}. Install it with: surehand-ae update`);
+    else ok(`Surehand MCP is up to date (v${c.current}, ${c.channel} channel).${c.keptBeta ? ` ${c.keptBeta}` : ""}`);
     process.exitCode = c.error ? 1 : 0;
     return;
   }
