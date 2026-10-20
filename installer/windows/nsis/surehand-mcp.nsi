@@ -125,7 +125,6 @@ Var TunnelBox
 Var Tunnel     ; 1: "Set up ChatGPT on the web" ticked (download cloudflared)
 Var Detected   ; 1 once the app list was read
 Var RtNode     ; the Node.js ExtractRuntime found or unpacked
-Var AppsWait   ; "Looking for the AI apps on this PC…" while they are read
 Var UnAll      ; uninstaller: 1 with /ALL (remove the settings and checkpoints too)
 
 ; $0 = process image name -> $0 = 1 if running, else 0
@@ -275,45 +274,66 @@ Function ToggleTunnel
   ${EndIf}
 FunctionEnd
 
-; The page is shown at once with its header and "Looking for…", Next disabled; the apps are read a moment later (a
-; timer), then the rows are drawn and Next enabled. (Reading them first, before the page, left the window blank
-; for seconds with the previous page's header, and a click then went through to the install.)
+; Choose AI apps. The apps are read before the page is built (controls made later, from a timer, lost their colours
+; and fonts on Windows 11), but visibly: the header already says "Choose AI apps", the previous page is hidden and a
+; note says what is happening, Next is disabled, and clicks and keys made meanwhile are dropped, so none goes on to
+; the install. The installed Node.js reads them when there is one (about a second).
 Function AppsCreate
   !insertmacro MUI_HEADER_TEXT "Choose AI apps" "Surehand connects the apps you tick. You can change this later in the panel."
+  ${If} $Detected != 1
+    Call DetectAppsVisibly
+  ${EndIf}
   nsDialogs::Create 1018
   Pop $0
   ${If} $0 == error
     Abort
   ${EndIf}
   SetCtlColors $0 "${CL_INK}" "${CL_PAPER}"
+  Call AppsRows
   Call cl.AppPageShow
   StrCpy $0 "&Install"
   ${If} $cl.Installed == 1
     StrCpy $0 $cl.ActionButton ; Update / Reinstall
   ${EndIf}
   Call cl.SetMainButton
-  ${If} $Detected == 1
-    Call AppsRows
-  ${Else}
-    ${NSD_CreateLabel} 0 0 100% 10u "Looking for the AI apps on this PC…"
-    Pop $AppsWait
-    SetCtlColors $AppsWait "${CL_MUTED}" "${CL_PAPER}"
-    GetDlgItem $0 $HWNDPARENT 1
-    EnableWindow $0 0
-    Call cl.SyncMainButton
-    ${NSD_CreateTimer} AppsDetect 50
-  ${EndIf}
   nsDialogs::Show
 FunctionEnd
 
-Function AppsDetect
-  ${NSD_KillTimer} AppsDetect
-  Call DetectApps
-  ShowWindow $AppsWait ${SW_HIDE}
-  Call AppsRows
-  GetDlgItem $0 $HWNDPARENT 1
-  EnableWindow $0 1
+Function DetectAppsVisibly
+  ; the previous page out of the way, a note where this page will be
+  FindWindow $1 "#32770" "" $HWNDPARENT
+  ${If} $1 <> 0
+    ShowWindow $1 ${SW_HIDE}
+  ${EndIf}
+  GetDlgItem $1 $HWNDPARENT 1018 ; MUI's placeholder for the inner page
+  System::Call "*(i,i,i,i)p.r2"
+  System::Call "user32::GetWindowRect(p r1, p r2)"
+  System::Call "user32::MapWindowPoints(p 0, p $HWNDPARENT, p r2, i 2)"
+  System::Call "*$2(i.r3, i.r4, i.r5, i)"
+  System::Free $2
+  IntOp $5 $5 - $3
+  System::Call 'user32::CreateWindowExW(i 0, w "STATIC", w "Looking for the AI apps on this PC…", i 0x50000000, i r3, i r4, i r5, i 24, p $HWNDPARENT, p 0, p 0, p 0) p.r6'
+  SetCtlColors $6 "${CL_MUTED}" "${CL_PAPER}"
+  SendMessage $HWNDPARENT ${WM_GETFONT} 0 0 $1
+  SendMessage $6 ${WM_SETFONT} $1 0
+  GetDlgItem $7 $HWNDPARENT 1
+  EnableWindow $7 0
   Call cl.SyncMainButton
+  System::Call "user32::RedrawWindow(p $HWNDPARENT, p 0, p 0, i 0x185)" ; RDW_INVALIDATE|ERASE|ALLCHILDREN|UPDATENOW
+  Call DetectApps
+  System::Call "user32::DestroyWindow(p r6)"
+  ; drop the clicks and keys made while Setup was busy
+  System::Call "*(&i48)p.r2"
+  ${Do}
+    System::Call "user32::PeekMessageW(p r2, p 0, i 0x100, i 0x109, i 1) i.r1" ; keyboard
+    ${IfThen} $1 = 0 ${|} System::Call "user32::PeekMessageW(p r2, p 0, i 0x200, i 0x20E, i 1) i.r1" ${|} ; mouse
+    ${IfThen} $1 = 0 ${|} System::Call "user32::PeekMessageW(p r2, p 0, i 0xA0, i 0xAD, i 1) i.r1" ${|} ; mouse on frames
+    ${If} $1 = 0
+      ${Break}
+    ${EndIf}
+  ${Loop}
+  System::Free $2
+  EnableWindow $7 1
 FunctionEnd
 
 ; the rows, on the page being shown
@@ -321,9 +341,9 @@ Function AppsRows
   !insertmacro CL_SECTION_LABEL 0 "AI APPS"
   StrCpy $R0 11 ; the next row's top (dialog units)
   !insertmacro AI_APPS_FOR_EACH _APP_ROW
-  IntOp $R0 $R0 + 7
+  IntOp $R0 $R0 + 4
   !insertmacro CL_SECTION_LABEL $R0u "OPTIONAL"
-  IntOp $R0 $R0 + 11
+  IntOp $R0 $R0 + 10
   StrCpy $R1 "${AI_WEB_TITLE}"
   StrCpy $R2 "Downloads Cloudflare's cloudflared (about 55 MB) for the secure link ChatGPT uses."
   StrCpy $R3 1

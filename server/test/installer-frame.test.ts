@@ -78,17 +78,32 @@ describe("Windows installer: Choose AI apps (one list with the Mac Installer)", 
     expect([...INSTALLER_ORDER].sort()).toEqual([...CLIENT_IDS].sort());
   });
 
-  it("shows the page (its own header) at once, reads the apps a moment later with Next disabled, then draws the rows", () => {
+  it("reads the apps before building the page, visibly: its header, a note, Next disabled, input dropped afterwards", () => {
     const create = fn(nsi, "AppsCreate");
-    // nothing slow before the page exists (reading first left a blank page and let a click through)
-    expect(create.indexOf("MUI_HEADER_TEXT")).toBeLessThan(create.indexOf("nsDialogs::Create 1018"));
-    expect(create).not.toMatch(/Call DetectApps/);
-    expect(create).toMatch(/"Looking for the AI apps on this PC…"[\s\S]*EnableWindow \$0 0[\s\S]*\$\{NSD_CreateTimer\} AppsDetect 50[\s\S]*nsDialogs::Show/);
-    const detect = fn(nsi, "AppsDetect");
-    expect(detect).toMatch(/NSD_KillTimer\} AppsDetect\s*\n\s*Call DetectApps[\s\S]*Call AppsRows[\s\S]*EnableWindow \$0 1\s*\n\s*Call cl\.SyncMainButton/);
+    // the header first; the rows are built in the page's create function (not later from a timer, where they lost
+    // their colours and fonts on Windows 11)
+    expect(create.indexOf("MUI_HEADER_TEXT")).toBeLessThan(create.indexOf("Call DetectAppsVisibly"));
+    expect(create.indexOf("Call DetectAppsVisibly")).toBeLessThan(create.indexOf("nsDialogs::Create 1018"));
+    expect(create).toMatch(/nsDialogs::Create 1018[\s\S]*Call AppsRows[\s\S]*nsDialogs::Show/);
+    expect(nsi).not.toMatch(/NSD_CreateTimer/);
+    const visibly = fn(nsi, "DetectAppsVisibly");
+    expect(visibly).toMatch(/"Looking for the AI apps on this PC…"[\s\S]*EnableWindow \$7 0[\s\S]*RedrawWindow[\s\S]*Call DetectApps/);
+    // clicks and keys made while Setup was busy are dropped, so none goes on to the install
+    expect(visibly).toMatch(/Call DetectApps[\s\S]*PeekMessageW\(p r2, p 0, i 0x100, i 0x109, i 1\)[\s\S]*PeekMessageW\(p r2, p 0, i 0x200, i 0x20E, i 1\)[\s\S]*EnableWindow \$7 1/);
     expect(fn(nsi, "AppsLeave")).toMatch(/\$\{If\} \$Detected != 1\s*\n\s*Abort/);
     // the installed Node.js runs the detection when there is one (no 80 MB to unpack)
     expect(fn(nsi, "ExtractRuntime")).toMatch(/StrCpy \$RtNode "\$\{NODE_DIR\}\\node\.exe"\s*\n\s*\$\{IfNot\} \$\{FileExists\} "\$RtNode"/);
+  });
+
+  it("every label on the page is coloured and the section labels are mono; four missing apps and cloudflared fit 140u", () => {
+    const rows = fn(nsh, "cl.CheckRow");
+    for (const m of rows.matchAll(/\$\{NSD_CreateLabel\}[^\n]*\n\s*Pop \$0\n([^\n]*)/g)) expect(m[1]).toMatch(/SetCtlColors \$0|\$\{If\}/);
+    expect(macro(nsh, "CL_SECTION_LABEL")).toMatch(/SetCtlColors \$0 "\$\{CL_MUTED\}" "\$\{CL_PAPER\}"\s*\n\s*SendMessage \$0 \$\{WM_SETFONT\} \$cl\.FontLabel 0/);
+    // 11u, four rows of 23u, 4u, the label, 10u, a 23u row: the last note ends by 140u
+    expect(rows).toMatch(/StrCpy \$R6 15[\s\S]*IntOp \$1 \$R0 \+ 13\s*\n\s*\$\{NSD_CreateLabel\} 13u \$1u 280u 9u "\$R2"[\s\S]*StrCpy \$R6 23/);
+    const appsRows = fn(nsi, "AppsRows");
+    expect(appsRows).toMatch(/StrCpy \$R0 11[\s\S]*IntOp \$R0 \$R0 \+ 4[\s\S]*"OPTIONAL"\s*\n\s*IntOp \$R0 \$R0 \+ 10/);
+    expect(11 + 4 * 23 + 4 + 10 + 13 + 9).toBeLessThanOrEqual(140);
   });
 
   it("the accent button follows the Next button's own WS_VISIBLE (on the first page the window is not shown yet)", () => {
@@ -168,13 +183,17 @@ describe("Windows installer: progress and finish pages", () => {
     // rule, top strip, rows, bottom strip: each starts where the one before ends
     expect(results).toMatch(/NSD_CreateLabel\} 124u \$R9u 196u 1u ""[\s\S]*?IntOp \$R9 \$R9 \+ 1\s*\n\s*\$\{NSD_CreateLabel\} 124u \$R9u 196u 3u ""[\s\S]*?IntOp \$R9 \$R9 \+ 3/);
     expect(results).toMatch(/NSD_CreateBitmap\} 124u \$R9u 14u \$3u ""[\s\S]*?NSD_AddStyle\} \$0 \$\{CL_SS_CENTERIMAGE\}[\s\S]*?NSD_CreateLabel\} 138u \$R9u 182u \$3u "\$2"[\s\S]*?IntOp \$R9 \$R9 \+ \$3/);
-    expect(results).toMatch(/Call cl\.ResultLines[^\n]*\n\s*IntOp \$3 \$3 \* 10/);
+    // each row as tall as Windows will wrap its text: measured with the real font and width
+    expect(results).toMatch(/StrCpy \$R1 \$cl\.FontMono[\s\S]*Call cl\.TextLines[^\n]*\n\s*IntOp \$3 \$R4 \* 10/);
+    expect(results).toMatch(/NSD_CreateLabel\} 0 0 182u 5u ""[\s\S]*Call cl\.ClientWidth/);
+    expect(fn(nsh, "cl.TextLines")).toMatch(/DrawTextW\(p r0, w R2, i -1, p r2, i 0xC10\)/); // DT_CALCRECT: measure only
+    // the glyph cells are paper-sunk around the bitmap (they showed light frames)
+    expect(results).toMatch(/NSD_CreateBitmap\}[^\n]*\n\s*Pop \$0\s*\n\s*SetCtlColors \$0 "" "\$\{CL_SUNK\}"/);
     // nothing is moved or re-stacked afterwards (that put the box over the title and the rows)
     expect(results).not.toMatch(/PlaceDialogUnits|SendToBack|BringToTop|MoveWindow|SetWindowPos/);
-    expect(fn(nsh, "cl.ResultLines")).toContain(`\${If} $2 > ${frame.RESULT_LINE_CHARS}`);
   });
 
-  it("counts a result's lines by words, as Windows wraps them (long lines get the height they need)", () => {
+  it("the previews count a result's lines by words, as Windows wraps them", () => {
     const { resultLines } = frame;
     expect(resultLines("Adobe® After Effects® 2025, 2026")).toBe(1);
     expect(resultLines("Connected Claude Desktop, Claude Code, Cursor")).toBe(1); // 45 characters

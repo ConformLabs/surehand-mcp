@@ -56,7 +56,7 @@ img.p{position:absolute;image-rendering:pixelated}`;
   const rule = (y) => inner(0, y, 300, 1, "", "rule");
   const checkRow = (y, title, note, on, enabled = true) =>
     rule(y) + `<div class="box ${on ? "on" : ""} ${enabled ? "" : "off"}" style="left:${Math.round(15 * UX)}px;top:${Math.round((44 + y + 4) * UY) + 3}px"></div>` +
-    inner(13, y + 4, 280, 10, esc(title), enabled ? "strong" : "muted") + (note ? inner(13, y + 14, 280, 9, esc(note), "muted") : "");
+    inner(13, y + 4, 280, 10, esc(title), enabled ? "strong" : "muted") + (note ? inner(13, y + 13, 280, 9, esc(note), "muted") : "");
   // the bitmaps have a 1 px margin of their background
   const glyph = (kind, bg, x, y) => `<img class="p" src="${bmp(`glyph-${kind}-${bg}-9.bmp`)}" style="left:${Math.round(x * UX) - 1}px;top:${Math.round(y * UY) - 1}px;width:11px;height:11px">`;
 
@@ -73,13 +73,13 @@ img.p{position:absolute;image-rendering:pixelated}`;
   let y = 11, rows = "";
   for (const [name, found] of [["Claude Desktop", true], ["Claude Code", true], ["Cursor", true], ["ChatGPT desktop / Codex", false]]) {
     rows += checkRow(y, name, found ? "" : "Not found on this PC. Install it, then run Setup again.", found, found);
-    y += found ? 16 : 25;
+    y += found ? 15 : 23;
   }
-  y += 7;
+  y += 4;
   rows += inner(0, y, 300, 9, "OPTIONAL", "lab muted");
-  y += 11;
+  y += 10;
   rows += checkRow(y, "Set up ChatGPT on the web", "Downloads Cloudflare's cloudflared (about 55 MB) for the secure link ChatGPT uses.", false);
-  y += 25;
+  y += 23;
   pages.apps = page(
     header("Choose AI apps", "Surehand connects the apps you tick. You can change this later in the panel.") + inner(0, 0, 300, 9, "AI APPS", "lab muted") + rows + rule(y),
     [["Back", 164], ["Install", 214, "main"], ["Cancel", 273]],

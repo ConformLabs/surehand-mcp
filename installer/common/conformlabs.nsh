@@ -689,8 +689,13 @@ FunctionEnd
   SendMessage $0 ${WM_SETFONT} $cl.FontLabel 0
 !macroend
 
-; the same with run-time positions and texts (the app's rows built from what Setup found): $R0 top, $R1 title,
-; $R2 note ("" for none), $R3 enabled (1/0), $R4 on-click function address (GetFunctionAddress) -> $R5 box, $R6 height
+; A check box row (the app's rows, built from what Setup found): a hairline above, the box (its text is the real name:
+; what screen readers say; the box is only as wide as its square, so the text Windows would draw in black is never
+; seen), beside it the name (IBM Plex Sans SemiBold) and an optional muted note under it, both clickable. Not enabled:
+; the box is disabled and the name muted; the labels stay enabled. Rows are 15u, 23u with a note: four apps that are
+; all missing and the cloudflared row still fit the 140u page.
+; $R0 top, $R1 title, $R2 note ("" for none), $R3 enabled (1/0), $R4 on-click function address (GetFunctionAddress)
+; -> $R5 box, $R6 height
 Function cl.CheckRow
   Push $0
   Push $1
@@ -714,16 +719,16 @@ Function cl.CheckRow
     SetCtlColors $0 "${CL_MUTED}" "${CL_PAPER}"
     EnableWindow $R5 0
   ${EndIf}
-  StrCpy $R6 16
+  StrCpy $R6 15
   ${If} $R2 != ""
-    IntOp $1 $R0 + 14
+    IntOp $1 $R0 + 13
     ${NSD_CreateLabel} 13u $1u 280u 9u "$R2"
     Pop $0
     SetCtlColors $0 "${CL_MUTED}" "${CL_PAPER}"
     ${If} $R3 == 1
       nsDialogs::OnClick $0 $R4
     ${EndIf}
-    StrCpy $R6 25
+    StrCpy $R6 23
   ${EndIf}
   Pop $1
   Pop $0
@@ -1090,6 +1095,7 @@ Function cl.StepAdd
   StrCpy $cl.cS ${CL_SS_BITMAP_CENTER}
   IntOp $cl.cI $2 + 1
   Call cl.Static
+  SetCtlColors $cl.cOut "" "${CL_PAPER}" ; what the centred bitmap leaves around it
   SendMessage $cl.cOut ${CL_STM_SETIMAGE} 0 $cl.GNext
   StrCpy $cl.cX 10
   IntOp $cl.cY $cl.StepY + 3
@@ -1263,6 +1269,12 @@ Function cl.FinishResults
   Call cl.PickArt
   StrCpy $R7 $cl.Art
   ShowWindow $0 ${SW_HIDE}
+  ; the rows' text width in pixels, measured on a 182u label (and the next steps' 186u)
+  ${NSD_CreateLabel} 0 0 182u 5u ""
+  Pop $0
+  Call cl.ClientWidth
+  StrCpy $R6 $1
+  ShowWindow $0 ${SW_HIDE}
   ; the ink rule on the box's top edge (1u: 2 px at 100 %)
   ${NSD_CreateLabel} 124u $R9u 196u 1u ""
   Pop $0
@@ -1280,12 +1292,15 @@ Function cl.FinishResults
     ${AndIf} $1 != "failed"
       StrCpy $1 "skipped"
     ${EndIf}
-    Push $2
-    Call cl.ResultLines ; -> $3 lines
-    IntOp $3 $3 * 10 ; 10u a line
+    StrCpy $R1 $cl.FontMono
+    StrCpy $R2 $2
+    StrCpy $R3 $R6 ; the text's width in pixels
+    Call cl.TextLines ; -> $R4 lines, as Windows will wrap them
+    IntOp $3 $R4 * 10 ; 10u a line
     ; the gutter: the glyph centred (SS_CENTERIMAGE fills the rest with the bitmap's corner, paper-sunk)
     ${NSD_CreateBitmap} 124u $R9u 14u $3u ""
     Pop $0
+    SetCtlColors $0 "" "${CL_SUNK}" ; what the centred bitmap leaves around it
     ${NSD_AddStyle} $0 ${CL_SS_CENTERIMAGE}
     ${NSD_SetImage} $0 "$PLUGINSDIR\cl\glyph-$1-sunk-$R7.bmp" $5
     ${NSD_CreateLabel} 138u $R9u 182u $3u "$2"
@@ -1312,12 +1327,13 @@ Function cl.FinishResults
     ${NSD_CreateLabel} 124u $R9u 9u 9u "$1."
     Pop $0
     SetCtlColors $0 "${CL_MUTED}" "${CL_PAPER}"
-    ; about 48 Segoe UI characters on a line
-    StrLen $3 $2
-    IntOp $3 $3 + 47
-    IntOp $3 $3 / 48
-    ${IfThen} $3 < 1 ${|} StrCpy $3 1 ${|}
-    IntOp $3 $3 * 9
+    SendMessage $mui.FinishPage ${WM_GETFONT} 0 0 $R1
+    StrCpy $R2 $2
+    IntOp $R3 $R6 + 0
+    IntOp $R3 $R3 * 186
+    IntOp $R3 $R3 / 182 ; 186u
+    Call cl.TextLines
+    IntOp $3 $R4 * 9
     ${NSD_CreateLabel} 134u $R9u 186u $3u "$2"
     Pop $0
     SetCtlColors $0 "${CL_INK}" "${CL_PAPER}"
@@ -1331,54 +1347,44 @@ FunctionEnd
 
 
 !ifdef CL_RESULTS_INI
-; Push "text" / Call cl.ResultLines -> $3: the lines a results row needs. IBM Plex Mono 8 is 6.4 px a character
-; at 96 dpi and the row's label 182u (318 px at Segoe UI 9): 49 fit; 47 leaves room. A word that would cross the
-; edge moves to the next line, so the count is by words, the way Windows wraps the label.
-Function cl.ResultLines
-  Exch $0 ; text
+; $R1 font, $R2 text, $R3 width in pixels -> $R4: the lines Windows needs for the text in a label that wide
+; (DrawText with DT_CALCRECT | DT_WORDBREAK, the way a static control wraps), at least 1
+Function cl.TextLines
+  Push $0
   Push $1
   Push $2
-  Push $4
-  StrCpy $3 1
-  StrCpy $4 0 ; characters on this line
-  ${Do}
-    ; the next word (up to a space) of $0
-    StrCpy $1 0
-    ${Do}
-      StrCpy $2 $0 1 $1
-      ${If} $2 == ""
-      ${OrIf} $2 == " "
-        ${Break}
-      ${EndIf}
-      IntOp $1 $1 + 1
-    ${Loop}
-    ${If} $4 > 0
-      IntOp $2 $4 + 1
-      IntOp $2 $2 + $1
-      ${If} $2 > 47
-        IntOp $3 $3 + 1
-        StrCpy $4 $1
-      ${Else}
-        StrCpy $4 $2
-      ${EndIf}
-    ${Else}
-      StrCpy $4 $1
-    ${EndIf}
-    ; a word longer than a line takes more lines
-    ${DoWhile} $4 > 47
-      IntOp $3 $3 + 1
-      IntOp $4 $4 - 47
-    ${Loop}
-    IntOp $1 $1 + 1
-    StrCpy $0 $0 "" $1
-    ${If} $0 == ""
-      ${Break}
-    ${EndIf}
-  ${Loop}
-  Pop $4
+  Push $3
+  System::Call "user32::GetDC(p $HWNDPARENT) p.r0"
+  System::Call "gdi32::SelectObject(p r0, p $R1) p.r1"
+  System::Call "*(i 0, i 0, i $R3, i 0)p.r2"
+  System::Call "user32::DrawTextW(p r0, w R2, i -1, p r2, i 0xC10) i.r3" ; DT_CALCRECT | DT_WORDBREAK | DT_NOPREFIX: measures, draws nothing
+  System::Call "*$2(i,i,i,i.r3)" ; the text's height
+  System::Call "*$2(i 0, i 0, i $R3, i 0)"
+  System::Call "user32::DrawTextW(p r0, w 'X', i -1, p r2, i 0xC10) i.r2" ; one line's
+  System::Call "gdi32::SelectObject(p r0, p r1)"
+  System::Call "user32::ReleaseDC(p $HWNDPARENT, p r0)"
+  ${If} $2 > 0
+    IntOp $R4 $3 + $2
+    IntOp $R4 $R4 - 1
+    IntOp $R4 $R4 / $2
+  ${Else}
+    StrCpy $R4 1
+  ${EndIf}
+  ${IfThen} $R4 < 1 ${|} StrCpy $R4 1 ${|}
+  Pop $3
   Pop $2
   Pop $1
   Pop $0
+FunctionEnd
+
+; $0 = control -> $1 its width in pixels
+Function cl.ClientWidth
+  Push $2
+  System::Call "*(i,i,i,i)p.r2"
+  System::Call "user32::GetClientRect(p r0, p r2)"
+  System::Call "*$2(i,i,i.r1,i)"
+  System::Free $2
+  Pop $2
 FunctionEnd
 !endif
 
