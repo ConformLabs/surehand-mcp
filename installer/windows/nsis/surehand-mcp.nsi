@@ -31,6 +31,7 @@ SetCompressor /SOLID lzma
 !include x64.nsh
 !include WinVer.nsh
 !include FileFunc.nsh
+!include WordFunc.nsh
 !include "${AI_APPS_NSH}"
 
 !define PRODUCT "Surehand MCP"
@@ -135,15 +136,18 @@ Var UnAll      ; uninstaller: 1 with /ALL (remove the settings and checkpoints t
 Var UnAE       ; uninstaller: 1 when After Effects was open
 Var UnNodeKept ; uninstaller: 1 when the shared Node.js stayed for another Surehand app
 
-; $0 = process image name -> $0 = 1 if running, else 0
+; EXE = process image name -> $0 = 1 if running, else 0. tasklist's own output is searched for the name (not a
+; `cmd /c "...tasklist.exe" ... | "...find.exe" ...` pipe: cmd strips the first and the last quote of such a line, so
+; the pipe never ran and the answer was always "not running"). Its "no tasks" message never contains the name.
 !macro IsRunning EXE
-  nsExec::ExecToStack '"$SYSDIR\cmd.exe" /c "$SYSDIR\tasklist.exe" /FI "IMAGENAME eq ${EXE}" /NH | "$SYSDIR\find.exe" /I "${EXE}"'
-  Pop $0
-  Pop $1
-  ${If} $0 == 0
+  nsExec::ExecToStack '"$SYSDIR\tasklist.exe" /FI "IMAGENAME eq ${EXE}" /NH'
+  Pop $0 ; exit code
+  Pop $1 ; output
+  StrCpy $0 0
+  ClearErrors
+  ${WordFind} "$1" "${EXE}" "E*" $2 ; case-insensitive; Errors when it is not there
+  ${IfNot} ${Errors}
     StrCpy $0 1
-  ${Else}
-    StrCpy $0 0
   ${EndIf}
 !macroend
 

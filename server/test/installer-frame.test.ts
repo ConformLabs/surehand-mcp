@@ -186,6 +186,19 @@ describe("Windows installer: progress and finish pages", () => {
     expect(fn(nsh, "${UN}cl.GUIInit")).toMatch(/File "\$\{CL_ART\}\\wizard-\*\.bmp"\s*\n\s*File "\$\{CL_ART\}\\glyph-\*\.bmp"/);
   });
 
+  it("tells whether a program is running from tasklist's own output (a cmd pipe lost its quotes and always said no)", () => {
+    const m = macro(nsi, "IsRunning");
+    expect(m).toMatch(/nsExec::ExecToStack '"\$SYSDIR\\tasklist\.exe" \/FI "IMAGENAME eq \$\{EXE\}" \/NH'/);
+    expect(m).not.toMatch(/cmd\.exe|find\.exe/);
+    expect(m).toMatch(/\$\{WordFind\} "\$1" "\$\{EXE\}" "E\*" \$2[\s\S]*\$\{IfNot\} \$\{Errors\}\s*\n\s*StrCpy \$0 1/);
+    // the uninstaller's answer reaches its finish page
+    expect(nsi).toMatch(/!insertmacro IsRunning "AfterFX\.exe"\s*\n\s*StrCpy \$UnAE \$0/);
+  });
+
+  it("the uninstaller's confirmation page has no blank Back button", () => {
+    expect(nsh).toMatch(/Function un\.cl\.ConfirmShow\s*\n\s*Call un\.cl\.InnerPageShow\s*\n\s*StrCpy \$0 "back"[^\n]*\n\s*Call un\.cl\.FooterButtons/);
+  });
+
   it("hides MUI's separators and branding line before the apps are read (MUI shows them again after the welcome page)", () => {
     const hide = fn(nsh, "${UN}cl.HideLines");
     for (const id of [1035, 1036, 1045, 1028, 1256]) expect(hide).toMatch(new RegExp(`GetDlgItem \\$0 \\$HWNDPARENT ${id}\\s*\\n\\s*ShowWindow \\$0 \\$\\{SW_HIDE\\}`));

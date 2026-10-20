@@ -1430,6 +1430,8 @@ FunctionEnd
   !insertmacro MUI_UNPAGE_CONFIRM
   Function un.cl.ConfirmShow
     Call un.cl.InnerPageShow
+    StrCpy $0 "back" ; the uninstaller's first page: no Back (Windows left it as a blank button)
+    Call un.cl.FooterButtons
     !ifdef CL_UNCONFIRM_SHOW
       Call ${CL_UNCONFIRM_SHOW}
     !endif
