@@ -966,6 +966,12 @@ aemcp = (function () {
   // until the file is written. The call ends with its undo group closed and the sentinel in it; the undo and its
   // check run later in A.finishRollback (a second call), only if nothing changed the project in between.
   var pending = {};
+  // A render places the sentinel BEFORE its first edit (A.renderMark), not after the body: seen in AE 26.5, the first
+  // saveFrameToPng after a project was opened and its settings changed can close the open undo group, so a sentinel
+  // added after it lands in undo steps of its own and Edit > Undo reverts only part of it. markable: inside a
+  // deferred call with an undo group; runMark: the sentinel placed in this call.
+  var markable = false, runMark = null;
+  A.renderMark = function () { if (markable && runMark === null) runMark = addSentinel(); };
   // fix(): the caller's cleanup by hand (what is still there is removed / set back); it returns what it did
   A.finishRollback = function (token, fix) {
     var p = pending[token], out, done = [];
@@ -984,12 +990,19 @@ aemcp = (function () {
     var st = { ran: false };
     try { out = rollback(p.before, p.revS, p.id, st); } catch (e) { out = failedRollback(p.id, e, st.ran); }
     if (fix) { try { done = fix(); } catch (e) { done = ["failed: " + (e.message || e)]; } }
-    if (done.length) {
-      out.byHand = done;
-      // what the Undo didn't restore and was set back by hand: compare again
-      if (out.undone && out.problem === "not back" && p.before) {
-        try { var d = A.diff(p.before, snapshotAgain(p.before)); if (!listed(d)) { out.verified = true; delete out.problem; delete out.remaining; } else out.remaining = d; } catch (e) {}
-      }
+    if (done.length) out.byHand = done;
+    // after what was set back by hand: compare again. Back as before: a "not back" is then verified; when the Undo
+    // reverted another step ("not this call"), `clean` says items, layers and settings are as before the call
+    if (out.undone && !out.verified && p.before && (done.length || out.problem === "not back" || out.problem === "not this call")) {
+      try {
+        var d = A.diff(p.before, snapshotAgain(p.before));
+        if (listed(d)) out.remaining = d;
+        else {
+          delete out.remaining;
+          if (out.problem === "not back") { out.verified = true; delete out.problem; }
+          else out.clean = true;
+        }
+      } catch (e) {}
     }
     return out;
   };
@@ -1012,6 +1025,9 @@ aemcp = (function () {
         rev0 = opts.report || opts.rollback ? A.revision() : null;
         // checkOnly (read-only mode): with project.revision, no property snapshot at all
         if (opts.report) { try { before = A.snapshot(opts.report, !!opts.checkOnly && rev0 !== null); } catch (e) { before = null; } }
+        var wasMarkable = markable, wasMark = runMark, mark = null;
+        markable = opts.rollback === "deferred" && undo;
+        runMark = null;
         try {
           var r = fn(args || {}, log);
           back = opts.rollback === "changes" || opts.rollback === "deferred" || (opts.rollback === "requested" && !!r && r.rollback === true);
@@ -1025,9 +1041,13 @@ aemcp = (function () {
           // a failed script may have changed things before it stopped: report those too
           if (before) { try { res.changes = changesSince(before, rev0, opts.report); } catch (e2) {} }
         }
+        mark = runMark;
+        markable = wasMarkable;
+        runMark = wasMark;
         rev1 = rev0 === null ? null : A.revision();
-        // to be undone: the sentinel goes in while this call's undo group is still open
-        if (back && undo) {
+        // to be undone: the sentinel goes in while this call's undo group is still open (a render placed it first)
+        if (back && undo && mark) { sentinel = mark; revS = A.revision(); }
+        else if (back && undo) {
           try { plan = rollbackPlan(before, rev0, rev1, res.changes, opts.report, opts.rollback === "requested"); } catch (e) { plan = { undone: false, verified: false, problem: "failed: " + (e.message || e) }; }
           if (!plan) {
             try { sentinel = addSentinel(); revS = A.revision(); }

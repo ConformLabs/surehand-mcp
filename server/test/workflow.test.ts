@@ -320,6 +320,57 @@ describe("deferred rollback (renders)", () => {
     expect(fake.folders()).toEqual([]);
   });
 
+  // Seen live (AE 26.5): the first render after a project was opened, its bit depth / linear blending changed and saved
+  // reported "Edit > Undo ... did not revert the render's changes as a whole". Modelled here as the hypothesis that fits
+  // it: saveFrameToPng closes the open undo group, so what comes after it is outside the render's undo step.
+  const RENDER_THAT_SPLITS = (mark: boolean) => () => {
+    if (mark) helpers.renderMark();
+    RENDER();
+    fake.app.endUndoGroup(); // saveFrameToPng closes the group
+    return "saved";
+  };
+
+  it("a render whose save closes the undo group: the marker placed before its edits makes the Undo revert all of it", () => {
+    withManualEdit();
+    const r = run(RENDER_THAT_SPLITS(true));
+    const rb = helpers.finishRollback(r.pending, () => []);
+    expect(rb).toMatchObject({ undone: true, verified: "sentinel" });
+    expect(fake.folders()).toEqual([]);
+    expect(color()).toEqual([32, true]);
+    expect(fake.undoStack()).toEqual(["user: opacity 50"]);
+  });
+
+  it("the same with the marker added after the body (as before): reproduces the live message; cleaned up by hand, it says the project is unchanged", () => {
+    withManualEdit();
+    const r = run(RENDER_THAT_SPLITS(false));
+    // the cleanup FINISH_JSX does by hand (here the folder stands for the temporary comp)
+    const cleanNow = () => {
+      const done: string[] = [];
+      const P = fake.app.project;
+      for (let i = P.numItems; i >= 1; i--) if (P.item(i).name === "__aemcp_preview") (P.item(i).remove(), done.push("temporary comp removed"));
+      if (P.bitsPerChannel !== 32) (P.bitsPerChannel = 32), done.push("bit depth 32 bpc");
+      if (!P.linearBlending) (P.linearBlending = true), done.push("linear blending on");
+      return done;
+    };
+    const rb = helpers.finishRollback(r.pending, cleanNow);
+    // the Undo reverted only the marker's rename (its own undo step), not the render; after the cleanup the project's
+    // items, layers and settings are as before: said plainly, not as a list of differences
+    expect(rb).toMatchObject({ undone: true, verified: false, problem: "not this call", clean: true, byHand: ["temporary comp removed", "bit depth 32 bpc", "linear blending on"] });
+    expect(rb.remaining).toBeUndefined();
+    expect(rollbackProblem(rb, "the render")).toMatch(/^The project is unchanged: .* After Effects marks the project as modified\./);
+    expect(fake.folders()).toEqual([]);
+    expect(color()).toEqual([32, true]);
+  });
+
+  it("the live message is never shown with an empty list: a clean project says so", () => {
+    expect(rollbackProblem({ undone: true, verified: false, problem: "not this call", clean: true, byHand: ["bit depth 32 bpc"] }, "the render")).toBe(
+      "The project is unchanged: what the render added was removed and its items, layers and project settings are as before (property values were not compared); " +
+        "After Effects marks the project as modified. Edit > Undo reverted a different step than the render's own, so if your last change before this is missing, Edit > Redo brings it back.\nSet back by hand: bit depth 32 bpc.",
+    );
+    const empty = rollbackProblem({ undone: true, verified: false, problem: "not this call", remaining: { items: [], layers: [], props: [], scope: [] } }, "the render");
+    expect(empty).not.toMatch(/still isn't how it was/);
+  });
+
   it("a render that changed nothing (an 8 bpc frame of the comp itself) leaves nothing pending", () => {
     withManualEdit();
     const r = run(() => "saved");

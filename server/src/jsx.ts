@@ -78,6 +78,8 @@ export interface Rollback {
   leftover?: string;
   /** deferred rollbacks: what the caller's cleanup removed or set back by hand (after the Undo, or instead of it) */
   byHand?: string[];
+  /** deferred rollbacks: the Undo reverted another step, but after the cleanup by hand items, layers and settings are as before */
+  clean?: boolean;
 }
 
 export interface RunResult {
@@ -264,8 +266,17 @@ export function rollbackProblem(rb: Rollback, what: string): string {
     );
   if (!rb.undone)
     return `It couldn't be checked whether ${what} changed the project${rb.problem && rb.problem !== "unknown" ? ` (${rb.problem})` : ""}, so nothing was undone. ${check}${leftover}`;
-  const remaining = rb.remaining ? (formatChanges(rb.remaining) ?? "").replace(/^Changes[^\n]*:\n/, "") : "";
+  // what still differs, listed; never a claim of differences with an empty list
+  const listedText = rb.remaining ? formatChanges(rb.remaining) : null;
+  const remaining =
+    !listedText || listedText === "Changes: none" ? "" : rb.remaining?.unlisted ? "(changes this check can't list)" : listedText.replace(/^Changes[^\n]*:\n/, "");
   const notBack = `the project still isn't how it was before ${what}:\n${remaining}`;
+  if (rb.clean)
+    return (
+      `The project is unchanged: what ${what} added was removed and its items, layers and project settings are as before ` +
+      `(property values were not compared); After Effects marks the project as modified. Edit > Undo reverted a different step than ` +
+      `${what}'s own, so if your last change before this is missing, Edit > Redo brings it back.${byHand}${leftover}`
+    );
   if (rb.problem === "not this call" || rb.problem === "undo did nothing / not this call")
     return (
       `Edit > Undo was run once for ${what}, but the Undo did not revert ${what}'s changes as a whole ` +

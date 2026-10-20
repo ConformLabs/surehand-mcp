@@ -318,7 +318,7 @@ function runOnFakeComp(body: string, args: Record<string, unknown>, color = { bp
       time = v;
     },
   };
-  const aemcp = { findComp: () => comp, findLayer: (_c: unknown, ref: number) => layers[ref - 1] };
+  const aemcp = { findComp: () => comp, findLayer: (_c: unknown, ref: number) => layers[ref - 1], renderMark: () => calls.push("mark") };
   class File {
     fsName: string;
     exists = true;
@@ -352,8 +352,8 @@ describe("the app-only tools' ExtendScript", () => {
 
   it("frame in a 32 bpc project with linear blending: saved at 16 bpc without it (undone afterwards), as the viewer shows it", () => {
     const { result, calls } = runOnFakeComp(FRAME_JSX, { comp: 12, time: 1, tmpDir: "/tmp/x" }, { bpc: 32, lb: true });
-    expect(calls.slice(0, 2)).toEqual(["bpc 16", "linear blending false"]);
-    expect(calls[2]).toMatch(/^save 1 /);
+    expect(calls.slice(0, 3)).toEqual(["mark", "bpc 16", "linear blending false"]);
+    expect(calls[3]).toMatch(/^save 1 /);
     expect(result.cleanup.color).toEqual({ bpc: 32, lb: true });
   });
 

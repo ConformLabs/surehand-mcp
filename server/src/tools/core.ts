@@ -36,13 +36,15 @@ function displayColor() {
   var P = app.project, s;
   try { s = { bpc: P.bitsPerChannel, lb: !!P.linearBlending }; } catch (e) { return null; }
   if (s.bpc !== 32 && !s.lb) return null;
+  aemcp.renderMark();
   __clean.color = s;
   if (s.bpc === 32) P.bitsPerChannel = 16;
   if (s.lb) P.linearBlending = false;
   return s;
 }
-function tempComp(name, w, h, par, dur, fps) { var t = app.project.items.addComp(name, w, h, par, dur, fps); __clean.comps.push(t.id); return t; }
+function tempComp(name, w, h, par, dur, fps) { aemcp.renderMark(); var t = app.project.items.addComp(name, w, h, par, dur, fps); __clean.comps.push(t.id); return t; }
 function hideLayer(comp, L) {
+  aemcp.renderMark();
   var lk = L.locked;
   if (lk) L.locked = false;
   L.enabled = false;
@@ -52,6 +54,7 @@ function hideLayer(comp, L) {
 function fullRes(comp) {
   var rf = comp.resolutionFactor;
   if (rf[0] === 1 && rf[1] === 1) return;
+  aemcp.renderMark();
   __clean.res.push({ comp: comp.id, rf: [rf[0], rf[1]] });
   comp.resolutionFactor = [1, 1];
 }
