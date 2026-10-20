@@ -23,7 +23,7 @@ export const MaskFeatherFalloff = { FFO_LINEAR: 7213, FFO_SMOOTH: 7212 };
 export const MaskMotionBlur = { SAME_AS_LAYER: 7012, ON: 7013, OFF: 7014 };
 const TrackMatteType = { NO_TRACK_MATTE: 5012 };
 
-interface State { opacity: number[]; blend: number; layerLabel: number; compLabel: number; comment: string; folders: { id: number; name: string }[] }
+interface State { opacity: number[]; blend: number; layerLabel: number; compLabel: number; comment: string; folders: { id: number; name: string }[]; color: { bpc: number; lb: boolean } }
 
 export interface Fake {
   app: any;
@@ -54,11 +54,14 @@ export interface Fake {
  * default: app has no preferences, so the setting can't be told).
  */
 export function fakeAE(
-  opts: { revision?: boolean; undoWorks?: boolean; otherComp?: boolean; bigComp?: boolean; mask?: boolean; renameFails?: boolean; throwAfterUndo?: boolean; writeAccess?: boolean | "unreadable" } = {},
+  opts: { revision?: boolean; undoWorks?: boolean; otherComp?: boolean; bigComp?: boolean; mask?: boolean; renameFails?: boolean; throwAfterUndo?: boolean; colorNotUndone?: boolean; writeAccess?: boolean | "unreadable" } = {},
 ): Fake {
   const reads = { n: 0 };
   const undos = { n: 0 };
   let revision = 1;
+  // the project's bit depth and linear blending (colorNotUndone: Edit > Undo doesn't restore them)
+  let color = { bpc: 32, lb: true };
+  const setColor = (v: { bpc: number; lb: boolean }) => edit(() => (color = v));
   const opacityValues = [100, 100];
   const makeOpacity = (i: number): any => ({
     name: "Opacity",
@@ -138,7 +141,10 @@ export function fakeAE(
     item: (i: number) => items()[i - 1],
     itemByID: (id: number) => items().find((it) => it.id === id) ?? null,
     activeItem: comp,
-    bitsPerChannel: 8,
+    get bitsPerChannel() { return color.bpc; },
+    set bitsPerChannel(v: number) { setColor({ ...color, bpc: v }); },
+    get linearBlending() { return color.lb; },
+    set linearBlending(v: boolean) { setColor({ ...color, lb: v }); },
     items: {
       addFolder(name: string) {
         const f = { id: nextId++, name };
@@ -150,7 +156,7 @@ export function fakeAE(
   if (opts.revision !== false) Object.defineProperty(project, "revision", { get: () => revision });
 
   // ---------- undo ----------
-  const state = (): State => ({ opacity: [...opacityValues], blend: layer.blendingMode, layerLabel: layer.label, compLabel: comp.label, comment: comp.comment, folders: [...folders] });
+  const state = (): State => ({ opacity: [...opacityValues], blend: layer.blendingMode, layerLabel: layer.label, compLabel: comp.label, comment: comp.comment, folders: [...folders], color: opts.colorNotUndone ? { bpc: 0, lb: false } : { ...color } });
   const restore = (s: State) => {
     opacityValues.splice(0, 2, ...s.opacity);
     layer.blendingMode = s.blend;
@@ -158,6 +164,7 @@ export function fakeAE(
     comp.label = s.compLabel;
     comp.comment = s.comment;
     folders = [...s.folders];
+    if (!opts.colorNotUndone) color = { ...s.color };
   };
   const same = (a: State, b: State) => JSON.stringify(a) === JSON.stringify(b);
   const stack: { name: string; before: State; moved: boolean }[] = [];
@@ -263,11 +270,18 @@ export interface FakeLayerSpec {
   /** animated values by match name ("ADBE Position", "ADBE Opacity", "ADBE Text Document"...): value at a time */
   anim?: Record<string, (t: number) => unknown>;
   /** sourceRectAtTime [left, top, width, height] (default: text [0,-50,400,60], others the source size) */
-  rect?: number[] | ((t: number, text: string) => number[]);
+  rect?: number[] | ((t: number, text: string, doc: any) => number[]);
   /** text layers: the text (default: the layer name), font size (default 50), paragraph box overflow (or by the text shown) */
   text?: string;
   fontSize?: number;
-  boxOverflow?: boolean | ((text: string) => boolean);
+  boxOverflow?: boolean | ((text: string, doc: any) => boolean);
+  /** paragraph text: the box [w, h] (boxTextSize; boxTextPos [0, -fontSize]); makes boxText true */
+  box?: number[];
+  /** ParagraphJustification name (default LEFT_JUSTIFY), ParagraphDirection name (default left to right) */
+  justification?: string;
+  direction?: string;
+  /** keyframed Source Text: the text at each keyframe (hold) */
+  textKeys?: { t: number; text: string }[];
   /** text layers: fill colour (default white) */
   fillColor?: number[];
   /** more properties at a path ("Contents/Rectangle 1/Fill 1/Color"): value, type (PropertyValueType name), keyframes, expression */
@@ -321,6 +335,10 @@ export interface FakeProjectSpec {
   /** app.project.usedFonts: a font and the layers (by name) that use it; noIds: usedAt entries without layerID */
   usedFonts?: { ps: string; layers: string[]; noIds?: boolean; family?: string; style?: string; version?: string; adobe?: boolean }[];
   activeComp?: string;
+  /** characters each font (PostScript name) has no glyph for, when a layer's font changes (hasGlyphsFor) */
+  fontGlyphsMissing?: Record<string, string>;
+  /** an After Effects before 24.0: no ParagraphDirection / ComposerEngine (TextDocument has no direction) */
+  noRtlApi?: boolean;
   /** output module templates applyTemplate accepts (default: any) */
   outputModuleTemplates?: string[];
   /** the project file (default /jobs/Inherited.aep); unsaved changes */
@@ -392,6 +410,16 @@ export function fakeProject(spec: FakeProjectSpec) {
     RQItemStatus: { QUEUED: 3015, UNQUEUED: 3013, DONE: 3019 },
     AutoOrientType: { NO_AUTO_ORIENT: 4212, ALONG_PATH: 4213 },
     FrameBlendingType: { NO_FRAME_BLEND: 4012, FRAME_MIX: 4013, PIXEL_MOTION: 4014 },
+    ParagraphJustification: { LEFT_JUSTIFY: 7413, RIGHT_JUSTIFY: 7414, CENTER_JUSTIFY: 7415, FULL_JUSTIFY_LASTLINE_LEFT: 7416, FULL_JUSTIFY_LASTLINE_RIGHT: 7417, FULL_JUSTIFY_LASTLINE_CENTER: 7418, FULL_JUSTIFY_LASTLINE_FULL: 7419, MULTIPLE_JUSTIFICATIONS: 7420 },
+    BoxVerticalAlignment: { TOP: 7713, CENTER: 7714, BOTTOM: 7715, JUSTIFY: 7716 },
+    // After Effects 24.0+ (TextDocument.direction, composerEngine, digitSet)
+    ...(spec.noRtlApi
+      ? {}
+      : {
+          ParagraphDirection: { DIRECTION_LEFT_TO_RIGHT: 7612, DIRECTION_RIGHT_TO_LEFT: 7613 },
+          ComposerEngine: { LATIN_CJK_ENGINE: 7812, UNIVERSAL_TYPE_ENGINE: 7813 },
+          DigitSet: { DEFAULT_DIGITS: 7912, ARABIC_DIGITS: 7913, HINDI_DIGITS: 7914, FARSI_DIGITS: 7915, ARABIC_DIGITS_RTL: 7916 },
+        }),
   };
   const writes: string[] = [];
   const calls: string[] = [];
@@ -514,6 +542,10 @@ export function fakeProject(spec: FakeProjectSpec) {
       return w;
     };
     it.__egp = c.egp;
+    it.remove = () => {
+      const k = items.findIndex((x) => x.id === it.id);
+      if (k >= 0) items.splice(k, 1);
+    };
     return it;
   };
   /** the values of a layer's properties (and its source) into the same layer of a duplicate */
@@ -549,16 +581,44 @@ export function fakeProject(spec: FakeProjectSpec) {
       const children: any[] = [transform];
       if (type !== "camera") children.push(group("Effects", "ADBE Effect Parade", effectGroups(ls)));
       const fontObj = (ps: string, missing: string) => ({ postScriptName: ps, hasGlyphsFor: (ch: string) => !missing.includes(ch) });
+      const G: any = globals;
       const doc = (text: string) => {
-        const d: any = { font: ls.font ?? "ArialMT", text, fontSize: ls.fontSize ?? 50, boxText: ls.boxOverflow !== undefined, applyFill: true, fillColor: clone(ls.fillColor ?? [1, 1, 1]),
-          ...(ls.glyphsMissing !== undefined ? { fontObject: fontObj(ls.font ?? "ArialMT", ls.glyphsMissing) } : {}),
+        const isBox = ls.boxOverflow !== undefined || ls.box !== undefined;
+        const d: any = { font: ls.font ?? "ArialMT", text, fontSize: ls.fontSize ?? 50, boxText: isBox, pointText: !isBox, applyFill: true, fillColor: clone(ls.fillColor ?? [1, 1, 1]),
+          tracking: 0, horizontalScale: 1, justification: G.ParagraphJustification[ls.justification ?? "LEFT_JUSTIFY"],
+          ...(isBox ? { boxTextSize: clone(ls.box ?? [400, 200]), boxTextPos: [0, -(ls.fontSize ?? 50)], boxVerticalAlignment: G.BoxVerticalAlignment.TOP } : {}),
+          ...(spec.noRtlApi ? {} : { direction: G.ParagraphDirection[ls.direction ?? "DIRECTION_LEFT_TO_RIGHT"], _ce: G.ComposerEngine.LATIN_CJK_ENGINE, digitSet: G.DigitSet.DEFAULT_DIGITS }),
           ...(ls.charFonts ? { characterRange: (i: number) => ({ font: ls.charFonts![i].font, fontObject: fontObj(ls.charFonts![i].font, ls.charFonts![i].missing ?? "") }) } : {}) };
+        // the font object follows the font (a font map changes it): the project's per-font glyph list, else the layer's
+        if (ls.glyphsMissing !== undefined || spec.fontGlyphsMissing)
+          Object.defineProperty(d, "fontObject", { get() { return fontObj(this.font, spec.fontGlyphsMissing?.[this.font] ?? ls.glyphsMissing ?? ""); }, enumerable: true, configurable: true });
+        // as in After Effects 24+: only the Universal engine can be written
+        if (!spec.noRtlApi)
+          Object.defineProperty(d, "composerEngine", {
+            get() { return this._ce; },
+            set(v) { if (v !== G.ComposerEngine.UNIVERSAL_TYPE_ENGINE) throw new Error("After Effects error: only ComposerEngine.UNIVERSAL_TYPE_ENGINE can be written"); this._ce = v; },
+            enumerable: true, configurable: true,
+          });
         const bo = ls.boxOverflow;
-        Object.defineProperty(d, "boxOverflow", { get() { return typeof bo === "function" ? bo(this.text) : bo; }, enumerable: true, configurable: true });
+        if (isBox) Object.defineProperty(d, "boxOverflow", { get() { return typeof bo === "function" ? bo(this.text, this) : (bo ?? false); }, enumerable: true, configurable: true });
         return d;
       };
       const textAnim = an["ADBE Text Document"];
-      if (type === "text") children.push(group("Text", "ADBE Text Properties", [prop("Source Text", "ADBE Text Document", { value: doc(ls.text ?? ls.name), propertyValueType: T("TEXT_DOCUMENT") }, textAnim && ((t: number) => doc(String(textAnim(t)))))]));
+      if (type === "text" && ls.textKeys) {
+        // keyframed Source Text (hold keyframes): keyValue / setValueAtKey per keyframe
+        const keys = ls.textKeys.map((k) => ({ t: k.t, v: doc(k.text) }));
+        const at = (t: number) => [...keys].reverse().find((k) => k.t <= t + 1e-9) ?? keys[0];
+        const st = prop("Source Text", "ADBE Text Document", {
+          propertyValueType: T("TEXT_DOCUMENT"), numKeys: keys.length,
+          get value() { return at(0).v; },
+          keyTime: (k: number) => keys[k - 1].t,
+          keyValue: (k: number) => clone(keys[k - 1].v),
+          setValueAtKey: (k: number, v: unknown) => { keys[k - 1].v = v; },
+          valueAtTime: (t: number) => at(t).v,
+        });
+        (st as any).__keys = keys;
+        children.push(group("Text", "ADBE Text Properties", [st]));
+      } else if (type === "text") children.push(group("Text", "ADBE Text Properties", [prop("Source Text", "ADBE Text Document", { value: doc(ls.text ?? ls.name), propertyValueType: T("TEXT_DOCUMENT") }, textAnim && ((t: number) => doc(String(textAnim(t)))))]));
       const at = (path: string, leaf: (name: string) => any) => {
         const segs = path.split("/");
         let g: any = { children };
@@ -586,9 +646,10 @@ export function fakeProject(spec: FakeProjectSpec) {
         startTime: ls.startTime ?? 0, stretch: 100, locked: !!ls.locked, costMs: ls.costMs ?? 0,
         sourceRectAtTime: (t: number) => {
           calls.push("sourceRectAtTime");
-          const text = type === "text" ? String(L.property("ADBE Text Properties").property("ADBE Text Document").valueAtTime(t, false).text) : "";
+          const td = type === "text" ? L.property("ADBE Text Properties").property("ADBE Text Document").valueAtTime(t, false) : null;
+          const text = td ? String(td.text) : "";
           const src = L.source;
-          const r = typeof ls.rect === "function" ? ls.rect(t, text) : (ls.rect ?? (type === "text" ? [0, -50, 400, 60] : [0, 0, src?.width ?? 100, src?.height ?? 100]));
+          const r = typeof ls.rect === "function" ? ls.rect(t, text, td) : (ls.rect ?? (type === "text" ? [0, -50, 400, 60] : [0, 0, src?.width ?? 100, src?.height ?? 100]));
           return { left: r[0], top: r[1], width: r[2], height: r[3] };
         },
         replaceSource(this: any, item: any) {

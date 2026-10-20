@@ -27,6 +27,8 @@ describe("activity details", () => {
     expect(activityDetails("ae_preflight", "PASS\nChecked Main").result?.verdict).toBe("PASS");
     expect(activityDetails("ae_versions_from_data", 'FAIL (2 of 12 rows)\n12 versions of "Card"').result).toEqual({ verdict: "FAIL", summary: 'FAIL (2 of 12 rows) · 12 versions of "Card"' });
     expect(activityDetails("ae_versions_from_data", "Dry run: the mapping fits the comp").result).toBeUndefined();
+    expect(activityDetails("ae_localize", 'FAIL (1 of 2 languages)\n2 languages of "Main"').result).toEqual({ verdict: "FAIL", summary: 'FAIL (1 of 2 languages) · 2 languages of "Main"' });
+    expect(activityDetails("ae_localize", "Exported 12 strings").result).toBeUndefined();
     expect(activityDetails("ae_prove_identical", "Verdict: DIFFERS in 2 of 5 frames (exact): 0:00, 0:01.\nProof p1").result).toEqual({ verdict: "DIFFERS", summary: "in 2 of 5 frames (exact): 0:00, 0:01." });
     expect(activityDetails("ae_prove_identical", "Verdict: IDENTICAL WITHIN TOLERANCE: all 5 frames match").result?.verdict).toBe("IDENTICAL WITHIN TOLERANCE");
     expect(activityDetails("ae_prove_identical", "Captured proof p1: ...").result?.verdict).toBe("CAPTURED");

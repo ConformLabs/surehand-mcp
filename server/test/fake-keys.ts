@@ -223,11 +223,15 @@ export function fakeKeysAE(opts: {
   footage?: { name: string; width: number; height: number; fps: number; duration: number }[];
   writeAccess?: boolean;
   dirs?: string[];
+  /** the project's bit depth and "Blend Colors Using 1.0 Gamma" (default 8 bpc, off) */
+  color?: { bpc: number; lb: boolean };
 }) {
   const log: string[] = [];
   const files = new Set(opts.files ?? []);
   const on = opts.writeAccess !== false;
-  const saved: { comp: string; t: number; path: string; enabled: string[]; res: number[] }[] = [];
+  const saved: { comp: string; t: number; path: string; enabled: string[]; res: number[]; color: { bpc: number; lb: boolean } }[] = [];
+  // frames saved by the running script, written when it returns
+  const writes: (() => void)[] = [];
   class File {
     fsName: string;
     constructor(p: string) {
@@ -254,9 +258,14 @@ export function fakeKeysAE(opts: {
     Object.defineProperty(c, "frameDuration", { get: () => 1 / rate });
     Object.defineProperty(c, "numLayers", { get: () => c.layers.length });
     c.layer = (k: number | string) => (typeof k === "number" ? c.layers[k - 1] : c.layers.find((l: any) => l.name === k)) ?? null;
+    // as in After Effects 26.5: it returns at once and the PNG is written after the script ends, with the project as
+    // it is then (a comp removed by then writes nothing). `color`: the project's settings it was rendered with.
     c.saveFrameToPng = (t: number, f: File) => {
-      files.add(f.fsName);
-      saved.push({ comp: c.name, t, path: f.fsName, enabled: c.layers.filter((l: any) => l.enabled).map((l: any) => l.name), res: c.resolutionFactor.slice() });
+      writes.push(() => {
+        if (!items.includes(c)) return;
+        files.add(f.fsName);
+        saved.push({ comp: c.name, t, path: f.fsName, enabled: c.layers.filter((l: any) => l.enabled).map((l: any) => l.name), res: c.resolutionFactor.slice(), color: { bpc: project.bitsPerChannel, lb: project.linearBlending } });
+      });
     };
     c.remove = () => void items.splice(items.indexOf(c), 1);
     const reindex = () => c.layers.forEach((l: any, i: number) => (l.index = i + 1));
@@ -330,6 +339,8 @@ export function fakeKeysAE(opts: {
     itemByID: (id: number) => items.find((i) => i.id === id) ?? null,
     activeItem: comp,
     items: { addComp: (n: string, w: number, h: number, par: number, d: number, f: number) => mkComp(n, w, h, par, d, f) },
+    bitsPerChannel: opts.color?.bpc ?? 8,
+    linearBlending: opts.color?.lb ?? false,
   };
   const app: any = { project, beginSuppressDialogs() {}, endSuppressDialogs() {}, beginUndoGroup() {}, endUndoGroup() {}, effects: [], preferences: fakeWriteAccess(on).preferences };
   const globals: Record<string, unknown> = {
@@ -343,7 +354,10 @@ export function fakeKeysAE(opts: {
   /** a tool's JSX body, run like the bridge does (no undo group), parsed result */
   const run = (jsx: string, args: Record<string, unknown>) => {
     const fn = new Function("aemcp", "app", "$", ...names, `return function (args, log) {\n${jsx}\n};`)(aemcp, app, $, ...values);
-    return JSON.parse(aemcp.run(fn, args, { undoGroup: false }));
+    const out = JSON.parse(aemcp.run(fn, args, { undoGroup: false }));
+    // the frames saved during the script are written now
+    for (const w of writes.splice(0)) w();
+    return out;
   };
   const prop = (layer: string, match: string) => {
     const L = comp.layer(layer);

@@ -26,6 +26,7 @@ const { buildViews } = await import("../scripts/views.mjs");
 const { createMcpServer } = await import("../src/server.js");
 const { resolveProfile, CORE_TOOLS } = await import("../src/tools/profile.js");
 const { FRAME_JSX, PREFLIGHT_VIEW_URI, REVEAL_JSX, stillSize, viewHtml } = await import("../src/tools/views.js");
+const { RENDER_KIT_JSX } = await import("../src/tools/core.js");
 const { FONT_SLOT, VIEW_FONTS } = await import("../src/views/fonts.js");
 const { PREFLIGHT_JSX, jsxArgs, projectChecks } = await import("../src/preflight/project.js");
 const { formatReport } = await import("../src/preflight/report.js");
@@ -266,10 +267,12 @@ describe("app-only tools: navigation only, in every permission mode", () => {
       expect(fr._meta["surehand/view"]).toEqual({ view: "frame", comp: "Main", time: 12.4, compWidth: 1920, compHeight: 1080, width: 480, height: 270 });
       expect(fr.content[0].data.length).toBeLessThan(150_000);
       expect(existsSync(png)).toBe(false); // the temporary PNG is removed
-      for (const [, , opts] of jsx.runJsx.mock.calls) {
-        expect(opts.undoGroup).toBe(false);
+      for (const [body, , opts] of jsx.runJsx.mock.calls) {
         expect(opts.bridge?.approval).toBeUndefined();
-        expect(opts.rollback).toBeUndefined();
+        // the frame: in an undo group that is undone if it changed anything (only the color settings of a
+        // 32 bpc / linear blending project), after the file is written
+        if (body === FRAME_JSX) expect(opts).toMatchObject({ undoGroup: "Surehand MCP frame", rollback: "deferred", checkOnly: true });
+        else expect([opts.undoGroup, opts.rollback]).toEqual([false, undefined]);
       }
       await client.close();
     });
@@ -286,8 +289,25 @@ describe("app-only tools: navigation only, in every permission mode", () => {
 });
 
 /** Runs an ExtendScript body against a small fake comp and records what it touched. */
-function runOnFakeComp(body: string, args: Record<string, unknown>) {
+function runOnFakeComp(body: string, args: Record<string, unknown>, color = { bpc: 8, lb: false }) {
   const calls: string[] = [];
+  // the project's color settings (written ones are logged)
+  const project = {
+    get bitsPerChannel() {
+      return color.bpc;
+    },
+    set bitsPerChannel(v: number) {
+      calls.push(`bpc ${v}`);
+      color.bpc = v;
+    },
+    get linearBlending() {
+      return color.lb;
+    },
+    set linearBlending(v: boolean) {
+      calls.push(`linear blending ${v}`);
+      color.lb = v;
+    },
+  };
   const layers = [1, 2, 3].map((i) => {
     let sel = i === 1;
     return {
@@ -325,7 +345,7 @@ function runOnFakeComp(body: string, args: Record<string, unknown>) {
     }
     remove() {}
   }
-  const app = new Proxy({}, { get: (_t, k) => (calls.push(`app.${String(k)}`), undefined) });
+  const app = new Proxy({}, { get: (_t, k) => (k === "project" ? project : (calls.push(`app.${String(k)}`), undefined)) });
   const result = new Function("args", "aemcp", "app", "File", "$", body)(args, aemcp, app, File, { sleep: () => undefined });
   return { result, calls, layers };
 }
@@ -338,12 +358,21 @@ describe("the app-only tools' ExtendScript", () => {
     expect(result).toMatchObject({ comp: "Main", time: 12.4, layer: "LT_Name" });
   });
 
-  it("frame saves the comp's own frame: no temporary comp, no undo group", () => {
+  it("frame saves the comp's own frame: no temporary comp; nothing else changes in an 8 / 16 bpc project", () => {
     const { result, calls } = runOnFakeComp(FRAME_JSX, { comp: 12, time: 40, tmpDir: "/tmp/x" });
     expect(calls).toHaveLength(1);
     expect(calls[0]).toMatch(/^save 29\.96 \/tmp\/x\/aemcp_view_\d+\.png$/); // clamped to the last frame
-    expect(result).toMatchObject({ comp: "Main", width: 1920, height: 1080 });
-    for (const body of [REVEAL_JSX, FRAME_JSX]) expect(body).not.toMatch(/UndoGroup|executeCommand|addComp|items\.add/);
+    expect(result).toMatchObject({ comp: "Main", width: 1920, height: 1080, cleanup: { comps: [], layers: [], color: null } });
+    expect(REVEAL_JSX).not.toMatch(/UndoGroup|executeCommand|addComp|items\.add/);
+    // the shared render kit aside, the frame script adds nothing to the project
+    expect(FRAME_JSX.replace(RENDER_KIT_JSX, "")).not.toMatch(/UndoGroup|executeCommand|addComp|items\.add|tempComp|hideLayer/);
+  });
+
+  it("frame in a 32 bpc project with linear blending: saved at 16 bpc without it (undone afterwards), as the viewer shows it", () => {
+    const { result, calls } = runOnFakeComp(FRAME_JSX, { comp: 12, time: 1, tmpDir: "/tmp/x" }, { bpc: 32, lb: true });
+    expect(calls.slice(0, 2)).toEqual(["bpc 16", "linear blending false"]);
+    expect(calls[2]).toMatch(/^save 1 /);
+    expect(result.cleanup.color).toEqual({ bpc: 32, lb: true });
   });
 
   it("are ES3 (ExtendScript)", async () => {

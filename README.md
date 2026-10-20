@@ -17,7 +17,7 @@
 
 Surehand MCP connects **Claude** (Desktop / Code), **ChatGPT** (desktop app or web), Cursor, Codex, VS Code (GitHub Copilot), Windsurf / Devin Desktop, LM Studio, or any MCP client to **Adobe® After Effects®**.
 The AI can run any script inside After Effects (modern JavaScript, converted for AE's ExtendScript engine automatically),
-read information back, and use up to 110 ready-made tools for projects, comps, layers, keyframes (Graph Editor level),
+read information back, and use up to 111 ready-made tools for projects, comps, layers, keyframes (Graph Editor level),
 text styling and animators, footage, effects, shapes, masks, 3D cameras/lights/materials, audio, color management,
 Essential Graphics and rendering (including background renders with aerender). Batch edits run many steps as one
 undo step, checkpoints keep safety copies of the project, structural changes can be proven not to change the render,
@@ -96,7 +96,7 @@ The installer:
 
 Four Agent Skills teach the AI how to work with Surehand well: `surehand-ae` (the basics: check the connection, read
 before editing, confirm each edit with its change report, look at the result, never work around a refusal, plus the
-ExtendScript traps seen live), `surehand-ae-delivery` (preflight against your own delivery spec, and versions from data checked row by row),
+ExtendScript traps seen live), `surehand-ae-delivery` (preflight against your own delivery spec, versions from data checked row by row, and the localization round trip),
 `surehand-ae-safe-restructure` (structural edits with pixel proof) and `surehand-ae-timing-layout` (exact keyframes,
 easing and measured alignment). The source is `skills/` in this repo.
 
@@ -194,7 +194,7 @@ To rotate the token, delete `token` from `~/.surehand/ae/config.json` and re-run
 | `ae_get_scripting_guide` | ExtendScript cheat sheet for the model (also an MCP resource `aemcp://docs/extendscript`). |
 
 **Tool profiles.** Every tool description is sent to the AI in every chat, so by default only a **core set of
-29 tools** is loaded (about 9k tokens instead of 40k for all 110), and **every other tool stays available on demand**:
+29 tools** is loaded (about 9k tokens instead of 42k for all 111), and **every other tool stays available on demand**:
 `ae_tools` lists all tools by category (or gives full parameter details of chosen ones), and `ae_call` runs any tool by
 name with the same validation, permissions, change report and activity log. Loading everything up front is optional:
 switch to **All tools** in the Surehand panel in After Effects (**☰ › Tools the AI sees › All tools**), in Claude Desktop's
@@ -232,7 +232,13 @@ unknown effect name gets suggestions.
 
 - **Seeing the result:** `ae_render_frame` (a frame as an image; options: zoom into a region, render only some layers,
   transparency on a checkerboard or a color, difference image against another time or comp), `ae_render_contact_sheet`
-  (a grid of frames across time, labelled with time and frame number, to judge motion and easing)
+  (a grid of frames across time, labelled with time and frame number, to judge motion and easing). The temporary comp
+  stays until After Effects has written the image, then it is removed and anything switched for the render set back by
+  hand, and the project is compared with how it was. They never use Edit > Undo (it could revert your own last step);
+  After Effects may list a "Surehand MCP preview" step, which only brings the preview's own changes back. In a 32 bpc
+  project, or one with "Blend Colors Using 1.0 Gamma", frames are rendered at 16 bpc without it, so colors look as in
+  the viewer (After Effects writes such frames far too dark); the project settings are put back. `ae_export_frames` does
+  the same. `ae_prove_identical` always renders with the project's own settings, so a capture and its comparison match.
 - **Existing files are not replaced silently:** Save As in `ae_save_project`, the `outputPath` of `ae_render_frame` and
   `ae_render_contact_sheet`, and `ae_export_frames` refuse when a file is already there, and the error says to pass `overwrite: true` to replace it
 - **Measuring:** `ae_get_layer_bounds` (exact on-screen boxes after transforms, parenting, 3D and camera; in-frame and
@@ -271,7 +277,9 @@ unknown effect name gets suggestions.
 - **Reformat:** `ae_reformat` (the comp at another size or aspect ratio, laid out by your own rules and checked on every
   frame; see Reformat below)
 - **Checks:** `ae_preflight` (check the delivered comp and its render against your own delivery spec; see Preflight below),
-  `ae_versions_from_data` (a CSV / JSON file becomes versions of a comp, then every row is checked; see Versions from data below)
+  `ae_versions_from_data` (a CSV / JSON file becomes versions of a comp, then every row is checked; see Versions from data below),
+  `ae_localize` (texts out to translators as CSV / XLIFF, translations back in as a version per language, fitted by your rules
+  and checked; Hebrew and Arabic right to left; see Localization below)
 - **Project:** `ae_project_health` (missing footage/fonts/effects, expression errors, unused footage, empty comps/folders,
   duplicate comp names); `ae_project_xray` (explains an inherited project: what the render queue pulls in, what
   every expression depends on and which links are fragile, what is missing, footage specs, what makes it heavy);
@@ -280,8 +288,7 @@ unknown effect name gets suggestions.
 - **Render:** `ae_list_render_queue`, `ae_add_to_render_queue`, `ae_get_render_settings` / `ae_set_render_settings` (every
   render-settings and output-module setting as editable key/value pairs), `ae_queue_in_media_encoder`,
   `ae_render_background` + `ae_render_jobs` (aerender in a separate process, with progress and cancel; After Effects stays
-  usable), `ae_render_queue_start`, `ae_clear_render_queue`; `ae_render_profile` (where the render time goes over the
-  whole timeline, and speed-ups kept only when proven pixel-identical; see Render profile below)
+  usable), `ae_render_queue_start`, `ae_clear_render_queue`
 
 Comps can be referenced by id, name, or omitted for the active comp; layers by 1-based index or name; properties by
 paths like `"Transform/Position"` or `"Effects/Gaussian Blur/Blurriness"` (display names or match names).
@@ -391,6 +398,37 @@ built in: every format, colour, size and margin comes from your data and your ow
 - **Render (optional):** `queue` adds every version to the render queue with your output module template and an output
   path pattern (`/renders/{City}_{#3}.mov`); `render: true` renders only the versions that pass. Existing files are never
   replaced unless `overwrite: true`.
+
+### Localization
+
+`ae_localize` takes a comp's texts to translators and back, with every language checked.
+
+- **Export** (`action: "export"`): every text layer of the comp and its precomps (visible or not; keyframed Source
+  Text per keyframe) to a **CSV** for Excel (UTF-8 with a BOM, so Hebrew and Arabic open correctly; one column per
+  language) or **XLIFF 1.2** for CAT tools (Trados, memoQ, Phrase...; one file per language). XLIFF 1.2 is the version
+  CAT tools import most widely; 2.0 files are read too. Each string has its context: comp and layer, time on screen,
+  the paragraph box or the width a point text has to the edge of the frame (or your safe area), a character limit
+  (yours, or estimated from the box with `maxChars: "fromBox"`) and your notes.
+- **Import** (`action: "import"`): one version per language. The comp tree is duplicated the way versions from data
+  duplicates a comp: the root and every precomp that holds a translated text, the copies using each other
+  (`"{comp} [{lang}]"`). One undo step with the Changes list; `dryRun: true` shows what each language gets; names
+  already in the project are refused unless `overwrite: true`.
+- **Fit by your rules, never invented:** the adjustments you allow, in your order: tracking down to a minimum, font
+  size down to a minimum (or a minimum cap height in comp pixels, measured on the font), horizontal scale down to a
+  minimum, the paragraph box growing by at most so many pixels (away from the edge the text is aligned to); point
+  text within a width you give. Each step goes only as far as needed. A text that still doesn't fit is left at the
+  best attempt and FAILs with what was tried; nothing goes below your minimum. Without rules nothing is adjusted.
+- **Right to left:** Hebrew, Arabic, Persian, Urdu, Yiddish (by the language code, or `direction`) get right-to-left
+  paragraph direction and the Universal composer (formerly South Asian and Middle Eastern, After Effects 24.0+), and
+  their alignment is mirrored (left becomes right); a point text whose alignment flips keeps its place. Your font
+  per language (`fonts: {"he": {"*": "YourHebrewFont"}}`). Not available to scripts, so not done: mirroring the
+  layout itself, kashida justification, per-character direction.
+- **Checks per language**, worded like Preflight (`FAIL (1 of 3 languages)`, `INCOMPLETE`, `PASS`): each text read
+  back where it renders, the fit, the direction, box overflow, text inside the frame or safe area on every frame,
+  missing glyphs (the common Hebrew / Arabic problem: a Latin font without those letters) and missing fonts.
+  Untranslated strings FAIL (or warn with `allowUntranslated: true`).
+- **Drift** (`action: "drift"`): which master texts changed since the export, per language, compared with the
+  file's source text; the import warns about them too.
 
 ### Change report
 
@@ -510,32 +548,6 @@ project with unsaved changes is refused), its undo history starts fresh, and the
 unchanged (size, date and SHA-256) and that it reopened without unsaved changes. It follows the permission mode like
 any edit (refused in read-only; one approval in ask mode, before anything is written).
 
-### Render profile
-
-After Effects' own profiler shows one frame. `ae_render_profile` maps the whole timeline. `action: "measure"` renders
-sampled frames of a comp (24 across the work area by default; `startFrame` / `endFrame` for a range), each several times
-(`runs`, default 3; the median counts) with the image cache purged before every render, and prints a text heat map of
-render time per frame and the slowest ranges. At the slowest frames it then switches each layer, and each effect of the
-costly layers, off in turn and times the frame with and without it (A/B in the same call, alternating order), so every
-layer and effect gets a cost in ms and as a share of the frame. Then the findings, each with its evidence: layers that
-are invisible (opacity 0 at every sampled frame) but still cost time; in a 32-bit project, whether 16-bit gives the same
-picture (proven with `ae_prove_identical` before it is suggested, with the time it saves); expressions evaluated for
-every motion blur sample, and which of them never change; precomps rendered much larger than they are shown; shy layers
-that render and X-ray's effects on hidden layers. Which effects block Multi-Frame Rendering is a plug-in flag that
-scripting can't read, so it says so instead of guessing.
-
-After Effects writes a frame saved by a script after the script has returned, so each render is timed from the call
-that starts it until its PNG is written, minus the measured round trip of a call that starts nothing. Switches are set
-in their own short calls and switched back right after the render; at the end every layer and effect switch (and the
-bit depth) is read back and compared with the start, and anything an interrupted measurement left switched is put back
-first. Edit > Undo is never run. The switches stay in the undo history as "Surehand MCP render profile switch" steps
-that cancel each other, and After Effects marks the project as changed; the result says both. Read-only mode measures
-only the frame times. `action: "optimize"` with finding ids applies them one at a time after a checkpoint, proves each
-with `ae_prove_identical` at its default tolerance, puts any change that isn't identical back with its own steps and
-reads it back, and re-measures the same frames to report the time saved. `timeBudgetSeconds` (default 300) stops new
-measurements; the result says what was measured and what wasn't. The disk cache and plug-in caches are not purged.
-Profiles are kept in `~/.surehand/ae/profiles/` for 7 days (30 at most).
-
 ### Project history
 
 "What changed between v11 and v12?" `ae_project_history` answers it. A **snapshot** is a record of the open project:
@@ -573,6 +585,7 @@ mean opening the old `.aep` in place of your project, so it isn't done automatic
 - "Un-precompose 'Logo Precomp' into the main comp and prove the render didn't change."
 - "Package this project for the render farm in ~/Handoff/Spot, and prove the package renders the same."
 - "Import /Users/me/footage/*.mov, make a comp for each clip and add them all to the render queue as ProRes."
+- "Export the texts of 'Promo' for Hebrew and French translators as a CSV. When it comes back, build both versions: tracking down to -40, then font size down to 36, never smaller."
 - "Make a version of 'Score Card' for every row of scores.csv: City into the City layer, Score as $1,234.00, the bar 0-100 → 0-800 px, red below zero. Check every row before you queue them."
 
 ## Control and trust

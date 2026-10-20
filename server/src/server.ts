@@ -11,6 +11,7 @@ import { registerHistoryTools } from "./tools/history.js";
 import { registerPreflightTools } from "./tools/preflight.js";
 import { registerReformatTools } from "./tools/reformat.js";
 import { registerVersionsTools } from "./tools/versions.js";
+import { registerLocalizeTools } from "./tools/localize.js";
 import { registerFileTools } from "./tools/files.js";
 import { registerHandoffTools } from "./tools/handoff.js";
 import { registerOnDemandTools } from "./tools/ondemand.js";
@@ -35,6 +36,7 @@ export function createMcpServer(profile: ToolProfile = resolveProfile()): McpSer
   registerPreflightTools(server);
   registerReformatTools(server);
   registerVersionsTools(server);
+  registerLocalizeTools(server);
   registerFileTools(server);
   registerHandoffTools(server);
   registerViews(server); // in-chat views and their app-only tools (on only where the AI app shows views)

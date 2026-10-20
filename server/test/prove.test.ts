@@ -117,6 +117,13 @@ describe("ae_prove_identical", () => {
     expect(() => parse(`(function(args, log){${PROVE_RENDER_JSX}\n})`, { ecmaVersion: 3, allowReserved: false })).not.toThrow();
   });
 
+  it("renders with the project's own color settings (a capture and its comparison the same way) and never waits inside the script", async () => {
+    const { RENDER_KIT_JSX } = await import("../src/tools/core.js");
+    const own = PROVE_RENDER_JSX.replace(RENDER_KIT_JSX, "");
+    expect(own).not.toMatch(/displayColor\(|bitsPerChannel|linearBlending/);
+    expect(own).not.toMatch(/\$\.sleep/);
+  });
+
   it("capture stores the frames and a manifest; compare with nothing changed is identical", async () => {
     const cap = await prove({ action: "capture" }, FULL);
     expect(cap.isError).toBeFalsy();

@@ -363,16 +363,16 @@ const round1 = (n: number) => Math.round(n * 10) / 10;
 const word = (v: string) => v.split(" ")[0];
 
 /** "FAIL (2 of 12 rows)": the worst row verdict, with how many rows have it. */
-export function runVerdict(rows: RowResult[]): string {
+export function runVerdict(rows: Pick<RowResult, "verdict">[], noun = "row"): string {
   for (const w of ["FAIL", "INCOMPLETE", "WARNINGS"]) {
     const n = rows.filter((r) => word(r.verdict) === w).length;
-    if (n) return `${w} (${n} of ${rows.length} row${rows.length === 1 ? "" : "s"})`;
+    if (n) return `${w} (${n} of ${rows.length} ${noun}${rows.length === 1 ? "" : "s"})`;
   }
   return "PASS";
 }
 
 /** One line for a finding: where, what, when. */
-function findingText(f: Finding, tb?: TimeBase): string {
+export function findingText(f: Finding, tb?: TimeBase): string {
   const when = f.at !== undefined && f.check !== "text.format" && f.check !== "value" && f.check !== "color" ? ` at ${formatAt(f.at, tb)}` : "";
   return `${f.where && f.check !== "render" ? `${f.where.replace(/^.* > \d+: /, "")}: ` : ""}${f.severity === "warn" ? "warning: " : ""}${f.message}${when}`;
 }
@@ -387,8 +387,8 @@ export function rowLine(r: RowResult, tb?: TimeBase, maxPerRow = 4): string {
   return `${head}: ${shown.join(" · ")}${parts.length > shown.length ? ` · +${parts.length - shown.length} more` : ""}`;
 }
 
-export function totalsLine(rows: RowResult[]): string {
+export function totalsLine(rows: Pick<RowResult, "verdict">[], noun = "row"): string {
   const count = (w: string) => rows.filter((r) => word(r.verdict) === w).length;
   const parts = [["PASS", count("PASS")], ["FAIL", count("FAIL")], ["INCOMPLETE", count("INCOMPLETE")], ["WARNINGS", count("WARNINGS")]].filter(([, n]) => n).map(([w, n]) => `${n} ${w}`);
-  return `${rows.length} row${rows.length === 1 ? "" : "s"}: ${parts.join(", ")}`;
+  return `${rows.length} ${noun}${rows.length === 1 ? "" : "s"}: ${parts.join(", ")}`;
 }
