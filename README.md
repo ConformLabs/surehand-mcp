@@ -17,7 +17,7 @@
 
 Surehand MCP connects **Claude** (Desktop / Code), **ChatGPT** (desktop app or web), Cursor, Codex, VS Code (GitHub Copilot), Windsurf / Devin Desktop, LM Studio, or any MCP client to **Adobe® After Effects®**.
 The AI can run any script inside After Effects (modern JavaScript, converted for AE's ExtendScript engine automatically),
-read information back, and use up to 109 ready-made tools for projects, comps, layers, keyframes (Graph Editor level),
+read information back, and use up to 110 ready-made tools for projects, comps, layers, keyframes (Graph Editor level),
 text styling and animators, footage, effects, shapes, masks, 3D cameras/lights/materials, audio, color management,
 Essential Graphics and rendering (including background renders with aerender). Batch edits run many steps as one
 undo step, checkpoints keep safety copies of the project, structural changes can be proven not to change the render,
@@ -194,7 +194,7 @@ To rotate the token, delete `token` from `~/.surehand/ae/config.json` and re-run
 | `ae_get_scripting_guide` | ExtendScript cheat sheet for the model (also an MCP resource `aemcp://docs/extendscript`). |
 
 **Tool profiles.** Every tool description is sent to the AI in every chat, so by default only a **core set of
-29 tools** is loaded (about 9k tokens instead of 39k for all 109), and **every other tool stays available on demand**:
+29 tools** is loaded (about 9k tokens instead of 40k for all 110), and **every other tool stays available on demand**:
 `ae_tools` lists all tools by category (or gives full parameter details of chosen ones), and `ae_call` runs any tool by
 name with the same validation, permissions, change report and activity log. Loading everything up front is optional:
 switch to **All tools** in the Surehand panel in After Effects (**☰ › Tools the AI sees › All tools**), in Claude Desktop's
@@ -280,7 +280,8 @@ unknown effect name gets suggestions.
 - **Render:** `ae_list_render_queue`, `ae_add_to_render_queue`, `ae_get_render_settings` / `ae_set_render_settings` (every
   render-settings and output-module setting as editable key/value pairs), `ae_queue_in_media_encoder`,
   `ae_render_background` + `ae_render_jobs` (aerender in a separate process, with progress and cancel; After Effects stays
-  usable), `ae_render_queue_start`, `ae_clear_render_queue`
+  usable), `ae_render_queue_start`, `ae_clear_render_queue`; `ae_render_profile` (where the render time goes over the
+  whole timeline, and speed-ups kept only when proven pixel-identical; see Render profile below)
 
 Comps can be referenced by id, name, or omitted for the active comp; layers by 1-based index or name; properties by
 paths like `"Transform/Position"` or `"Effects/Gaussian Blur/Blurriness"` (display names or match names).
@@ -508,6 +509,32 @@ package is made with Save As, and your project is opened again from disk at the 
 project with unsaved changes is refused), its undo history starts fresh, and the result confirms the file on disk is
 unchanged (size, date and SHA-256) and that it reopened without unsaved changes. It follows the permission mode like
 any edit (refused in read-only; one approval in ask mode, before anything is written).
+
+### Render profile
+
+After Effects' own profiler shows one frame. `ae_render_profile` maps the whole timeline. `action: "measure"` renders
+sampled frames of a comp (24 across the work area by default; `startFrame` / `endFrame` for a range), each several times
+(`runs`, default 3; the median counts) with the image cache purged before every render, and prints a text heat map of
+render time per frame and the slowest ranges. At the slowest frames it then switches each layer, and each effect of the
+costly layers, off in turn and times the frame with and without it (A/B in the same call, alternating order), so every
+layer and effect gets a cost in ms and as a share of the frame. Then the findings, each with its evidence: layers that
+are invisible (opacity 0 at every sampled frame) but still cost time; in a 32-bit project, whether 16-bit gives the same
+picture (proven with `ae_prove_identical` before it is suggested, with the time it saves); expressions evaluated for
+every motion blur sample, and which of them never change; precomps rendered much larger than they are shown; shy layers
+that render and X-ray's effects on hidden layers. Which effects block Multi-Frame Rendering is a plug-in flag that
+scripting can't read, so it says so instead of guessing.
+
+After Effects writes a frame saved by a script after the script has returned, so each render is timed from the call
+that starts it until its PNG is written, minus the measured round trip of a call that starts nothing. Switches are set
+in their own short calls and switched back right after the render; at the end every layer and effect switch (and the
+bit depth) is read back and compared with the start, and anything an interrupted measurement left switched is put back
+first. Edit > Undo is never run. The switches stay in the undo history as "Surehand MCP render profile switch" steps
+that cancel each other, and After Effects marks the project as changed; the result says both. Read-only mode measures
+only the frame times. `action: "optimize"` with finding ids applies them one at a time after a checkpoint, proves each
+with `ae_prove_identical` at its default tolerance, puts any change that isn't identical back with its own steps and
+reads it back, and re-measures the same frames to report the time saved. `timeBudgetSeconds` (default 300) stops new
+measurements; the result says what was measured and what wasn't. The disk cache and plug-in caches are not purged.
+Profiles are kept in `~/.surehand/ae/profiles/` for 7 days (30 at most).
 
 ### Project history
 

@@ -5,7 +5,7 @@
 // that is already set moves the revision but leaves no undo step), an edit outside a group is a step of
 // its own, an extra endUndoGroup() closes the group early, and Edit > Undo moves the revision forward
 // (it doesn't restore it).
-import { existsSync, writeFileSync } from "node:fs";
+import { existsSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { basename, dirname, resolve as resolvePath } from "node:path";
 import { helperSource } from "../src/jsx.js";
 
@@ -16,7 +16,7 @@ class SolidSource {}
 class PlaceholderSource {}
 class AVLayer {}
 const PropertyType = { PROPERTY: 6212, INDEXED_GROUP: 6213, NAMED_GROUP: 6214 };
-const PropertyValueType = { NO_VALUE: 6412, OneD: 6417, TEXT_DOCUMENT: 6420 };
+const PropertyValueType = { NO_VALUE: 6412, OneD: 6417, COLOR: 6418, TEXT_DOCUMENT: 6420, SHAPE: 6421 };
 export const BlendingMode = { NORMAL: 5212, ADD: 5220 };
 export const MaskMode = { NONE: 6812, ADD: 6813, SUBTRACT: 6814, INTERSECT: 6815 };
 export const MaskFeatherFalloff = { FFO_LINEAR: 7213, FFO_SMOOTH: 7212 };
@@ -239,7 +239,10 @@ export interface FakeLayerSpec {
   isTrackMatte?: boolean;
   /** 1-based index */
   parent?: number;
-  effects?: { matchName: string; name: string; enabled?: boolean }[];
+  effects?: { matchName: string; name: string; enabled?: boolean; /** render cost (ms) while on */ costMs?: number }[];
+  /** render cost (ms) while the layer is on and active (a precomp layer adds its comp's render cost too) */
+  costMs?: number | ((t: number) => number);
+  locked?: boolean;
   /** property path ("Transform/Opacity", "Effects/Slider Control/Slider") -> expression */
   expressions?: Record<string, { expr: string; error?: string; enabled?: boolean }>;
   font?: string;
@@ -290,6 +293,8 @@ export interface FakeCompSpec {
   renderer?: string;
   /** Essential Graphics controllers (name, value and type of the Essential Property a precomp layer gets) */
   egp?: { name: string; value: unknown; type: string }[];
+  /** render cost (ms) of the comp itself, before its layers (default 10) */
+  renderMs?: number;
 }
 export interface FakeFootageSpec {
   name: string;
@@ -325,6 +330,12 @@ export interface FakeProjectSpec {
   appPackage?: string;
   /** how an output module becomes PNG: setSettings({Format}) (default), only by a template's name, or not at all */
   png?: "settings" | "template" | "none";
+  /** project bit depth (default 16) */
+  bpc?: number;
+  /** render cost factor at 32 bpc (default 1.5) */
+  cost32?: number;
+  /** extra ms per render, cycled (deterministic noise; default none) */
+  jitter?: number[];
 }
 
 /** PropertyValueType with After Effects' own values. */
@@ -348,11 +359,22 @@ export function fakeProject(spec: FakeProjectSpec) {
   class CameraLayer extends Layer {}
   class LightLayer extends Layer {}
   class PropertyBase {}
+  // comp.saveFrameToPng is asynchronous, as in After Effects 26.5: it returns at once and the PNG is written after the
+  // script has returned (polling for it inside the same call never sees it). Each render reports what it costs (ms: the
+  // comp, plus every layer and effect that is on) to clock.onRender, which decides when the file appears; without it
+  // the file is written on the next turn of the event loop. File (below) is the real file system.
+  const clock: { renders: number; onRender?: (path: string, ms: number) => void } = { renders: 0 };
+  const dollar = { sleep() {} };
   const globals: Record<string, unknown> = {
     File: Object.assign(
       function (this: any, path: string) {
         const full = resolvePath(String(path));
-        return { fsName: full, name: basename(full), get exists() { return existsSync(full); } };
+        return {
+          fsName: full, name: basename(full),
+          get exists() { return existsSync(full); },
+          get length() { return existsSync(full) ? statSync(full).size : -1; },
+          remove() { try { unlinkSync(full); return true; } catch { return false; } },
+        };
       },
       { decode: decodeURIComponent },
     ),
@@ -363,6 +385,7 @@ export function fakeProject(spec: FakeProjectSpec) {
     Folder: { appPackage: { fsName: spec.appPackage ?? "/Applications/Adobe After Effects/Adobe After Effects.app" } },
     CloseOptions: { DO_NOT_SAVE_CHANGES: 1213, PROMPT_TO_SAVE_CHANGES: 1214, SAVE_CHANGES: 1212 },
     GetSettingsFormat: { STRING: 2, NUMBER: 1, STRING_SETTABLE: 3 },
+    PurgeTarget: { ALL_CACHES: 1, UNDO_CACHES: 2, SNAPSHOT_CACHES: 3, IMAGE_CACHES: 4, ALL_MEMORY_CACHES: 5 },
     Item, CompItem, FootageItem, FolderItem, FootageSource, FileSource, SolidSource, PlaceholderSource, Layer, AVLayer, TextLayer, ShapeLayer, CameraLayer, LightLayer, PropertyBase,
     PropertyType, PropertyValueType: PVT_FULL, BlendingMode, TrackMatteType,
     AlphaMode: { IGNORE: 5412, STRAIGHT: 5413, PREMULTIPLIED: 5414 },
@@ -453,8 +476,18 @@ export function fakeProject(spec: FakeProjectSpec) {
       id: nextId++, name, width: c.width ?? 1920, height: c.height ?? 1080, pixelAspect: 1, frameRate: c.fps ?? 25, duration: c.duration ?? 10,
       motionBlur: !!c.motionBlur, shutterAngle: 180, shutterPhase: -90, motionBlurSamplesPerFrame: c.samples ?? 16, motionBlurAdaptiveSampleLimit: 128,
       frameBlending: true, renderer: c.renderer ?? "ADBE Advanced 3d", usedIn: [], layers: [] as any[], time: 0, frameDuration: 1 / (c.fps ?? 25), displayStartTime: 0,
-      bgColor: [0, 0, 0], workAreaStart: 0, workAreaDuration: c.duration ?? 10, parentFolder: root,
+      bgColor: [0, 0, 0], workAreaStart: 0, workAreaDuration: c.duration ?? 10, parentFolder: root, resolutionFactor: [1, 1],
     });
+    it.saveFrameToPng = (t: number, f: { fsName: string }) => {
+      calls.push("saveFrameToPng");
+      const jit = spec.jitter?.length ? spec.jitter[clock.renders % spec.jitter.length] : 0;
+      clock.renders++;
+      // what is on now decides the cost (After Effects takes the comp as it is when the render starts)
+      const ms = renderCost(it, t) * (project.bitsPerChannel === 32 ? (spec.cost32 ?? 1.5) : 1) + jit;
+      if (clock.onRender) clock.onRender(f.fsName, ms);
+      else setTimeout(() => writeFileSync(f.fsName, "png"), 0);
+    };
+    it.renderMs = c.renderMs ?? 10;
     Object.defineProperty(it, "numLayers", { get: () => it.layers.length });
     it.layer = (k: number | string) => (typeof k === "number" ? it.layers[k - 1] : it.layers.find((l: any) => l.name === k)) ?? null;
     const egp = c.egp ?? [];
@@ -497,7 +530,7 @@ export function fakeProject(spec: FakeProjectSpec) {
     walk(a, b);
   };
   const effectGroups = (l: FakeLayerSpec) =>
-    (l.effects ?? []).map((e) => group(e.name, e.matchName, [], { enabled: e.enabled !== false }));
+    (l.effects ?? []).map((e) => group(e.name, e.matchName, [], { enabled: e.enabled !== false, costMs: e.costMs ?? 0 }));
   const T = (n: string) => (PVT_FULL as any)[n];
   function addLayers(comp: any, c: FakeCompSpec) {
     c.layers.forEach((ls, li) => {
@@ -550,7 +583,7 @@ export function fakeProject(spec: FakeProjectSpec) {
         nullLayer: type === "null", adjustmentLayer: type === "adjustment", source: source ?? null, collapseTransformation: !!ls.collapse, timeRemapEnabled: !!ls.timeRemap,
         frameBlendingType: ls.frameBlend ? (globals.FrameBlendingType as any)[ls.frameBlend] : (globals.FrameBlendingType as any).NO_FRAME_BLEND,
         motionBlur: !!ls.motionBlur, inPoint: ls.inPoint ?? 0, outPoint: ls.outPoint ?? comp.duration, parent: null, children,
-        startTime: ls.startTime ?? 0, stretch: 100,
+        startTime: ls.startTime ?? 0, stretch: 100, locked: !!ls.locked, costMs: ls.costMs ?? 0,
         sourceRectAtTime: (t: number) => {
           calls.push("sourceRectAtTime");
           const text = type === "text" ? String(L.property("ADBE Text Properties").property("ADBE Text Document").valueAtTime(t, false).text) : "";
@@ -638,7 +671,7 @@ export function fakeProject(spec: FakeProjectSpec) {
     rq: rqItems.map((r) => ({ compId: r.comp.id, comp: r.comp.name, fps: r.comp.frameRate, start: r.timeSpanStart, dur: r.timeSpanDuration, render: r.render, format: r.om.format, out: r.om.file?.fsName ?? null })),
   });
   const projRaw: any = {
-      file: fileOf(spec.file ?? "/jobs/Inherited.aep"), bitsPerChannel: 16, expressionEngine: "javascript-1.0", rootFolder: root,
+      file: fileOf(spec.file ?? "/jobs/Inherited.aep"), bitsPerChannel: spec.bpc ?? 16, expressionEngine: "javascript-1.0", rootFolder: root,
       colorManagementSystem: 0, workingSpace: "Rec.709 Gamma 2.4", linearizeWorkingSpace: false, linearBlending: true,
       get dirty() { return !!spec.dirty || writes.length > cleanAt; },
       save(f?: any) {
@@ -718,13 +751,26 @@ export function fakeProject(spec: FakeProjectSpec) {
     project.usedFonts = spec.usedFonts.map((u) => ({ font: { postScriptName: u.ps, familyName: u.family, styleName: u.style, version: u.version, isFromAdobeFonts: u.adobe }, usedAt: u.layers.map((n) => (u.noIds ? { layerTimeD: {} } : { layerID: layerId(n), layerTimeD: {} })) }));
     writes.length = 0;
   }
+  app.purge = (target: number) => calls.push(`purge ${target}`);
+  /** what a render of `comp` at time t costs (ms): the comp, then every layer that is on and active, its effects that are on, and its precomp */
+  function renderCost(comp: any, t: number): number {
+    let ms = comp.renderMs ?? 10;
+    for (const L of comp.layers) {
+      if (!L.enabled || t < L.inPoint || t >= L.outPoint) continue;
+      ms += typeof L.costMs === "function" ? L.costMs(t) : L.costMs;
+      const fx = L.property("ADBE Effect Parade");
+      for (const e of fx?.children ?? []) if (e.enabled) ms += e.costMs ?? 0;
+      if (L.source instanceof CompItem) ms += renderCost(L.source, t - L.startTime);
+    }
+    return ms;
+  }
   const names = Object.keys(globals);
   const values = names.map((n) => globals[n]);
   const aemcp = new Function("$", "app", ...names, "var aemcp;\n" + helperSource + "\nreturn aemcp;")({ global: { ...globals } }, app, ...values);
   /** run a tool's JSX body like the bridge does (no undo group: a read-only tool) */
   const run = (jsx: string, args: Record<string, unknown>) => {
-    const fn = new Function("aemcp", "app", ...names, `return function (args, log) {\n${jsx}\n};`)(aemcp, app, ...values);
+    const fn = new Function("aemcp", "app", "$", ...names, `return function (args, log) {\n${jsx}\n};`)(aemcp, app, dollar, ...values);
     return JSON.parse(aemcp.run(fn, args, { undoGroup: false }));
   };
-  return { app, comps, items, writes, calls, run, rqItems, rendered, imported, saves, opens, disk, rq: () => rqItems };
+  return { app, comps, items, writes, calls, run, rqItems, rendered, imported, saves, opens, disk, rq: () => rqItems, clock };
 }

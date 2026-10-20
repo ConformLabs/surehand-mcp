@@ -53,6 +53,11 @@ When the edit takes several calls or needs a look in between: {action: "capture"
 - Between two versions: take a snapshot of each (ae_checkpoint save stores one too), then diff with from and to
   set to their labels.
 
+## Faster renders
+
+To find what makes a comp slow and speed it up without changing the picture: ae_render_profile measure, then optimize
+with the findings to apply (details: references/render-profile.md).
+
 ## Checklist
 
 - [ ] X-ray and comp map read

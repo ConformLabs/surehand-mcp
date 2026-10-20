@@ -3,6 +3,7 @@ import { registerCoreTools } from "../src/tools/core.js";
 import { registerRenderJobs } from "../src/tools/renderjobs.js";
 import { registerWorkflowTools } from "../src/tools/workflow.js";
 import { registerProveTools } from "../src/tools/prove.js";
+import { registerRenderProfileTools } from "../src/tools/renderprofile.js";
 import { registerHistoryTools } from "../src/tools/history.js";
 import { registerPreflightTools } from "../src/tools/preflight.js";
 import { registerReformatTools } from "../src/tools/reformat.js";
@@ -28,6 +29,7 @@ export function registeredTools(): Set<string> {
   registerRenderJobs(stub);
   registerWorkflowTools(stub);
   registerProveTools(stub);
+  registerRenderProfileTools(stub);
   registerHistoryTools(stub);
   registerPreflightTools(stub);
   registerReformatTools(stub);

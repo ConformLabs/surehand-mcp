@@ -142,6 +142,7 @@ const EXPECTED: Record<string, Hints> = {
   ae_clear_render_queue: DI,
   ae_render_background: D, // writes the output file; save:true saves the project
   ae_render_jobs: DI, // cancel stops a render
+  ae_render_profile: E, // optimize applies proven changes (each one undo step, checkpoint first); measure puts everything back
   // status & app
   ae_execute_menu_command: D, // any menu command
   ae_undo: E, // reversible with ae_redo
