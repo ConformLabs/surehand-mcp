@@ -89,6 +89,26 @@ The installer:
   if they are installed, under the name `surehand-ae`. Before a config file is changed, a timestamped backup is made next to it
   (`*.surehand-<time>.bak`, the newest five are kept); the very first original also stays as `*.surehand.bak`. If Claude Desktop is open it offers to restart it,
   because a running Claude Desktop overwrites its config file
+- writes the Surehand skills (see "Skills" below) for the AI apps that read skill files, and the zips to upload in
+  Claude Desktop chat
+
+### Skills
+
+Four Agent Skills teach the AI how to work with Surehand well: `surehand-ae` (the basics: check the connection, read
+before editing, confirm each edit with its change report, look at the result, never work around a refusal, plus the
+ExtendScript traps seen live), `surehand-ae-delivery` (preflight against your own delivery spec),
+`surehand-ae-safe-restructure` (structural edits with pixel proof) and `surehand-ae-timing-layout` (exact keyframes,
+easing and measured alignment). The source is `skills/` in this repo.
+
+- The installer writes them to `~/.claude/skills/` (Claude Code; Cursor and VS Code read it too) and
+  `~/.agents/skills/` (ChatGPT desktop / Codex, Cursor, VS Code, Windsurf / Devin Desktop); `%USERPROFILE%` on
+  Windows. A folder is written only when one of those apps is on the computer (or the folder is there already).
+  Only the four `surehand-ae*` folders are written, replaced on update and removed on uninstall; other skills are
+  never touched.
+- **For Claude Desktop chat:** upload the skills in **Customize › Skills › Upload a skill** (files in
+  `~/.surehand/ae/skills`, one zip per skill). claude.ai takes the same zips.
+- `surehand-ae skills [--json]` shows where they are installed; `surehand-ae skills install` / `uninstall` writes or
+  removes them.
 
 The server also checks the After Effects extension every time it starts and installs or updates it if needed, so
 updating is just: replace the `.mcpb` (or re-run the installer) and restart After Effects.
@@ -551,6 +571,7 @@ server/              MCP server (TypeScript) -> bundled into server/dist/surehan
   scripts/sign-win.mjs               signs Windows files with the Certum certificate (SimplySign)
   scripts/ci-check.mjs assertions for the CI install / uninstall dry runs
 extension/           After Effects extension (signed): invisible bridge (auto-starts) + status panel
+skills/              the Agent Skills (embedded in the server bundle; `install` writes them)
 installer/           run.sh / run.ps1: find or download Node.js, then run a surehand-ae command
   START HERE.txt       plain-language install guide (copied into the release)
   mac/, windows/       double-click launchers for a source checkout (the release generates its own)

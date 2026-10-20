@@ -20,7 +20,9 @@ export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$HOME/.volta/bin:
 
 # Surehand MCP's own entries in ~/.surehand/ae and ~/.aemcp: the same list as OWN_FILES in
 # server/src/cli/uninstall.ts (a test keeps them equal). Everything else there is the user's.
-OWN_FILES="server config.json runtime.json extension-hash bridge-status.json instances update-check.json activity.jsonl tmp renders compat install.log install-result.json chatgpt.json chatgpt.lock sessions MOVED.txt"
+OWN_FILES="server config.json runtime.json extension-hash bridge-status.json instances update-check.json activity.jsonl tmp renders compat install.log install-result.json chatgpt.json chatgpt.lock sessions skills MOVED.txt"
+# Our Agent Skills in ~/.claude/skills and ~/.agents/skills: the same list as SKILL_NAMES in server/src/cli/skills.ts.
+SKILLS="surehand-ae surehand-ae-delivery surehand-ae-safe-restructure surehand-ae-timing-layout"
 
 # Another Surehand app (~/.surehand/<app>) is installed: the shared Node.js stays for it.
 other_apps() {
@@ -87,6 +89,7 @@ if [ -z "$NODE" ]; then
     rm -rf "$HOME/Library/Application Support/Adobe/CEP/extensions/com.aemcp"
     remove_own "$SUREHAND/ae"
     remove_own "$HOME/.aemcp"
+    for s in $SKILLS; do rm -rf "$HOME/.claude/skills/$s" "$HOME/.agents/skills/$s"; done
     rm -f "$SUREHAND/migration.log"
     remove_own_cloudflared
     if other_apps; then echo "Kept $PRIVATE_NODE (another Surehand app uses it)."; else rm -rf "$PRIVATE_NODE"; fi

@@ -1,23 +1,44 @@
-export const INSTRUCTIONS = `This server controls a running Adobe After Effects instance through ExtendScript.
-- Start with ae_status to confirm the connection, then ae_get_project_info / ae_get_comp_info (and ae_get_comp_map for
-  nested precomps, parenting and expression links) to understand the project. For an unfamiliar or inherited project,
-  ae_project_xray explains how it works: what the render queue pulls in, expression dependencies and fragile links,
-  missing items, footage specs and what makes it heavy (run it with ae_call if it isn't loaded).
-- Prefer the specific tools (ae_create_comp, ae_add_layer, ae_set_keyframes, ae_apply_effect...) for common edits; use ae_run_script for anything else - the full AE scripting API is available.
-- Use ae_get_properties to discover property paths/match names before setting values.
-- For exact timing work use the keyframe table (ae_get_keyframes / ae_set_keyframe_table: frames or seconds, exact speed and
-  influence), ae_copy_ease, ae_retime_keyframes (whole frames) and ae_audit_easing; for layout, ae_align_layers moves layers by
+/**
+ * The server's instructions to the AI, the most important rules first. Claude Code cuts them at 4,096 characters:
+ * a test keeps the longest version (with `onDemand`) under 4,000. `onDemand`: the chat has only the core tools
+ * loaded (tools/profile.ts).
+ */
+export function serverInstructions(onDemand: boolean): string {
+  return `This server controls a running Adobe After Effects instance through ExtendScript. Rules, most important first:
+1. Check the connection first: ae_status.
+2. Read before editing: ae_get_project_info, ae_get_comp_info, ae_get_comp_map (nested precomps, parenting, expression
+   links). Use ae_get_properties to find property paths/match names before setting values.
+3. Every edit returns a "Changes" list of exactly what changed in the project: use it to confirm the edit did what you
+   meant. Every tool call is one undo step; ae_undo reverts it.
+4. After visual changes, look at the result: ae_render_frame (one frame; can zoom a region, solo layers, show alpha, diff),
+   ae_render_contact_sheet (motion over time). Check layout numerically with ae_get_layer_bounds.
+5. Prove structural edits that should not change the picture (un-precompose, bake expressions, reorder effects, simplify
+   a rig): ae_prove_identical (action "run" with the edits as batch steps) gives pixel evidence that the render is
+   unchanged. Report its verdict (IDENTICAL, or DIFFERS: then undo or explain) as given.
+6. Before delivery, ae_preflight checks the comp and/or its render against the user's own delivery spec (size, frame
+   rate, safe areas over time, text size and reading speed, missing items, file codec/levels/loudness); action "schema"
+   helps write the spec. Never invent spec values; never call a check PASS that did not run.
+7. Never work around a refusal: when the permission mode (Full / Ask / Read-only in the Surehand panel), a Deny or a
+   pause stops a call, report it; don't get the same result with another tool or a script.${
+    onDemand
+      ? `
+8. This chat has the core tools loaded. Many more (3D, audio, text styling, footage, render settings, masks, Essential
+   Graphics, project management...) are available on demand: ae_tools lists them, ae_tools {describe: [...]} gives
+   parameters, ae_call runs them.`
+      : ""
+  }
+Also:
+- Prefer the specific tools (ae_create_comp, ae_add_layer, ae_set_keyframes, ae_apply_effect...) for common edits; use
+  ae_run_script for anything else - the full AE scripting API is available. Read the resource aemcp://docs/extendscript
+  before writing non-trivial ExtendScript.
+- For an unfamiliar or inherited project, ae_project_xray explains how it works: what the render queue pulls in,
+  expression dependencies and fragile links, missing items, footage specs and what makes it heavy.
+- Exact timing: the keyframe table (ae_get_keyframes / ae_set_keyframe_table: frames or seconds, exact speed and
+  influence), ae_copy_ease, ae_retime_keyframes (whole frames), ae_audit_easing. Layout: ae_align_layers moves layers by
   their measured on-screen bounds. ae_find_files locates files on disk; ae_export_frames saves PNG stills.
-- After visual changes, look at the result: ae_render_frame (one frame; can zoom a region, solo layers, show alpha, diff),
-  ae_render_contact_sheet (motion over time). Check layout numerically with ae_get_layer_bounds.
-- For a structural change that should not change the picture (un-precompose, bake expressions, reorder effects, simplify a rig),
-  use ae_prove_identical (action "run" with the edits as batch steps) to get pixel evidence that the render is unchanged.
-- Before delivery, ae_preflight checks the comp and/or its render against the user's own delivery spec (size, frame rate,
-  safe areas over time, text size and reading speed, missing items, file codec/levels/loudness); action "schema" helps write the spec.
-- Every edit returns a "Changes" list of exactly what changed in the project; use it to confirm the edit did what you meant.
-- Every tool call is one undo step; ae_undo reverts it.
-- Tools never replace an existing file silently: ae_save_project (Save As), ae_render_frame and ae_render_contact_sheet (outputPath) and ae_export_frames refuse and say so. Pass overwrite: true only when replacing it is intended.
-- Read the resource aemcp://docs/extendscript before writing non-trivial ExtendScript.`;
+- Tools never replace an existing file silently: ae_save_project (Save As), ae_render_frame and ae_render_contact_sheet
+  (outputPath) and ae_export_frames refuse and say so. Pass overwrite: true only when replacing it is intended.`;
+}
 
 export const EXTENDSCRIPT_DOC = `# After Effects ExtendScript cheat sheet (for ae_run_script)
 

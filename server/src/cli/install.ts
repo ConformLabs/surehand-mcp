@@ -14,6 +14,9 @@
 // elsewhere). A --connect-only run adds its apps to the results that are there. The Windows Setup shows the
 // results on its finish page, the Mac Installer at the top of install.log, and `clients --json` gives the panel
 // the reason an app could not be connected. The text output stays as it is.
+//
+// A full run (not --connect-only) also writes the Agent Skills (skills.ts) for the AI apps on this computer that
+// read them, and the zips to upload in Claude Desktop chat.
 import { spawn, spawnSync } from "node:child_process";
 import { chmodSync, copyFileSync, existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -25,6 +28,7 @@ import {
   claudeDesktopRunning, CLIENT_NAMES, clientInstalled, connectClient, disconnectClient, INSTALLER_ORDER, installResultFile, isOurEntry, mcpbInstalled,
   moveFromLegacy, repointLegacyClients, type ClientId,
 } from "./clients.js";
+import { installSkills, type SkillsInstallResult } from "./skills.js";
 import { bundledExtensionSigned, ensureConfig, ensureDebugMode, ensureExtension, PANEL_COMMANDS, runtimeFile } from "./setup.js";
 import {
   LEGACY_SERVER_NAME, SERVER_NAME, ask, bold, claudeDesktopConfig, claudeDesktopExe, configPath,
@@ -52,6 +56,8 @@ export interface InstallResult {
   clients: { id: ClientId; name: string; outcome: ClientOutcome; message?: string }[];
   /** cloudflared for ChatGPT on the web, when it was asked for (--tunnel) */
   tunnel?: { outcome: TunnelOutcome; path?: string; error?: string };
+  /** the Agent Skills: the folders written and the zips for Claude Desktop chat (a full run; skills.ts) */
+  skills?: { dirs: string[]; zips: string[]; error?: string; /** Claude Desktop is on this computer: the next steps say to upload the zips */ claudeDesktop?: boolean };
   /** the results as the installers show them (installResultView) */
   summary: SummaryRow[];
   /** the numbered next steps */
@@ -92,6 +98,11 @@ const list = (names: string[]) => (names.length < 2 ? names.join("") : `${names.
 /** "Adobe® After Effects® 2025, 2026" from ["After Effects 2025", "After Effects 2026"]. */
 const aeNames = (versions: string[]) => `Adobe® After Effects® ${versions.map((v) => v.replace(/^After Effects /, "").replace(/^\((Beta)\)$/, "$1")).join(", ")}`;
 
+/** The next step for Claude Desktop chat, which can't read skill files: the user uploads the zips (skills.ts). */
+export const CLAUDE_CHAT_SKILLS = `For Claude Desktop chat: upload the skills in Customize › Skills › Upload a skill (files in ${
+  isWin ? "%USERPROFILE%\\.surehand\\ae\\skills" : "~/.surehand/ae/skills"
+}).`;
+
 /** The results as the installers show them: rows (glyph + text) and the numbered next steps. */
 export function installResultView(r: Omit<InstallResult, "summary" | "next">): { summary: SummaryRow[]; next: string[] } {
   const summary: SummaryRow[] = [];
@@ -116,6 +127,7 @@ export function installResultView(r: Omit<InstallResult, "summary" | "next">): {
     next.push(`Restart ${list(connected)}.`);
     next.push(`Ask ${connected.length > 1 ? "one of them" : "it"} “What's in my project?” The Surehand panel (Window › Extensions › Surehand MCP) shows when it's connected.`);
   } else next.push("Open After Effects and connect an AI app in the Surehand panel (Window › Extensions › Surehand MCP).");
+  if (r.skills?.zips.length && r.skills.claudeDesktop) next.push(CLAUDE_CHAT_SKILLS);
   return { summary, next };
 }
 
@@ -201,6 +213,7 @@ export async function install(argv: string[]) {
     afterEffectsRunning: afterEffectsRunning(),
     clients: prior ? prior.clients.filter((c) => !(chosen?.has(c.id) || unchosen.has(c.id))) : [],
     ...(prior?.tunnel ? { tunnel: prior.tunnel } : {}),
+    ...(prior?.skills ? { skills: prior.skills } : {}),
     summary: [],
     next: [],
   };
@@ -359,6 +372,12 @@ export async function install(argv: string[]) {
       result.tunnel = { outcome: "failed", error: t.error };
     }
   }
+  if (!connectOnly) {
+    // the Agent Skills, for the apps on this computer that read them (whether or not they were chosen above)
+    const sk = installSkills();
+    reportSkills(sk);
+    result.skills = { dirs: sk.targets.filter((t) => t.written).map((t) => t.dir), zips: sk.zips, ...(sk.zipError ? { error: sk.zipError } : {}), claudeDesktop: clientInstalled("claude-desktop") };
+  }
   writeResult();
   if (connectOnly) {
     // an installer step: exit code 3 when something it was asked for did not work
@@ -374,10 +393,21 @@ export async function install(argv: string[]) {
 
   Then open your AI app and ask it something about your After Effects project, like ${bold('"What\'s in my project?"')}
   Check the installation any time with ${fromInstaller ? bold(`"${nodePath}" "${INSTALLED_SERVER}" selftest`) : `${bold("2. Test Installation")} (in the ${isWin ? "Windows" : "Mac"} folder)`}.
-${registered.includes("ChatGPT desktop") ? `  ChatGPT desktop app: restart it; ${SERVER_NAME} appears under Settings > Plugins > Servers.\n` : ""}  ChatGPT on the web: run ${fromInstaller ? bold(`"${nodePath}" "${INSTALLED_SERVER}" chatgpt`) : `${bold("3. Connect ChatGPT")} from the same folder`}.
+${registered.includes("ChatGPT desktop") ? `  ChatGPT desktop app: restart it; ${SERVER_NAME} appears under Settings > Plugins > Servers.\n` : ""}${result.skills?.zips.length && result.skills.claudeDesktop ? `  ${CLAUDE_CHAT_SKILLS}\n` : ""}  ChatGPT on the web: run ${fromInstaller ? bold(`"${nodePath}" "${INSTALLED_SERVER}" chatgpt`) : `${bold("3. Connect ChatGPT")} from the same folder`}.
 
   Other MCP apps can use:  command ${nodePath}
                            args    ["${INSTALLED_SERVER}"]
 `);
 }
 
+
+/** The skills step's lines (install, `skills install`). */
+export function reportSkills(r: SkillsInstallResult) {
+  for (const t of r.targets) {
+    if (t.written) ok(`Skills for ${t.apps.join(", ")}: ${t.dir}`);
+    else if (t.error) warn(`Skills not written to ${t.dir}: ${t.error}`);
+    else console.log(dim(`  - Skills not written to ${t.dir} (${t.reason})`));
+  }
+  if (r.zips.length) ok(`Skills for Claude Desktop chat (to upload): ${dirname(r.zips[0])}`);
+  else if (r.zipError) warn(`Skill zips not written: ${r.zipError}`);
+}
