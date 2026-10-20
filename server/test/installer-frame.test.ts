@@ -471,13 +471,26 @@ describe("Mac installer: choices on Installation Type", () => {
     expect(outline).toEqual(["main", ...aiApps.apps.flatMap((a: any) => [`app-${a.id}`, `app-${a.id}-missing`]), "tunnel", "summary"]);
     expect(xml).toMatch(/<choice id="main" title="Surehand MCP" [^>]*enabled="false" selected="true">\s*<pkg-ref id="com\.conformlabs\.surehand-mcp"\/>/);
     for (const a of aiApps.apps) {
-      expect(xml).toContain(`<choice id="app-${a.id}" title="Connect ${a.name}" description="Surehand connects the apps you tick. You can change this later in the Surehand panel in Adobe® After Effects®." visible="found('${a.id}')" start_selected="found('${a.id}')">`);
-      expect(xml).toMatch(new RegExp(`<choice id="app-${a.id}-missing" title="Connect ${a.name.replace("/", "\\/")} \\(not found on this Mac\\)"[^>]*visible="!found\\('${a.id}'\\)" enabled="false" selected="false"/>`));
+      const title = `Connect ${a.macName ?? a.name}`;
+      expect(xml).toContain(`<choice id="app-${a.id}" title="${title}" description="Surehand connects the apps you tick. You can change this later in the Surehand panel in Adobe® After Effects®." visible="found('${a.id}')" start_selected="found('${a.id}')">`);
+      expect(xml).toContain(`<choice id="app-${a.id}-missing" title="${title}" description="${a.name} was not found on this Mac. Install it, then run this installer again. Surehand connects the apps you tick. You can change this later in the Surehand panel in Adobe® After Effects®." visible="!found('${a.id}')" enabled="false" selected="false"/>`);
       expect(xml).toContain(`<pkg-ref id="com.conformlabs.surehand-mcp.connect.${a.id}" version="9.8.7" onConclusion="none">surehand-mcp-connect-${a.id}.pkg</pkg-ref>`);
     }
-    expect(xml).toMatch(/<choice id="tunnel" title="Set up ChatGPT on the web \(downloads cloudflared, 20 MB\)"[^>]*start_selected="false">/);
+    expect(xml).toContain(`<choice id="app-codex" title="Connect ChatGPT / Codex"`);
+    expect(xml).toContain(`<choice id="app-windsurf-missing" title="Connect Windsurf / Devin"`);
+    expect(xml).toMatch(/<choice id="tunnel" title="ChatGPT on the web \(optional\)" description="Downloads Cloudflare's cloudflared \(20 MB\) into [^"]*"[^>]*start_selected="false">/);
+    expect(xml).not.toContain("(not found on this Mac)");
     expect(xml).toMatch(/<choice id="summary" title="Summary" visible="false" enabled="false" selected="true">/);
     expect(xml).toContain('<pkg-ref id="com.conformlabs.surehand-mcp" version="9.8.7" onConclusion="none">surehand-mcp-9.8.7-component.pkg</pkg-ref>');
+  });
+
+  it("keeps every visible choice title short enough for the Custom Install list's Package Name column", async () => {
+    const { MAC_TITLE_MAX } = await import(aiAppsUrl);
+    expect(MAC_TITLE_MAX).toBeLessThanOrEqual(30);
+    const xml = await gen();
+    const titles = [...xml.matchAll(/<choice id="([^"]+)" title="([^"]*)"/g)].filter((m) => m[1] !== "summary").map((m) => m[2].replaceAll("&amp;", "&"));
+    expect(titles.length).toBe(1 + 2 * aiApps.apps.length + 1);
+    for (const t of titles) expect(t.length, t).toBeLessThanOrEqual(MAC_TITLE_MAX);
   });
 
   it("greys out the apps that aren't on this Mac (the installer script's found())", async () => {

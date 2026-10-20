@@ -1,5 +1,5 @@
 {
-  "$comment": "The AI apps Surehand MCP connects to: one list for the server (names), the Windows Setup's Choose AI apps page and the Mac Installer's Installation Type choices (installer/ai-apps.mjs), in this order. id: the server's client id (surehand-ae connect <id>). mac: where the Mac Installer looks for the app (~ is the home folder); the server's own test (server/src/cli/clients.ts clientInstalled) is what Windows uses. web: ChatGPT on the web, which needs cloudflared (optional, never ticked by default).",
+  "$comment": "The AI apps Surehand MCP connects to: one list for the server (names), the Windows Setup's Choose AI apps page and the Mac Installer's Installation Type choices (installer/ai-apps.mjs), in this order. id: the server's client id (surehand-ae connect <id>). mac: where the Mac Installer looks for the app (~ is the home folder). macName / web.macTitle: a shorter name for the Mac Installer's Custom Install list, whose Package Name column cuts titles off at about 30 characters (the description under the list says the rest); the server's own test (server/src/cli/clients.ts clientInstalled) is what Windows uses. web: ChatGPT on the web, which needs cloudflared (optional, never ticked by default).",
   "apps": [
     {
       "id": "claude-desktop",
@@ -19,6 +19,7 @@
     {
       "id": "codex",
       "name": "ChatGPT desktop / Codex",
+      "macName": "ChatGPT / Codex",
       "mac": ["~/.codex", "/Applications/ChatGPT.app", "/Applications/Codex.app", "~/Applications/ChatGPT.app", "/opt/homebrew/bin/codex", "/usr/local/bin/codex"]
     },
     {
@@ -29,6 +30,7 @@
     {
       "id": "windsurf",
       "name": "Windsurf / Devin Desktop",
+      "macName": "Windsurf / Devin",
       "mac": ["~/.codeium/windsurf", "~/.config/devin", "~/Library/Application Support/Windsurf", "/Applications/Windsurf.app", "/Applications/Devin.app", "~/Applications/Windsurf.app", "~/Applications/Devin.app"]
     },
     {
@@ -41,6 +43,7 @@
     "id": "chatgpt-web",
     "name": "ChatGPT (web)",
     "title": "Set up ChatGPT on the web",
+    "macTitle": "ChatGPT on the web (optional)",
     "default": false
   }
 }

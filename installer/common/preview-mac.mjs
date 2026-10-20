@@ -2,7 +2,7 @@
 // (620 x 440 points): Apple's window, sidebar and controls drawn approximately, with the real background image, the
 // real welcome / conclusion pages (macPage) and the Installation Type choices as installer/ai-apps.mjs generates them.
 import { join } from "node:path";
-import { loadAiApps, MAC_NOTE } from "../ai-apps.mjs";
+import { loadAiApps, macTitles, MAC_NOTE } from "../ai-apps.mjs";
 
 export function macPages({ app, version, preview, macPage }) {
   const steps = ["Introduction", "Destination Select", "Installation Type", "Installation", "Summary"];
@@ -34,14 +34,15 @@ ${buttons.map(([label, right, def]) => `<div class="btn ${def ? "def" : ""}" sty
   };
   const iframe = (page) => `data:text/html;base64,${Buffer.from(macPage(page, { version, app })).toString("base64")}`;
   const def = loadAiApps();
+  const titles = macTitles(def);
   // on the reviewer's Mac the choices would follow what is installed; the mock-up shows the design's case
   const found = { "claude-desktop": true, "claude-code": true, cursor: true, codex: false, vscode: true, windsurf: false, "lm-studio": false };
   const rows = [
     `<tr><td><span class="cb on" style="opacity:.5"></span></td><td>${app.name}</td><td class="grey">Install</td></tr>`,
     ...def.apps.map((a) => found[a.id]
-      ? `<tr><td><span class="cb on"></span></td><td>Connect ${a.name}</td><td class="grey">Install</td></tr>`
-      : `<tr class="grey"><td><span class="cb" style="opacity:.5"></span></td><td>Connect ${a.name} (not found on this Mac)</td><td>Skip</td></tr>`),
-    `<tr><td><span class="cb"></span></td><td>${def.web.title} (downloads cloudflared, 20 MB)</td><td class="grey">Skip</td></tr>`,
+      ? `<tr><td><span class="cb on"></span></td><td>${titles.apps[a.id]}</td><td class="grey">Install</td></tr>`
+      : `<tr class="grey"><td><span class="cb" style="opacity:.5"></span></td><td>${titles.apps[a.id]}</td><td>Skip</td></tr>`),
+    `<tr><td><span class="cb"></span></td><td>${titles.tunnel}</td><td class="grey">Skip</td></tr>`,
   ];
   return {
     welcome: (mode) => frame(mode, "Introduction", `<div class="main"><iframe src="${iframe("welcome")}"></iframe></div>`, [["Continue", 16, true], ["Go Back", 110]]),
