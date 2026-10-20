@@ -32,6 +32,7 @@ import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSy
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { macPage } from "../../installer/common/frame.mjs";
 
 const NODE_VERSION = "24.22.0"; // Node.js 24 LTS "Krypton"
 const NODE_SHA256 = {
@@ -271,8 +272,9 @@ rmSync(expandedComponent, { recursive: true, force: true });
 log("Building the signed product archive");
 const res = join(BUILD, "resources");
 mkdirSync(res, { recursive: true });
-for (const page of ["welcome.html", "conclusion.html"])
-  writeFileSync(join(res, page), readFileSync(join(PKG_SRC, "resources", page), "utf8").replaceAll("@VERSION@", version));
+// welcome/conclusion: this app's page bodies (resources/*.body.html) in the Conform Labs frame (installer/common);
+// the background images come from installer/common/generate-art.mjs
+for (const page of ["welcome", "conclusion"]) writeFileSync(join(res, `${page}.html`), macPage(page, { version }));
 for (const image of ["background-light.tiff", "background-dark.tiff"]) copyFileSync(join(PKG_SRC, "resources", image), join(res, image));
 const dist = join(BUILD, "distribution.xml");
 writeFileSync(dist, readFileSync(join(PKG_SRC, "distribution.xml"), "utf8").replaceAll("@VERSION@", version).replaceAll("@COMPONENT_PKG@", componentName));

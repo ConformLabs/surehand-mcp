@@ -20,7 +20,6 @@ ManifestDPIAware true
 RequestExecutionLevel user
 SetCompressor /SOLID lzma
 
-!include MUI2.nsh
 !include LogicLib.nsh
 !include x64.nsh
 !include WinVer.nsh
@@ -47,9 +46,6 @@ SetCompressor /SOLID lzma
 Name "${PRODUCT}"
 OutFile "${OUTFILE}"
 InstallDir "$LOCALAPPDATA\Programs\${PRODUCT}"
-BrandingText "${PRODUCT} ${VERSION}"
-ShowInstDetails show
-ShowUninstDetails show
 
 VIProductVersion "${VERSION4}"
 VIFileVersion "${VERSION4}"
@@ -63,7 +59,17 @@ VIAddVersionKey /LANG=1033 "Comments" "${HOMEPAGE}"
 
 !define MUI_ICON "${ICON}"
 !define MUI_UNICON "${ICON}"
-!define MUI_ABORTWARNING
+
+; --- the Conform Labs installer frame (installer/common): look, maintenance page; this app's part below ---
+!define CL_APP_NAME "${PRODUCT}"
+!define CL_APP_VERSION "${VERSION}"
+!define CL_ACCENT "3DD68C" ; installer/app.json accent.dark
+!define CL_ART "${__FILEDIR__}\art" ; node installer/common/generate-art.mjs
+!define CL_UNINST_KEY "${UNINST_KEY}"
+!define CL_UNINST_EXE "${UNINST_EXE}"
+!define CL_KEEP_NOTE "Your settings, project checkpoints and AI app connections are kept."
+!define CL_UNINSTALL_NOTE "Removes the server, the After Effects extension and its AI app connections. Your settings and project checkpoints are kept."
+!include "${__FILEDIR__}\..\..\common\conformlabs.nsh"
 
 !define MUI_WELCOMEPAGE_TITLE "Install ${PRODUCT} ${VERSION}"
 !define MUI_WELCOMEPAGE_TEXT "${PRODUCT} lets Claude and other AI apps work in Adobe After Effects on this computer.$\r$\n$\r$\nSetup installs it for your Windows account only (no administrator rights needed): a private copy of Node.js, the ${PRODUCT} server, and the After Effects extension. It then connects the AI apps it finds (Claude Desktop, Claude Code, Cursor, ChatGPT desktop / Codex).$\r$\n$\r$\nIf After Effects is open, restart it after installing.$\r$\n$\r$\nClick Install to continue."
@@ -74,12 +80,13 @@ VIAddVersionKey /LANG=1033 "Comments" "${HOMEPAGE}"
 !define MUI_FINISHPAGE_NOREBOOTSUPPORT
 !define MUI_UNCONFIRMPAGE_TEXT_TOP "${PRODUCT} will be removed: the server, the After Effects extension, its AI app connections and its private Node.js. Your settings (.surehand\ae\config.json) and project checkpoints (.surehand\ae\checkpoints) and your other files there are kept."
 
-!insertmacro MUI_PAGE_WELCOME
-!insertmacro MUI_PAGE_INSTFILES
-!insertmacro MUI_PAGE_FINISH
+!insertmacro CL_PAGE_MAINTENANCE ; Setup run again on a computer that has it: update / reinstall, or uninstall
+!insertmacro CL_PAGE_WELCOME
+!insertmacro CL_PAGE_INSTFILES
+!insertmacro CL_PAGE_FINISH
 
-!insertmacro MUI_UNPAGE_CONFIRM
-!insertmacro MUI_UNPAGE_INSTFILES
+!insertmacro CL_UNPAGE_CONFIRM
+!insertmacro CL_UNPAGE_INSTFILES
 
 !insertmacro MUI_LANGUAGE "English"
 
@@ -108,6 +115,7 @@ Function .onInit
     SetErrorLevel 3
     Abort
   ${EndIf}
+  !insertmacro CL_ONINIT ; is it installed already? (the maintenance page; a silent Setup ignores it)
 FunctionEnd
 
 Section "Install"

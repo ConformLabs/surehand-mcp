@@ -91,6 +91,10 @@ if (has("osslsigncode")) {
 const icon = join(ROOT, "brand", "Surehand.ico");
 if (!existsSync(icon)) throw new Error(`missing ${icon}`);
 
+// --- this app's artwork for the Conform Labs frame (installer/common/generate-art.mjs, committed) ---
+for (const f of ["wizard-164.bmp", "header-150.bmp"])
+  if (!existsSync(join(NSIS_DIR, "art", f))) throw new Error(`missing installer/windows/nsis/art/${f}: run node installer/common/generate-art.mjs`);
+
 // --- makensis ---
 const version = pkg.version;
 const [maj, min, pat] = version.split(/[.+-]/).map((n) => parseInt(n, 10) || 0);
@@ -110,7 +114,11 @@ const defines = {
   ESTIMATED_KB: String(estimatedKb),
 };
 if (sign) defines.SIGN_CMD = `"${process.execPath}" "${signScript}"`;
-run("makensis", ["-V2", "-INPUTCHARSET", "UTF8", ...Object.entries(defines).map(([k, v]) => `-D${k}=${v}`), join(NSIS_DIR, "surehand-mcp.nsi")]);
+// makensis on macOS aborts (std::bad_alloc) when the locale is not UTF-8, e.g. in a bare non-interactive shell
+const utf8 = /utf-?8/i.test(`${process.env.LC_ALL || process.env.LC_CTYPE || process.env.LANG || ""}`);
+run("makensis", ["-V2", "-INPUTCHARSET", "UTF8", ...Object.entries(defines).map(([k, v]) => `-D${k}=${v}`), join(NSIS_DIR, "surehand-mcp.nsi")], {
+  env: utf8 ? process.env : { ...process.env, LANG: "en_US.UTF-8", LC_ALL: "en_US.UTF-8" },
+});
 
 if (has("osslsigncode")) {
   const v = spawnSync("osslsigncode", ["verify", "-in", outFile], { encoding: "utf8" });
