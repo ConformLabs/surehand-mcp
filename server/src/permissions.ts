@@ -49,6 +49,22 @@ export const SHELL_REFUSAL =
   "Shell commands (system.callSystem) are disabled in the Surehand MCP permissions. The user can allow them in the " +
   "Surehand panel in After Effects: \u2630 menu \u203a Shell commands in scripts \u203a Allowed (or \"allowShell\": true in ~/.surehand/ae/config.json).";
 
+/** Where After Effects' own setting is, on Mac and Windows. */
+export const WRITE_ACCESS_WHERE =
+  "After Effects > Settings > Scripting & Expressions (Windows: Edit > Preferences > Scripting & Expressions)";
+
+/**
+ * Added to a call that failed with After Effects' "Permission denied" while "Allow Scripts to Write Files and
+ * Access Network" is off: off, scripts can't run shell commands (system.callSystem) or use the network.
+ * (Reading and writing files still works from scripts sent through the Surehand bridge: checked in AE 26.5.)
+ */
+export const WRITE_ACCESS_HINT =
+  "Note: 'Allow Scripts to Write Files and Access Network' is off in After Effects, so scripts can't run shell commands " +
+  `(system.callSystem) or use the network. If the script needs that, ask the user to turn it on in ${WRITE_ACCESS_WHERE}.`;
+
+/** The error After Effects gives a shell command (and, presumably, a network call) while the setting is off. */
+export const isWriteAccessError = (message: string) => /Permission denied|Allow Scripts to Write Files and Access Network/i.test(message);
+
 /**
  * What the approval prompt in After Effects shows for a tool call: the script, or the call's
  * arguments. Sent in full: the bridge checks all of it for risks, and shortens only what is shown

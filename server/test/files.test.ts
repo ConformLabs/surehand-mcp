@@ -106,6 +106,13 @@ describe("ae_export_frames (ExtendScript)", () => {
     expect(ae.saved).toEqual([]);
     expect(run([{ frames: [3], outputPath: "/out/b.png" }], true).ok).toBe(true);
   });
+  it('works with "Allow Scripts to Write Files and Access Network" off: new folders and replaced files too (as in AE 26.5 through CEP)', () => {
+    const ae = fakeKeysAE({ layers: [{ name: "a" }], files: ["/out/b.png"], dirs: ["/out"], writeAccess: false });
+    expect(ae.app.preferences.getPrefAsLong("Main Pref Section", "Pref_SCRIPTING_FILE_NETWORK_SECURITY")).toBe(0);
+    const r = ae.run(EXPORT_FRAMES_JSX, { exports: [{ frames: [0], outputPath: "/out/b.png" }, { frames: [1], outputPath: "/new/c.png" }], overwrite: true });
+    expect(r.ok, JSON.stringify(r.error)).toBe(true);
+    expect(ae.saved.map((s) => s.path)).toEqual(["/out/b.png", "/new/c.png"]);
+  });
 });
 
 describe("ae_export_frames (handler)", () => {

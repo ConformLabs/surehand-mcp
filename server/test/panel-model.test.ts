@@ -280,6 +280,20 @@ describe("Conform Labs style: status words, glyphs and texts", () => {
     expect(UI.refusal("Layer not found")).toBeNull();
   });
 
+  it('"Allow Scripts to Write Files and Access Network": a Test row only (Surehand\'s tools need neither shell nor network), with where it is', () => {
+    expect(UI.writeAccessCheck(null, "darwin")).toBeNull(); // not known: no row
+    expect(UI.writeAccessCheck(true, "darwin")).toEqual({ ok: true, name: "scripting-prefs", message: "Scripts may run shell commands and use the network" });
+    // off is not a problem for Surehand: a passed row that says what it means
+    expect(UI.writeAccessCheck(false, "darwin")).toEqual({
+      ok: true, name: "scripting-prefs",
+      message: "Off: scripts can’t run shell commands or use the network (Surehand’s tools don’t need either). " +
+        "To allow it, turn on Allow Scripts to Write Files and Access Network in After Effects › Settings › Scripting & Expressions.",
+    });
+    expect(UI.writeAccessCheck(false, "win32").message).toMatch(/in Edit › Preferences › Scripting & Expressions\.$/);
+    // no standing notice: the panel's working row is only for what the AI is doing
+    expect(UI.writeAccessView).toBeUndefined();
+  });
+
   it("the header's status square: verified, amber while waiting or paused, dotted with no AI app, crossed for a broken setting", () => {
     expect(UI.statusFor({ apps: ["Claude Desktop"] }).glyph).toBe("verified");
     expect(UI.statusFor({ pendingCount: 2 }).glyph).toBe("waiting");

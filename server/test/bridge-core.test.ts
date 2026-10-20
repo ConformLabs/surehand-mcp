@@ -673,3 +673,60 @@ describe("config.json in the bridge: torn reads never reset it", () => {
     }
   });
 });
+
+// "Allow Scripts to Write Files and Access Network": ae_status reports it and says what it means (off: no shell
+// commands or network from scripts; Surehand's tools don't need either).
+describe("Allow Scripts to Write Files and Access Network", () => {
+  const ae = {
+    on: false,
+    evalScript(script: string, cb: (r: string) => void) {
+      let r = "result:" + script;
+      // ae_status' own script (the helper library reads the preference)
+      if (script.includes("canWriteFiles: aemcp.canWriteFiles()"))
+        r = JSON.stringify({ ok: true, result: { appVersion: "26.5", os: "Macintosh OS 26.0", canWriteFiles: ae.on }, logs: [] });
+      setTimeout(() => cb(r), 5);
+    },
+  };
+  let bridge: any;
+  beforeAll(async () => {
+    writeFileSync(join(home, ".aemcp", "config.json"), JSON.stringify({ token, bridgePort: basePort, httpPort: basePort + 1 }));
+    bridge = loadBridge("26.5", 20, (s, cb) => ae.evalScript(s, cb));
+    bridge.start();
+    await waitFor(() => bridge.state.listening);
+  });
+  afterAll(() => bridge?.state.server.close());
+
+  it("ae_status reports it, and what it means while it is off", async () => {
+    process.env.AEMCP_CONFIG = join(home, ".aemcp", "config.json");
+    process.env.AEMCP_NO_UPDATE_CHECK = "1";
+    const prevPort = process.env.SUREHAND_AE_BRIDGE_PORT;
+    process.env.SUREHAND_AE_BRIDGE_PORT = String(bridge.state.port); // this bridge, no discovery
+    try {
+      const { registerCoreTools, WRITE_ACCESS_STATUS } = await import("../src/tools/core.js");
+      let handler: any;
+      registerCoreTools({ registerTool: (name: string, _def: unknown, h: unknown) => void (name === "ae_status" && (handler = h)) } as any);
+      const status = async () => {
+        const r = await handler({});
+        return { isError: !!r.isError, text: r.content.map((c: any) => c.text).join("\n") };
+      };
+      ae.on = false;
+      const off = await status();
+      expect(off.isError).toBe(false);
+      expect(off.text).toMatch(/"canWriteFiles":false/);
+      expect(off.text).toContain(WRITE_ACCESS_STATUS);
+      expect(WRITE_ACCESS_STATUS).toBe(
+        "Note: 'Allow Scripts to Write Files and Access Network' is OFF in After Effects. Surehand's tools don't need it, and scripts can still " +
+          "read and write files, but they can't run shell commands (system.callSystem fails with \"Permission denied\") or use the network. " +
+          "If a script needs that, ask the user to turn it on: After Effects > Settings > Scripting & Expressions (Windows: Edit > Preferences > Scripting & Expressions).",
+      );
+      ae.on = true;
+      const on = await status();
+      expect(on.text).toMatch(/"canWriteFiles":true/);
+      expect(on.text).not.toContain("Allow Scripts to Write Files");
+    } finally {
+      if (prevPort === undefined) delete process.env.SUREHAND_AE_BRIDGE_PORT;
+      else process.env.SUREHAND_AE_BRIDGE_PORT = prevPort;
+      delete process.env.AEMCP_NO_UPDATE_CHECK;
+    }
+  });
+});

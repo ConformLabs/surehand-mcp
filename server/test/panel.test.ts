@@ -433,6 +433,23 @@ describe("Surehand panel: ☰ menu", () => {
     $("back").click();
   });
 
+  it('Test: "Allow Scripts to Write Files and Access Network" off is a passed "Shell and network" row, no standing notice', async () => {
+    const msg = "'Allow Scripts to Write Files and Access Network' is off: scripts can't run shell commands or use the network (Surehand's tools don't need either). " +
+      "If a script needs that, turn it on in After Effects > Settings > Scripting & Expressions (Windows: Edit > Preferences > Scripting & Expressions).";
+    cliAnswer = (cmd) => (cmd === "test --json" ? { checks: [{ ok: true, name: "bridge", message: "Bridge running" }, { ok: true, name: "scripting-prefs", message: msg }] } : undefined);
+    try {
+      panel().menu("test");
+      await waitFor(() => /2 of 2 checks passed/.test($("screenBody").textContent));
+      const row = [...doc().querySelectorAll("#screenBody .check")].find((c: any) => /Shell and network/.test(c.textContent)) as any;
+      expect(row.className).toBe("check");
+      expect(row.textContent).toMatch(/^Shell and network · 'Allow Scripts to Write Files and Access Network' is off: scripts can't run shell commands/);
+      expect($("working").hidden).toBe(true);
+      $("back").click();
+    } finally {
+      cliAnswer = null;
+    }
+  });
+
   it("Activity history: search and filters", async () => {
     panel().menu("history");
     const rows = () => [...doc().querySelectorAll("#screenBody .hrow .htitle")].map((t: any) => t.textContent);

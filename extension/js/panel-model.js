@@ -335,6 +335,24 @@
     return { text: "Working \u00b7 " + toolName(h.busyWith), time: secsText(h.busyForMs), line: "", waiting: false };
   }
 
+  // ---------- "Allow Scripts to Write Files and Access Network" ----------
+  /** Where the setting is: "After Effects › Settings › Scripting & Expressions" (Windows: Edit › Preferences). */
+  function writeAccessWhere(platform) {
+    return platform === "win32" ? "Edit \u203a Preferences \u203a Scripting & Expressions" : "After Effects \u203a Settings \u203a Scripting & Expressions";
+  }
+  /**
+   * The Test screen's row for the setting (canWrite: true / false), or null when it isn't known. Off, scripts can't
+   * run shell commands or use the network; Surehand's own tools need neither, so it is a passed row that says so
+   * (no standing notice in the panel).
+   */
+  function writeAccessCheck(canWrite, platform) {
+    if (canWrite === true) return { ok: true, name: "scripting-prefs", message: "Scripts may run shell commands and use the network" };
+    if (canWrite === false) return { ok: true, name: "scripting-prefs",
+      message: "Off: scripts can\u2019t run shell commands or use the network (Surehand\u2019s tools don\u2019t need either). " +
+        "To allow it, turn on Allow Scripts to Write Files and Access Network in " + writeAccessWhere(platform) + "." };
+    return null;
+  }
+
   // ---------- background renders ----------
   function renderIdOf(e) {
     var m = /job (r[0-9a-z]+)/.exec(String(e.summary || ""));
@@ -483,7 +501,7 @@
 
   var api = {
     layoutFor: layoutFor, MODES: MODES, connectedApps: connectedApps, appsText: appsText, connectedClientsText: connectedClientsText, modeOf: modeOf, clientName: clientName, lastClient: lastClient, statusFor: statusFor,
-    toolName: toolName, describeEntry: describeEntry, statusOf: statusOf, changeParts: changeParts, refusal: refusal, readableError: readableError, workingView: workingView, entryDetails: entryDetails, feedItems: feedItems, entryKey: entryKey, canUndo: canUndo,
+    toolName: toolName, describeEntry: describeEntry, statusOf: statusOf, changeParts: changeParts, refusal: refusal, readableError: readableError, workingView: workingView, writeAccessCheck: writeAccessCheck, writeAccessWhere: writeAccessWhere, entryDetails: entryDetails, feedItems: feedItems, entryKey: entryKey, canUndo: canUndo,
     renderIdOf: renderIdOf, renderStartInfo: renderStartInfo, renderProgress: renderProgress, timeLeft: timeLeft,
     riskChips: riskChips, approvalView: approvalView, countdown: countdown, countdownView: countdownView, previewView: previewView,
     hhmm: hhmm, dayLabel: dayLabel, whenLabel: whenLabel, parseCliJson: parseCliJson, cmpVersions: cmpVersions, aeLabel: aeLabel,

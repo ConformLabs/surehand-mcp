@@ -9,7 +9,7 @@ import { checkForUpdate, updateMessage } from "../update.js";
 import { VERSION } from "../config.js";
 import { codeExcerpt, ensureHelpers, errorHint, evalBody, formatChanges, rollbackProblem, runJsx, type RunOptions, type RunResult } from "../jsx.js";
 import { reservedGlobalsHint, transpileUserCode, withoutComments } from "../transpile.js";
-import { approvalSummary, permissions, READ_ONLY_REFUSAL, scriptFileApproval, SHELL_REFUSAL, usesShell } from "../permissions.js";
+import { approvalSummary, permissions, READ_ONLY_REFUSAL, scriptFileApproval, SHELL_REFUSAL, usesShell, WRITE_ACCESS_WHERE } from "../permissions.js";
 import { compRef, errorResult, formatResult, layerRef, reportScope } from "./registry.js";
 import { appFile } from "../paths.js";
 
@@ -319,6 +319,12 @@ export async function runReadOnly(code: string, timeoutMs = 120_000): Promise<{ 
   return { refusal: readOnlyRefusal(r), r };
 }
 
+/** What ae_status adds while "Allow Scripts to Write Files and Access Network" is off. */
+export const WRITE_ACCESS_STATUS =
+  "Note: 'Allow Scripts to Write Files and Access Network' is OFF in After Effects. Surehand's tools don't need it, and scripts can still " +
+  "read and write files, but they can't run shell commands (system.callSystem fails with \"Permission denied\") or use the network. " +
+  `If a script needs that, ask the user to turn it on: ${WRITE_ACCESS_WHERE}.`;
+
 export function registerCoreTools(server: McpServer) {
   server.registerTool(
     "ae_run_script",
@@ -461,7 +467,7 @@ export function registerCoreTools(server: McpServer) {
         const statusScript =
           "return { appVersion: app.version, buildName: app.buildName, language: String(app.isoLanguage), os: $.os, extendScriptVersion: $.version, " +
           "memoryInUse: app.memoryInUse, isRenderEngine: app.isRenderEngine, project: aemcp.projectInfo(), " +
-          "canWriteFiles: (function(){ try { return app.preferences.getPrefAsLong('Main Pref Section', 'Pref_SCRIPTING_FILE_NETWORK_SECURITY') === 1; } catch (e) { return null; } })() };";
+          "canWriteFiles: aemcp.canWriteFiles() };";
         let r;
         for (;;) {
           try {
@@ -498,14 +504,7 @@ export function registerCoreTools(server: McpServer) {
               `${perm.allowShell ? "" : "; shell commands disabled"}.`,
           );
         out.content.unshift({ type: "text", text: head.join("\n") });
-        if (r.ok && (r.result as any)?.canWriteFiles === false)
-          out.content.push({
-            type: "text",
-            text:
-              "Note: 'Allow Scripts to Write Files and Access Network' is OFF in After Effects. Frame previews and the built-in tools still work, " +
-              "but your own scripts can't write files (File.write, exporting data) or use the network. If you need that, ask the user to enable it: " +
-              "After Effects > Settings > Scripting & Expressions (Windows: Edit > Preferences > Scripting & Expressions).",
-          });
+        if (r.ok && (r.result as any)?.canWriteFiles === false) out.content.push({ type: "text", text: WRITE_ACCESS_STATUS });
         const upd = updateMessage(await checkForUpdate());
         if (upd) out.content.push({ type: "text", text: `${upd}\nTell the user about this update.` });
         if (lastSetup?.extensionUpdated || (h.version && h.version !== VERSION))

@@ -48,10 +48,11 @@ export interface Fake {
  * revision: false = an AE without app.project.revision; undoWorks: false = Edit > Undo does nothing;
  * otherComp: a second comp; bigComp: the layer has more properties than a snapshot reads (partial);
  * mask: the layer has one mask; renameFails: renaming a folder silently keeps its name; throwAfterUndo: the first look at the project's
- * items after Edit > Undo throws (once).
+ * items after Edit > Undo throws (once); writeAccess: "Allow Scripts to Write Files and Access Network" (fakeWriteAccess;
+ * default: app has no preferences, so the setting can't be told).
  */
 export function fakeAE(
-  opts: { revision?: boolean; undoWorks?: boolean; otherComp?: boolean; bigComp?: boolean; mask?: boolean; renameFails?: boolean; throwAfterUndo?: boolean } = {},
+  opts: { revision?: boolean; undoWorks?: boolean; otherComp?: boolean; bigComp?: boolean; mask?: boolean; renameFails?: boolean; throwAfterUndo?: boolean; writeAccess?: boolean | "unreadable" } = {},
 ): Fake {
   const reads = { n: 0 };
   const undos = { n: 0 };
@@ -159,7 +160,7 @@ export function fakeAE(
   const same = (a: State, b: State) => JSON.stringify(a) === JSON.stringify(b);
   const stack: { name: string; before: State; moved: boolean }[] = [];
   let group: { name: string; before: State; rev: number } | null = null;
-  const app = {
+  const app: any = {
     project,
     beginSuppressDialogs() {},
     endSuppressDialogs() {},
@@ -181,6 +182,7 @@ export function fakeAE(
       if (step.moved) revision++;
     },
   };
+  if (opts.writeAccess !== undefined) app.preferences = fakeWriteAccess(opts.writeAccess).preferences;
   function edit(f: () => void) {
     const before = state(), rev = revision;
     f();
@@ -191,9 +193,31 @@ export function fakeAE(
   return { app, comp, layer, opacity, mask, other, reads, edit, undoStack: () => stack.map((s) => s.name), undos, folders: () => folders.map((f) => f.name) };
 }
 
+/**
+ * After Effects' "Allow Scripts to Write Files and Access Network" (Settings > Scripting & Expressions): on, off,
+ * or "unreadable" (the preference can't be read). As measured in AE 26.5 through the CEP bridge: off, scripts can
+ * still read and write files (so File and Folder are not modelled here), but system.callSystem throws.
+ * `preferences` goes on app; `system` is the ExtendScript global.
+ */
+export function fakeWriteAccess(state: boolean | "unreadable") {
+  const preferences = {
+    getPrefAsLong(section: string, key: string) {
+      if (state !== "unreadable" && section === "Main Pref Section" && key === "Pref_SCRIPTING_FILE_NETWORK_SECURITY") return state ? 1 : 0;
+      throw new Error(`After Effects error: preference "${key}" in section "${section}" could not be found`);
+    },
+  };
+  const system = {
+    callSystem(cmd: string) {
+      if (state !== true) throw new Error("Permission denied (is Preferences > Scripting & Expressions > Allow Scripts to Write Files and Access Network enabled?)");
+      return cmd.replace(/^echo /, "") + "\n";
+    },
+  };
+  return { preferences, system };
+}
+
 /** The real helper library (aemcp.jsxinc), loaded into the fake After Effects. */
-export function loadHelpers(f: Fake): any {
-  const globals = { CompItem, FolderItem, FootageItem, SolidSource, PlaceholderSource, AVLayer, PropertyType, PropertyValueType, BlendingMode, TrackMatteType, MaskMode, MaskFeatherFalloff, MaskMotionBlur };
+export function loadHelpers(f: Fake, extra: Record<string, unknown> = {}): any {
+  const globals = { ...extra, CompItem, FolderItem, FootageItem, SolidSource, PlaceholderSource, AVLayer, PropertyType, PropertyValueType, BlendingMode, TrackMatteType, MaskMode, MaskFeatherFalloff, MaskMotionBlur };
   const names = Object.keys(globals);
   const $ = { global: { ...globals } };
   return new Function("$", "app", ...names, "var aemcp;\n" + helperSource + "\nreturn aemcp;")($, f.app, ...names.map((n) => (globals as any)[n]));

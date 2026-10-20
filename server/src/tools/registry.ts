@@ -4,7 +4,7 @@ import { z } from "zod";
 import { BridgeError } from "../bridge.js";
 import { loadConfig } from "../config.js";
 import { formatChanges, runJsx, type RunResult } from "../jsx.js";
-import { approvalSummary, permissions, READ_ONLY_REFUSAL } from "../permissions.js";
+import { approvalSummary, isWriteAccessError, permissions, READ_ONLY_REFUSAL, WRITE_ACCESS_HINT } from "../permissions.js";
 
 export interface JsxTool {
   name: string;
@@ -71,7 +71,9 @@ export function formatResult(r: RunResult, opts: { quietNoChanges?: boolean } = 
     const where = e.line && !e.user ? ` (line ${e.line})` : "";
     const changes = formatChanges(r.changes);
     const changed = changes && changes !== "Changes: none" ? `\n\nThe call failed, but these changes were already made (one undo step reverts them):\n${changes}` : "";
-    return { isError: true, content: [{ type: "text", text: `${e.name && !e.user ? e.name + ": " : ""}${e.message}${where}${logs}${changed}` }] };
+    // "Permission denied" while "Allow Scripts to Write Files and Access Network" is off: say where to turn it on
+    const access = r.writeAccess === false && isWriteAccessError(e.message) ? `\n\n${WRITE_ACCESS_HINT}` : "";
+    return { isError: true, content: [{ type: "text", text: `${e.name && !e.user ? e.name + ": " : ""}${e.message}${where}${logs}${changed}${access}` }] };
   }
   // compact JSON: indentation can cost a third of the tokens of a result
   const text = r.result === undefined || r.result === null ? "OK (no return value)" : typeof r.result === "string" ? r.result : JSON.stringify(r.result);

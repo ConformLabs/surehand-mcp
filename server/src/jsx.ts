@@ -86,6 +86,8 @@ export interface RunResult {
   rollback?: Rollback;
   logs: string[];
   error?: { message: string; name?: string; line?: number; user?: boolean };
+  /** false: the call failed while "Allow Scripts to Write Files and Access Network" is off (formatResult may say so) */
+  writeAccess?: false;
 }
 
 /** JSON.stringify that is also a valid ES3 literal (U+2028/2029 are illegal in ES3 strings). */

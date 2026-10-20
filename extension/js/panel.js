@@ -1305,14 +1305,19 @@
       checks.push({ ok: !!readJson(P().config), name: readJson(P().config) ? "Settings file found" : "Settings file missing" });
       var rt = runtime();
       checks.push({ ok: !!rt, name: rt ? "Server " + (rt.version || "") + " installed" : "Server not installed with the installer" });
-      evalAE("'After Effects ' + app.version", "panel test", function (e2, r) {
-        checks.push({ ok: !e2, name: e2 ? "Scripts don\u2019t run: " + e2.message : "Scripts run (" + r + ")" });
+      var script = "(function(){var w='?';try{w=app.preferences.getPrefAsLong('Main Pref Section','Pref_SCRIPTING_FILE_NETWORK_SECURITY');}catch(e){}" +
+        "return 'After Effects '+app.version+'|'+w;})()";
+      evalAE(script, "panel test", function (e2, r) {
+        var parts = String(r).split("|");
+        checks.push({ ok: !e2, name: e2 ? "Scripts don\u2019t run: " + e2.message : "Scripts run (" + parts[0] + ")" });
+        var write = !e2 && UI.writeAccessCheck(parts[1] === "1" ? true : parts[1] === "0" ? false : null, process.platform);
+        if (write) checks.push(write);
         cb(checks);
       });
     });
   }
   var CHECK_NAMES = { update: "Updates", config: "Settings file", extension: "After Effects extension", signature: "Extension signature",
-    bridge: "Bridge", extendscript: "Scripting", node: "Node.js", server: "Server", ffmpeg: "ffmpeg", migration: "Move from 1.3" };
+    bridge: "Bridge", extendscript: "Scripting", "scripting-prefs": "Shell and network", node: "Node.js", server: "Server", ffmpeg: "ffmpeg", migration: "Move from 1.3" };
   function tilde(t) { var h = os.homedir(); return h ? String(t).split(h).join("~") : String(t); }
   function showChecks(body, checks, again, note) {
     again.disabled = false;
