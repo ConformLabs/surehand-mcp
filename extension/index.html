@@ -16,6 +16,7 @@
       </div>
       <button id="pause" class="btn labeled" type="button" aria-label="Pause AI" title="Pause AI: its calls are refused until you resume"><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><rect x="1.5" y="1" width="2.4" height="8" fill="currentColor"></rect><rect x="6.1" y="1" width="2.4" height="8" fill="currentColor"></rect></svg><span class="lbl">Pause</span></button>
       <button id="resume" class="btn main" type="button" hidden>Resume</button>
+      <button id="chatBtn" class="btn icon" type="button" aria-label="Chat with your AI app" title="Chat with your AI app"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M1.5 2.5h9v6h-5l-2.5 2v-2h-1.5z"></path></svg></button>
       <button id="menuBtn" class="btn icon" type="button" aria-label="Menu" title="Menu: connect apps, checkpoints, history, settings" aria-haspopup="dialog"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2 3h8M2 6h8M2 9h8"></path></svg></button>
     </header>
 
@@ -64,7 +65,7 @@
 <div id="screen" class="screen" role="dialog" aria-modal="true" aria-labelledby="screenTitle" hidden>
   <div class="screen-head">
     <button id="back" class="btn icon" type="button" aria-label="Back"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M6.5 1.5 3 5l3.5 3.5"></path></svg></button>
-    <span id="screenTitle" class="screen-title"></span>
+    <div class="who"><span id="screenTitle" class="screen-title"></span><div id="screenStatus" class="status" hidden><span id="screenStatusGlyph" class="g g-sm g-pending" aria-hidden="true"></span><span id="screenStatusText"></span></div></div>
     <span id="screenAction"></span>
   </div>
   <div id="screenBody" class="screen-body"></div>
