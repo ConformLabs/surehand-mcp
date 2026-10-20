@@ -61,6 +61,24 @@ describe("Windows installer: pages", () => {
   });
 });
 
+describe("Windows installer: starts quickly, once", () => {
+  it("no CRC pass over the whole file before the first page (the release is Authenticode-signed)", () => {
+    expect(nsi).toMatch(/Authenticode-signed[\s\S]*\nCRCCheck off\n/);
+  });
+
+  it("a second Setup brings the first to the front and quits (a named mutex, first thing in .onInit)", () => {
+    const init = fn(nsi, ".onInit");
+    expect(init.trim().split("\n")[0]).toMatch(/^!insertmacro CL_SINGLE_INSTANCE/);
+    const guard = macro(nsh, "CL_SINGLE_INSTANCE");
+    expect(guard).toMatch(/CreateMutexW\(p 0, i 0, w "Local\\\$\{CL_MUTEX\}"\) p\.r0 \?e'\s*\n\s*Pop \$1[^\n]*\n\s*\$\{If\} \$1 = 183/);
+    expect(guard).toMatch(/FindWindow \$0 "#32770" "\$\{CL_APP_NAME\} setup"[\s\S]*SetForegroundWindow[\s\S]*SetErrorLevel 5\s*\n\s*Abort/);
+    // the title it looks for is Setup's own
+    expect(nsh).toContain('Caption "${CL_APP_NAME} setup"');
+    // nothing slow before the window: no programs run, no Node.js or server unpacked
+    for (const f of [init, macro(nsh, "CL_ONINIT"), fn(nsh, "cl.DetectInstalled")]) expect(f).not.toMatch(/nsExec|ExtractRuntime|DetectApps|IsRunning/);
+  });
+});
+
 describe("Windows installer: Choose AI apps (one list with the Mac Installer)", () => {
   it("is generated from installer/ai-apps.json", async () => {
     const { nsisApps } = await import(aiAppsUrl);
@@ -95,15 +113,25 @@ describe("Windows installer: Choose AI apps (one list with the Mac Installer)", 
     expect(fn(nsi, "ExtractRuntime")).toMatch(/StrCpy \$RtNode "\$\{NODE_DIR\}\\node\.exe"\s*\n\s*\$\{IfNot\} \$\{FileExists\} "\$RtNode"/);
   });
 
-  it("every label on the page is coloured and the section labels are mono; four missing apps and cloudflared fit 140u", () => {
+  it("every label on the page is coloured and the section labels are mono; the apps missing, in two columns, and cloudflared fit 140u", () => {
     const rows = fn(nsh, "cl.CheckRow");
     for (const m of rows.matchAll(/\$\{NSD_CreateLabel\}[^\n]*\n\s*Pop \$0\n([^\n]*)/g)) expect(m[1]).toMatch(/SetCtlColors \$0|\$\{If\}/);
     expect(macro(nsh, "CL_SECTION_LABEL")).toMatch(/SetCtlColors \$0 "\$\{CL_MUTED\}" "\$\{CL_PAPER\}"\s*\n\s*SendMessage \$0 \$\{WM_SETFONT\} \$cl\.FontLabel 0/);
-    // 11u, four rows of 23u, 4u, the label, 10u, a 23u row: the last note ends by 140u
-    expect(rows).toMatch(/StrCpy \$R6 15[\s\S]*IntOp \$1 \$R0 \+ 13\s*\n\s*\$\{NSD_CreateLabel\} 13u \$1u 280u 9u "\$R2"[\s\S]*StrCpy \$R6 23/);
+    // a row at $R7, $R8 wide: the hairline, the box, the labels 13u in and 20u narrower
+    expect(rows).toMatch(/\$\{NSD_CreateLabel\} \$R7u \$R0u \$R8u 1u ""[\s\S]*\$\{NSD_CreateCheckbox\} \$R7u \$1u 8u 10u "\$R1"[\s\S]*IntOp \$2 \$R7 \+ 13[^\n]*\n\s*IntOp \$3 \$R8 - 20/);
+    expect(rows).toMatch(/StrCpy \$R6 15[\s\S]*IntOp \$1 \$R0 \+ 13\s*\n\s*\$\{NSD_CreateLabel\} \$2u \$1u \$3u 9u "\$R2"[\s\S]*StrCpy \$R6 23/);
+    // the apps in two columns of 146u (odd N left, even N right), a pair as tall as its taller cell
+    const row = macro(nsi, "_APP_ROW");
+    expect(row).toMatch(/!define \/redef \/math _APP_COL \$\{N\} % 2\s*\n\s*!if \$\{_APP_COL\} == 1\s*\n\s*StrCpy \$R7 0\s*\n\s*!else\s*\n\s*StrCpy \$R7 154\s*\n\s*!endif\s*\n\s*StrCpy \$R8 146/);
+    expect(row).toMatch(/\$\{IfThen\} \$R6 > \$R9 \$\{\|\} StrCpy \$R9 \$R6 \$\{\|\}\s*\n\s*IntOp \$R0 \$R0 \+ \$R9/);
+    expect(154 + 146).toBe(300);
     const appsRows = fn(nsi, "AppsRows");
-    expect(appsRows).toMatch(/StrCpy \$R0 11[\s\S]*IntOp \$R0 \$R0 \+ 4[\s\S]*"OPTIONAL"\s*\n\s*IntOp \$R0 \$R0 \+ 10/);
-    expect(11 + 4 * 23 + 4 + 10 + 13 + 9).toBeLessThanOrEqual(140);
+    expect(appsRows).toMatch(/StrCpy \$R0 11[\s\S]*IntOp \$R0 \$R0 \+ \$R9[^\n]*\n\s*IntOp \$R0 \$R0 \+ 4[\s\S]*"OPTIONAL"\s*\n\s*IntOp \$R0 \$R0 \+ 10[\s\S]*StrCpy \$R7 0[^\n]*\n\s*StrCpy \$R8 300\s*\n\s*Call cl\.CheckRow/);
+    // 11u, the pairs of 23u, 4u, the label, 10u, a 23u row: the last note ends by 140u
+    const pairs = Math.ceil(aiApps.apps.length / 2);
+    expect(11 + pairs * 23 + 4 + 10 + 13 + 9).toBeLessThanOrEqual(140);
+    // a cell's note is one short line (126u is about 220 px at 100 %)
+    expect(row).toMatch(/StrCpy \$R2 "Not found on this PC"/);
   });
 
   it("the accent button follows the Next button's own WS_VISIBLE (on the first page the window is not shown yet)", () => {
@@ -121,7 +149,7 @@ describe("Windows installer: Choose AI apps (one list with the Mac Installer)", 
 
   it("ticks what was found (the current connections when updating); a not-found app's box alone is disabled", () => {
     const row = macro(nsi, "_APP_ROW");
-    expect(row).toMatch(/StrCpy \$R2 "Not found on this PC\. Install it, then run Setup again\."\s*\n\s*StrCpy \$R3 0/);
+    expect(row).toMatch(/StrCpy \$R2 "Not found on this PC"\s*\n\s*StrCpy \$R3 0/);
     expect(row).toMatch(/\$\{If\} \$cl\.Installed == 1\s*\n\s*StrCpy \$App\$\{N\}\.Chosen \$2\s*\n\s*\$\{Else\}\s*\n\s*StrCpy \$App\$\{N\}\.Chosen \$1/);
     const check = fn(nsh, "cl.CheckRow");
     // disabled: the box only; the name stays an enabled (muted) label

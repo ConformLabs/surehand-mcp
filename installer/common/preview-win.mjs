@@ -53,10 +53,11 @@ img.p{position:absolute;image-rendering:pixelated}`;
   const inner = (x, y, w, h, body, cls = "") => `<div class="a ${cls}" style="${px(15 + x, 44 + y, w, h)}">${body}</div>`;
   const sidebar = `<img class="p" src="${bmp("wizard-191.bmp")}" style="left:0;top:0;width:191px;height:362px"><div class="a mono muted" style="${px(12, 178, 90, 9)}">${esc(version)}</div>`;
   const page = (body, buttons) => ({ w: W, h: H + BAR, page: `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${css}</style></head><body><div class="win">${titleBar}<div class="c">${body}${footer(buttons)}</div></div></body></html>` });
-  const rule = (y) => inner(0, y, 300, 1, "", "rule");
-  const checkRow = (y, title, note, on, enabled = true) =>
-    rule(y) + `<div class="box ${on ? "on" : ""} ${enabled ? "" : "off"}" style="left:${Math.round(15 * UX)}px;top:${Math.round((44 + y + 4) * UY) + 3}px"></div>` +
-    inner(13, y + 4, 280, 10, esc(title), enabled ? "strong" : "muted") + (note ? inner(13, y + 13, 280, 9, esc(note), "muted") : "");
+  const rule = (y, x = 0, w = 300) => inner(x, y, w, 1, "", "rule");
+  // conformlabs.nsh cl.CheckRow: across the page (x 0, w 300) or one of two cells (x 0 / 154, w 146)
+  const checkRow = (y, title, note, on, enabled = true, x = 0, w = 300) =>
+    rule(y, x, w) + `<div class="box ${on ? "on" : ""} ${enabled ? "" : "off"}" style="left:${Math.round((15 + x) * UX)}px;top:${Math.round((44 + y + 4) * UY) + 3}px"></div>` +
+    inner(x + 13, y + 4, w - 20, 10, esc(title), enabled ? "strong" : "muted") + (note ? inner(x + 13, y + 13, w - 20, 9, esc(note), "muted") : "");
   // the bitmaps have a 1 px margin of their background
   const glyph = (kind, bg, x, y) => `<img class="p" src="${bmp(`glyph-${kind}-${bg}-9.bmp`)}" style="left:${Math.round(x * UX) - 1}px;top:${Math.round(y * UY) - 1}px;width:11px;height:11px">`;
 
@@ -70,11 +71,17 @@ img.p{position:absolute;image-rendering:pixelated}`;
       `<div class="a muted" style="${px(124, 116, 196, 10)}">Next, you choose which AI apps to connect.</div>`,
     [["Back", 164, "off"], ["Next", 214, "main"], ["Cancel", 273]],
   );
-  let y = 11, rows = "";
-  for (const [name, found] of [["Claude Desktop", true], ["Claude Code", true], ["Cursor", true], ["ChatGPT desktop / Codex", false]]) {
-    rows += checkRow(y, name, found ? "" : "Not found on this PC. Install it, then run Setup again.", found, found);
-    y += found ? 15 : 23;
-  }
+  // surehand-mcp.nsi AppsRows: two columns, in the list's order across; a pair is as tall as its taller cell
+  let y = 11, rows = "", pair = 0;
+  const apps = [["Claude Desktop", true], ["Claude Code", true], ["Cursor", true], ["ChatGPT desktop / Codex", false], ["VS Code", true], ["Windsurf / Devin Desktop", false], ["LM Studio", false]];
+  apps.forEach(([name, found], i) => {
+    rows += checkRow(y, name, found ? "" : "Not found on this PC", found, found, i % 2 ? 154 : 0, 146);
+    pair = Math.max(pair, found ? 15 : 23);
+    if (i % 2 || i === apps.length - 1) {
+      y += pair;
+      pair = 0;
+    }
+  });
   y += 4;
   rows += inner(0, y, 300, 9, "OPTIONAL", "lab muted");
   y += 10;

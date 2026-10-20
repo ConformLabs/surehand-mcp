@@ -1,4 +1,5 @@
-// The AI apps Surehand MCP connects to: Claude Desktop, Claude Code, ChatGPT desktop / Codex and Cursor.
+// The AI apps Surehand MCP connects to: Claude Desktop, Claude Code, ChatGPT desktop / Codex, Cursor, VS Code
+// (GitHub Copilot), Windsurf / Devin Desktop and LM Studio.
 // Used by `install` / `uninstall`, by the commands behind the panel's Connect screen (`clients`, `connect`,
 // `disconnect`), and after moving a 1.3 installation (settings that still name ~/.aemcp are pointed at
 // the new place).
@@ -12,15 +13,16 @@ import { readJsonFile, UnreadableFileError, updateJsonFile } from "../fsutil.js"
 import { lateMerge, mapLegacyPath, migrateLegacy, type LateMergeResult, type MigrationResult } from "../migrate.js";
 import { appFile, installedServer, LEGACY_SERVER_NAME, migrationPending, SERVER_NAME } from "../paths.js";
 import {
-  chatgptDesktopInstalled, claudeCodeConfig, claudeDesktopConfig, claudeDesktopDir, codexBlock, codexConfig, cursorConfig, findClaudeCli,
-  hasCodexBlock, isMac, isWin, removeCodexBlock, run, stableNodePath, writeTextWithBackup,
+  chatgptDesktopInstalled, claudeCodeConfig, claudeDesktopConfig, claudeDesktopDir, codexBlock, codexConfig, cursorConfig, devinConfig, findClaudeCli,
+  hasCodexBlock, isMac, isWin, lmStudioConfig, lmStudioInstalled, removeCodexBlock, run, stableNodePath, vscodeConfig, vscodeInstalled,
+  windsurfInstalled, windsurfLegacyConfig, writeTextWithBackup,
 } from "./util.js";
 import { spawnSync } from "node:child_process";
 import { chatgptStatus, tunnelTool } from "./chatgpt.js";
 import AI_APPS from "../../../installer/ai-apps.json" with { type: "json" };
 
-export type ClientId = "claude-desktop" | "claude-code" | "codex" | "cursor";
-export const CLIENT_IDS: ClientId[] = ["claude-desktop", "claude-code", "codex", "cursor"];
+export type ClientId = "claude-desktop" | "claude-code" | "codex" | "cursor" | "vscode" | "windsurf" | "lm-studio";
+export const CLIENT_IDS: ClientId[] = ["claude-desktop", "claude-code", "codex", "cursor", "vscode", "windsurf", "lm-studio"];
 /**
  * The apps' names come from installer/ai-apps.json, the one list the installers' app pickers are generated from
  * (installer/ai-apps.mjs), so the server, the Windows Setup and the Mac Installer name them the same.
@@ -83,16 +85,33 @@ export function claudeDesktopRunning(): boolean {
   return false;
 }
 
-// ---------- JSON settings files (Claude Desktop, Claude Code, Cursor) ----------
+// ---------- JSON settings files (all but Codex) ----------
 //
 // These files belong to the AI apps. They are only changed when they can be read: one that is there
 // but can't be parsed (half-written, a typo...) is left alone and the problem reported, never
 // replaced with just our entry. Every change makes a timestamped backup first (the newest five are
-// kept) and is written atomically. Cursor (VS Code-style) accepts comments and trailing commas.
+// kept) and is written atomically. Cursor and VS Code accept comments and trailing commas. VS Code
+// keeps its servers under "servers" (with type "stdio"), the others under "mcpServers".
 
-const jsonFile = (id: ClientId) => (id === "claude-desktop" ? claudeDesktopConfig() : id === "claude-code" ? claudeCodeConfig() : cursorConfig());
+type JsonClientId = Exclude<ClientId, "codex">;
+/** The app's settings files: the first is the one shown; Windsurf / Devin Desktop has two (see devinConfig). */
+const jsonFiles = (id: JsonClientId): string[] =>
+  id === "claude-desktop" ? [claudeDesktopConfig()]
+  : id === "claude-code" ? [claudeCodeConfig()]
+  : id === "cursor" ? [cursorConfig()]
+  : id === "vscode" ? [vscodeConfig()]
+  : id === "windsurf" ? [devinConfig(), windsurfLegacyConfig()]
+  : [lmStudioConfig()];
+const jsonFile = (id: JsonClientId) => jsonFiles(id)[0];
+/**
+ * Where Connect writes: Devin Desktop's file, and Windsurf's from before the rename too while its folder is there
+ * (a Windsurf that was not updated reads only that one).
+ */
+const connectFiles = (id: JsonClientId) => (id === "windsurf" ? jsonFiles(id).filter((f, i) => i === 0 || existsSync(dirname(f))) : [jsonFile(id)]);
 /** Settings files that may contain comments / trailing commas (JSONC). */
-const jsoncFile = (file: string) => file === cursorConfig();
+const jsoncFile = (file: string) => file === cursorConfig() || file === vscodeConfig();
+/** The key a settings file keeps its servers under. */
+const serversKey = (file: string) => (file === vscodeConfig() ? "servers" : "mcpServers");
 
 function readSettings(file: string) {
   return readJsonFile<any>(file, { jsonc: jsoncFile(file) });
@@ -101,24 +120,25 @@ function readSettings(file: string) {
 /** Our entry in a JSON settings file: the new name, else a 1.3 entry that runs our server. */
 function jsonEntry(file: string): { key: string; entry: any } | null {
   const r = readSettings(file);
-  const servers = r.ok ? r.data?.mcpServers : null;
+  const servers = r.ok ? r.data?.[serversKey(file)] : null;
   if (!servers || typeof servers !== "object") return null;
   if (servers[SERVER_NAME]) return { key: SERVER_NAME, entry: servers[SERVER_NAME] };
   if (isOurEntry(servers[LEGACY_SERVER_NAME])) return { key: LEGACY_SERVER_NAME, entry: servers[LEGACY_SERVER_NAME] };
   return null;
 }
 
-/** Edits a settings file's mcpServers (refuses an unreadable file; backup + atomic write). */
+/** Edits a settings file's mcpServers ("servers" for VS Code) (refuses an unreadable file; backup + atomic write). */
 function updateServers(file: string, change: (servers: Record<string, any>) => boolean, create: boolean): boolean {
+  const key = serversKey(file);
   return updateJsonFile<any>(
     file,
     (data) => {
       if (!data || typeof data !== "object" || Array.isArray(data)) throw new UnreadableFileError(file, "it doesn't hold a JSON object");
-      if (data.mcpServers !== undefined && (typeof data.mcpServers !== "object" || data.mcpServers === null || Array.isArray(data.mcpServers)))
-        throw new UnreadableFileError(file, '"mcpServers" in it isn\'t an object');
-      const servers = data.mcpServers ?? {};
+      if (data[key] !== undefined && (typeof data[key] !== "object" || data[key] === null || Array.isArray(data[key])))
+        throw new UnreadableFileError(file, `"${key}" in it isn't an object`);
+      const servers = data[key] ?? {};
       if (!change(servers)) return false;
-      data.mcpServers = servers;
+      data[key] = servers;
       return true;
     },
     { jsonc: jsoncFile(file), missing: create ? () => ({}) : undefined },
@@ -173,6 +193,12 @@ export function clientInstalled(id: ClientId): boolean {
       return existsSync(dirname(codexConfig())) || chatgptDesktopInstalled();
     case "cursor":
       return existsSync(dirname(cursorConfig()));
+    case "vscode":
+      return vscodeInstalled();
+    case "windsurf":
+      return windsurfInstalled();
+    case "lm-studio":
+      return lmStudioInstalled();
   }
 }
 
@@ -187,7 +213,9 @@ export function clientInfo(id: ClientId): ClientInfo {
     const configured = hasCodexBlock(text);
     return { ...base, configured, configPath: file, note: configured && /# >>> ae-mcp >>>/.test(text) ? "connected under the old name; Connect updates it" : null };
   }
-  const file = jsonFile(id);
+  // the file that has our entry (Windsurf / Devin Desktop: either of its two), else the first
+  const files = jsonFiles(id);
+  const file = files.find((f) => jsonEntry(f)) ?? files[0];
   const read = readSettings(file);
   if (!read.ok && !read.missing)
     return { ...base, configured: false, configPath: file, note: `its settings file can't be read (${read.error}); Surehand leaves it alone until it is fixed` };
@@ -260,7 +288,13 @@ const RESTART: Record<ClientId, string> = {
   "claude-code": "Start a new Claude Code session.",
   codex: "Restart the ChatGPT desktop app (or Codex); it appears under Settings > Plugins > Servers.",
   cursor: "Restart Cursor.",
+  vscode: "Restart VS Code (or run MCP: List Servers); Surehand is used in Copilot Chat's Agent mode.",
+  windsurf: "Restart Windsurf / Devin Desktop.",
+  "lm-studio": "Restart LM Studio.",
 };
+
+/** The entry as each app's file wants it (VS Code: with type "stdio"). */
+const entryFor = (id: JsonClientId, entry: { command: string; args: string[] }) => (id === "vscode" ? { type: "stdio", ...entry } : entry);
 
 /** Our block in Codex's config.toml (the ChatGPT desktop app reads the same file). Backup + atomic write. */
 export function writeCodex(entry: { command: string; args: string[] }) {
@@ -302,7 +336,7 @@ export function connectClient(id: string, entry = serverEntry()): ClientAction {
   try {
     if (cid === "codex") writeCodex(entry);
     else if (cid === "claude-code") connectClaudeCode(entry);
-    else setJsonEntry(jsonFile(cid), entry);
+    else for (const f of connectFiles(cid)) setJsonEntry(f, entryFor(cid, entry));
   } catch (e: any) {
     return { ok: false, message: `${NAMES[cid]}: could not update its settings: ${String(e.stderr || e.message).split("\n")[0]}`, restartHint: null };
   }
@@ -343,7 +377,7 @@ export function disconnectClient(id: string): ClientAction {
           }
         }
       }
-      if (removeJsonEntries(jsonFile(cid))) changed = true;
+      for (const f of jsonFiles(cid)) if (removeJsonEntries(f)) changed = true;
     }
   } catch (e: any) {
     return { ok: false, message: `${NAMES[cid]}: could not update its settings: ${String(e.stderr || e.message).split("\n")[0]}`, restartHint: null };
