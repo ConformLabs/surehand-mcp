@@ -126,6 +126,8 @@ describe("Windows installer: Conform Labs look", () => {
         const file = join(ROOT, "installer/windows/nsis/art", `${kind}-${w}.bmp`);
         const b = readFileSync(file);
         expect([b.toString("latin1", 0, 2), b.readInt32LE(18), b.readInt32LE(22), b.readUInt16LE(28)]).toEqual(["BM", w, h, 24]);
+        // not just the background: the logo is drawn (a headless render once came out empty)
+        expect(b.subarray(54).reduce((m, x) => Math.max(m, x), 0), `${kind}-${w}.bmp is empty`).toBeGreaterThan(150);
       }
     }
     expect(nsh).toMatch(/MUI_WELCOMEFINISHPAGE_BITMAP "\$\{CL_ART\}\\wizard-164\.bmp"/);

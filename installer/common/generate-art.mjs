@@ -44,7 +44,7 @@ function screenshot(page, w, h, { scale = 1, transparent = false, dark = false }
   writeFileSync(htmlFile, page);
   const r = spawnSync(CHROME, [
     "--headless=new", "--disable-gpu", "--hide-scrollbars", "--no-first-run", "--no-default-browser-check",
-    "--allow-file-access-from-files", `--user-data-dir=${join(tmp, "profile")}`,
+    "--allow-file-access-from-files", "--virtual-time-budget=3000", `--user-data-dir=${join(tmp, "profile")}`,
     `--force-device-scale-factor=${scale}`, `--window-size=${w},${h}`,
     ...(transparent ? ["--default-background-color=00000000"] : []),
     ...(dark ? ["--force-dark-mode", "--blink-settings=preferredColorScheme=0"] : ["--blink-settings=preferredColorScheme=1"]),
@@ -129,7 +129,7 @@ function wizardPage(w, h) {
 // header: the logo at the right (MUI_HEADERIMAGE_RIGHT), on the header colour
 function headerPage(w, h) {
   const a = art("dark"), logo = box(a, h * 0.62), right = Math.round(a.tiled ? h * 0.3 : h * 0.12);
-  return doc(`<img src="${svgUri(a.file)}" style="width:${logo}px;height:${logo}px;right:${right}px;top:${Math.round((h - logo) / 2)}px">`, COLORS.header);
+  return doc(`<img src="${svgUri(a.file)}" style="width:${logo}px;height:${logo}px;left:${w - right - logo}px;top:${Math.round((h - logo) / 2)}px">`, COLORS.header);
 }
 // Mac Installer background (bottom left, under the step list): the logo and the Conform Labs endorsement line
 function macBackground(mode) {
