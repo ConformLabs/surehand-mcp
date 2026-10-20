@@ -213,8 +213,8 @@ export interface LayerSpec {
 }
 
 /**
- * writeAccess: "Allow Scripts to Write Files and Access Network" (default on); off, File can't remove and a
- * folder can't be created. dirs: folders that exist (default: every folder).
+ * writeAccess: "Allow Scripts to Write Files and Access Network" (default on). Like After Effects 26.5 through
+ * CEP, files and folders are written either way. dirs: folders that exist (default: every folder).
  */
 export function fakeKeysAE(opts: {
   fps?: number;
@@ -238,10 +238,9 @@ export function fakeKeysAE(opts: {
     }
     get parent() {
       const dir = this.fsName.replace(/\/[^/]*$/, "");
-      return { exists: !opts.dirs || opts.dirs.includes(dir), create: () => on, fsName: dir };
+      return { exists: !opts.dirs || opts.dirs.includes(dir), create: () => true, fsName: dir };
     }
     remove() {
-      if (!on) return false;
       files.delete(this.fsName);
       return true;
     }

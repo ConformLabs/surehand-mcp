@@ -15,12 +15,10 @@ import { appFile } from "../paths.js";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-// A preview never replaces an existing file at outputPath unless overwrite is true. Replacing it removes
-// the old file from ExtendScript, which needs "Allow Scripts to Write Files and Access Network".
+// A preview never replaces an existing file at outputPath unless overwrite is true
 const OUTPUT_GUARD_JSX = `
 if (args.outputPath && !args.overwrite && new File(args.outputPath).exists)
-  aemcp.fail("A file already exists at " + new File(args.outputPath).fsName + ". Nothing was rendered. To replace it, pass overwrite: true (or choose another outputPath).");
-if (args.outputPath && new File(args.outputPath).exists) aemcp.needWriteAccess("replace the existing file " + new File(args.outputPath).fsName);`;
+  aemcp.fail("A file already exists at " + new File(args.outputPath).fsName + ". Nothing was rendered. To replace it, pass overwrite: true (or choose another outputPath).");`;
 
 // ExtendScript bodies of the preview tools (exported so tests can check them)
 export const RENDER_FRAME_JSX = `${OUTPUT_GUARD_JSX}
@@ -323,10 +321,9 @@ export async function runReadOnly(code: string, timeoutMs = 120_000): Promise<{ 
 
 /** What ae_status adds while "Allow Scripts to Write Files and Access Network" is off. */
 export const WRITE_ACCESS_STATUS =
-  "Note: 'Allow Scripts to Write Files and Access Network' is OFF in After Effects. Edits, frame previews and most tools still work, " +
-  "but scripts can't write files themselves (File.write, creating folders, replacing or deleting files), use the network or run shell commands, " +
-  "and ae_export_frames, ae_render_frame and ae_render_contact_sheet refuse to create a folder or replace an existing file. " +
-  `If that is needed, ask the user to turn it on: ${WRITE_ACCESS_WHERE}.`;
+  "Note: 'Allow Scripts to Write Files and Access Network' is OFF in After Effects. Surehand's tools don't need it, and scripts can still " +
+  "read and write files, but they can't run shell commands (system.callSystem fails with \"Permission denied\") or use the network. " +
+  `If a script needs that, ask the user to turn it on: ${WRITE_ACCESS_WHERE}.`;
 
 export function registerCoreTools(server: McpServer) {
   server.registerTool(
@@ -470,7 +467,7 @@ export function registerCoreTools(server: McpServer) {
         const statusScript =
           "return { appVersion: app.version, buildName: app.buildName, language: String(app.isoLanguage), os: $.os, extendScriptVersion: $.version, " +
           "memoryInUse: app.memoryInUse, isRenderEngine: app.isRenderEngine, project: aemcp.projectInfo(), " +
-          "canWriteFiles: aemcp.canWriteFiles(true) };";
+          "canWriteFiles: aemcp.canWriteFiles() };";
         let r;
         for (;;) {
           try {

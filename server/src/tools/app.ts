@@ -73,7 +73,7 @@ var caps = (function () {${CAPABILITIES_JSX}
 })();
 var o = { features: caps.features, appVersion: app.version, buildName: app.buildName, os: $.os, locale: $.locale, screens: $.screens, memoryInUse: app.memoryInUse, tempFolder: Folder.temp.fsName,
   userDataFolder: Folder.userData.fsName, appFolder: Folder.appPackage ? Folder.appPackage.fsName : null };
-o.canWriteFiles = aemcp.canWriteFiles(true);
+o.canWriteFiles = aemcp.canWriteFiles();
 try { o.expressionEngine = app.project.expressionEngine; } catch (e) {}
 return o;`,
   },

@@ -13,7 +13,7 @@ const { CONTACT_SHEET_JSX, RENDER_FRAME_JSX } = await import("../src/tools/core.
 const { RESTORE_JSX, restoreCheckpoint, _internal } = await import("../src/tools/workflow.js");
 
 /** A fake After Effects: files on "disk", one open project, and a log of what was called. */
-function fakeAE(opts: { files?: string[]; projectFile?: string; dirty?: boolean; openWorks?: boolean; writeAccess?: boolean } = {}) {
+function fakeAE(opts: { files?: string[]; projectFile?: string; dirty?: boolean; openWorks?: boolean } = {}) {
   const files = new Set(opts.files ?? []);
   const calls: string[] = [];
   class File {
@@ -56,10 +56,6 @@ function fakeAE(opts: { files?: string[]; projectFile?: string; dirty?: boolean;
     findComp() {
       calls.push("render");
       return { name: "Comp" };
-    },
-    // as the helper library: refuses while "Allow Scripts to Write Files and Access Network" is off (default on)
-    needWriteAccess(what: string) {
-      if (opts.writeAccess === false) aemcp.fail(`Nothing ran. After Effects doesn't allow scripts to write files, and this call needs to ${what}.`);
     },
   };
   const run = (body: string, args: Record<string, unknown>) =>
@@ -109,20 +105,6 @@ describe("preview outputPath", () => {
         } catch {}
         expect(ae.calls[0]).toBe("render");
       }
-    });
-
-    it(`${name}: replacing a file needs "Allow Scripts to Write Files"; a new outputPath doesn't (saveFrameToPng)`, () => {
-      const ae = fakeAE({ files: ["/out/frame.png"], writeAccess: false });
-      expect(() => ae.run(body, { comp: 1, outputPath: "/out/frame.png", overwrite: true })).toThrow(
-        /^Nothing ran\. After Effects doesn't allow scripts to write files, and this call needs to replace the existing file \/out\/frame\.png\.$/,
-      );
-      expect(ae.calls).toEqual([]);
-      for (const args of [{ outputPath: "/out/new.png" }, {}]) {
-        try {
-          ae.run(body, { comp: 1, ...args });
-        } catch {}
-      }
-      expect(ae.calls).toEqual(["render", "render"]);
     });
   }
 });

@@ -132,31 +132,17 @@ aemcp = (function () {
   A.fail = function (msg) { var e = new Error(msg); e.aemcpUser = true; throw e; };
 
   // ---------- "Allow Scripts to Write Files and Access Network" ----------
-  // Without it ExtendScript's File and Folder can't write (create a folder, remove or replace a file),
-  // and the network and system.callSystem are refused. After Effects' own writers (saveFrameToPng,
-  // checked on macOS and Windows) don't need it. true / false, or null when it can't be told.
-  // The preference ("Main Pref Section", 1 = on) is read first; only when it can't be read and `probe`
-  // is set, a temporary file is created and removed in Folder.temp.
-  A.canWriteFiles = function (probe) {
+  // Off, scripts sent through the Surehand bridge (CEP evalScript) can still read and write files, but
+  // system.callSystem throws "Permission denied" (checked in AE 26.5) and, per Adobe, the network is refused.
+  // The preference ("Main Pref Section", 1 = on; it follows the Settings dialog without a restart):
+  // true / false, or null when it can't be read.
+  A.canWriteFiles = function () {
     try {
       var v = app.preferences.getPrefAsLong("Main Pref Section", "Pref_SCRIPTING_FILE_NETWORK_SECURITY");
       if (v === 1) return true;
       if (v === 0) return false;
     } catch (e) {}
-    if (!probe) return null;
-    try {
-      var f = new File(Folder.temp.fsName + "/surehand_write_check_" + new Date().getTime() + ".tmp");
-      if (!f.open("w")) return false;
-      var wrote = f.write("x");
-      f.close();
-      return f.remove() && wrote !== false;
-    } catch (e) { return false; }
-  };
-  // the refusal ({what}: what the call needed to write), from WRITE_ACCESS_REFUSAL in permissions.ts
-  var WRITE_ACCESS_REFUSAL = __WRITE_ACCESS_REFUSAL__;
-  /** Fails with the refusal when the setting is known to be off (call it before anything is changed). */
-  A.needWriteAccess = function (what) {
-    if (A.canWriteFiles(true) === false) A.fail(WRITE_ACCESS_REFUSAL.replace("{what}", what));
+    return null;
   };
 
   // ---------- finders ----------
@@ -990,8 +976,8 @@ aemcp = (function () {
         } catch (e) {
           back = opts.rollback === "changes";
           res = { ok: false, error: { message: e.message || String(e), name: e.name, line: e.line, user: !!e.aemcpUser }, logs: logs };
-          // the setting is off: the server adds a hint (a failed save or script may be why)
-          if (A.canWriteFiles(false) === false) res.writeAccess = false;
+          // the setting is off: the server adds a hint when the error is its "Permission denied"
+          if (A.canWriteFiles() === false) res.writeAccess = false;
           // a failed script may have changed things before it stopped: report those too
           if (before) { try { res.changes = changesSince(before, rev0, opts.report); } catch (e2) {} }
         }

@@ -106,29 +106,12 @@ describe("ae_export_frames (ExtendScript)", () => {
     expect(ae.saved).toEqual([]);
     expect(run([{ frames: [3], outputPath: "/out/b.png" }], true).ok).toBe(true);
   });
-  it('"Allow Scripts to Write Files" off: refuses a new folder or a replaced file before exporting anything; a new file in an existing folder works', () => {
-    const off = () => fakeKeysAE({ layers: [{ name: "a" }], files: ["/out/b.png"], dirs: ["/out"], writeAccess: false });
-    let ae = off();
-    let r = ae.run(EXPORT_FRAMES_JSX, { exports: [{ frames: [0, 1, 2], outputPath: "/new/shot_{frame}.png" }] });
-    expect(r.error.message).toBe(
-      "Nothing ran. After Effects doesn't allow scripts to write files, and this call needs to create the folder /new. " +
-        "Ask the user to turn on 'Allow Scripts to Write Files and Access Network' in After Effects > Settings > Scripting & Expressions " +
-        "(Windows: Edit > Preferences > Scripting & Expressions), then try again.",
-    );
-    expect(ae.saved).toEqual([]);
-    ae = off();
-    r = ae.run(EXPORT_FRAMES_JSX, { exports: [{ frames: [0], outputPath: "/out/b.png" }, { frames: [1], outputPath: "/other/c.png" }], overwrite: true });
-    expect(r.error.message).toMatch(/needs to replace the existing file \/out\/b\.png \(and 1 more files or folders to write\)\. Ask the user/);
-    expect(ae.saved).toEqual([]);
-    // saveFrameToPng itself doesn't need the setting
-    ae = off();
-    r = ae.run(EXPORT_FRAMES_JSX, { exports: [{ frames: [0], outputPath: "/out/a.png" }] });
+  it('works with "Allow Scripts to Write Files and Access Network" off: new folders and replaced files too (as in AE 26.5 through CEP)', () => {
+    const ae = fakeKeysAE({ layers: [{ name: "a" }], files: ["/out/b.png"], dirs: ["/out"], writeAccess: false });
+    expect(ae.app.preferences.getPrefAsLong("Main Pref Section", "Pref_SCRIPTING_FILE_NETWORK_SECURITY")).toBe(0);
+    const r = ae.run(EXPORT_FRAMES_JSX, { exports: [{ frames: [0], outputPath: "/out/b.png" }, { frames: [1], outputPath: "/new/c.png" }], overwrite: true });
     expect(r.ok, JSON.stringify(r.error)).toBe(true);
-    expect(ae.saved.map((s) => s.path)).toEqual(["/out/a.png"]);
-    // on: the folder is created and the file replaced
-    ae = fakeKeysAE({ layers: [{ name: "a" }], files: ["/out/b.png"], dirs: ["/out"] });
-    r = ae.run(EXPORT_FRAMES_JSX, { exports: [{ frames: [0], outputPath: "/out/b.png" }, { frames: [1], outputPath: "/new/c.png" }], overwrite: true });
-    expect(r.ok, JSON.stringify(r.error)).toBe(true);
+    expect(ae.saved.map((s) => s.path)).toEqual(["/out/b.png", "/new/c.png"]);
   });
 });
 

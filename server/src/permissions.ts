@@ -54,17 +54,16 @@ export const WRITE_ACCESS_WHERE =
   "After Effects > Settings > Scripting & Expressions (Windows: Edit > Preferences > Scripting & Expressions)";
 
 /**
- * A call that has to write files from ExtendScript while "Allow Scripts to Write Files and Access Network"
- * is off, refused before it changes anything (aemcp.needWriteAccess). {what}: what it needed to do.
+ * Added to a call that failed with After Effects' "Permission denied" while "Allow Scripts to Write Files and
+ * Access Network" is off: off, scripts can't run shell commands (system.callSystem) or use the network.
+ * (Reading and writing files still works from scripts sent through the Surehand bridge: checked in AE 26.5.)
  */
-export const WRITE_ACCESS_REFUSAL =
-  "Nothing ran. After Effects doesn't allow scripts to write files, and this call needs to {what}. " +
-  `Ask the user to turn on 'Allow Scripts to Write Files and Access Network' in ${WRITE_ACCESS_WHERE}, then try again.`;
-
-/** Added to a failed call while the setting is off: a save, an export or a script's own File writes may fail because of it. */
 export const WRITE_ACCESS_HINT =
-  "Note: 'Allow Scripts to Write Files and Access Network' is off in After Effects. If this call failed because it writes files, " +
-  `uses the network or runs a shell command, ask the user to turn it on in ${WRITE_ACCESS_WHERE}.`;
+  "Note: 'Allow Scripts to Write Files and Access Network' is off in After Effects, so scripts can't run shell commands " +
+  `(system.callSystem) or use the network. If the script needs that, ask the user to turn it on in ${WRITE_ACCESS_WHERE}.`;
+
+/** The error After Effects gives a shell command (and, presumably, a network call) while the setting is off. */
+export const isWriteAccessError = (message: string) => /Permission denied|Allow Scripts to Write Files and Access Network/i.test(message);
 
 /**
  * What the approval prompt in After Effects shows for a tool call: the script, or the call's

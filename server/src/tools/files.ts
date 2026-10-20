@@ -201,7 +201,7 @@ function fileFor(tpl, frame, many) {
   if (many) aemcp.fail("outputPath '" + tpl + "' needs a frame token ({frame} or [#####]) to export several frames");
   return tpl;
 }
-var jobs = [], seen = {}, exists = [], writes = [], total = 0;
+var jobs = [], seen = {}, exists = [], total = 0;
 for (var i = 0; i < args.exports.length; i++) {
   var e = args.exports[i], src = null, footage = null;
   if (e.item !== undefined) {
@@ -228,10 +228,6 @@ for (var i = 0; i < args.exports.length; i++) {
     if (seen[key]) aemcp.fail("Two exports would write the same file: " + file.fsName);
     seen[key] = true;
     if (file.exists && !args.overwrite) exists.push(file.fsName);
-    // ExtendScript writes (they need "Allow Scripts to Write Files and Access Network"); saveFrameToPng doesn't
-    else if (file.exists) writes.push("replace the existing file " + file.fsName);
-    var dir = file.parent;
-    if (dir && !dir.exists && !seen["d:" + dir.fsName]) { seen["d:" + dir.fsName] = true; writes.push("create the folder " + dir.fsName); }
     list.push({ t: t, frame: fn, file: file });
   }
   total += list.length;
@@ -239,7 +235,6 @@ for (var i = 0; i < args.exports.length; i++) {
 }
 if (total > 500) aemcp.fail(total + " frames requested; at most 500 per call");
 if (exists.length) aemcp.fail("A file already exists at " + exists.slice(0, 5).join(", ") + (exists.length > 5 ? " and " + (exists.length - 5) + " more" : "") + ". Nothing was exported. To replace them, pass overwrite: true (or choose another outputPath).");
-if (writes.length) aemcp.needWriteAccess(writes[0] + (writes.length > 1 ? " (and " + (writes.length - 1) + " more files or folders to write)" : ""));
 var out = [], tmpLeft = false;
 for (var j = 0; j < jobs.length; j++) {
   var J = jobs[j], comp = J.src, tmp = null, restore = [], rf = null;

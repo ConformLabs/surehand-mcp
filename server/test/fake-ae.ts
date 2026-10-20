@@ -194,56 +194,25 @@ export function fakeAE(
 }
 
 /**
- * After Effects' "Allow Scripts to Write Files and Access Network" (Settings > Scripting & Expressions): on,
- * off, or "unreadable" (off, but the preference can't be read, so only a test write tells). `preferences`
- * goes on app; File and Folder are the ExtendScript globals: with the setting off they can't write
- * (open("w") fails, remove() and create() return false). `files`: what is on "disk".
+ * After Effects' "Allow Scripts to Write Files and Access Network" (Settings > Scripting & Expressions): on, off,
+ * or "unreadable" (the preference can't be read). As measured in AE 26.5 through the CEP bridge: off, scripts can
+ * still read and write files (so File and Folder are not modelled here), but system.callSystem throws.
+ * `preferences` goes on app; `system` is the ExtendScript global.
  */
-export function fakeWriteAccess(state: boolean | "unreadable", files = new Set<string>()) {
-  const on = state === true;
+export function fakeWriteAccess(state: boolean | "unreadable") {
   const preferences = {
     getPrefAsLong(section: string, key: string) {
-      if (state !== "unreadable" && section === "Main Pref Section" && key === "Pref_SCRIPTING_FILE_NETWORK_SECURITY") return on ? 1 : 0;
+      if (state !== "unreadable" && section === "Main Pref Section" && key === "Pref_SCRIPTING_FILE_NETWORK_SECURITY") return state ? 1 : 0;
       throw new Error(`After Effects error: preference "${key}" in section "${section}" could not be found`);
     },
   };
-  class File {
-    constructor(public fsName: string) {}
-    get exists() {
-      return files.has(this.fsName);
-    }
-    get parent() {
-      return new Folder(this.fsName.replace(/\/[^/]*$/, ""));
-    }
-    open(mode: string) {
-      if (mode !== "w") return this.exists;
-      if (!on) return false;
-      files.add(this.fsName);
-      return true;
-    }
-    write() {
-      return on;
-    }
-    close() {
-      return true;
-    }
-    remove() {
-      if (!on || !this.exists) return false;
-      files.delete(this.fsName);
-      return true;
-    }
-  }
-  class Folder {
-    static temp = new Folder("/tmp");
-    constructor(public fsName: string) {}
-    get exists() {
-      return this.fsName === "/tmp" || [...files].some((f) => f.startsWith(this.fsName + "/"));
-    }
-    create() {
-      return on;
-    }
-  }
-  return { preferences, File, Folder, files };
+  const system = {
+    callSystem(cmd: string) {
+      if (state !== true) throw new Error("Permission denied (is Preferences > Scripting & Expressions > Allow Scripts to Write Files and Access Network enabled?)");
+      return cmd.replace(/^echo /, "") + "\n";
+    },
+  };
+  return { preferences, system };
 }
 
 /** The real helper library (aemcp.jsxinc), loaded into the fake After Effects. */

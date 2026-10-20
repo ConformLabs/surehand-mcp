@@ -117,7 +117,7 @@ export async function quickChecks(print: boolean, beforeJob?: () => Promise<void
   }
 
   const info = await runJsx(
-    "return { version: app.version, os: $.os, canWrite: aemcp.canWriteFiles(true) };",
+    "return { version: app.version, os: $.os, canWrite: aemcp.canWriteFiles() };",
     {},
     { undoGroup: false, timeoutMs: 15000 },
   ).catch((e) => ({ ok: false, error: { message: e.message } }) as any);
@@ -127,13 +127,13 @@ export async function quickChecks(print: boolean, beforeJob?: () => Promise<void
   }
   pass("extendscript", `ExtendScript works: After Effects ${info.result.version} on ${info.result.os}`);
   if (info.result.canWrite === false)
-    bad(
+    // Surehand's own tools don't need it (none runs shell commands or uses the network): a note, not a problem
+    note(
       "scripting-prefs",
-      "'Allow Scripts to Write Files and Access Network' is off: scripts can't write files, use the network or run shell commands, " +
-        "and exporting frames into a new folder or replacing a file is refused. Previews and edits still work.",
-      `Turn it on in ${WRITE_ACCESS_WHERE}.`,
+      "'Allow Scripts to Write Files and Access Network' is off: scripts can't run shell commands or use the network (Surehand's tools don't need either).",
+      `If a script needs that, turn it on in ${WRITE_ACCESS_WHERE}.`,
     );
-  else if (info.result.canWrite === true) pass("scripting-prefs", "Scripts may write files and use the network");
+  else if (info.result.canWrite === true) pass("scripting-prefs", "Scripts may run shell commands and use the network");
 
   // --- functional test in a temporary comp ---
   await beforeJob?.();

@@ -629,8 +629,7 @@
   }
   var shownWorking = "";
   function renderWorking() {
-    // when nothing runs: the notice that scripts can't write files (the bridge knows from its last job)
-    var w = UI.workingView(S.health, S.busySince ? Date.now() - S.busySince : null) || UI.writeAccessView(S.health, process.platform), box = $("working");
+    var w = UI.workingView(S.health, S.busySince ? Date.now() - S.busySince : null), box = $("working");
     var key = w ? w.text + "|" + w.time + "|" + w.line + "|" + w.waiting : "";
     if (key === shownWorking) return;
     shownWorking = key;
@@ -1318,7 +1317,7 @@
     });
   }
   var CHECK_NAMES = { update: "Updates", config: "Settings file", extension: "After Effects extension", signature: "Extension signature",
-    bridge: "Bridge", extendscript: "Scripting", "scripting-prefs": "Write access", node: "Node.js", server: "Server", ffmpeg: "ffmpeg", migration: "Move from 1.3" };
+    bridge: "Bridge", extendscript: "Scripting", "scripting-prefs": "Shell and network", node: "Node.js", server: "Server", ffmpeg: "ffmpeg", migration: "Move from 1.3" };
   function tilde(t) { var h = os.homedir(); return h ? String(t).split(h).join("~") : String(t); }
   function showChecks(body, checks, again, note) {
     again.disabled = false;

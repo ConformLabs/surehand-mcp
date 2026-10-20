@@ -146,8 +146,6 @@
     pending: [], // edits waiting for approval in "ask" mode
     lastActivated: null,
     pause: null, // { key, since, refused } while paused
-    // "Allow Scripts to Write Files and Access Network", as read before the last job (null: not known yet)
-    writeAccess: null,
     // the pause set in this After Effects' panel (kept here, so editing config.json can't undo it)
     heldPause: null,
     panelSecret: null, // see the top of this file
@@ -267,15 +265,7 @@
   // and After Effects runs them whenever it is free again: possibly long after the AI gave up.
   // So each job first sends this no-op, and the job itself is only sent once it has come back
   // (AE is free right now) and only if the job is still wanted.
-  // It also reads "Allow Scripts to Write Files and Access Network" (1 = on), so the bridge knows it
-  // at no extra cost: never a script of its own, never on a timer (a dialog would make AE complain).
-  var READY_SCRIPT = "(function(){try{return 'aemcp-ready:'+app.preferences.getPrefAsLong('Main Pref Section','Pref_SCRIPTING_FILE_NETWORK_SECURITY');}" +
-    "catch(e){return 'aemcp-ready:?';}})()";
-  /** The setting from the no-op's answer: true / false, or unchanged when it can't be told. */
-  function noteWriteAccess(r) {
-    var m = /^aemcp-ready:(\d+)$/.exec(String(r));
-    if (m && (m[1] === "0" || m[1] === "1")) state.writeAccess = m[1] === "1";
-  }
+  var READY_SCRIPT = "'aemcp-ready'";
 
   // the client gave up on it (timeout or cancel), or its deadline has passed
   function dead(job) { return job.cancelled || Date.now() >= job.deadline; }
@@ -294,8 +284,7 @@
     state.busy = true;
     // waiting: the no-op has not come back yet, so After Effects isn't taking scripts right now
     state.current = { startedAt: Date.now(), label: job.label, waiting: true };
-    evalScript(READY_SCRIPT, function (ready) {
-      noteWriteAccess(ready);
+    evalScript(READY_SCRIPT, function () {
       if (dead(job)) {
         state.busy = false;
         state.current = null;
@@ -365,7 +354,7 @@
       // AE has not accepted the no-op sent before the current job: a dialog is open, or AE is busy/starting
       waitingForAE: !!(cur && cur.waiting), waitingForMs: cur && cur.waiting ? Date.now() - cur.startedAt : 0,
       queue: state.queue.length, pendingApprovals: state.pending.length, permissionMode: permissionMode(),
-      paused: pauseInfo(), configProblem: configProblem, scriptsCanWriteFiles: state.writeAccess,
+      paused: pauseInfo(), configProblem: configProblem,
       startedAt: state.startedAt, lastActivated: state.lastActivated, authorized: authorized(req, token),
     };
   }
