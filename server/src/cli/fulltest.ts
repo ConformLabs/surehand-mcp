@@ -159,6 +159,21 @@ return c.id;`,
   return [{ step: name, ok: !problem, ms, error: problem ?? undefined }];
 }
 
+/**
+ * Whether Edit > Undo works in this After Effects right now: a throwaway folder made in its own undo step must be
+ * gone after one Undo. true, or why not (a dialog open in After Effects is the usual reason).
+ */
+async function undoWorks(): Promise<true | string> {
+  const name = "__aemcp_fulltest_undo_probe";
+  const made = await runJsx(`app.project.items.addFolder("${name}"); return true;`, {}, { undoGroup: "Surehand MCP self-test" });
+  if (!made.ok) return `the probe couldn't run (${made.error?.message ?? "failed"})`;
+  const undo = await runJsx(`try { return aemcp.undoRedo(16, 1, "undo"); } catch (e) { return { error: e.message }; }`, {}, { undoGroup: false });
+  const left = await runJsx(`var n = 0; for (var i = app.project.numItems; i >= 1; i--) { var it = app.project.item(i); if (it.name === "${name}") { it.remove(); n++; } } return n;`, {}, { undoGroup: false });
+  if (left.ok && left.result === 0) return true;
+  const why = (undo.result as { error?: string } | undefined)?.error;
+  return why ? why.replace(/\.$/, "") : "After Effects didn't undo the probe step: a dialog may be open in After Effects";
+}
+
 /** `before`: the project state before any self-test edits (the project-switching checks need it). */
 export async function fullSelftest(before?: ProjectState): Promise<number> {
   console.log(bold(`\nFull self-test: every major tool against this After Effects (temporary comps, removed afterwards)\n`));
@@ -268,8 +283,16 @@ export async function fullSelftest(before?: ProjectState): Promise<number> {
     problem ? fail(`${s.name}: ${problem}`) : ok(`${s.name} (${ms} ms)`);
   }
 
-  results.push(...(await revisionSteps(features, (good, line) => (good ? ok : fail)(line))));
-  results.push(...(await rollbackSteps((good, line) => (good ? ok : fail)(line))));
+  // the revision and rollback checks need Edit > Undo, which does nothing while a dialog is open in After Effects
+  // (seen with AE 2025's disk cache warning at launch): check it once, so a dialog is one clear failure, not six
+  const undoProbe = await undoWorks();
+  if (undoProbe === true) {
+    results.push(...(await revisionSteps(features, (good, line) => (good ? ok : fail)(line))));
+    results.push(...(await rollbackSteps((good, line) => (good ? ok : fail)(line))));
+  } else {
+    fail(`Edit > Undo: ${undoProbe}. The undo and rollback checks were skipped; close the dialog and run the self-test again.`);
+    results.push({ step: "Edit > Undo works", ok: false, ms: 0, error: undoProbe });
+  }
   results.push(...(await regressionSteps(tmpDir, (good, line) => (good ? ok : fail)(line))));
   results.push(...(await historySteps((good, line) => (good ? ok : fail)(line))));
 
