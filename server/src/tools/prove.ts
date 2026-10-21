@@ -322,15 +322,15 @@ export const afterDir = (id: string) => join(proofsRoot(), id, "after");
 export const proofDir = (id: string) => join(proofsRoot(), id);
 export { loadManifest };
 
-/** Move a comparison's rendered frames into the proof (afterDir), replacing the last comparison's; updates their paths. */
-function keepAfterFrames(id: string, compared: string, comps: Rendered[]) {
+/** Move a comparison's rendered frames into the proof (afterDir), replacing the last comparison's; updates their paths. `as`: the reference comp a rendered comp stands for (two-comp comparisons). */
+function keepAfterFrames(id: string, compared: string, comps: Rendered[], as: (id: number) => number = (x) => x) {
   const dir = afterDir(id);
   try {
     rmSync(dir, { recursive: true, force: true });
     mkdirSync(dir, { recursive: true });
     for (const c of comps)
       for (const [i, f] of (c.frames ?? []).entries()) {
-        const to = join(dir, `${c.id}_${i}.png`);
+        const to = join(dir, `${as(c.id)}_${i}.png`);
         try {
           renameSync(f.path, to);
           f.path = to;
@@ -344,16 +344,22 @@ function keepAfterFrames(id: string, compared: string, comps: Rendered[]) {
   }
 }
 
-/** Render the proof's comps and times again and compare them with the stored reference frames. */
-export async function compareProof(input: { id?: string; tolerance?: number }): Promise<Comparison | string> {
+/**
+ * Render the proof's comps and times again and compare them with the stored reference frames. `against`: compare a
+ * reference comp with another comp instead of with itself (reference comp id -> the other comp's id), e.g. a comp and
+ * its deep duplicate; the other comp must have the same size.
+ */
+export async function compareProof(input: { id?: string; tolerance?: number; against?: Record<number, number> }): Promise<Comparison | string> {
   const m = loadManifest(input.id);
   if (typeof m === "string") return m;
+  const other = (id: number) => input.against?.[id] ?? id;
+  const back = new Map(m.comps.map((c) => [other(c.id), c.id]));
   // default: under half an 8-bit step, so 16/32 bpc rounding (e.g. 0.02/255 after a precompose) doesn't count,
   // while any change that shows in 8-bit output does; tolerance 0 asks for bit-identical
   const tol = input.tolerance ?? DEFAULT_TOLERANCE;
   const tmp = appFile("tmp");
   mkdirSync(tmp, { recursive: true });
-  const specs = m.comps.map((c) => ({ id: c.id, times: c.frames.map((f) => f.time), width: c.width, height: c.height, pixelAspect: c.pixelAspect }));
+  const specs = m.comps.map((c) => ({ id: other(c.id), times: c.frames.map((f) => f.time), width: c.width, height: c.height, pixelAspect: c.pixelAspect }));
   const prefix = `aemcp_proof_${Date.now()}_${randomBytes(2).toString("hex")}_`;
   const lines: string[] = [];
   const problems: string[] = [];
@@ -367,20 +373,21 @@ export async function compareProof(input: { id?: string; tolerance?: number }): 
   try {
     const res = await render(specs, { maxSize: m.maxSize }, tmp, prefix);
     if (res.note) notes.push(res.note);
-    keepAfterFrames(m.id, compared, res.comps);
-    const other = otherProject(m, res);
-    if (other) problems.push(other), m.comps.forEach((c) => c.frames.forEach((_, i) => vf(c, i, { missing: true })));
+    keepAfterFrames(m.id, compared, res.comps, (id) => back.get(id) ?? id);
+    const elsewhere = otherProject(m, res);
+    if (elsewhere) problems.push(elsewhere), m.comps.forEach((c) => c.frames.forEach((_, i) => vf(c, i, { missing: true })));
     else if (!m.project) notes.push("Note: the reference was captured in an unsaved project, so it can't be confirmed that this is the same project; the comps were matched by id, and their names are unchanged.");
-    for (const c of other ? [] : m.comps) {
-      const now = res.comps.find((r) => r.id === c.id);
-      const title = `"${c.name}" (id ${c.id})`;
+    for (const c of elsewhere ? [] : m.comps) {
+      const now = res.comps.find((r) => r.id === other(c.id));
+      const versus = other(c.id) !== c.id;
+      const title = versus ? `"${c.name}" (id ${c.id}) against ${now?.name ? `"${now.name}" ` : ""}(id ${other(c.id)})` : `"${c.name}" (id ${c.id})`;
       if (!now || now.missing) {
         c.frames.forEach((_, i) => vf(c, i, { missing: true }));
         problems.push(`${title} was deleted since the capture`);
         lines.push(`${title}: deleted since the capture (no comp with this id), not compared.`);
         continue;
       }
-      const renamed = now.name !== c.name ? ` (renamed to "${now.name}")` : "";
+      const renamed = !versus && now.name !== c.name ? ` (renamed to "${now.name}")` : "";
       if (now.sizeChanged) {
         c.frames.forEach((_, i) => vf(c, i, { missing: true }));
         problems.push(`${title} changed size`);

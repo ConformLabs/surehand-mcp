@@ -17,7 +17,7 @@
 
 Surehand MCP connects **Claude** (Desktop / Code), **ChatGPT** (desktop app or web), Cursor, Codex, VS Code (GitHub Copilot), Windsurf / Devin Desktop, LM Studio, or any MCP client to **Adobe® After Effects®**.
 The AI can run any script inside After Effects (modern JavaScript, converted for AE's ExtendScript engine automatically),
-read information back, and use up to 111 ready-made tools for projects, comps, layers, keyframes (Graph Editor level),
+read information back, and use up to 112 ready-made tools for projects, comps, layers, keyframes (Graph Editor level),
 text styling and animators, footage, effects, shapes, masks, 3D cameras/lights/materials, audio, color management,
 Essential Graphics and rendering (including background renders with aerender). Batch edits run many steps as one
 undo step, checkpoints keep safety copies of the project, structural changes can be proven not to change the render,
@@ -194,7 +194,7 @@ To rotate the token, delete `token` from `~/.surehand/ae/config.json` and re-run
 | `ae_get_scripting_guide` | ExtendScript cheat sheet for the model (also an MCP resource `aemcp://docs/extendscript`). |
 
 **Tool profiles.** Every tool description is sent to the AI in every chat, so by default only a **core set of
-29 tools** is loaded (about 9k tokens instead of 42k for all 111), and **every other tool stays available on demand**:
+29 tools** is loaded (about 9k tokens instead of 42k for all 112), and **every other tool stays available on demand**:
 `ae_tools` lists all tools by category (or gives full parameter details of chosen ones), and `ae_call` runs any tool by
 name with the same validation, permissions, change report and activity log. Loading everything up front is optional:
 switch to **All tools** in the Surehand panel in After Effects (**☰ › Tools the AI sees › All tools**), in Claude Desktop's
@@ -276,6 +276,8 @@ unknown effect name gets suggestions.
 - **Checks:** `ae_preflight` (check the delivered comp and its render against your own delivery spec; see Preflight below)
 - **Reformat:** `ae_reformat` (the comp at another size or aspect ratio, laid out by your own rules and checked on every
   frame; see Reformat below)
+- **Precomp surgery:** `ae_precomp_surgery` (un-precompose a precomp layer, or deep-duplicate a comp with every nested
+  precomp unlinked, with every expression reference rewritten exactly and pixel proof; see Precomp surgery below)
 - **Checks:** `ae_preflight` (check the delivered comp and its render against your own delivery spec; see Preflight below),
   `ae_versions_from_data` (a CSV / JSON file becomes versions of a comp, then every row is checked; see Versions from data below),
   `ae_localize` (texts out to translators as CSV / XLIFF, translations back in as a version per language, fitted by your rules
@@ -506,10 +508,57 @@ over-bright areas can be missed. Comp ids belong to one project: a proof capture
 that same file (otherwise the verdict is not proven); one captured in an unsaved project is compared if every comp still
 has its name, with a note that the project itself couldn't be confirmed.
 `action: "run"` does it in one call: capture, the edits as `ae_batch` steps (one undo step, all or nothing), compare.
+For un-precomposing and deep duplicates, `ae_precomp_surgery` (see Precomp surgery) makes the edit itself, with the
+expression rewrites, and proves it the same way before applying it.
 Reference frames are stored in `~/.surehand/ae/proofs/` for 7 days (30 proofs at most). Rendering works like
 `ae_render_frame`: through a temporary comp that is removed again and leaves no undo step behind (After Effects still
 marks the project as changed); if the temporary comp can't be removed, the result says so. Capture and compare are
 allowed in read-only mode; `run` makes edits, so it follows the same permissions as `ae_batch`.
+
+### Precomp surgery
+
+Inherited projects often need restructuring: a precomp that should not be one, or a comp to copy with all its nested
+precomps *unlinked* (a "deep duplicate"). After Effects' own commands and free scripts can drop what the precomp layer
+did and silently break expressions such as `comp("Logo").layer("Title")` or `thisComp.layer(3)`. `ae_precomp_surgery`
+does it exactly or not at all.
+
+- **`unprecompose`** brings a precomp layer's layers into its comp at its place. A null carries the precomp layer's
+  anchor point, position, scale and rotation (keyframes and expressions included) and the moved top-level layers are
+  parented to it (parents inside the precomp are kept; `bakeNull` leaves the null out when the transform is the identity).
+  Layers move by the precomp layer's start time and are trimmed to its span; a layer entirely outside it is moved
+  switched off. Names that are taken in the comp get a number. Expressions are read with a real JavaScript parser
+  and rewritten by position: in the moved layers `thisComp.layer("x")` points at the moved copy, `thisComp.layer(3)` at its
+  new index, `thisComp.width` (and every other comp attribute) becomes `comp("<precomp>").width`; references by index to
+  the comp's own layers, from anywhere in the project, follow the layers that move down. Track mattes and Layer Control
+  parameters are pointed at the moved layers. One visible layer takes over the precomp layer's opacity and blend mode.
+  The source comp is kept (`removeSource` removes it only if nothing else uses it).
+- **`deep_duplicate`** copies a comp and every nested precomp, each once (a precomp used in several places maps to one
+  copy), points the copies' precomp layers at the copies, and rewrites `comp("X")` in the copies when X is in the tree
+  (references to comps outside it stay). `suffix` (default " copy", a number is added when the name is taken) and
+  `folder` (a new folder for the copies). Footage and solids are shared, not copied.
+
+**Refused, with the exact reason**, when it can't be reproduced exactly: effects, masks, layer styles, time remapping,
+time stretch, track mattes, 3D, collapse transformations, motion blur or frame blending on the precomp layer; its blend
+mode or opacity when the precomp has more than one visible layer; layers in the precomp that would interact with the
+comp's other layers (blend modes, adjustment layers, Preserve Underlying Transparency, cameras, lights, 3D layers);
+different frame rates or motion blur settings; Essential Graphics overrides; layers reaching outside the precomp's frame
+where that part would show; and expressions whose references can't be rewritten safely: names or indices computed when
+the expression runs, a layer's own `index` or `wiggle` / `random` (seeded by the layer index) when the index changes,
+`time` when the layers move in time, `toComp` and friends, references to the precomp layer itself, ambiguous comp names,
+expressions with an error before the surgery (they could start working). `override: ["expressions"]` or `["bounds"]`
+goes ahead anyway: those are still listed, left as they are, and the proof decides. `dryRun` returns the plan only:
+what moves, what is renamed, every expression rewrite (before → after) and every problem.
+
+**Proof first, then the change.** A checkpoint is saved (the project must be saved), reference frames are rendered (by
+default 6 frames across the precomp layer's time span, first and last included; deep duplicate: 5 across the work area),
+and the surgery is **rehearsed on a scratch copy** (a duplicate of the parent comp; for a deep duplicate, the copies). The
+scratch copy is compared with the original pixel by pixel, the same comparison as `ae_prove_identical` (default
+tolerance), and removed again. Only when it is **IDENTICAL** is the same surgery applied to the project, in one undo step
+(`ae_undo` reverts it), and the result is checked layer for layer against the rehearsal (otherwise that step is undone at
+once). **DIFFERS** means nothing was applied: the result lists the frames that differ with the largest difference, a
+difference image, and the likely cause (for example a precomp layer that is scaled: the precomp was resampled as a whole,
+while the moved layers are transformed once). Expression rewrites in other comps are exact text edits; the pixel proof
+covers the parent comp (or the copied tree).
 
 ### Handoff package
 
