@@ -36,6 +36,7 @@ Also:
 - Sending a project to someone: ae_handoff_package collects it with its footage, lists what the recipient needs, and
   with verify proves the package renders the same.
 - Slow render? ae_render_profile measures where the time goes over the timeline and proves speed-ups before keeping them.
+- Un-precompose or deep-duplicate a precomp tree: ae_precomp_surgery (rewrites expression references exactly, proves it).
 - Exact timing: the keyframe table (ae_get_keyframes / ae_set_keyframe_table: frames or seconds, exact speed and
   influence), ae_copy_ease, ae_retime_keyframes (whole frames), ae_audit_easing. Layout: ae_align_layers moves layers by
   their measured on-screen bounds; ae_reformat makes the comp at another size by the user's rules and checks every frame.
@@ -96,7 +97,15 @@ layer.name, .index, .enabled, .solo, .locked, .shy, .inPoint, .outPoint, .startT
 layer.threeDLayer, .blendingMode = BlendingMode.SCREEN, .adjustmentLayer, .motionBlur, .label (0-16)
 layer.moveToBeginning(), .moveBefore(l), .moveAfter(l), .duplicate(), .remove(), .selected = true
 layer.setTrackMatte(matteLayer, TrackMatteType.ALPHA)   // AE 23+
+layer.copyToComp(otherComp)   // returns nothing; find the copy by Layer.id (don't assume index 1); no parent.
+                              // Inside an undo group (every ae_run_script) AE refuses a layer with a parent or a
+                              // linked expression: detach (setParentWithJump(null), stash expressions), copy, put back
+layer.setParentWithJump(p)    // parent without changing the layer's values (.parent = p compensates the transform)
+avLayer.replaceSource(item, false)   // false: don't let AE rename references in expressions
+comp.duplicate()              // "<name> 2"; precomp layers in it still show the same precomps
 \`\`\`
+- Un-precompose or deep-duplicate a comp tree: use ae_precomp_surgery instead of scripting it. It rewrites expression
+  references (thisComp, comp("X"), layer indices) exactly, refuses what can't be reproduced, and proves the picture.
 
 ## Properties & keyframes
 \`\`\`js

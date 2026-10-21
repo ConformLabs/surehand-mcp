@@ -12,7 +12,7 @@ let babel: typeof BabelTypes | undefined;
  * Babel is the biggest dependency (about 2.3 MB minified), so the bundle stores it brotli-compressed (build.mjs) and
  * unpacks it the first time a script needs transpiling. Outside the bundle (tests) it loads from node_modules.
  */
-function Babel(): typeof BabelTypes {
+export function Babel(): typeof BabelTypes {
   if (babel) return babel;
   if (typeof __AEMCP_BABEL__ === "undefined") return (babel = createRequire(import.meta.url)("@babel/standalone"));
   const mod: { exports: any } = { exports: {} };

@@ -22,6 +22,8 @@ app.executeCommand(id); return { executed: args.command, id: id };`,
     input: { steps: z.number().int().min(1).max(50).optional() },
     noUndo: true,
     report: true,
+    // the step undone can be in any comp: compare them all (a rename and a value in another comp read "Changes: none")
+    reportAll: true,
     jsx: `var n = args.steps || 1; for (var i = 0; i < n; i++) app.executeCommand(16); return { undone: n };`,
   },
   {
@@ -31,6 +33,7 @@ app.executeCommand(id); return { executed: args.command, id: id };`,
     input: { steps: z.number().int().min(1).max(50).optional() },
     noUndo: true,
     report: true,
+    reportAll: true,
     jsx: `var n = args.steps || 1; for (var i = 0; i < n; i++) app.executeCommand(2035); return { redone: n };`,
   },
   {

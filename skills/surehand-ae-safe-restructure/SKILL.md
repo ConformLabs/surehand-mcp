@@ -20,7 +20,20 @@ simplifying rigs (parenting, nulls, expression controls), and renames that expre
 3. ae_project_history {action: "snapshot", label: "before"}: records the starting state.
 4. ae_checkpoint {action: "save", label: "..."} before the first edit.
 
-ae_project_xray and ae_project_history are on demand in a core-tools chat: run them with ae_call.
+ae_project_xray, ae_project_history and ae_precomp_surgery are on demand in a core-tools chat: run them with ae_call.
+
+## Un-precompose and deep duplicate: ae_precomp_surgery
+
+Don't script these by hand: ae_precomp_surgery rewrites every expression reference exactly, refuses what it can't
+reproduce, and proves the picture before it changes anything (details: references/precomp-surgery.md).
+
+1. {action: "unprecompose", comp, layer, dryRun: true} or {action: "deep_duplicate", comp, dryRun: true}: the plan.
+   Show the user what moves, what is renamed, every expression rewrite and every problem.
+2. Problems: report each reason as given. Never work around one with a script. An `override` only when the user
+   accepts that those references stay as they are and the pixel proof decides.
+3. Run it without dryRun. DONE means proven IDENTICAL and applied. The way back is the one the result names (the
+   checkpoint for an un-precompose, {action: "remove_copies", id} for a deep duplicate), not a count of ae_undo steps. DIFFERS means nothing was applied: report the frames, the difference and the
+   likely cause, and let the user decide.
 
 ## Prove every structural edit
 
@@ -62,6 +75,6 @@ with the findings to apply (details: references/render-profile.md).
 
 - [ ] X-ray and comp map read
 - [ ] Checkpoint saved, history snapshot taken
-- [ ] Every structural edit proved, verdict quoted as given
+- [ ] Every structural edit proved, verdict quoted as given (un-precompose / deep duplicate with ae_precomp_surgery)
 - [ ] Every DIFFERS undone or explained
 - [ ] History diff shown to the user
