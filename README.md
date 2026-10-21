@@ -1097,7 +1097,7 @@ What Surehand doesn't do, or can't do yet. Each feature's own limits are in its 
 - **Read-only mode and the permissions are guardrails, not a sandbox.** See [What the AI can and can't
   do](#what-the-ai-can-and-cant-do).
 - **Chat in After Effects** supports Codex, Claude Code and Antigravity. Antigravity's output format isn't documented
-  yet, so its chat is read more loosely and is the least tested of the three.
+  yet: Surehand reads the format Antigravity's CLI 1.4 writes, so a later Antigravity version may need an update.
 - **Right to left:** paragraph direction, the composer and alignment are set; mirroring the layout itself, kashida
   justification and per-character direction are not available to scripts.
 
