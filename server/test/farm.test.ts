@@ -808,16 +808,16 @@ describe.skipIf(!posix)("run_local and verify (fake aerender)", () => {
     expect(text(await farm({ action: "verify", plan }))).toMatch(/^PASS/);
   });
 
-  it("without staggering the collision is seen: a chunk that ended before its first frame is FAILED with its log", async () => {
+  it("without staggering the collision is seen: the chunk that ended before its first frame is started again once, said with its log", async () => {
     const plan = await planFile({ processes: 2 });
     process.env.FAKE_COLLIDE = mkdtempSync(join(home, "collide-"));
     const id = runIdOf(text(await farm({ action: "run_local", plan })));
     await waitForRun(id);
-    // the retry starts while the other is still starting, so it collides again: failed, said with aerender's last line
+    // whichever of the two started second collided; its retry collides again or renders, depending on timing
     const st = text(await farm({ action: "status", run: id }));
-    expect(st).toMatch(/finished with failures/);
-    // whichever of the two started second
-    expect(st).toMatch(/[12]\. frames (0-49|50-99): failed, 0\/50 \(aerender version 26\.5x89 \| \(aerender ended after 0 of 50 frames\); log .*\) \(started again once: its first aerender, job r\w+, ended before rendering a frame: aerender version 26\.5x89/);
+    expect(st).toMatch(/: (finished with failures|done)\./);
+    expect(aerenderRuns()).toHaveLength(3);
+    expect(st).toMatch(/[12]\. frames (0-49|50-99): (failed|done), .*\(started again once: its first aerender, job r\w+, ended before rendering a frame: aerender version 26\.5x89 \| \(aerender ended after 0 of 50 frames\); log /);
   });
 
   it("a chunk that dies before its first frame is started again once, and status says so", async () => {
