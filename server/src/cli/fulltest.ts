@@ -7,7 +7,7 @@ import { VERSION } from "../config.js";
 import { evalBody, runJsx, type RunResult } from "../jsx.js";
 import { transpileUserCode } from "../transpile.js";
 import { ALL_JSX_TOOLS } from "../tools/all.js";
-import { CONTACT_SHEET_JSX, RENDER_FRAME_JSX } from "../tools/core.js";
+import { CONTACT_SHEET_JSX, RENDER_FRAME_JSX, waitForFile } from "../tools/core.js";
 import { restoreCheckpoint, saveCheckpoint } from "../tools/workflow.js";
 import { captureSnapshot } from "../tools/history.js";
 import { regressionSteps } from "./fulltest-regression.js";
@@ -19,7 +19,7 @@ import { appFile } from "../paths.js";
 const ALL = ALL_JSX_TOOLS;
 const C = "__aemcp_fulltest";
 
-interface Step { name: string; tool?: string; args?: Record<string, unknown>; jsx?: string; needs?: string; check?: (r: RunResult) => string | null }
+interface Step { name: string; tool?: string; args?: Record<string, unknown>; jsx?: string; needs?: string; check?: (r: RunResult) => string | null | Promise<string | null> }
 interface StepResult { step: string; ok: boolean; ms: number; error?: string; skipped?: boolean }
 
 const jsxOf = (tool: string) => ALL.find((t) => t.name === tool)!.jsx;
@@ -227,7 +227,8 @@ export async function fullSelftest(before?: ProjectState): Promise<number> {
     { name: "replace in expressions (dry run)", tool: "ae_replace_in_expressions", args: { find: "time", replace: "time", comps: [C], dryRun: true } },
     { name: "color settings", tool: "ae_color_settings", args: { listProfiles: true } },
     { name: "system info", tool: "ae_system_info", args: {} },
-    { name: "frame preview", jsx: RENDER_FRAME_JSX, args: { comp: C, time: 1, outputPath: frame, tmpDir }, check: () => (existsSync(frame) && statSync(frame).size > 0 ? null : "no PNG written") },
+    { name: "frame preview", jsx: RENDER_FRAME_JSX, args: { comp: C, time: 1, outputPath: frame, tmpDir }, // saveFrameToPng writes after the script returns: wait for the complete PNG, as ae_render_frame does
+      check: async () => ((await waitForFile(frame)) && statSync(frame).size > 0 ? null : "no PNG written") },
     { name: "contact sheet", jsx: CONTACT_SHEET_JSX, args: { comp: C, frames: 4, tmpDir } },
     {
       name: "modern JavaScript",
@@ -253,7 +254,7 @@ export async function fullSelftest(before?: ProjectState): Promise<number> {
     } catch (e: any) {
       r = { ok: false, logs: [], error: { message: e.message } };
     }
-    const problem = !r.ok ? r.error?.message ?? "failed" : s.check?.(r) ?? null;
+    const problem = !r.ok ? r.error?.message ?? "failed" : (await s.check?.(r)) ?? null;
     const ms = Date.now() - t0;
     results.push({ step: s.name, ok: !problem, ms, error: problem ?? undefined });
     problem ? fail(`${s.name}: ${problem}`) : ok(`${s.name} (${ms} ms)`);
