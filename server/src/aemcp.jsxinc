@@ -526,7 +526,7 @@ aemcp = (function () {
   A.projectInfo = function () {
     var p = app.project, counts = { comp: 0, footage: 0, folder: 0, solid: 0, placeholder: 0 };
     for (var i = 1; i <= p.numItems; i++) { var t = A.itemType(p.item(i)); counts[t] = (counts[t] || 0) + 1; }
-    var o = { file: p.file ? p.file.fsName : null, name: p.file ? p.file.name : "Untitled", dirty: p.dirty, numItems: p.numItems, counts: counts,
+    var o = { file: p.file ? p.file.fsName : null, name: p.file ? decodeURI(p.file.name) : "Untitled", dirty: p.dirty, numItems: p.numItems, counts: counts,
       bitsPerChannel: p.bitsPerChannel, renderQueueItems: p.renderQueue.numItems };
     try { o.frameRate = A.round(p.frameRate); } catch (e) {}
     try { o.workingSpace = p.workingSpace; } catch (e) {}
