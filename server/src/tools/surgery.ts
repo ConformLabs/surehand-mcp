@@ -361,12 +361,21 @@ try {
   // C's order, right above L, the null on top
   for (var o1 = 1; o1 <= C.numLayers; o1++) map["c" + o1].moveBefore(LT);
   if (N && C.numLayers) N.moveBefore(map["c1"]);
+  // parents first, as the diagnostic does (proven live): from the source itself, not from the plan's arguments. The
+  // original's parent inside C becomes its copy; a top-level layer goes on the null. Read back at once.
+  var planned = {};
+  for (var m0 = 0; m0 < args.moved.length; m0++) planned["c" + args.moved[m0].ci] = args.moved[m0].par;
+  for (var p1 = 1; p1 <= C.numLayers; p1++) {
+    var Yp = map["c" + p1], sp1 = C.layer(p1).parent, want = sp1 ? map["c" + sp1.index] : N;
+    if (want) Yp.setParentWithJump(want);
+    else if (Yp.parent) { try { Yp.setParentWithJump(null); } catch (e) { Yp.parent = null; } }
+    var gotP = Yp.parent;
+    if (want ? !gotP || gotP.index !== want.index : !!gotP)
+      throw new Error("parenting " + JSON.stringify(Yp.name) + " failed: wanted " + (want ? JSON.stringify(want.name) + " (layer " + want.index + ")" : "none") + ", got " + (gotP ? JSON.stringify(gotP.name) + " (layer " + gotP.index + ")" : "none") + " (planned: " + JSON.stringify(planned["c" + p1]) + ")");
+  }
   for (var m = 0; m < args.moved.length; m++) {
     var mv = args.moved[m], Y = map["c" + mv.ci];
     if (Y.name !== mv.to) Y.name = mv.to;
-    var want = mv.parent === "null" ? N : mv.parent ? map["c" + mv.parent] : null;
-    if (want) Y.setParentWithJump(want);
-    else if (Y.parent) { try { Y.setParentWithJump(null); } catch (e) { Y.parent = null; } }
     // exact values from After Effects (the plan's are rounded, for the report): shifted by L's start, cut to L's span
     if (Ls !== 0) Y.startTime = Y.startTime + Ls;
     var nin = Math.max(Y.inPoint, Lin), nout = Math.min(Y.outPoint, Lout);
@@ -400,7 +409,7 @@ try {
         for (var q3 = 0; q3 < 6; q3++) off3 = Math.max(off3, Math.abs(want3[q3] - got3[q3]) * (q3 < 4 ? 1000 : 1));
         if (off3 > 0.01) {
           var Mv = map["c" + c3];
-          throw new Error("placement check failed for " + JSON.stringify(Mv.name) + " at " + r4(tt[t3]) + "s: expected matrix " + mats(want3) + ", got " + mats(got3) +
+          throw new Error("placement check failed for " + JSON.stringify(Mv.name) + " at " + r4(tt[t3]) + "s (planned parent: " + planned["c" + c3] + ", actual: " + (Mv.parent ? JSON.stringify(Mv.parent.name) : "none") + "): expected matrix " + mats(want3) + ", got " + mats(got3) +
             "; " + diag("the layer", Mv, tt[t3]) + "; " + diag("its original in " + C.name, C.layer(c3), tt[t3] - Ls) + "; " + (N ? diag("the null", N, tt[t3]) + "; " : "") + diag("the precomp layer", LT, tt[t3]));
         }
       }
@@ -646,7 +655,8 @@ export async function runSurgery(a: SurgeryInput, perm: { mode: string; allowShe
       edits: u.rewrites.filter((r) => pick(r) !== null && pick(r) !== r.old).map((r) => ({ c: r.c, l: r.l, p: r.p, old: r.old, text: pick(r) })),
       nullLayer: u.nullLayer,
       nullEdits: u.nullRewrites.map((r) => ({ m: r.p.length ? f.exprs.find((e) => e.c === r.c && e.l === r.l && e.p.join() === r.p.join())?.mp[1] : "", text: pick(r) ?? r.old })),
-      moved: u.moved.map((m) => ({ ci: m.ci, to: m.to, parent: m.parent ?? 0, matte: m.matte ?? null })),
+      // par: the planned parent, for messages only (the script takes parents from the source comp itself)
+      moved: u.moved.map((m) => ({ ci: m.ci, to: m.to, par: m.parent === "null" ? "the null" : m.parent ? `layer ${m.parent} of the precomp` : "none", matte: m.matte ?? null })),
       movedEdits: u.movedRewrites.map((r) => ({ ci: r.l, p: r.p, text: pick(r) ?? r.old })),
       layerParams: u.layerParams,
       carry: u.carry ?? null,

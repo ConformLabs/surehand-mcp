@@ -19,6 +19,9 @@ let fake: ReturnType<typeof fakeSurgeryAE>;
 let skew: ((comp: any) => boolean) | null = null;
 let onCompare: (() => void) | null = null;
 let calls: { kind: string; args: any; opts: any }[] = [];
+/** test hooks: change a script's arguments on the way to After Effects; run before every script */
+let mangle: ((args: any) => void) | null = null;
+let onJsx: (() => void) | null = null;
 
 function png(text: string): Buffer {
   let h = 7;
@@ -51,6 +54,11 @@ vi.mock("../src/jsx.js", async (orig) => {
         });
         return { ok: true, logs: [], result: { project: projectFile, comps: out, tmpLeft: false } };
       }
+      onJsx?.();
+      if (mangle) {
+        args = JSON.parse(JSON.stringify(args));
+        mangle(args);
+      }
       return fake.run(body, args, opts);
     },
   };
@@ -74,6 +82,8 @@ const checkpoints = () => {
 };
 
 beforeEach(() => {
+  mangle = null;
+  onJsx = null;
   skew = null;
   onCompare = null;
   calls = [];
@@ -487,8 +497,37 @@ describe("un-precompose: the tool", () => {
     const r = await runSurgery({ action: "unprecompose", comp: "Main", layer: "Pre" }, FULL);
     expect(r.isError).toBe(true);
     const t = text(r);
-    expect(t).toMatch(/The rehearsal on a scratch copy stopped: placement check failed for "Title" at 0s: expected matrix \[0\.5, 0, 0, 0\.5, 700, 500\], got \[1, 0, 0, 1, 960, 540\]/);
-    expect(t).toMatch(/the layer "Title" \(layer 2, parent none\): anchor \[0, 0\], position \[960, 540\], scale \[100, 100, 100\], rotation 0; .*the null "Pre \(null\)" \(layer 1, parent none\): anchor \[960, 540\], position \[700, 500\], scale \[50, 50, 100\]/);
+    expect(t).toMatch(/The rehearsal on a scratch copy stopped: parenting "Title" failed: wanted "Pre \(null\)" \(layer 1\), got none \(planned: "the null"\)/);
+  });
+
+  it("parents come from the source comp, not from the plan's arguments (a lost or wrong argument changes nothing)", async () => {
+    const comps: SComp[] = [
+      { name: "Pre", layers: [{ name: "Title", type: "text", position: [960, 300] }, { name: "Box", size: [300, 300], position: [400, 400] }, { name: "Child", parent: "Box", position: [10, 10] }] },
+      { name: "Main", layers: [{ name: "Pre", type: "precomp", source: "Pre", position: [700, 500] }] },
+    ];
+    ae(comps);
+    const main = fake.comp("Main"), pics = pictures(main);
+    // the arguments' planned parents are dropped on the way to After Effects
+    mangle = (args) => args.moved && args.moved.forEach((m: any) => delete m.par);
+    const r = await runSurgery({ action: "unprecompose", comp: "Main", layer: "Pre" }, FULL);
+    expect(r.isError, text(r)).toBeFalsy();
+    expect(pictures(main)).toEqual(pics);
+    expect(main.layers.map((l: any) => [l.name, l.parent?.name ?? null])).toEqual([["Pre (null)", null], ["Title", "Pre (null)"], ["Box", "Pre (null)"], ["Child", "Box"]]);
+  });
+
+  it("the placement check names the planned and actual parent", async () => {
+    const comps: SComp[] = [
+      { name: "Pre", layers: [{ name: "Title", type: "text", position: [960, 540] }] },
+      { name: "Main", layers: [{ name: "Pre", type: "precomp", source: "Pre", position: [700, 500], scale: [50, 50, 100] }] },
+    ];
+    // an After Effects that moves the copy when it is parented
+    ae(comps, { afterJump: (L: any, p: any) => p && L._comp.name.endsWith("(Surehand rehearsal)") && L.property("ADBE Transform Group").property("ADBE Position").setValue([0, 0]) });
+    const before = fake.state();
+    const r = await runSurgery({ action: "unprecompose", comp: "Main", layer: "Pre" }, FULL);
+    expect(r.isError).toBe(true);
+    const t = text(r);
+    expect(t).toMatch(/placement check failed for "Title" at 0s \(planned parent: the null, actual: "Pre \(null\)"\): expected matrix \[0\.5, 0, 0, 0\.5, 700, 500\], got \[0\.5, 0, 0, 0\.5, 220, 230\]/);
+    expect(t).toMatch(/the layer "Title" \(layer 2, parent "Pre \(null\)"\): anchor \[0, 0\], position \[0, 0\], scale \[100, 100, 100\], rotation 0; its original in Pre "Title" \(layer 1, parent none\): anchor \[0, 0\], position \[960, 540\].*the null "Pre \(null\)" \(layer 1, parent none\): anchor \[960, 540\], position \[700, 500\], scale \[50, 50, 100\]/);
     expect(fake.state()).toBe(before);
   });
 

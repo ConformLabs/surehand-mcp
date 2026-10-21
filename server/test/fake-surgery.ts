@@ -178,7 +178,7 @@ function eachProp(g: any, f: (p: any) => void) {
 
 const LAYER_FIELDS = ["name", "enabled", "locked", "guideLayer", "solo", "threeDLayer", "blendingMode", "motionBlur", "collapseTransformation", "timeRemapEnabled", "preserveTransparency", "adjustmentLayer", "frameBlendingType", "autoOrient", "trackMatteType", "label", "stretch", "_in", "_out", "_start", "_parent", "_matte", "source", "_comp", "_ident"] as const;
 
-export function fakeSurgeryAE(opts: { comps: SComp[]; file?: string | null; active?: string; rq?: string[]; copyInsert?: "top" | "aboveSelection"; /** a broken After Effects for tests: setParentWithJump with a layer does nothing */ jumpIgnored?: boolean }) {
+export function fakeSurgeryAE(opts: { comps: SComp[]; file?: string | null; active?: string; rq?: string[]; copyInsert?: "top" | "aboveSelection"; /** a broken After Effects for tests: setParentWithJump with a layer does nothing */ jumpIgnored?: boolean; /** called after setParentWithJump */ afterJump?: (L: any, p: any) => void }) {
   let nextId = 1;
   let groupOpen = false;
   /** a new layer is the only selected one in its comp */
@@ -296,6 +296,7 @@ export function fakeSurgeryAE(opts: { comps: SComp[]; file?: string | null; acti
       guard("parent");
       if (opts.jumpIgnored && p) return;
       L._parent = p ?? null;
+      opts.afterJump?.(L, p);
     };
     L.setTrackMatte = (m: any, type: number) => {
       L._matte = m;
