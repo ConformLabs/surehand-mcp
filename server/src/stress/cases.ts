@@ -53,6 +53,8 @@ export interface Variant {
   set: "generated" | "together" | "own" | "data" | "combination";
   caseId?: string;
   group?: string;
+  /** the sub-line, when not built from the sets ("names.csv") */
+  detail?: string;
   sets: { target: string; value: Cell | number[]; detail?: string }[];
 }
 
@@ -96,14 +98,14 @@ export function textCases(current: string): Case[] {
   };
   const url = noSpace("https://www.example.com/campaign/2026/spring-collection-launch-event", Math.max(Math.round(base * 1.5), 40));
   return [
-    { id: "de-long", label: "German long", group: "length", value: de, detail: `${de.length} chars, compounds` },
-    { id: "fi-long", label: "Finnish long", group: "length", value: fi, detail: `${fi.length} chars, compounds` },
+    { id: "de-long", label: "German · longest", group: "length", value: de, detail: `${de.length} chars, compounds` },
+    { id: "fi-long", label: "Finnish · longest", group: "length", value: fi, detail: `${fi.length} chars, compounds` },
     { id: "double", label: "Twice as long", group: "length", value: grow(current, base * 2), detail: `the current text grown to ${base * 2} chars` },
     { id: "no-spaces", label: "No spaces", group: "length", value: url, detail: `${url.length} chars, a URL with no break point` },
     { id: "caps", label: "All caps", group: "edge", value: upper(current.trim() ? current : "Überraschung für Österreich") + " ÄÖÜ ÉÑ", detail: "the current text in capitals, accented capitals" },
-    { id: "he-rtl", label: "Hebrew + numbers", group: "rtl", value: "מבצע מיוחד: 50% הנחה עד 31.12.2026", detail: "right to left, mixed with numbers" },
-    { id: "ar-rtl", label: "Arabic + numbers", group: "rtl", value: "عرض خاص: خصم 50% حتى 31.12.2026", detail: "right to left, joined letters, numbers" },
-    { id: "ar-mixed", label: "Arabic + Latin", group: "rtl", value: "مهرجان After Effects للتصميم 2026", detail: "right to left with a Latin name inside" },
+    { id: "he-rtl", label: "Hebrew · with digits", group: "rtl", value: "מבצע מיוחד: 50% הנחה עד 31.12.2026", detail: "right to left, mixed with numbers" },
+    { id: "ar-rtl", label: "Arabic · with digits", group: "rtl", value: "عرض خاص: خصم 50% حتى 31.12.2026", detail: "right to left, joined letters, numbers" },
+    { id: "ar-mixed", label: "Arabic · with Latin", group: "rtl", value: "مهرجان After Effects للتصميم 2026", detail: "right to left with a Latin name inside" },
     { id: "ja", label: "Japanese", group: "cjk", value: "東京都千代田区で特別キャンペーン開催中", detail: "kanji and kana, no spaces" },
     { id: "zh", label: "Chinese", group: "cjk", value: "限时特惠活动现已全面开始", detail: "simplified Chinese, no spaces" },
     { id: "ko", label: "Korean", group: "cjk", value: "특별 할인 행사가 진행 중입니다", detail: "Hangul" },
@@ -119,23 +121,23 @@ export function textCases(current: string): Case[] {
 
 /** Number cases typed into a text field that shows a number: both separator styles, signs, percent, decimals. */
 export const NUMBER_TEXT_CASES: Case[] = [
-  { id: "n-zero", label: "Zero", group: "number", value: "0", detail: '"0"' },
-  { id: "n-negative", label: "Negative", group: "number", value: "-1,234.50", detail: '"-1,234.50"' },
-  { id: "n-huge", label: "Huge", group: "number", value: "1,234,567.89", detail: '"1,234,567.89"' },
-  { id: "n-eu", label: "European separators", group: "number", value: "1.234.567,89", detail: '"1.234.567,89"' },
-  { id: "n-decimals", label: "Many decimals", group: "number", value: "3.14159265", detail: '"3.14159265"' },
-  { id: "n-percent", label: "Percent", group: "number", value: "100%", detail: '"100%"' },
+  { id: "n-zero", label: "Number · 0", group: "number", value: "0", detail: '"0"' },
+  { id: "n-negative", label: "Number · -1,234.50", group: "number", value: "-1,234.50", detail: '"-1,234.50"' },
+  { id: "n-huge", label: "Number · 1,234,567.89", group: "number", value: "1,234,567.89", detail: '"1,234,567.89"' },
+  { id: "n-eu", label: "Number · 1.234.567,89", group: "number", value: "1.234.567,89", detail: '"1.234.567,89"' },
+  { id: "n-decimals", label: "Number · 3.14159265", group: "number", value: "3.14159265", detail: '"3.14159265"' },
+  { id: "n-percent", label: "Number · 100%", group: "number", value: "100%", detail: '"100%"' },
 ];
 
 /** Number cases set on a number control (a slider): sign, size, precision, AE's own slider limits. */
 export const NUMBER_CASES: Case[] = [
   { id: "n-zero", label: "Zero", group: "number", value: 0, detail: "0" },
-  { id: "n-negative", label: "Negative", group: "number", value: -1234.5, detail: "-1234.5" },
-  { id: "n-huge", label: "Huge", group: "number", value: 1234567.89, detail: "1234567.89" },
-  { id: "n-limit", label: "Past the slider limit", group: "number", value: 9999999999, detail: "9999999999 (sliders stop at ±1,000,000)" },
-  { id: "n-decimals", label: "Many decimals", group: "number", value: 3.14159265, detail: "3.14159265" },
-  { id: "n-tiny", label: "Tiny", group: "number", value: 0.000001, detail: "0.000001" },
-  { id: "n-percent", label: "Over 100 percent", group: "number", value: 150, detail: "150 (a percentage over 100)" },
+  { id: "n-negative", label: "Negative · -1234.5", group: "number", value: -1234.5, detail: "-1234.5" },
+  { id: "n-huge", label: "Huge · 1234567.89", group: "number", value: 1234567.89, detail: "1234567.89" },
+  { id: "n-limit", label: "Past the limit · 9999999999", group: "number", value: 9999999999, detail: "9999999999 (sliders stop at ±1,000,000)" },
+  { id: "n-decimals", label: "Decimals · 3.14159265", group: "number", value: 3.14159265, detail: "3.14159265" },
+  { id: "n-tiny", label: "Tiny · 0.000001", group: "number", value: 0.000001, detail: "0.000001" },
+  { id: "n-percent", label: "Over 100 % · 150", group: "number", value: 150, detail: "150 (a percentage over 100)" },
 ];
 
 /** A text that is a number (a price, a score): its digits parse as one. */
@@ -187,6 +189,8 @@ export interface PlanOptions {
   maxVariants: number;
   own?: { target: string; values: (Cell | number[])[] }[];
   rows?: { n: number; cells: { target: string; value: Cell }[] }[];
+  /** where the rows came from (the sub-line: "names.csv") */
+  rowsSource?: string;
 }
 
 export interface Plan {
@@ -215,9 +219,9 @@ export function planVariants(targets: Target[], o: PlanOptions): Plan {
   const live = targets.filter((t) => !t.problem);
   const real: Variant[] = [];
   for (const r of o.rows ?? [])
-    real.push({ id: `row-${r.n}`, name: `Row ${r.n}`, set: "data", sets: r.cells.map((c) => ({ target: c.target, value: c.value })) });
+    real.push({ id: `row-${r.n}`, name: `Your data · row ${r.n}`, set: "data", ...(o.rowsSource ? { detail: o.rowsSource } : {}), sets: r.cells.map((c) => ({ target: c.target, value: c.value })) });
   for (const own of o.own ?? [])
-    own.values.forEach((v, k) => real.push({ id: `own-${k + 1}@${own.target}`, name: `${own.target}: value ${k + 1}`, set: "own", sets: [{ target: own.target, value: v }] }));
+    own.values.forEach((v, k) => real.push({ id: `own-${k + 1}@${own.target}`, name: `Your value · ${k + 1}`, set: "own", sets: [{ target: own.target, value: v }] }));
 
   const perTarget = live.map((t) => casesFor(t).filter((c) => wanted(c, o)).map((c): Variant => ({
     id: `${c.id}@${t.id}`,

@@ -48,7 +48,7 @@ export const CORE_TOOLS = new Set([
 /**
  * Tools with an in-chat view (MCP Apps). A view only shows when the AI app calls the tool itself, not through
  * ae_call, so where the AI app shows views (it says so at initialize) these join the core set. That costs
- * about 1,750 tokens of tool definitions per chat (ae_preflight ~650, ae_project_xray ~500, ae_project_history
+ * about 4,100 tokens of tool definitions per chat (ae_preflight ~650, ae_project_xray ~500, ae_stress_test ~2,300, ae_project_history
  * ~600: their tools/list JSON / 4); the two app-only tools are hidden from the AI by the AI app. AI apps without
  * views keep today's core set. ae_prove_identical is core already.
  */

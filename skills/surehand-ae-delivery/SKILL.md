@@ -1,6 +1,6 @@
 ---
 name: surehand-ae-delivery
-description: Checks After Effects comps and renders against the user's delivery spec (QC preflight); builds checked versions from data or translations. Use for delivery specs, QC, versions, localization.
+description: Checks After Effects comps and renders against the user's delivery spec, stress-tests them with worst-case inputs, builds checked versions. Use for QC, stress tests, versions, localization.
 license: MIT
 ---
 
@@ -51,6 +51,12 @@ skill for every edit.
 When a CSV / JSON file becomes many versions of a comp (names, scores, prices, bars, photos), use
 ae_versions_from_data: it builds every row in one undo step and checks every row (values, text overflow and frame,
 glyphs, fonts, bar sizes, footage). Follow references/versions-from-data.md for the workflow.
+
+## Stress test
+
+Before a comp goes to editors or a client, ae_stress_test measures what breaks with worst-case inputs (long
+German, Arabic, CJK, empty, huge numbers, the user's own rows) on a scratch copy, and which expressions break in
+After Effects in another language. Follow references/stress-test.md for the workflow.
 
 ## Localization
 

@@ -32,6 +32,8 @@ import { historyView } from "./src/tools/history.ts";
 import { diffSnapshots } from "./src/history-diff.ts";
 import { mockupProject, emptyQueueProject } from "./test/fixtures/xray-view.ts";
 import { xrayView, xrayNodeView } from "./src/tools/xray-view.ts";
+import { stressFixture } from "./test/fixtures/stress-view.ts";
+export const stress = stressFixture();
 import { withFonts } from "./src/views/fonts.ts";
 import { encodeJpeg } from "./src/jpeg.ts";
 import { readFileSync } from "node:fs";
@@ -92,6 +94,8 @@ const PAGES = [
   { name: "proof-differs", view: "changes", ask: "Un-precompose Logo_Lockup and prove nothing changed on screen.", tool: "ae_prove_identical", data: fx.proofDiffers, calls: { ae_view_proof_frame: stills(true) } },
   { name: "history", view: "changes", ask: "What changed since the checkpoint?", tool: "ae_project_history", data: fx.history, calls: {} },
   { name: "xray", view: "xray", ask: "I inherited this project. How does it work, and what will break?", tool: "ae_project_xray", data: fx.xray.data, calls: { ae_view_xray_node: { byNode: fx.xray.byNode } } },
+  // the stress test: the first failing variant opens by itself, with its kept frame (a lower third whose name runs long)
+  { name: "stress", view: "stress", ask: "Stress-test the lower third before we hand the template to the client.", tool: "ae_stress_test", data: fx.stress, args: fx.stress.args, calls: { ae_view_stress_frame: { content: [{ type: "image", data: fx.frame([190, 800, 1070, 960]), mimeType: "image/jpeg" }, { type: "text", text: "Frame" }] } } },
   { name: "xray-empty-queue", view: "xray", ask: "How does this project work?", tool: "ae_project_xray", data: fx.xrayEmptyQueue.data, calls: { ae_view_xray_node: { byNode: fx.xrayEmptyQueue.byNode } } },
 ];
 

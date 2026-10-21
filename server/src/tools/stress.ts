@@ -9,7 +9,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { createHash, randomBytes } from "node:crypto";
 import { existsSync, mkdirSync } from "node:fs";
-import { isAbsolute, join } from "node:path";
+import { basename, isAbsolute, join } from "node:path";
 import { z } from "zod";
 import { runJsx } from "../jsx.js";
 import { approvalSummary, permissions } from "../permissions.js";
@@ -209,6 +209,7 @@ const SAMPLE_BUDGET_MS = 60_000;
 
 /** The view's sub-line for a variant: "Title · 52 chars, compounds". */
 function detailOf(v: Variant): string {
+  if (v.detail) return v.detail;
   return v.sets.map((s) => `${s.target}${s.detail ? ` · ${s.detail}` : ""}`).join("; ");
 }
 const shown = (v: unknown): string => (Array.isArray(v) ? `[${v.join(", ")}]` : v === null || v === undefined ? "" : String(v));
@@ -280,8 +281,10 @@ export async function runStress(a: StressArgs, perm: { mode: string } = permissi
     own.push({ target: t.id, values: v.values });
   }
   let rows: { n: number; cells: { target: string; value: Cell }[] }[] | undefined;
+  let rowsSource: string | undefined;
   if (a.data !== undefined && a.columns) {
     const table = loadTable(a.data, { delimiter: a.csvDelimiter });
+    rowsSource = typeof a.data === "string" ? basename(a.data) : "your rows";
     for (const [col, name] of Object.entries(a.columns)) {
       if (!table.columns.includes(col)) return errorResult(`columns: there is no column "${col}" in ${table.source} (columns: ${table.columns.join(", ")}).`);
       if (!findTarget(targets, name)) return errorResult(`columns: no control named "${name}" (controls: ${targets.map((x) => x.id).join(", ")}).`);
@@ -291,7 +294,7 @@ export async function runStress(a: StressArgs, perm: { mode: string } = permissi
       cells: Object.entries(a.columns!).map(([col, name]) => ({ target: findTarget(targets, name)!.id, value: table.rows[n - 1][col] ?? null })),
     }));
   }
-  const plan = planVariants(targets, { sets: a.sets, exclude: a.exclude, combinations: a.combinations ?? "single", maxVariants: a.maxVariants ?? 80, own, rows });
+  const plan = planVariants(targets, { sets: a.sets, exclude: a.exclude, combinations: a.combinations ?? "single", maxVariants: a.maxVariants ?? 80, own, rows, rowsSource });
   const frames = a.frames?.length
     ? [...new Set(a.frames.filter((f) => f < nFrames))].sort((x, y) => x - y)
     : pickFrames({ frames: nFrames, keys: disc.keys.map((t) => t / comp.fd), edges: disc.edges.map((t) => t / comp.fd), max: a.maxFrames ?? 12 });

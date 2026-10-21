@@ -270,32 +270,32 @@ const invertAttr: Record<string, string> = Object.fromEntries(Object.entries(ATT
 const MESSAGE: Record<RiskCode, (f: Found) => { message: string; fix: string; severity: "fail" | "warn" }> = {
   effectDefaultName: (f) => ({
     severity: "fail",
-    message: `effect "${f.name}" by its default name: After Effects in another language names it differently, so the expression can't find it`,
+    message: `names effect "${f.name}" by its default name: After Effects in another language names it differently, so the expression can't find it`,
     fix: `rename the effect (a name you give it is the same in every language) and use that name${f.effect ? `, or its match name "${f.effect}"` : ""}`,
   }),
   paramName: (f) => ({
     severity: "fail",
-    message: `parameter "${f.name}"${f.effect ? ` of "${f.effect}"` : ""} by its display name, which is translated in other After Effects languages`,
+    message: `names parameter "${f.name}"${f.effect ? ` of "${f.effect}"` : ""} by its display name, which is translated in other After Effects languages`,
     fix: "use the parameter's index (expression controls: 1) or its match name",
   }),
   propertyName: (f) => ({
     severity: "fail",
-    message: `property "${f.name}" by its display name, which is translated in other After Effects languages`,
+    message: `names property "${f.name}" by its display name, which is translated in other After Effects languages`,
     fix: ATTRIBUTES[f.name] ? `use the attribute .${ATTRIBUTES[f.name]} (or the match name)` : "use the property's match name or index",
   }),
   layerStyleName: (f) => ({
     severity: "fail",
-    message: `layer style "${f.name}" by its display name, which is translated in other After Effects languages`,
+    message: `names layer style "${f.name}" by its display name, which is translated in other After Effects languages`,
     fix: ATTRIBUTES[f.name] ? `use layerStyle.${ATTRIBUTES[f.name]}` : "use the layerStyle attributes (layerStyle.dropShadow...) or match names",
   }),
   shapeDefaultName: (f) => ({
     severity: "warn",
-    message: `shape item "${f.name}" by the default name After Effects gave it: a template made or edited in another language names it differently`,
+    message: `names shape item "${f.name}" by the default name After Effects gave it: a template made or edited in another language names it differently`,
     fix: "rename the shape group (your own name is the same in every language) or use its index, content(1)",
   }),
   maskDefaultName: (f) => ({
     severity: "warn",
-    message: `mask "${f.name}" by its default name: After Effects in another language names masks differently`,
+    message: `names mask "${f.name}" by its default name: After Effects in another language names masks differently`,
     fix: "rename the mask, or use its index, mask(1)",
   }),
 };

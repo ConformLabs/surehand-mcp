@@ -1,0 +1,18 @@
+/* Stress test view (the approved board "Stress test"): Preflight's styles (preflight.css, built in before this file)
+ * and two of its own, the variants x checks grid and the input box */
+
+/* the variants x checks grid */
+.mx { padding: 8px 14px 10px; }
+.mx table { width: 100%; border-collapse: collapse; }
+.mx th { font: 500 10px/14px var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-muted); text-align: center; padding: 4px 4px 6px; white-space: nowrap; }
+.mx th:first-child { text-align: left; }
+.mx td { padding: 5px 4px; border-top: 1px solid var(--rule); text-align: center; vertical-align: middle; }
+.mx td:first-child { text-align: left; }
+.mx tr.sel td { background: var(--paper-raised); }
+.mx tr.sel td:first-child { box-shadow: inset 2px 0 0 var(--ink); }
+.mx .vn { font: 13px var(--font-text); }
+.mx .vs { font: 11px var(--font-mono); color: var(--ink-muted); }
+.mx .g { vertical-align: middle; }
+.mx .dash { color: var(--ink-muted); font: 11px var(--font-mono); }
+/* the input, exactly as typed */
+.input { font: 12px/18px var(--font-mono); background: var(--paper-sunk); border: 1px solid var(--rule); padding: 6px 8px; overflow-wrap: anywhere; white-space: pre-wrap; }
