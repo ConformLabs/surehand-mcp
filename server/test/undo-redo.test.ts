@@ -1,5 +1,5 @@
-// ae_undo / ae_redo count only the steps After Effects really took (aemcp.undoRedo): a modal dialog in AE makes
-// Edit > Undo do nothing, and the tool used to report it as done anyway.
+// Small helper-library behaviours checked on a fake After Effects: ae_undo / ae_redo count only the steps AE really took
+// (aemcp.undoRedo; a modal dialog makes Edit > Undo do nothing), and the project name as the user sees it.
 import { describe, expect, it } from "vitest";
 import { fakeAE, loadHelpers } from "./fake-ae.js";
 
@@ -29,5 +29,16 @@ describe("aemcp.undoRedo", () => {
   it("without project.revision it can't check, and says so", () => {
     const { aemcp } = withSteps({ revision: false, undoWorks: false }, 1);
     expect(aemcp.undoRedo(16, 1, "undo")).toEqual({ undone: 1, unverified: expect.stringMatching(/couldn't be checked/) });
+  });
+});
+
+describe("aemcp.projectInfo", () => {
+  it("names the project as its file is called, not URL-encoded (ExtendScript's File.name is)", () => {
+    const f = fakeAE();
+    f.app.project.file = { name: "My%20Spot%20v2.aep", fsName: "/work/My Spot v2.aep" };
+    f.app.project.renderQueue = { numItems: 0 };
+    const info = loadHelpers(f).projectInfo();
+    expect(info.name).toBe("My Spot v2.aep");
+    expect(info.file).toBe("/work/My Spot v2.aep");
   });
 });
