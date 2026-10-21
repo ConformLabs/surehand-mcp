@@ -74,6 +74,11 @@ fits. See the [full tool list](#all-tools).
 Nothing else is needed: the `.pkg` and `Setup.exe` include Node.js 24, the `.mcpb` uses Claude Desktop's built-in
 Node.js, and the zip's installer downloads Node.js if it is missing.
 
+Step-by-step setup guides for each AI app: [Claude](https://conformlabs.co/surehand/claude/),
+[ChatGPT and Codex](https://conformlabs.co/surehand/chatgpt/), [Cursor](https://conformlabs.co/surehand/cursor/),
+[VS Code](https://conformlabs.co/surehand/vs-code/), [Windsurf](https://conformlabs.co/surehand/windsurf/),
+[LM Studio](https://conformlabs.co/surehand/lm-studio/).
+
 ### Mac and Windows installers
 
 1. **Mac:** double-click `Surehand-MCP-<version>.pkg` and follow the steps. No administrator password: everything
