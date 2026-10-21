@@ -26,6 +26,7 @@ worst-case inputs, and every version built from data is checked row by row. Veri
   extension loads in CC 2019 (16.0) and newer; versions before 2025 are best effort.
 - **Install:** signed and notarized `.pkg` for Mac, signed `Setup.exe` for Windows. No administrator rights, no
   account. Free and open source (MIT).
+- **Website and downloads:** [conformlabs.co/get](https://conformlabs.co/get).
 
 It doesn't generate images and ships no presets or canned looks. It works on your project, by your rules, and
 measures the result.
