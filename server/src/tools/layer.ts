@@ -13,6 +13,10 @@ const textStyle = {
   fauxBold: z.boolean().optional(),
   fauxItalic: z.boolean().optional(),
   allCaps: z.boolean().optional(),
+  direction: z
+    .enum(["LEFT_TO_RIGHT", "RIGHT_TO_LEFT"])
+    .optional()
+    .describe("Paragraph direction (AE 24+). Default: text without Hebrew/Arabic characters is set left to right whatever the user's AE type preference is."),
 };
 
 export const layerTools: JsxTool[] = [
@@ -58,7 +62,7 @@ switch (args.type) {
   case "text":
     l = args.boxSize ? L.addBoxText(args.boxSize, args.text || "") : L.addText(args.text || "");
     var tp = l.property("ADBE Text Properties").property("ADBE Text Document");
-    tp.setValue(aemcp.applyText(tp.value, args));
+    tp.setValue(aemcp.applyText(tp.value, args, true));
     break;
   case "shape": l = L.addShape(); break;
   case "null": l = L.addNull(args.duration || c.duration); break;

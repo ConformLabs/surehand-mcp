@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, statSync, unlinkSync } from "node:
 import { join } from "node:path";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import { aeLabel, BridgeError, health, listInstances, matchInstance, selectInstance, startupWaitMs, waitForBridge, type Health } from "../bridge.js";
+import { aeLabel, BridgeError, health, restartToFinishUpdate, listInstances, matchInstance, selectInstance, startupWaitMs, waitForBridge, type Health } from "../bridge.js";
 import { lastSetup } from "../cli/setup.js";
 import { checkForUpdate, updateMessage } from "../update.js";
 import { VERSION } from "../config.js";
@@ -12,6 +12,7 @@ import { reservedGlobalsHint, transpileUserCode, withoutComments } from "../tran
 import { approvalSummary, permissions, READ_ONLY_REFUSAL, scriptFileApproval, SHELL_REFUSAL, usesShell, WRITE_ACCESS_WHERE } from "../permissions.js";
 import { compRef, errorResult, formatResult, layerRef, reportScope } from "./registry.js";
 import { appFile } from "../paths.js";
+import { completePngSize } from "../png.js";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -193,6 +194,7 @@ try {
     td.fontSize = 15; td.applyFill = true; td.fillColor = [0.85, 0.85, 0.85]; td.applyStroke = false;
     try { td.fauxBold = false; td.fauxItalic = false; td.allCaps = false; td.tracking = 0; } catch (e) {}
     td.justification = ParagraphJustification.CENTER_JUSTIFY;
+    aemcp.textDirection(td, String(td.text), null, true);
     src.setValue(td);
     // center the label under its cell using its real bounds (independent of AE's last-used text settings)
     var rc = t.sourceRectAtTime(0, false), ttr = t.property("ADBE Transform Group");
@@ -209,18 +211,31 @@ try {
 } finally { if (!done) cleanNow(__clean); }
 return r;`;
 
-/** saveFrameToPng may finish writing asynchronously: wait (up to ~15 s) for a non-empty file whose size is stable. */
+/**
+ * The size of a written file, else -1 (missing or empty). A PNG counts only once it is complete (signature and IEND,
+ * completePngSize): a size that holds still can still be a half-written PNG. Callers remove an old file first or use a
+ * new path, so a complete PNG at the path is the one being rendered.
+ */
+export function writtenSize(path: string): number {
+  if (/\.png$/i.test(path)) return completePngSize(path);
+  try {
+    const s = statSync(path).size;
+    return s > 0 ? s : -1;
+  } catch {
+    return -1;
+  }
+}
+
+/** saveFrameToPng may finish writing asynchronously: wait (up to ~15 s) for a written file (writtenSize) whose size is stable. */
 export async function waitForFile(path: string, tries = 150): Promise<boolean> {
   let last = -1;
   for (let i = 0; i < tries; i++) {
-    if (existsSync(path)) {
-      const size = statSync(path).size;
-      if (size > 0 && size === last) return true;
-      last = size;
-    }
+    const size = writtenSize(path);
+    if (size > 0 && size === last) return true;
+    last = size;
     await sleep(100);
   }
-  return existsSync(path);
+  return /\.png$/i.test(path) ? writtenSize(path) > 0 : existsSync(path);
 }
 
 /** Waits for each file (waitForFile); returns the ones that weren't written. */
@@ -599,7 +614,10 @@ export function registerCoreTools(server: McpServer) {
           }
         }
         const out = formatResult(r);
-        const head: string[] = [`Connected to ${aeLabel(h.host?.appVersion)} (bridge v${h.version} on port ${port}, MCP server v${VERSION}).`];
+        const head: string[] = [];
+        // updated while After Effects kept running: it says so first, in one line
+        if (h.version && h.version !== VERSION) head.push(restartToFinishUpdate(h.version));
+        head.push(`Connected to ${aeLabel(h.host?.appVersion)} (bridge v${h.version} on port ${port}, MCP server v${VERSION}).`);
         if (list.length > 1)
           head.push(
             `${list.length} After Effects instances are running: ${list.map((i) => `${i.label} (port ${i.port}${i.port === port ? ", in use" : ""})`).join(", ")}. ` +
@@ -615,11 +633,8 @@ export function registerCoreTools(server: McpServer) {
         if (r.ok && (r.result as any)?.canWriteFiles === false) out.content.push({ type: "text", text: WRITE_ACCESS_STATUS });
         const upd = updateMessage(await checkForUpdate());
         if (upd) out.content.push({ type: "text", text: `${upd}\nTell the user about this update.` });
-        if (lastSetup?.extensionUpdated || (h.version && h.version !== VERSION))
-          out.content.push({
-            type: "text",
-            text: `Note: After Effects is running bridge v${h.version} but v${VERSION} is installed; ask the user to restart After Effects when convenient to load it.`,
-          });
+        if (lastSetup?.extensionUpdated && h.version === VERSION)
+          out.content.push({ type: "text", text: "Note: the After Effects extension was just updated; ask the user to restart After Effects when convenient to load it." });
         return out;
       } catch (e) {
         return errorResult(e);

@@ -427,4 +427,11 @@ describe("updates: versions and the Beta updates switch", () => {
     expect(UI.keptBetaText("stable", "1.3.4", "1.3.4")).toBeNull();
     expect(UI.keptBetaText("stable", null, "1.4.0-beta.3")).toBeNull();
   });
+
+  it("the restart notice: only when the installed version isn't the one this panel runs", () => {
+    expect(UI.restartNote("1.4.0-beta.3", "1.4.0-beta.4")).toBe("Restart After Effects to finish the update.");
+    expect(UI.restartNote("1.4.0-beta.4", "1.4.0-beta.4")).toBeNull();
+    expect(UI.restartNote("1.4.0-beta.3", null)).toBeNull(); // no installer (Claude Desktop extension only)
+    expect(UI.restartNote("__AEMCP_VERSION__", "1.4.0-beta.4")).toBeNull(); // an unbuilt panel
+  });
 });

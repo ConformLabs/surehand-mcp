@@ -122,6 +122,8 @@ var td = src.value; td.text = "New"; td.font = "Arial-BoldMT"; td.fontSize = 120
 td.applyFill = true; td.fillColor = [1,1,1]; td.justification = ParagraphJustification.CENTER_JUSTIFY;
 src.setValue(td);
 \`\`\`
+New text may inherit the user's right-to-left default (an AE type preference): in scripts set it explicitly,
+td.direction = ParagraphDirection.DIRECTION_LEFT_TO_RIGHT (AE 24+; check typeof ParagraphDirection first).
 
 ## Shape layers
 \`\`\`js

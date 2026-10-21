@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { setupHint } from "./cli/setup.js";
-import { configPath, loadConfig } from "./config.js";
+import { configPath, loadConfig, VERSION } from "./config.js";
 import { defaultConfigPath, env, legacyDir } from "./paths.js";
 import { callContext } from "./context.js";
 
@@ -77,6 +77,26 @@ function readInstanceFile(port: number): any {
 let selectedPort: number | null = null;
 let cache: { at: number; list: Instance[] } | null = null;
 
+// ---------- an update After Effects hasn't loaded yet ----------
+
+/** Bridge versions seen (discovery, health), by port; and the port of the last request. */
+const bridgeVersions = new Map<number, string>();
+let lastPort: number | null = null;
+export function noteBridgeVersion(port: number | undefined, version: string | undefined) {
+  if (port && version) bridgeVersions.set(port, version);
+}
+/**
+ * The version of the Surehand panel (bridge) After Effects is running, when it isn't this server's: the server was
+ * updated while After Effects kept running the previous one until a restart. null when they match or it isn't known.
+ */
+export function staleBridgeVersion(port?: number): string | null {
+  const p = port ?? callContext.getStore()?.instance?.port ?? lastPort ?? selectedPort ?? (bridgeVersions.size === 1 ? [...bridgeVersions.keys()][0] : null);
+  const v = p ? bridgeVersions.get(p) : undefined;
+  return v && v !== VERSION ? v : null;
+}
+export const restartToFinishUpdate = (bridgeVersion: string) =>
+  `After Effects is still running the previous Surehand panel (v${bridgeVersion}). Restart After Effects to finish the update.`;
+
 export function aeLabel(appVersion = ""): string {
   const major = parseInt(appVersion, 10);
   return major >= 17 ? `After Effects ${2000 + major}` : `After Effects ${appVersion}`;
@@ -111,6 +131,7 @@ export async function listInstances(force = false): Promise<Instance[]> {
     [...ports].map(async (port) => {
       const h = await probe(port);
       if (!h) return null;
+      noteBridgeVersion(port, h.version);
       const file = readInstanceFile(port);
       const appVersion = h.host?.appVersion || file.host?.appVersion || "";
       return {
@@ -187,6 +208,7 @@ interface RequestOptions extends RequestInit {
 async function request(path: string, init: RequestOptions = {}): Promise<any> {
   const cfg = loadConfig();
   const port = init.port ?? (await resolvePort());
+  lastPort = port;
   const ctrl = new AbortController();
   const timeoutMs = init.timeoutMs ?? 30_000;
   let reason: "timeout" | "cancel" | null = null;
@@ -265,7 +287,9 @@ async function explainTimeout(port: number, timeoutMs: number): Promise<string> 
 }
 
 export async function health(port?: number): Promise<Health> {
-  return request("/health", { method: "GET", timeoutMs: 3000, port });
+  const h: Health = await request("/health", { method: "GET", timeoutMs: 3000, port });
+  noteBridgeVersion(port ?? lastPort ?? undefined, h?.version);
+  return h;
 }
 
 /**

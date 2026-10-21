@@ -3,6 +3,7 @@
 // can still be done with ae_run_script.
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { loadConfig } from "../config.js";
+import { restartToFinishUpdate, staleBridgeVersion } from "../bridge.js";
 import { activityDetails, logActivity } from "../activity.js";
 import { callContext, type CallContext } from "../context.js";
 import { env as envVar } from "../paths.js";
@@ -96,6 +97,15 @@ export interface CatalogEntry {
  * cancel signal) and is written to the activity log. Every tool goes into a catalog; only tools in
  * the profile are registered with the AI app directly, the rest stay reachable through ae_call.
  */
+/** A failed call while After Effects still runs the previous Surehand panel (updated, not restarted): the error says so. */
+export function withRestartHint(result: any, port?: number): any {
+  const stale = result?.isError ? staleBridgeVersion(port) : null;
+  if (!stale || !Array.isArray(result.content)) return result;
+  const hint = restartToFinishUpdate(stale);
+  if (result.content.some((c: any) => c?.type === "text" && String(c.text).includes(hint))) return result;
+  return { ...result, content: [...result.content, { type: "text", text: hint }] };
+}
+
 export function applyProfile(server: McpServer, profile: ToolProfile): Map<string, CatalogEntry> {
   const catalog = new Map<string, CatalogEntry>();
   const original = server.registerTool.bind(server) as (...a: any[]) => any;
@@ -107,7 +117,7 @@ export function applyProfile(server: McpServer, profile: ToolProfile): Map<strin
       const ctx: CallContext = { tool: name, signal: extra?.signal, client };
       try {
         result = await callContext.run(ctx, () => cb(args, extra));
-        return result;
+        return withRestartHint(result, ctx.instance?.port);
       } finally {
         const text: string = result?.content?.find((c: any) => c.type === "text")?.text ?? "";
         const changesAt = text.indexOf("\nChanges");

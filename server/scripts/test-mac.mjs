@@ -119,8 +119,10 @@ if (!instances.length) {
     const r = node([installed, "selftest", "--full"], { SUREHAND_AE_BRIDGE_PORT: String(i.port), AEMCP_BRIDGE_PORT: String(i.port) });
     console.log(r.out.split("\n").filter((l) => /✖|signature|Bridge running|steps passed|step\(s\) failed|All checks|problem/i.test(l)).join("\n"));
     const bridge = /bridge v(\S+?)\)/.exec(r.out)?.[1];
-    if (bridge && bridge !== buildVersion)
+    if (bridge && bridge !== buildVersion) {
       console.log(`  ! this After Effects still runs the v${bridge} extension: restart it to test v${buildVersion}'s extension too`);
+      if (r.status !== 0) console.log(`  ! a failure here is likely that mix (v${bridge} extension, v${buildVersion} server): restart After Effects and run again before looking further`);
+    }
     if (r.status !== 0) failed++;
     checkInstalled(`after the self-test on After Effects ${i.host?.appVersion ?? "?"}`);
   }

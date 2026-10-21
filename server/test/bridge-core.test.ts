@@ -383,13 +383,17 @@ describe("blocked After Effects is reported fast", () => {
       setTimeout(() => ae.closeDialog(), 900);
       const r = await status();
       expect(r.isError).toBe(false);
-      expect(r.text).toMatch(/^Connected to After Effects 2026/);
+      expect(r.text).toMatch(/^Connected to After Effects 2026/m);
     });
 
-    it("reports ready when After Effects takes scripts", async () => {
+    it("reports ready when After Effects takes scripts; a bridge of another version says first to restart After Effects", async () => {
       const r = await status();
       expect(r.isError).toBe(false);
-      expect(r.text).toMatch(/^Connected to After Effects 2026 \(bridge v.* on port \d+/);
+      // this bridge is unbuilt (v__AEMCP_VERSION__), the server is vtest: as after an update AE hasn't loaded yet
+      const [first, second] = r.text.split("\n");
+      expect(first).toBe("After Effects is still running the previous Surehand panel (v__AEMCP_VERSION__). Restart After Effects to finish the update.");
+      expect(second).toMatch(/^Connected to After Effects 2026 \(bridge v.* on port \d+/);
+      expect(r.text.match(/Restart After Effects/g)).toHaveLength(1);
     });
   });
 });

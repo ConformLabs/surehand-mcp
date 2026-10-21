@@ -14,7 +14,7 @@ import { capChanges, changesFromReport } from "../view-changes.js";
 import { VIEW_META_KEY, type ChangesView, type ProofFrame } from "../views/types.js";
 import { errorResult } from "./registry.js";
 import { CHANGES_VIEW_URI, registerViewTool, viewError } from "./views.js";
-import { RENDER_KIT_JSX, renderCleanupNote, runRender } from "./core.js";
+import { RENDER_KIT_JSX, renderCleanupNote, runRender, writtenSize } from "./core.js";
 import { runBatch } from "./workflow.js";
 import { appFile } from "../paths.js";
 
@@ -99,19 +99,19 @@ interface Rendered {
 export interface CompProof { id: number; name: string; width: number; height: number; pixelAspect: number; frameRate: number; renderW: number; renderH: number; frames: { time: number; file: string }[] }
 export interface Manifest { id: string; createdAt: string; project: string | null; maxSize: number; comps: CompProof[] }
 
-/** Wait until After Effects has finished writing each file (saveFrameToPng can finish asynchronously). */
+/** Wait until After Effects has finished writing each file (saveFrameToPng can finish asynchronously): complete PNGs (writtenSize) whose sizes hold still. */
 async function waitForFiles(paths: string[]) {
   const deadline = Date.now() + 15_000 + paths.length * 2000;
   let last = "";
   for (;;) {
-    const sizes = paths.map((p) => (existsSync(p) ? statSync(p).size : 0));
+    const sizes = paths.map(writtenSize);
     const now = sizes.join(",");
     if (sizes.every((s) => s > 0) && now === last) return;
     if (Date.now() > deadline) break;
     last = now;
     await new Promise((r) => setTimeout(r, 100));
   }
-  const missing = paths.find((p) => !existsSync(p));
+  const missing = paths.find((p) => writtenSize(p) <= 0);
   if (missing) throw new Error(`After Effects did not write the frame ${missing}.`);
 }
 

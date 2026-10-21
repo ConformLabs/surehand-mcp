@@ -792,6 +792,14 @@
     if (channel === "beta") return "Pre-releases too: new features first, less tested.";
     return String(version).indexOf("-") > 0 ? "Stable only. Your beta stays until a newer stable release is out." : "Stable releases only.";
   }
+  /**
+   * After an update while After Effects is running: the installed version (runtime.json, or what Update now just
+   * installed) isn't the one this panel runs. The calm one-line notice, else null (also for an unbuilt panel).
+   */
+  function restartNote(running, installed) {
+    if (!running || !installed || String(running).indexOf("__") === 0 || String(installed) === String(running)) return null;
+    return "Restart After Effects to finish the update.";
+  }
   /** On stable with a beta installed that is newer than the latest stable release: the one line saying it stays; else null. */
   function keptBetaText(channel, latest, version) {
     if (channel !== "stable" || !latest || String(version).indexOf("-") < 0 || cmpVersions(latest, version) >= 0) return null;
@@ -838,7 +846,7 @@
     riskChips: riskChips, approvalView: approvalView, countdown: countdown, countdownView: countdownView, previewView: previewView,
     CHAT_AGENTS: CHAT_AGENTS, chatPick: chatPick, chatOther: chatOther, chatMenuSub: chatMenuSub, chatView: chatView, chatAppsView: chatAppsView, chatReady: chatReady, chatApply: chatApply, chatToolView: chatToolView, chatEntryFor: chatEntryFor, chatArgsLine: chatArgsLine, chatLabel: chatLabel, chatBlocks: chatBlocks, opensOn: opensOn,
     hhmm: hhmm, dayLabel: dayLabel, whenLabel: whenLabel, parseCliJson: parseCliJson, cmpVersions: cmpVersions, aeLabel: aeLabel,
-    updateChannel: updateChannel, updateFor: updateFor, betaSwitchText: betaSwitchText, keptBetaText: keptBetaText, channelToast: channelToast, noteView: noteView,
+    updateChannel: updateChannel, updateFor: updateFor, betaSwitchText: betaSwitchText, keptBetaText: keptBetaText, restartNote: restartNote, channelToast: channelToast, noteView: noteView,
   };
   global.SurehandUI = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
