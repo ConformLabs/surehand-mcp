@@ -64,7 +64,7 @@ vi.mock("../src/jsx.js", async (orig) => {
   };
 });
 
-const { runSurgery, likelyCause, UFACTS_JSX, DFACTS_JSX, UNPRECOMPOSE_JSX, DEEPDUP_JSX, CLEANUP_JSX } = await import("../src/tools/surgery.js");
+const { runSurgery, likelyCause, UFACTS_JSX, DFACTS_JSX, UNPRECOMPOSE_JSX, DEEPDUP_JSX, CLEANUP_JSX, REMOVE_COPIES_JSX } = await import("../src/tools/surgery.js");
 const { planUnprecompose, planDeepDuplicate, blocking } = await import("../src/surgery/plan.js");
 
 const FULL = { mode: "full", allowShell: false };
@@ -115,7 +115,7 @@ const spot = (logo: Partial<SComp["layers"][number]> = {}, inner: Partial<SComp[
 describe("the scripts", () => {
   it("are valid ES3", async () => {
     const { parse } = await import("acorn");
-    for (const body of [UFACTS_JSX, DFACTS_JSX, UNPRECOMPOSE_JSX, DEEPDUP_JSX, CLEANUP_JSX]) expect(() => parse(`(function(args, log){${body}\n})`, { ecmaVersion: 3, allowReserved: false })).not.toThrow();
+    for (const body of [UFACTS_JSX, DFACTS_JSX, UNPRECOMPOSE_JSX, DEEPDUP_JSX, CLEANUP_JSX, REMOVE_COPIES_JSX]) expect(() => parse(`(function(args, log){${body}\n})`, { ecmaVersion: 3, allowReserved: false })).not.toThrow();
   });
 });
 
@@ -728,6 +728,42 @@ describe("deep duplicate", () => {
     // ONE undo step takes everything back: the copies, the re-pointed sources, the rewrites
     expect(fake.undo()).toBe("Surehand MCP deep duplicate");
     expect(fake.state()).toBe(start);
+  });
+
+  it("the report is honest about undo and names the copy set; remove_copies takes exactly the copies away", async () => {
+    ae(tree());
+    const start = fake.state();
+    const r = await runSurgery({ action: "deep_duplicate", comp: "Main" }, FULL);
+    expect(r.isError, text(r)).toBeFalsy();
+    const t = text(r);
+    expect(t).not.toMatch(/One undo step/);
+    expect(t).toMatch(/The originals are unchanged: the deep duplicate only added the copies above .* ae_undo may take several steps; the exact way back is remove_copies\./);
+    const id = /Copies made \(copy set ([\w-]+)\): "Main copy" \(id \d+\), "Scene A copy" \(id \d+\), "Shared copy" \(id \d+\), "Scene B copy" \(id \d+\)\. To remove exactly these: ae_precomp_surgery \{action: "remove_copies", id: "([\w-]+)"\}/.exec(t);
+    expect(id).not.toBeNull();
+    const rm = await runSurgery({ action: "remove_copies", id: id![1] }, FULL);
+    expect(rm.isError, text(rm)).toBeFalsy();
+    expect(text(rm)).toMatch(/^Removed copy set [\w-]+: "Main copy", "Scene A copy", "Shared copy", "Scene B copy"\. The originals were never changed\./);
+    expect(fake.state()).toBe(start);
+    // nothing left to remove: the latest set's comps are gone
+    expect(text(await runSurgery({ action: "remove_copies" }, FULL))).toMatch(/Already gone: "Main copy", "Scene A copy", "Shared copy", "Scene B copy"/);
+  });
+
+  it("remove_copies refuses while anything outside the copies uses one, and in another project", async () => {
+    ae(tree());
+    await runSurgery({ action: "deep_duplicate", comp: "Main" }, FULL);
+    // a comp outside the set shows a copy; an expression elsewhere names one
+    const other = fake.comp("Outside");
+    other.layer(1).property("ADBE Transform Group").property("ADBE Opacity").expression = 'comp("Shared copy").layer(1).transform.opacity';
+    fake.comp("Main").layers[0].replaceSource(fake.comp("Scene A copy"), false);
+    const before = fake.state();
+    const r = await runSurgery({ action: "remove_copies" }, FULL);
+    expect(r.isError).toBe(true);
+    expect(text(r)).toMatch(/^REFUSED: nothing was removed\. Copy set [\w-]+ is in use outside its own copies:/);
+    expect(text(r)).toMatch(/"Scene A copy" is used in "Main", which is not one of the copies/);
+    expect(text(r)).toMatch(/"Outside" > 1 "Ref": an expression names "Shared copy"/);
+    expect(fake.state()).toBe(before);
+    expect(text(await runSurgery({ action: "remove_copies", id: "nope" }, FULL))).toMatch(/Copy set nope not found/);
+    expect(text(await runSurgery({ action: "remove_copies", id: "../x" }, FULL))).toMatch(/is not a copy set id/);
   });
 
   it("DIFFERS: no copy is left in the project", async () => {

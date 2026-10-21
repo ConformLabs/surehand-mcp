@@ -55,11 +55,14 @@ frames?, times?, tolerance?}
 - comp("X") inside the copies points at X's copy when X is in the tree; comps outside the tree stay.
 - Refused (override "expressions"): computed comp names, names that more than one comp has.
 - Reported: Essential Graphics controllers and overrides, expressions that read the comp's name (they show the copy's).
+- The originals are never changed. The result names the copy set; ae_undo may take several steps (After Effects doesn't
+  always keep comp duplicates in one undo step), so take them back with {action: "remove_copies", id}: it removes exactly
+  those comps, and refuses while another comp, the render queue or an expression elsewhere uses one.
 
 ## The result
 
 - DONE and proven: the verdict, frames compared and time, checkpoint, what moved or was copied, every rewrite
-  (before → after), the change list, one undo step.
+  (before → after), the change list. Un-precompose: one undo step. Deep duplicate: the copy set, removed with remove_copies.
 - DIFFERS / NOT PROVEN: nothing applied (the scratch copy was removed); frames that differ, difference image, likely
   cause. A scaled or rotated precomp layer is the usual one: the precomp was rendered, then resampled as a whole; the
   moved layers are transformed in one step. Report it; the user decides (a higher tolerance only if they accept it).

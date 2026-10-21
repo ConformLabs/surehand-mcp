@@ -28,6 +28,8 @@ export interface JsxTool {
   uiState?: boolean;
   /** Include a change report (default: for every tool that edits, i.e. not readOnly / noUndo). */
   report?: boolean;
+  /** Compare every comp, not only the active / named one (undo and redo can change any comp). */
+  reportAll?: boolean;
   timeoutMs?: number;
   /** Turns the JSX result into the tool's text (analysis done in TypeScript). */
   format?: (result: unknown, args: Record<string, unknown>) => string;
@@ -136,7 +138,7 @@ export function registerJsxTools(server: McpServer, tools: JsxTool[]) {
           const r = await runJsx(t.jsx, args, {
             undoGroup: t.tempItems ? "Surehand MCP " + t.title : t.readOnly || t.noUndo ? false : t.title,
             timeoutMs,
-            report: wantsReport ? reportScope(args) : undefined,
+            report: wantsReport ? (t.reportAll ? reportScope(args) && ["*"] : reportScope(args)) : undefined,
             bridge: edits && perm.mode === "ask" ? { approval: { tool: t.title, summary: approvalSummary(t.name, args) } } : undefined,
           });
           const raw = r.result;

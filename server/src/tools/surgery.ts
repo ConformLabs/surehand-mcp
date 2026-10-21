@@ -8,7 +8,11 @@
 // (layer by layer), otherwise that step is undone at once. DIFFERS: the project was never changed.
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { randomBytes } from "node:crypto";
+import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { z } from "zod";
+import { appFile } from "../paths.js";
 import { formatChanges, rollbackProblem, runJsx } from "../jsx.js";
 import { approvalSummary, permissions, READ_ONLY_REFUSAL } from "../permissions.js";
 import { blocking, planDeepDuplicate, planUnprecompose, type DFacts, type DPlan, type Override, type Problem, type Rewrite, type UFacts, type UPlan } from "../surgery/plan.js";
@@ -496,7 +500,9 @@ return { removed: done, left: left };`;
 // ---------- the tool ----------
 
 export interface SurgeryInput {
-  action: "unprecompose" | "deep_duplicate";
+  action: "unprecompose" | "deep_duplicate" | "remove_copies";
+  /** remove_copies: the copy set id from the deep duplicate's result (default: the latest in this project) */
+  id?: string;
   comp?: number | string;
   layer?: number | string;
   dryRun?: boolean;
@@ -604,7 +610,113 @@ export function likelyCause(all: string[], diff: { maxDiff: number; share: numbe
   return `Likely cause${other.length > 1 ? "s" : ""} (${size}), most likely first:\n${other.map((r) => `  - ${r}`).join("\n")}`;
 }
 
+// ---------- copy sets: what a deep duplicate made, so it can be removed exactly ----------
+
+export interface CopySet {
+  id: string;
+  createdAt: string;
+  project: string;
+  /** root first: the original's id and the copy's id and name */
+  copies: { from: number; id: number; name: string }[];
+}
+const copySets = () => appFile("copies");
+const MAX_COPY_SETS = 50;
+
+/** Store a deep duplicate's copies (ids and names) under ~/.surehand/ae/copies/<id>.json; keep the last 50. */
+export function saveCopySet(project: string, made: { id: number; copy: number; name: string }[]): CopySet {
+  const dir = copySets();
+  mkdirSync(dir, { recursive: true });
+  const set: CopySet = { id: `${new Date().toISOString().replace(/[-:]/g, "").replace("T", "-").replace(/\..*$/, "")}-${randomBytes(2).toString("hex")}`, createdAt: new Date().toISOString(), project, copies: made.map((m) => ({ from: m.id, id: m.copy, name: m.name })) };
+  writeFileSync(join(dir, `${set.id}.json`), JSON.stringify(set, null, 1));
+  try {
+    const all = readdirSync(dir).filter((f) => f.endsWith(".json")).sort();
+    for (const f of all.slice(0, Math.max(0, all.length - MAX_COPY_SETS))) rmSync(join(dir, f), { force: true });
+  } catch {}
+  return set;
+}
+
+/** A stored copy set: by id, else the latest one made in this project. */
+export function loadCopySet(id: string | undefined, project: string | null): CopySet | string {
+  const dir = copySets();
+  if (id !== undefined && !/^[\w-]+$/.test(id)) return `"${id}" is not a copy set id.`;
+  try {
+    if (id) return JSON.parse(readFileSync(join(dir, `${id}.json`), "utf8"));
+    const all = readdirSync(dir).filter((f) => f.endsWith(".json")).sort().reverse();
+    for (const f of all) {
+      const s: CopySet = JSON.parse(readFileSync(join(dir, f), "utf8"));
+      if (s.project === project) return s;
+    }
+  } catch {}
+  return id ? `Copy set ${id} not found (the last ${MAX_COPY_SETS} are kept).` : `No deep duplicate made by this tool is recorded for ${project ?? "this unsaved project"}.`;
+}
+
+const copiesLine = (s: CopySet) =>
+  `Copies made (copy set ${s.id}): ${s.copies.map((c) => `"${c.name}" (id ${c.id})`).join(", ")}. To remove exactly these: ae_precomp_surgery {action: "remove_copies", id: "${s.id}"}.`;
+
+/**
+ * Remove a copy set's comps, only when each one is still the comp this tool made (same id, a comp) and nothing outside the
+ * set uses it: no layer of another comp, no render queue item, no expression elsewhere naming it. Otherwise nothing is
+ * removed and every reason is listed.
+ */
+export const REMOVE_COPIES_JSX = `
+var P = app.project, inSet = {}, comps = [], problems = [], gone = [];
+function byId(id) { for (var i = 1; i <= P.numItems; i++) if (P.item(i).id === id) return P.item(i); return null; }
+for (var k = 0; k < args.copies.length; k++) inSet["i" + args.copies[k].id] = true;
+for (var k2 = 0; k2 < args.copies.length; k2++) {
+  var c = args.copies[k2], it = byId(c.id);
+  if (!it) { gone.push(c.name); continue; }
+  if (!(it instanceof CompItem)) { problems.push("item id " + c.id + " (\\"" + it.name + "\\") is not a comp any more"); continue; }
+  comps.push(it);
+}
+for (var a = 0; a < comps.length; a++) {
+  var u = comps[a].usedIn;
+  for (var b = 0; b < u.length; b++) if (!inSet["i" + u[b].id]) problems.push("\\"" + comps[a].name + "\\" is used in \\"" + u[b].name + "\\", which is not one of the copies");
+}
+try { for (var r = 1; r <= P.renderQueue.numItems; r++) { var rc = P.renderQueue.item(r).comp; if (rc && inSet["i" + rc.id]) problems.push("\\"" + rc.name + "\\" is in the render queue (item " + r + ")"); } } catch (e) {}
+function scan(g, where) {
+  for (var q = 1; q <= g.numProperties; q++) {
+    var p = g.property(q);
+    if (p.propertyType !== PropertyType.PROPERTY) { scan(p, where); continue; }
+    var x = "";
+    try { x = p.canSetExpression ? p.expression : ""; } catch (e) {}
+    if (!x) continue;
+    for (var n = 0; n < comps.length; n++) if (x.indexOf(comps[n].name) >= 0) problems.push(where + ": an expression names \\"" + comps[n].name + "\\"");
+  }
+}
+for (var i = 1; i <= P.numItems; i++) {
+  var o = P.item(i);
+  if (!(o instanceof CompItem) || inSet["i" + o.id]) continue;
+  for (var l = 1; l <= o.numLayers; l++) scan(o.layer(l), "\\"" + o.name + "\\" > " + l + " \\"" + o.layer(l).name + "\\"");
+}
+if (problems.length) return { refused: problems, gone: gone };
+var removed = [];
+for (var d = 0; d < comps.length; d++) { removed.push(comps[d].name); comps[d].remove(); }
+return { removed: removed, gone: gone };`;
+
+async function removeCopies(a: SurgeryInput, perm: { mode: string; allowShell: boolean }): Promise<CallToolResult> {
+  if (perm.mode === "read-only") return errorResult(READ_ONLY_REFUSAL);
+  const pr = await runJsx("return app.project.file ? app.project.file.fsName : null;", {}, { undoGroup: false });
+  const project = (pr.ok ? pr.result : null) as string | null;
+  const set = loadCopySet(a.id, project);
+  if (typeof set === "string") return errorResult(set);
+  if (set.project !== project) return errorResult(`Copy set ${set.id} was made in ${set.project}; the open project is ${project ?? "unsaved"}. Nothing was removed.`);
+  const r = await runJsx(REMOVE_COPIES_JSX, { copies: set.copies }, {
+    undoGroup: "Surehand MCP remove copies",
+    timeoutMs: 300_000,
+    report: reportScope({}),
+    bridge: perm.mode === "ask" ? { approval: { tool: "Remove copies", summary: `Remove the deep duplicate's copies (copy set ${set.id}): ${set.copies.map((c) => `"${c.name}"`).join(", ")}` } } : undefined,
+  });
+  if (!r.ok) return errorResult(r.error?.message ?? "After Effects could not remove the copies.");
+  const res = parse<{ refused?: string[]; removed?: string[]; gone: string[] }>(r.result);
+  const gone = res.gone.length ? `\nAlready gone: ${res.gone.map((n) => `"${n}"`).join(", ")}.` : "";
+  if (res.refused)
+    return { isError: true, content: [{ type: "text", text: `REFUSED: nothing was removed. Copy set ${set.id} is in use outside its own copies:\n${res.refused.map((p) => `  - ${p}`).join("\n")}${gone}` }] };
+  const changes = formatChanges(r.changes);
+  return { content: [{ type: "text", text: `Removed copy set ${set.id}: ${res.removed!.map((n) => `"${n}"`).join(", ")}. The originals were never changed.${gone}${changes ? `\n\n${changes}` : ""}` }] };
+}
+
 export async function runSurgery(a: SurgeryInput, perm: { mode: string; allowShell: boolean }): Promise<CallToolResult> {
+  if (a.action === "remove_copies") return removeCopies(a, perm);
   const override = a.override ?? [];
   const dup = a.action === "deep_duplicate";
   // seen live (AE 26.5): moving an item into a folder is an undo step of its own even inside an undo group, so a
@@ -743,13 +855,16 @@ export async function runSurgery(a: SurgeryInput, perm: { mode: string; allowShe
     `DONE and proven: ${head} (${plural(frames, "frame")} compared, ${sec(proofMs)} including the rehearsal).`,
     `Checkpoint saved first: ${cp}`,
     dup ? `New root comp: "${(plan as DPlan).copies[0].to}" (id ${rs.root}).` : "",
+    dup ? copiesLine(saveCopySet(df!.project!, rs.made ?? [])) : "",
     ...lines,
     rs.moved ? `Read back from "${uf!.P.name}" after the surgery: ${[...(rs.nullIndex ? [{ index: rs.nullIndex, name: (plan as UPlan).nullLayer?.name ?? "" }] : []), ...rs.moved].sort((x, y) => x.index - y.index).map((m) => `${m.index} "${m.name}"`).join(", ")}.` : "",
     "",
     "Proof (the rehearsal on a scratch copy against the original, then the same surgery applied and checked layer for layer against the rehearsal):",
     ...cmp.text.split("\n").slice(1),
     "",
-    `One undo step ("${dup ? "Surehand MCP deep duplicate" : "Surehand MCP un-precompose"}"); ae_undo reverts it.${dup ? "" : " Expression rewrites in other comps are exact text edits, listed above; the pixel proof covers the parent comp."}`,
+    dup
+      ? "The originals are unchanged: the deep duplicate only added the copies above (with their expressions rewritten inside them). Made in one undo group, but After Effects doesn't always keep comp duplicates and source replacements in one undo step, so ae_undo may take several steps; the exact way back is remove_copies."
+      : 'One undo step ("Surehand MCP un-precompose"); ae_undo reverts it. Expression rewrites in other comps are exact text edits, listed above; the pixel proof covers the parent comp.',
   );
   const changes = formatChanges(real.changes);
   return { content: [{ type: "text", text: out.filter((x) => x !== "").join("\n") + leftNote + (changes ? `\n\n${changes}` : "") }] };
@@ -767,11 +882,13 @@ export function registerSurgeryTools(server: McpServer) {
         "unlinked tree; comp(\"X\") references inside it point at the copies. Refuses, with the exact reason, what can't be done exactly " +
         "(effects, masks or time remap on the precomp layer, blend modes that would blend with other layers, computed references...). dryRun: " +
         "the plan only. Otherwise: checkpoint, rehearsal on a scratch copy, ae_prove_identical comparison, and only if IDENTICAL the same " +
-        "change in one undo step; DIFFERS: nothing is applied, with the frames that differ and the likely cause.",
+        "change (un-precompose: one undo step); DIFFERS: nothing is applied, with the frames that differ and the likely cause. remove_copies: " +
+        "removes exactly the comps a deep duplicate made, refused if anything outside them uses one.",
       inputSchema: {
-        action: z.enum(["unprecompose", "deep_duplicate"]),
+        action: z.enum(["unprecompose", "deep_duplicate", "remove_copies"]),
         comp: compRef.describe("unprecompose: the comp that holds the precomp layer; deep_duplicate: the comp to copy with its tree. Default: the active comp."),
         layer: layerRef.optional().describe("unprecompose: the precomp layer (index or name; default the selected layer)."),
+        id: z.string().optional().describe("remove_copies: the copy set id a deep duplicate returned (default: the latest one made in this project)."),
         dryRun: z.boolean().optional().describe("Only plan: what would move, be renamed and rewritten, and every blocker. Nothing is changed."),
         removeSource: z.boolean().optional().describe("unprecompose: also remove the source comp, only if nothing else uses it (refused otherwise). Default: keep it."),
         bakeNull: z.boolean().optional().describe("unprecompose: leave out the null when the precomp layer's transform is the identity (exact); otherwise a null is kept and the result says why."),

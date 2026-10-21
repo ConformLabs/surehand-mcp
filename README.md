@@ -554,9 +554,11 @@ what moves, what is renamed, every expression rewrite (before → after) and eve
 default 6 frames across the precomp layer's time span, first and last included; deep duplicate: 5 across the work area),
 and the surgery is **rehearsed on a scratch copy** (a duplicate of the parent comp; for a deep duplicate, the copies). The
 scratch copy is compared with the original pixel by pixel, the same comparison as `ae_prove_identical` (default
-tolerance), and removed again. Only when it is **IDENTICAL** is the same surgery applied to the project, in one undo step
-(`ae_undo` reverts it), and the result is checked layer for layer against the rehearsal (otherwise that step is undone at
-once). **DIFFERS** means nothing was applied: the result lists the frames that differ with the largest difference, a
+tolerance), and removed again. Only when it is **IDENTICAL** is the same surgery applied to the project, in one undo group,
+and the result is checked layer for layer against the rehearsal (otherwise it is undone at once). An un-precompose is one
+undo step (`ae_undo` reverts it). A deep duplicate never changes the originals, only adds the copies; After Effects doesn't
+always keep comp duplicates and source replacements in one undo step, so the result lists the copies it made as a copy
+set, and `{action: "remove_copies", id}` removes exactly those (refused while anything outside them uses one). **DIFFERS** means nothing was applied: the result lists the frames that differ with the largest difference, a
 difference image, and the likely cause (for example a precomp layer that is scaled: the precomp was resampled as a whole,
 while the moved layers are transformed once). Expression rewrites in other comps are exact text edits; the pixel proof
 covers the parent comp (or the copied tree).
