@@ -52,6 +52,22 @@ describe("bridge + runJsx", () => {
     expect(calls.length).toBe(3); // script -> helpers -> script
   });
 
+  it("a rejected token from the previous panel (updated, AE not restarted) only asks for a restart", async () => {
+    const { evalRaw, noteBridgeVersion } = await import("../src/bridge.js");
+    const { VERSION } = await import("../src/config.js");
+    process.env.AEMCP_TOKEN = "wrong";
+    try {
+      noteBridgeVersion(port, "1.3.4");
+      const stale = await evalRaw("1").catch((e) => e.message);
+      expect(stale).toBe("After Effects is still running the previous Surehand panel (v1.3.4). Restart After Effects to finish the update.");
+      noteBridgeVersion(port, VERSION);
+      const current = await evalRaw("1").catch((e) => e.message);
+      expect(current).toMatch(/^Bridge rejected the token\. Re-run the installer/);
+    } finally {
+      delete process.env.AEMCP_TOKEN;
+    }
+  });
+
   it("reports auth failures clearly", async () => {
     const { health, BridgeError } = await import("../src/bridge.js");
     process.env.AEMCP_TOKEN = "wrong";
