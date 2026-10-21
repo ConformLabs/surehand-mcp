@@ -104,7 +104,7 @@ input:focus { border-color: var(--ink) !important; }
 .notebox { margin: 12px; padding: 8px 12px; border: 1px solid var(--rule-strong); background: var(--paper); display: flex; flex-direction: column; flex: none; }
 .notebox > * + * { margin-top: 4px; }
 .notebox.amber { border-color: var(--changed); }
-.notebox:not([hidden]) + .modes { padding-top: 0; }
+.notebox:not([hidden]) + .modes, .notebox:not([hidden]) + .notebox[hidden] + .modes { padding-top: 0; }
 .setup-acts { display: flex; margin-top: 8px !important; }
 .setup-acts > * + * { margin-left: 8px; }
 

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import helperTemplate from "./aemcp.jsxinc";
 import { VERSION } from "./config.js";
-import { evalRaw, type EvalOptions } from "./bridge.js";
+import { evalRaw, restartToFinishUpdate, staleBridgeVersion, type EvalOptions } from "./bridge.js";
 import { callContext } from "./context.js";
 
 export const NEED_HELPERS = "__AEMCP_NEED_HELPERS__";
@@ -257,6 +257,12 @@ export function formatChanges(ch: Changes | undefined): string | null {
  * call: "the script", "the batch".
  */
 export function rollbackProblem(rb: Rollback, what: string): string {
+  const text = rollbackText(rb, what);
+  // After Effects still runs the previous panel after an update: the likely reason, said plainly
+  const stale = text ? staleBridgeVersion() : null;
+  return stale ? `${text}\n${restartToFinishUpdate(stale)}` : text;
+}
+function rollbackText(rb: Rollback, what: string): string {
   if (rb.verified) return "";
   const check = "Check the project before going on (Edit > Undo and Edit > Redo still work step by step).";
   const leftover = rb.leftover ? `\nA temporary folder "${rb.leftover}" (Surehand MCP's undo marker) couldn't be removed; it can be deleted.` : "";

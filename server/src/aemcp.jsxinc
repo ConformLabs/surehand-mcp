@@ -343,6 +343,7 @@ aemcp = (function () {
     var keys = ["font", "fontSize", "fillColor", "strokeColor", "strokeWidth", "applyFill", "applyStroke", "tracking", "leading", "fauxBold", "fauxItalic", "allCaps", "boxText", "pointText"];
     for (var i = 0; i < keys.length; i++) { try { var v = td[keys[i]]; if (v !== undefined) o[keys[i]] = A.valueOf(v); } catch (e) {} }
     try { o.justification = A.enumName(ParagraphJustification, td.justification); } catch (e) {}
+    try { if (typeof ParagraphDirection !== "undefined" && td.direction !== undefined) o.direction = String(A.enumName(ParagraphDirection, td.direction)).replace("DIRECTION_", ""); } catch (e) {}
     try { if (td.boxText) o.boxTextSize = td.boxTextSize; } catch (e) {}
     return o;
   };
@@ -518,7 +519,7 @@ aemcp = (function () {
   A.toAEValue = function (prop, v) {
     if (prop.propertyValueType === PropertyValueType.TEXT_DOCUMENT) {
       var td = prop.value;
-      if (typeof v === "string") { td.text = v; return td; }
+      if (typeof v === "string") { td.text = v; return A.textDirection(td, v); }
       A.applyText(td, v); return td;
     }
     if (prop.propertyValueType === PropertyValueType.SHAPE && v && v.vertices) {
@@ -555,7 +556,8 @@ aemcp = (function () {
     return { item: it, om: om };
   };
   A.color3 = function (v) { var c = A.color(v); return [c[0], c[1], c[2]]; };
-  A.applyText = function (td, o) {
+  // isNew: the layer was just made by the tool (its direction and composer come from the user's AE preference)
+  A.applyText = function (td, o, isNew) {
     if (o.text !== undefined) td.text = o.text;
     if (o.font !== undefined) td.font = o.font;
     if (o.fontSize !== undefined) td.fontSize = o.fontSize;
@@ -568,6 +570,22 @@ aemcp = (function () {
     if (o.fauxItalic !== undefined) td.fauxItalic = o.fauxItalic;
     if (o.allCaps !== undefined) td.allCaps = o.allCaps;
     if (o.justification !== undefined) td.justification = ParagraphJustification[String(o.justification).toUpperCase()] || td.justification;
+    if (o.direction !== undefined) A.textDirection(td, null, o.direction);
+    else A.textDirection(td, o.text !== undefined ? o.text : (isNew ? String(td.text) : undefined), null, isNew);
+    return td;
+  };
+  // Text Surehand writes shouldn't depend on the user's type preference (AE can make new text right to left, with the
+  // Universal composer): text with no right-to-left characters gets left to right, and a new layer also the Latin composer
+  // where AE lets scripts set it. Right-to-left text is left to AE (and ae_localize). Text that isn't being written keeps
+  // its direction. AE before 24.0 has neither setting: nothing happens there. dir "LEFT_TO_RIGHT" / "RIGHT_TO_LEFT": as asked.
+  A.hasRtl = function (s) { return /[֐-ࣿיִ-﷿ﹰ-﻿]/.test(String(s)); };
+  A.textDirection = function (td, text, dir, isNew) {
+    if (typeof ParagraphDirection === "undefined") return td;
+    if (!dir) { if (text === undefined || text === null || A.hasRtl(text)) return td; dir = "LEFT_TO_RIGHT"; }
+    try { var d = ParagraphDirection["DIRECTION_" + dir]; if (d !== undefined && td.direction !== undefined && td.direction !== d) td.direction = d; } catch (e) {}
+    if (isNew && dir === "LEFT_TO_RIGHT" && typeof ComposerEngine !== "undefined") {
+      try { if (td.composerEngine !== undefined && td.composerEngine !== ComposerEngine.LATIN_CJK_ENGINE) td.composerEngine = ComposerEngine.LATIN_CJK_ENGINE; } catch (e) {}
+    }
     return td;
   };
   A.interp = function (name) {

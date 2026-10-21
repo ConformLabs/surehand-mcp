@@ -301,6 +301,14 @@
     var upd = S.update && S.update.latest && UI.cmpVersions(S.update.latest, AEMCPBridge.VERSION) > 0;
     $("ver").textContent = AEMCPBridge.VERSION + (upd ? " \u00b7 update ready" : "");
     $("ver").className = "link" + (upd ? " update" : "");
+    var rn = UI.restartNote(AEMCPBridge.VERSION, updatedTo || installedVersion());
+    $("restartNote").hidden = !rn;
+  }
+  /** The installed server's version (runtime.json), read at most once a minute: an update this After Effects hasn't loaded. */
+  var installedSeen = { at: 0, v: null };
+  function installedVersion() {
+    if (!installedSeen || Date.now() - installedSeen.at > 60000) { var rt = readJson(P().runtime); installedSeen = { at: Date.now(), v: rt && rt.version || null }; }
+    return installedSeen.v;
   }
   /** Pause / Resume: the bridge holds it (and saves it in the config); only the panel can change it. */
   function setPaused(on) {
@@ -1505,7 +1513,7 @@
     drawUpdate(body, knownUpdate() || { latest: latest }, false);
     runCli(["update", "--json"], function (err, r) {
       updating = false;
-      if (r && r.ok && r.updated) { updatedTo = r.to; toast("Updated to " + r.to + ". Restart After Effects and your AI apps to finish."); }
+      if (r && r.ok && r.updated) { updatedTo = r.to; renderHeader(); toast("Updated to " + r.to + ". Restart After Effects and your AI apps to finish."); }
       else toast((r && r.message) || (err && err.friendly) || "The update did not finish.", true);
       if (token === screenToken && S.screen === "update") drawUpdate(body, knownUpdate() || { latest: latest }, false);
     }, { timeout: 180000 });

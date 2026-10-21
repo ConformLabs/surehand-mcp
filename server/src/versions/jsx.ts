@@ -170,14 +170,14 @@ function nums(v, n) {
 // a cell (kind "value") as this property's value
 function asValue(p, v) {
   var ty = vfType(p);
-  if (ty === "TEXT_DOCUMENT") { var td = p.value; td.text = String(v); return td; }
+  if (ty === "TEXT_DOCUMENT") { var td = p.value; td.text = String(v); return aemcp.textDirection(td, td.text); }
   if (ty === "COLOR") return aemcp.color(typeof v === "string" && v.charAt(0) !== "#" && /,/.test(v) ? nums(v, 0) : v);
   if (ty === "OneD" || ty === "LAYER_INDEX" || ty === "MASK_INDEX") { var x = typeof v === "number" ? v : Number(String(v).replace(/^\\s+|\\s+$/g, "")); if (String(v).replace(/\\s/g, "") === "" || isNaN(x)) aemcp.fail("'" + v + "' is not a number"); return x; }
   if (ty === "TwoD" || ty === "TwoD_SPATIAL") return nums(v, 2);
   if (ty === "ThreeD" || ty === "ThreeD_SPATIAL") { var a = nums(v, 0); if (a.length === 2) a.push(p.value[2]); if (a.length !== 3) aemcp.fail("'" + v + "' needs 2 or 3 numbers"); return a; }
   aemcp.fail("'" + p.name + "' holds " + ty + ", which can't be set from a data cell");
 }
-function setText(p, s) { var td = p.value; td.text = s; p.setValue(td); }
+function setText(p, s) { var td = p.value; td.text = s; aemcp.textDirection(td, s); p.setValue(td); }
 // writes one value; returns what the size driver got (size only)
 function apply(g, m, s) {
   var p = g.p, ty = p ? vfType(p) : "";

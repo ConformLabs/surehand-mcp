@@ -79,8 +79,10 @@ if (!instances.length) {
     const out = plain(r.out);
     console.log(out.split(/\r?\n/).filter((l) => /✖|signature|Bridge running|steps passed|step\(s\) failed|All checks|problem/i.test(l)).join("\n"));
     const bridge = /bridge v(\S+?)\)/.exec(out)?.[1];
-    if (bridge && bridge !== buildVersion)
+    if (bridge && bridge !== buildVersion) {
       console.log(`  ! this After Effects still runs the v${bridge} extension: restart it on the PC to test v${buildVersion}'s extension too`);
+      if (r.status !== 0) console.log(`  ! a failure here is likely that mix (v${bridge} extension, v${buildVersion} server): restart After Effects on the PC and run again before looking further`);
+    }
     if (r.status !== 0) failed++;
   }
 }

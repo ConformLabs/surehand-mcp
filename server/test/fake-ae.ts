@@ -280,6 +280,8 @@ export interface FakeLayerSpec {
   /** ParagraphJustification name (default LEFT_JUSTIFY), ParagraphDirection name (default left to right) */
   justification?: string;
   direction?: string;
+  /** ComposerEngine name (default LATIN_CJK_ENGINE) */
+  composer?: string;
   /** keyframed Source Text: the text at each keyframe (hold) */
   textKeys?: { t: number; text: string }[];
   /** text layers: fill colour (default white) */
@@ -339,6 +341,8 @@ export interface FakeProjectSpec {
   fontGlyphsMissing?: Record<string, string>;
   /** an After Effects before 24.0: no ParagraphDirection / ComposerEngine (TextDocument has no direction) */
   noRtlApi?: boolean;
+  /** the user's type preference "South Asian and Middle Eastern": new text (layers.addText) is right to left, Universal composer */
+  newTextRtl?: boolean;
   /** output module templates applyTemplate accepts (default: any) */
   outputModuleTemplates?: string[];
   /** the project file (default /jobs/Inherited.aep); unsaved changes */
@@ -542,6 +546,16 @@ export function fakeProject(spec: FakeProjectSpec) {
       return w;
     };
     it.__egp = c.egp;
+    // comp.layers.addText / addBoxText: a new text layer, as the user's type preference makes it
+    const newText = (text: string, box?: number[]) => {
+      const rtl = spec.newTextRtl ? { direction: "DIRECTION_RIGHT_TO_LEFT", composer: "UNIVERSAL_TYPE_ENGINE" } : {};
+      addLayers(it, { name: it.name, layers: [{ name: text || "Text", type: "text", text, ...(box ? { box } : {}), ...rtl }] });
+      const L = it.layers[it.layers.length - 1];
+      (raw.get(L) ?? L).index = it.layers.length;
+      return L;
+    };
+    it.layers.addText = (text: string) => newText(text);
+    it.layers.addBoxText = (box: number[], text: string) => newText(text, box);
     it.remove = () => {
       const k = items.findIndex((x) => x.id === it.id);
       if (k >= 0) items.splice(k, 1);
@@ -587,7 +601,7 @@ export function fakeProject(spec: FakeProjectSpec) {
         const d: any = { font: ls.font ?? "ArialMT", text, fontSize: ls.fontSize ?? 50, boxText: isBox, pointText: !isBox, applyFill: true, fillColor: clone(ls.fillColor ?? [1, 1, 1]),
           tracking: 0, horizontalScale: 1, justification: G.ParagraphJustification[ls.justification ?? "LEFT_JUSTIFY"],
           ...(isBox ? { boxTextSize: clone(ls.box ?? [400, 200]), boxTextPos: [0, -(ls.fontSize ?? 50)], boxVerticalAlignment: G.BoxVerticalAlignment.TOP } : {}),
-          ...(spec.noRtlApi ? {} : { direction: G.ParagraphDirection[ls.direction ?? "DIRECTION_LEFT_TO_RIGHT"], _ce: G.ComposerEngine.LATIN_CJK_ENGINE, digitSet: G.DigitSet.DEFAULT_DIGITS }),
+          ...(spec.noRtlApi ? {} : { direction: G.ParagraphDirection[ls.direction ?? "DIRECTION_LEFT_TO_RIGHT"], _ce: G.ComposerEngine[ls.composer ?? "LATIN_CJK_ENGINE"], digitSet: G.DigitSet.DEFAULT_DIGITS }),
           ...(ls.charFonts ? { characterRange: (i: number) => ({ font: ls.charFonts![i].font, fontObject: fontObj(ls.charFonts![i].font, ls.charFonts![i].missing ?? "") }) } : {}) };
         // the font object follows the font (a font map changes it): the project's per-font glyph list, else the layer's
         if (ls.glyphsMissing !== undefined || spec.fontGlyphsMissing)

@@ -1,7 +1,7 @@
 // ae_find_files (Node, real temp folders), ae_export_frames (its ExtendScript on the fake After Effects, and the
 // handler with a mocked bridge), and ae_import_files reporting a rejected "import as".
 import { describe, expect, it, vi } from "vitest";
-import { existsSync, mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -11,7 +11,9 @@ vi.mock("../src/jsx.js", async (orig) => ({ ...(await orig<typeof import("../src
 const { EXPORT_FRAMES_JSX, expandHome, findFiles, globToRegExp, registerFileTools } = await import("../src/tools/files.js");
 const { ALL_JSX_TOOLS } = await import("../src/tools/all.js");
 const { fakeKeysAE } = await import("./fake-keys.js");
-const { FINISH_JSX, RENDER_KIT_JSX } = await import("../src/tools/core.js");
+const { FINISH_JSX, RENDER_KIT_JSX, waitForFile } = await import("../src/tools/core.js");
+const { encodePng } = await import("../src/png.js");
+const PNG = encodePng(4, 4, new Uint8Array(4 * 4 * 3).fill(90), 3);
 
 describe("globs", () => {
   const m = (g: string, p: string) => globToRegExp(g).test(p.normalize("NFC").toLowerCase());
@@ -169,7 +171,7 @@ describe("ae_export_frames (handler)", () => {
       expect(opts).toMatchObject({ rollback: "deferred", checkOnly: true });
       calls.push("render");
       // written a moment after the script returned
-      setTimeout(() => writeFileSync(file, "png"), 250);
+      setTimeout(() => writeFileSync(file, PNG), 250);
       return { ok: true, logs: [], result: { files: [{ path: file, source: "Main", frame: 3, width: 1920, height: 1080 }], cleanup: {}, passes: 1 }, pending: "r1" };
     });
     const r = await handler({ exports: [{ frames: [3], outputPath: "~/f.png" }] });
@@ -215,5 +217,27 @@ describe("ae_import_files: a rejected import-as", () => {
     const f = fake();
     expect(() => f.run({ paths: ["/a/art.psd", "/a/logo.png"], importAs: "comp", strictImportAs: true })).toThrow(/can't import \/a\/logo.png as comp.*Nothing was imported/);
     expect(f.imported).toEqual([]);
+  });
+});
+
+describe("waitForFile (frame renders, proofs, exports)", () => {
+  it("waits for the whole PNG when it is written in two parts with a pause (the size holds still in between)", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "surehand-wait-"));
+    const file = join(dir, "frame.png");
+    // as seen live: the first half, then nothing for longer than one poll, then the rest
+    setTimeout(() => writeFileSync(file, PNG.subarray(0, PNG.length >> 1)), 50);
+    setTimeout(() => writeFileSync(file, PNG), 700);
+    const t0 = Date.now();
+    expect(await waitForFile(file)).toBe(true);
+    expect(Date.now() - t0).toBeGreaterThanOrEqual(690);
+    expect(readFileSync(file).equals(PNG)).toBe(true);
+  });
+
+  it("a PNG that never gets its end doesn't count as written; other files still go by a size that holds still", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "surehand-wait-"));
+    writeFileSync(join(dir, "half.png"), PNG.subarray(0, PNG.length >> 1));
+    expect(await waitForFile(join(dir, "half.png"), 5)).toBe(false);
+    writeFileSync(join(dir, "data.json"), "{}");
+    expect(await waitForFile(join(dir, "data.json"), 5)).toBe(true);
   });
 });
