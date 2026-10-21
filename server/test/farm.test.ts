@@ -678,7 +678,7 @@ describe.skipIf(!posix)("run_local and verify (fake aerender)", () => {
     expect(jobs.map((j) => j.status)).toEqual(["done", "done", "done"]);
     expect(secondsPerFrame(jobs[0])).toBe(2); // aerender's total time over the frames (its per-frame figure is whole seconds: 0)
     const st = text(await farm({ action: "status", run: id }));
-    expect(st).toMatch(/^Run farm\w+: done\. 100 of 100 frames rendered; 3 of 3 chunks done\./);
+    expect(st).toMatch(/^Run farm\w+ \(.*\): done\. 100 of 100 frames rendered; 3 of 3 chunks done\./);
     expect(st).toMatch(/1\. frames 0-32: done, 33\/33, 2 s per frame/);
     const v = text(await farm({ action: "verify", plan }));
     expect(v).toMatch(/^PASS: the chunked render of "Main" is complete: 100 frames \(0-99\), every file present once and complete, 2 sampled frames match a render here\./);
@@ -702,7 +702,7 @@ describe.skipIf(!posix)("run_local and verify (fake aerender)", () => {
     const plan = await planFile();
     await new Promise((r) => setTimeout(r, 20));
     writeFileSync(join(work, "Spot.aep"), readFileSync(join(work, "Spot.aep"), "utf8") + " ");
-    expect(text(await farm({ action: "run_local", plan }))).toMatch(/saved again after this plan was made.*Plan again/);
+    expect(text(await farm({ action: "run_local", plan }))).toMatch(/saved again after its plan was made.*Plan again/);
   });
 
   it("verify names the exact missing, cut-off, duplicated and extra frames", async () => {
@@ -793,9 +793,84 @@ describe.skipIf(!posix)("run_local and verify (fake aerender)", () => {
     farmRuns.clear();
     forgetJobs();
     const st = text(await farm({ action: "status", run: id }));
-    expect(st).toMatch(/^Run farm\w+: done\. 100 of 100 frames rendered; 3 of 3 chunks done\./);
+    expect(st).toMatch(/^Run farm\w+ \(.*\): done\. 100 of 100 frames rendered; 3 of 3 chunks done\./);
     expect(st).toMatch(/2\. frames 33-66: done, 34\/34, 2 s per frame/);
-    expect(text(await farm({ action: "status" }))).toContain(`Run ${id}: done`);
+    expect(text(await farm({ action: "status" }))).toMatch(new RegExp(`^Run ${id} \\(.*\\): done`));
+  });
+
+  /** A finished run as a stopped server leaves it: chunk 2's aerender died before its first frame, chunk 3 never started. */
+  async function interruptedRun() {
+    const plan = await planFile();
+    const id = runIdOf(text(await farm({ action: "run_local", plan })));
+    await waitForRun(id);
+    farmRuns.clear();
+    forgetJobs();
+    const renders = join(home, ".surehand", "ae", "renders");
+    const rf = JSON.parse(readFileSync(join(renders, `${id}.farm.json`), "utf8"));
+    const j2 = JSON.parse(readFileSync(join(renders, `${rf.chunks[1].job}.json`), "utf8"));
+    writeFileSync(join(renders, `${j2.id}.json`), JSON.stringify({ ...j2, status: "failed", done: 0 }));
+    writeFileSync(j2.log, "aerender version 26.5x89\n");
+    delete rf.chunks[2].job;
+    writeFileSync(join(renders, `${id}.farm.json`), JSON.stringify(rf));
+    for (let f = 67; f <= 99; f++) rmSync(join(work, "out", `main_00${f}.png`));
+    return { id, plan };
+  }
+
+  it("status never starts or retries anything: a run found on disk is reported as interrupted, with how to continue", async () => {
+    const { id } = await interruptedRun();
+    const st = text(await farm({ action: "status", run: id }));
+    expect(st).toMatch(/: interrupted: 1 chunk was still waiting when the server stopped\. 33 of 100 frames rendered; 1 of 3 chunks done, 1 failed or cancelled\./);
+    expect(st).toMatch(/2\. frames 33-66: failed, 0\/34 \(aerender version 26\.5x89/);
+    expect(st).toMatch(/3\. frames 67-99: not started/);
+    expect(st).toContain(`Resume it: ae_farm {action: "run_local", run: "${id}"}`);
+    expect(st).toMatch(/2\. frames 33-66: .*aerender -project .* -rqindex 1 -s 33 -e 66 /);
+    expect(st).toMatch(/3\. frames 67-99: .*aerender -project .* -rqindex 1 -s 67 -e 99 /);
+    expect(text(await farm({ action: "status" }))).toContain(`Run ${id}`);
+    await new Promise((r) => setTimeout(r, 300));
+    expect(aerenderRuns()).toHaveLength(3); // the run's own three, nothing since
+  });
+
+  it("resume only a current run: recent, on the unchanged project; then only its waiting chunks", async () => {
+    const { id } = await interruptedRun();
+    farmTiming.resumeWithinMs = 0;
+    try {
+      expect(text(await farm({ action: "status", run: id }))).not.toContain("Resume it");
+      expect(text(await farm({ action: "run_local", run: id }))).toMatch(/was not resumed: it started .*, more than 0 hours ago\. Nothing was started\.\nRender what is left yourself/);
+    } finally {
+      farmTiming.resumeWithinMs = 6 * 3600_000;
+    }
+    const aep = join(work, "Spot.aep"), before = readFileSync(aep, "utf8");
+    await new Promise((r) => setTimeout(r, 20));
+    writeFileSync(aep, before + " ");
+    expect(text(await farm({ action: "run_local", run: id }))).toMatch(/was not resumed: the project was saved again after its plan was made/);
+    expect(aerenderRuns()).toHaveLength(3);
+  });
+
+  it("resuming a current run starts its waiting chunk only (the chunk that died before the restart is not retried)", async () => {
+    const { id, plan } = await interruptedRun();
+    const r = text(await farm({ action: "run_local", run: id }));
+    expect(r).toMatch(new RegExp(`^Resumed run ${id}: chunk 3 of "Main"`));
+    for (let i = 0; i < 200 && !existsSync(join(work, "out", "main_0099.png")); i++) await new Promise((x) => setTimeout(x, 50));
+    await waitForRun(id);
+    expect(aerenderRuns().slice(3).map((a) => a[a.indexOf("-s") + 1])).toEqual(["67"]);
+    expect(text(await farm({ action: "run_local", run: id }))).toMatch(/was not resumed: (it is running in this session already|no chunk of it is waiting)/);
+    void plan;
+  });
+
+  it("status without a run shows the latest run of the open project, and how to see the others", async () => {
+    const plan = await planFile();
+    const first = runIdOf(text(await farm({ action: "run_local", plan })));
+    await waitForRun(first);
+    await new Promise((r) => setTimeout(r, 5));
+    const second = runIdOf(text(await farm({ action: "run_local", plan, overwrite: true })));
+    await waitForRun(second);
+    const st = text(await farm({ action: "status" }));
+    expect(st).toMatch(new RegExp(`^Run ${second} `));
+    expect(st).not.toContain(first);
+    expect(st).toMatch(/\n\d+ other runs?: ae_farm \{action: "status", all: true\}$/);
+    const all = text(await farm({ action: "status", all: true }));
+    expect(all).toContain(`Run ${first} `);
+    expect(all).toContain(`Run ${second} `);
   });
 
   it("Windows start-up collisions: staggered starts (the next once the previous renders a frame) avoid them", async () => {
@@ -831,7 +906,7 @@ describe.skipIf(!posix)("run_local and verify (fake aerender)", () => {
     for (let i = 0; i < 100 && farmRuns.get(id)!.chunks.some((c: any) => !c.job || c.job.status === "running"); i++) await new Promise((r) => setTimeout(r, 50));
     await waitForRun(id);
     const st = text(await farm({ action: "status", run: id }));
-    expect(st).toMatch(/^Run farm\w+: done\. 100 of 100 frames rendered; 3 of 3 chunks done\./);
+    expect(st).toMatch(/^Run farm\w+ \(.*\): done\. 100 of 100 frames rendered; 3 of 3 chunks done\./);
     expect(st).toMatch(/2\. frames 33-66: done, 34\/34, 2 s per frame \(started again once: its first aerender, job r\w+, ended before rendering a frame: aerender version 26\.5x89/);
     expect(aerenderRuns().filter((a) => a[a.indexOf("-s") + 1] === "33")).toHaveLength(2);
     expect(text(await farm({ action: "verify", plan }))).toMatch(/^PASS/);

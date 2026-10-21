@@ -20,7 +20,7 @@ import { checkManifest, formatCheck } from "../farm/check.js";
 import { FARM_CHECK_JSX, FARM_SCAN_JSX } from "../farm/jsx.js";
 import { buildManifest, formatManifest, manifestName, type FarmScan, type Manifest } from "../farm/manifest.js";
 import { aerenderNextTo, platformOf, readMounts, type PathMapping } from "../farm/paths.js";
-import { buildPlan, defaultPlanFolder, fileStamp, findProfile, fmtDuration, formatPlan, maxLocalProcesses, PlanRefusal, planFileName, planScripts, type FarmPlan, type MachineSpec } from "../farm/plan.js";
+import { buildPlan, commandLine, defaultPlanFolder, fileStamp, findProfile, fmtDuration, formatPlan, maxLocalProcesses, PlanRefusal, planFileName, planScripts, type FarmPlan, type MachineSpec } from "../farm/plan.js";
 import { listFrames, parseTemplate, runsOf, runsText } from "../farm/seq.js";
 import { blankRender, compareProof, farmFrame, pictureFacts, substantial, readPlanFile, sequenceProblems, verifyMovie, verifySequence, type PictureFacts, type ProofFrame } from "../farm/verify.js";
 import { expandHome } from "./files.js";
@@ -46,6 +46,7 @@ export interface FarmInput {
   plan?: string;
   run?: string;
   cancel?: boolean;
+  all?: boolean;
   join?: boolean;
   proveFrames?: number;
   tolerance?: number;
@@ -245,14 +246,20 @@ async function resolvePlan(a: FarmInput, fallback: boolean): Promise<{ plan: Far
 // ---------- run_local and status ----------
 
 interface RunChunk { index: number; job?: RenderJob; state: "waiting" | "started"; /** the job that died before its first frame, when this chunk was started again */ retriedFrom?: string }
-interface Run { id: string; plan: FarmPlan; planFile: string | null; chunks: RunChunk[]; max: number; startedAt: string; cancelled?: boolean; timer?: ReturnType<typeof setTimeout> }
+interface Run {
+  id: string; plan: FarmPlan; planFile: string | null; chunks: RunChunk[]; max: number; startedAt: string; cancelled?: boolean; timer?: ReturnType<typeof setTimeout>;
+  /** run_local is driving it in this server (starts the next chunks, retries once). A run found on disk is only reported. */
+  driven?: boolean;
+  /** jobs this server started for the run: only their deaths are retried */
+  startedHere?: Set<string>;
+}
 
 /**
  * Starting aerender processes one after another: the next starts once the previous one has rendered its first frame
  * (or after staggerTimeoutMs). Seen live on Windows 11: two started at the same moment, one wrote only its version line
  * and exited. On by default on Windows; replaceable in tests.
  */
-export const farmTiming: { stagger: boolean; staggerTimeoutMs: number; maxLocal?: number } = { stagger: process.platform === "win32", staggerTimeoutMs: 180_000 };
+export const farmTiming: { stagger: boolean; staggerTimeoutMs: number; maxLocal?: number; resumeWithinMs: number } = { stagger: process.platform === "win32", staggerTimeoutMs: 180_000, resumeWithinMs: 6 * 3600_000 };
 const runs = new Map<string, Run>();
 const RUNS_KEPT = 20;
 const runFile = (id: string) => appFile("renders", `${id}.farm.json`);
@@ -270,7 +277,7 @@ function pruneRuns() {
     for (const n of names.slice(0, Math.max(0, names.length - RUNS_KEPT))) rmSync(appFile("renders", n), { force: true });
   } catch {}
 }
-/** Runs started before the server restarted, from their files (their jobs from renders/<job>.json and the logs). */
+/** Runs started before the server restarted, from their files (their jobs from renders/<job>.json and the logs). Only read: nothing is started. */
 function recoverRuns(only?: string) {
   let names: string[] = [];
   try {
@@ -293,23 +300,26 @@ function recoverRuns(only?: string) {
   }
 }
 
-/** Files the plan's chunks would write that exist already. */
-export function existingOutputs(plan: FarmPlan): string[] {
+/** Files the plan's chunks would write that exist already (only these chunks, when given). */
+export function existingOutputs(plan: FarmPlan, chunks?: number[]): string[] {
+  const cs = plan.chunks.filter((c) => !chunks || chunks.includes(c.index));
   if (plan.sequence) {
     const p = parseTemplate(plan.sequence.template);
     if (!p) return [];
-    return listFrames(p).filter((f) => f.num >= plan.sequence!.firstFile && f.num <= plan.sequence!.lastFile).map((f) => join(p.dir, f.name));
+    const off = plan.sequence.offset;
+    return listFrames(p).filter((f) => cs.some((c) => f.num >= c.first + off && f.num <= c.last + off)).map((f) => join(p.dir, f.name));
   }
   const mv = plan.movie!;
-  return [...new Set([...mv.parts, mv.final])].filter((f) => existsSync(f));
+  const parts = plan.chunks.length > 1 ? cs.map((c) => mv.parts[c.index - 1]) : [];
+  return [...new Set([...parts, mv.final])].filter((f) => existsSync(f));
 }
 
-/** A chunk whose aerender died before rendering a frame (a start-up collision) is started again, once. */
+/** A chunk whose aerender died before rendering a frame (a start-up collision) is started again, once: only while run_local drives the run. */
 function retryDead(run: Run): number {
   let n = 0;
   for (const c of run.chunks) {
     const j = c.job ? renderJob(c.job.id) ?? c.job : undefined;
-    if (!j || c.retriedFrom || run.cancelled || j.status !== "failed" || j.frameRendered > 0) continue;
+    if (!j || c.retriedFrom || run.cancelled || j.status !== "failed" || j.frameRendered > 0 || !run.startedHere?.has(j.id)) continue;
     c.retriedFrom = j.id;
     c.job = undefined;
     c.state = "waiting";
@@ -318,8 +328,9 @@ function retryDead(run: Run): number {
   return n;
 }
 
+/** Starts the waiting chunks there is room for. Only for a run that run_local drives in this server: never from status. */
 function startNext(run: Run) {
-  if (run.cancelled) return;
+  if (run.cancelled || !run.driven) return;
   let started = retryDead(run) > 0;
   const starting = () =>
     run.chunks.some((x) => x.job?.status === "running" && x.job.frameRendered === 0 && Date.now() - Date.parse(x.job.startedAt) < farmTiming.staggerTimeoutMs);
@@ -345,27 +356,49 @@ function startNext(run: Run) {
       onExit: () => startNext(run),
       onFirstFrame: () => startNext(run),
     });
+    (run.startedHere ??= new Set()).add(c.job.id);
   }
   if (started) saveRun(run);
 }
 
+/** The project's unsaved changes (aerender renders the file): a refusal, or a note when After Effects can't be asked. */
+async function unsavedRefusal(plan: FarmPlan, notes: string[]): Promise<string | null> {
+  try {
+    const r = await runJsx(`return { file: app.project.file ? app.project.file.fsName : null, dirty: app.project.dirty };`, {}, { undoGroup: false, timeoutMs: 30_000 });
+    const d = r.ok ? parse<{ file: string | null; dirty: boolean }>(r) : null;
+    if (d?.dirty && d.file && d.file === plan.project.file) return "The project has unsaved changes, and aerender renders the file on disk. Nothing was started. Save it first (ae_save_project), then plan again.";
+  } catch {
+    notes.push("After Effects is not reachable: unsaved changes in it were not checked (aerender renders the saved file)");
+  }
+  return null;
+}
+
+const projectChanged = (plan: FarmPlan) => {
+  const now = fileStamp(plan.project.file);
+  return now.bytes === null ? "the project is not there" : now.bytes !== plan.project.bytes || now.modified !== plan.project.modified ? `the project was saved again after its plan was made (${plan.createdAt})` : null;
+};
+
+/** Why a run found on disk can't be resumed (null: it can): only a run that was in progress, started recently, on an unchanged project. */
+function notResumable(run: Run): string | null {
+  if (run.driven) return "it is running in this session already";
+  if (run.cancelled) return "it was cancelled";
+  if (!run.chunks.some((c) => c.state === "waiting")) return "no chunk of it is waiting: it finished (verify shows what is missing)";
+  if (Date.now() - Date.parse(run.startedAt) > farmTiming.resumeWithinMs) return `it started ${run.startedAt}, more than ${Math.round(farmTiming.resumeWithinMs / 3600_000)} hours ago`;
+  if (run.plan.machines.length !== 1 || !run.plan.machines[0].local) return "its plan is for other machines";
+  return projectChanged(run.plan);
+}
+
 async function runLocalAction(a: FarmInput, mode: string): Promise<CallToolResult> {
   if (mode === "read-only") return errorResult(`${READ_ONLY_REFUSAL} (run_local starts aerender processes that write the render.)`);
+  if (a.run) return resumeRun(a);
   const notes: string[] = [];
   const { plan, file: planFile, used } = await resolvePlan(a, false);
   if (used) notes.push(used);
   if (plan.machines.length !== 1 || !plan.machines[0].local) return errorResult(`This plan is for ${plan.machines.map((m) => m.name).join(", ")}: run its scripts on those machines. run_local renders only on this machine (plan without machines).`);
-  const now = fileStamp(plan.project.file);
-  if (now.bytes === null) return errorResult(`The project ${plan.project.file} is not there. Nothing was started.`);
-  if (now.bytes !== plan.project.bytes || now.modified !== plan.project.modified) return errorResult(`The project was saved again after this plan was made (${plan.createdAt}). Nothing was started. Plan again, so the chunks match the project.`);
-  // the open project: aerender renders the file, so unsaved changes would not be in the render
-  try {
-    const r = await runJsx(`return { file: app.project.file ? app.project.file.fsName : null, dirty: app.project.dirty };`, {}, { undoGroup: false, timeoutMs: 30_000 });
-    const d = r.ok ? parse<{ file: string | null; dirty: boolean }>(r) : null;
-    if (d?.dirty && d.file && d.file === plan.project.file) return errorResult("The project has unsaved changes, and aerender renders the file on disk. Nothing was started. Save it first (ae_save_project), then plan again.");
-  } catch {
-    notes.push("After Effects is not reachable: unsaved changes in it were not checked (aerender renders the saved file)");
-  }
+  const changed = projectChanged(plan);
+  if (changed) return errorResult(`${changed[0].toUpperCase()}${changed.slice(1)}. Nothing was started. Plan again, so the chunks match the project.`);
+  const unsaved = await unsavedRefusal(plan, notes);
+  if (unsaved) return errorResult(unsaved);
   const bin = plan.machines[0].aerender;
   if (!existsSync(bin)) return errorResult(`aerender is not at ${bin}. Nothing was started.`);
   const existing = existingOutputs(plan);
@@ -380,7 +413,7 @@ async function runLocalAction(a: FarmInput, mode: string): Promise<CallToolResul
   if (a.dryRun) return text(`Dry run: would start ${plan.chunks.length} aerender process${plan.chunks.length === 1 ? "" : "es"} (${max} at once) for "${plan.comp.name}" frames ${planFrames(plan)}.\n${plan.chunks.map((c) => `  ${c.index}. frames ${chunkFrames(plan, c)}`).join("\n")}${tail}`);
   pruneRuns();
   const id = `farm${Date.now().toString(36)}`;
-  const run: Run = { id, plan, planFile, chunks: plan.chunks.map((c) => ({ index: c.index, state: "waiting" })), max, startedAt: new Date().toISOString() };
+  const run: Run = { id, plan, planFile, chunks: plan.chunks.map((c) => ({ index: c.index, state: "waiting" })), max, startedAt: new Date().toISOString(), driven: true };
   runs.set(id, run);
   saveRun(run);
   startNext(run);
@@ -392,41 +425,108 @@ async function runLocalAction(a: FarmInput, mode: string): Promise<CallToolResul
   );
 }
 
+/** run_local {run}: the waiting chunks of a run the server stopped driving, when it is clearly current. */
+async function resumeRun(a: FarmInput): Promise<CallToolResult> {
+  recoverRuns(a.run);
+  const run = runs.get(a.run!);
+  if (!run) return errorResult(`No run ${a.run} (runs are kept in ~/.surehand/ae/renders).`);
+  const why = notResumable(run);
+  if (why) return errorResult(`Run ${run.id} was not resumed: ${why}. Nothing was started.\n${continueHint(run)}`);
+  const notes: string[] = [];
+  const unsaved = await unsavedRefusal(run.plan, notes);
+  if (unsaved) return errorResult(unsaved);
+  const waiting = run.chunks.filter((c) => c.state === "waiting").map((c) => c.index);
+  const existing = existingOutputs(run.plan, waiting);
+  if (existing.length && !a.overwrite) return errorResult(`${existing.length} file${existing.length === 1 ? "" : "s"} of the waiting chunks exist already (${basename(existing[0])}...). Nothing was started. Pass overwrite: true to render over them.`);
+  if (a.dryRun) return text(`Dry run: would resume run ${run.id}: chunks ${waiting.join(", ")}.`);
+  run.driven = true;
+  startNext(run);
+  return text(`Resumed run ${run.id}: chunk${waiting.length === 1 ? "" : "s"} ${waiting.join(", ")} of "${run.plan.comp.name}". Progress: ae_farm {action: "status", run: "${run.id}"}.${notes.length ? `\nNotes:\n${notes.map((n) => `  - ${n}`).join("\n")}` : ""}`);
+}
+
+/** What to run to finish a run: resume (when it can be), or the chunks' own aerender commands. */
+function continueHint(run: Run): string {
+  const left = run.chunks.filter((c) => {
+    const j = c.job ? renderJob(c.job.id) ?? c.job : undefined;
+    return !j || j.status === "failed" || j.status === "cancelled";
+  });
+  if (!left.length) return "";
+  const m = run.plan.machines[0];
+  const lines = left.map((c) => {
+    const ch = run.plan.chunks[c.index - 1];
+    return `  ${c.index}. frames ${chunkFrames(run.plan, ch)}: ${commandLine(platformOf(), m.aerender, ch.args)}`;
+  });
+  const can = !notResumable(run);
+  return `${can ? `Resume it: ae_farm {action: "run_local", run: "${run.id}"}. Or r` : "R"}ender what is left yourself (after checking the project is the one planned; verify then gives exact missing frames):\n${lines.join("\n")}`;
+}
+
 const medianOf = (a: number[]) => {
   const s = [...a].sort((x, y) => x - y), m = s.length >> 1;
   return s.length ? (s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2) : NaN;
 };
 
-function statusAction(a: FarmInput): CallToolResult {
+/** Reports runs; never starts or retries anything (it may find a dead process and mark its job failed). */
+async function statusAction(a: FarmInput): Promise<CallToolResult> {
   recoverRuns(a.run);
-  const list = a.run ? ([runs.get(a.run)].filter(Boolean) as Run[]) : [...runs.values()];
-  if (a.run && !list.length) return errorResult(`No run ${a.run} (runs started with run_local, kept in ~/.surehand/ae/renders; ae_render_jobs lists every background render).`);
-  if (!list.length) return text("No chunked runs.");
+  let list: Run[];
+  let older = 0;
+  if (a.run) {
+    list = [runs.get(a.run)].filter(Boolean) as Run[];
+    if (!list.length) return errorResult(`No run ${a.run} (runs started with run_local, kept in ~/.surehand/ae/renders; ae_render_jobs lists every background render).`);
+  } else {
+    const byNewest = [...runs.values()].sort((x, y) => y.startedAt.localeCompare(x.startedAt));
+    if (!byNewest.length) return text("No chunked runs.");
+    if (a.all) list = byNewest;
+    else {
+      // the latest run of the open project (else the latest of all)
+      let project: string | null = null;
+      try {
+        const r = await runJsx(`return app.project.file ? app.project.file.fsName : null;`, {}, { undoGroup: false, timeoutMs: 30_000 });
+        project = r.ok ? (r.result as string | null) : null;
+      } catch {}
+      list = [byNewest.find((r) => r.plan.project.file === project) ?? byNewest[0]];
+      older = byNewest.length - 1;
+    }
+  }
   const out: string[] = [];
   for (const run of list) {
-    // a run found again after a restart: its waiting chunks start now (nothing else would start them)
-    const before = run.chunks.filter((c) => c.state === "waiting").length;
     if (a.cancel) {
       run.cancelled = true;
+      if (run.timer) clearTimeout(run.timer);
       for (const c of run.chunks) if (c.job) cancelJob(renderJob(c.job.id) ?? c.job);
       saveRun(run);
-    } else startNext(run);
-    const resumed = before - run.chunks.filter((c) => c.state === "waiting").length;
+    }
     const all = run.chunks.map((c) => ({ c, ch: run.plan.chunks[c.index - 1], j: c.job ? renderJob(c.job.id) ?? c.job : undefined }));
     const spfs = all.map((x) => (x.j ? secondsPerFrame(x.j) : null)).filter((s): s is number => s !== null);
     const spf = medianOf(spfs);
     const done = all.filter((x) => x.j?.status === "done").length, failed = all.filter((x) => x.j && ["failed", "cancelled"].includes(x.j.status)).length;
     const framesDone = all.reduce((n, x) => n + Math.min(x.ch.frames, x.j?.status === "done" ? x.ch.frames : x.j?.frameRendered ?? 0), 0);
     const left = all.filter((x) => !x.j || x.j.status === "running").reduce((n, x) => n + x.ch.frames - (x.j?.frameRendered ?? 0), 0);
-    const state = run.cancelled ? "cancelled" : done === all.length ? "done" : failed && !all.some((x) => x.j?.status === "running" || x.c.state === "waiting") ? "finished with failures" : "running";
-    out.push(`Run ${run.id}: ${state}. ${framesDone} of ${run.plan.frames.frames} frames rendered; ${done} of ${all.length} chunks done${failed ? `, ${failed} failed or cancelled` : ""}.${Number.isFinite(spf) && left > 0 && state === "running" ? ` About ${fmtDuration((left * spf) / run.max)} left at ${perFrameText(spf)} per frame, ${run.max} at once.` : ""}`);
-    if (resumed > 0) out.push(`  (started ${resumed} waiting chunk${resumed === 1 ? "" : "s"} now)`);
+    const running = all.some((x) => x.j?.status === "running");
+    const waiting = all.filter((x) => x.c.state === "waiting").length;
+    const state = run.cancelled
+      ? "cancelled"
+      : done === all.length
+        ? "done"
+        : waiting && !run.driven
+          ? running
+            ? `running, but interrupted: ${waiting} chunk${waiting === 1 ? " was" : "s were"} still waiting when the server stopped`
+            : `interrupted: ${waiting} chunk${waiting === 1 ? " was" : "s were"} still waiting when the server stopped`
+          : !running && !waiting
+            ? "finished with failures"
+            : "running";
+    out.push(`Run ${run.id} (${run.startedAt}, "${run.plan.comp.name}", ${run.plan.project.file}): ${state}. ${framesDone} of ${run.plan.frames.frames} frames rendered; ${done} of ${all.length} chunks done${failed ? `, ${failed} failed or cancelled` : ""}.${Number.isFinite(spf) && left > 0 && running ? ` About ${fmtDuration((left * spf) / run.max)} left at ${perFrameText(spf)} per frame, ${run.max} at once.` : ""}`);
     for (const x of all) {
       const j = x.j, s = j ? secondsPerFrame(j) : null;
-      out.push(`  ${x.c.index}. frames ${chunkFrames(run.plan, x.ch)}: ${!j ? "waiting" : `${j.status}, ${Math.min(j.frameRendered, x.ch.frames)}/${x.ch.frames}${s !== null ? `, ${perFrameText(s)} per frame` : ""}${j.status === "failed" ? ` (${j.tail.slice(-2).join(" | ")}; log ${j.log})` : ""}`}${x.c.retriedFrom ? ` (started again once: its first aerender, job ${x.c.retriedFrom}, ended before rendering a frame${(() => { const d = renderJob(x.c.retriedFrom!); return d ? `: ${d.tail.slice(-2).join(" | ")}; log ${d.log}` : ""; })()})` : ""}`);
+      out.push(`  ${x.c.index}. frames ${chunkFrames(run.plan, x.ch)}: ${!j ? (run.driven ? "waiting" : "not started") : `${j.status}, ${Math.min(j.frameRendered, x.ch.frames)}/${x.ch.frames}${s !== null ? `, ${perFrameText(s)} per frame` : ""}${j.status === "failed" ? ` (${j.tail.slice(-2).join(" | ")}; log ${j.log})` : ""}`}${x.c.retriedFrom ? ` (started again once: its first aerender, job ${x.c.retriedFrom}, ended before rendering a frame${(() => { const d = renderJob(x.c.retriedFrom!); return d ? `: ${d.tail.slice(-2).join(" | ")}; log ${d.log}` : ""; })()})` : ""}`);
     }
-    if (state !== "running") out.push(`  Verify: ae_farm {action: "verify"${run.planFile ? `, plan: "${run.planFile}"` : `, rqIndex: ${run.plan.rqIndex}`}}`);
+    if (!running && state !== "done" && state !== "cancelled") {
+      const hint = continueHint(run);
+      if (hint) out.push(...hint.split("\n").map((l) => (l.startsWith("  ") ? `  ${l}` : `  ${l}`)));
+    }
+    if (!running && !(waiting && run.driven)) out.push(`  Verify: ae_farm {action: "verify"${run.planFile ? `, plan: "${run.planFile}"` : `, rqIndex: ${run.plan.rqIndex}`}}`);
   }
+  if (older > 0) out.push(`${older} other run${older === 1 ? "" : "s"}: ae_farm {action: "status", all: true}`);
   return text(out.join("\n"));
 }
 
@@ -556,7 +656,7 @@ export async function farm(a: FarmInput): Promise<CallToolResult> {
       case "run_local":
         return await runLocalAction(a, mode);
       case "status":
-        return statusAction(a);
+        return await statusAction(a);
       case "verify":
         return await verifyAction(a, mode);
     }
@@ -598,7 +698,8 @@ export function registerFarmTools(server: McpServer) {
         estimate: z.enum(["auto", "profile", "sample", "none"]).optional().describe("plan: from a render profile, else a few sampled frames (auto)."),
         folder: z.string().optional().describe("plan: where the plan and scripts go (default next to the project)."),
         plan: z.string().optional().describe("run_local/verify: the farm-plan.json path (default: the plan next to the open project)."),
-        run: z.string().optional().describe("status: the run id."),
+        run: z.string().optional().describe("status: the run id (default the latest of the open project); run_local: resume this run."),
+        all: z.boolean().optional().describe("status: every run."),
         cancel: z.boolean().optional().describe("status: cancel the run's chunks."),
         join: z.boolean().optional().describe("verify: join movie parts by stream copy when lossless (never over a file)."),
         proveFrames: z.number().int().min(0).max(12).optional().describe("verify: frames compared strictly with a render here (default: 2, loosely, when AE has the project open)."),

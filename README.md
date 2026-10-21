@@ -672,6 +672,10 @@ run there.
   render queue items have one. Existing output is never rendered over without `overwrite: true`; a plan is refused
   once the project was saved again. The renders go on when the AI app reloads the server: `status` finds the run again
   from its files and shows each chunk's progress and time per frame (aerender's total time over its frames).
+  `status` only reports (the latest run of the open project; `all: true` for every run): it never starts or retries
+  a render. A run whose chunks were still waiting when the server stopped is reported as interrupted, with the
+  aerender commands of what is left; `run_local` with its `run` resumes it, but only within 6 hours of its start
+  and while the project is unchanged since its plan.
 - **`verify`**: wherever the chunks ran, proof of the result. Sequences: every frame present once, no extras, no
   empty or cut-off files (a complete PNG, a JPEG end marker, a DPX size field; other formats by header), with the exact
   missing frames and the `-s` / `-e` ranges to render again (missing, empty and cut-off frames). A few frames are

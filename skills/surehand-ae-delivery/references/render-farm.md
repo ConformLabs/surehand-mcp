@@ -42,8 +42,10 @@ It never runs anything on another machine: other machines get scripts and a mani
      01:00:00:00 at 25 fps renders 90000 onwards). Quote frames that way to the user.
 4. **Run here:** ae_farm {action: "run_local"} uses the plan next to the open project (or pass plan, or rqIndex when
    several items have one). It runs at most as many aerender processes as this machine's cores and memory allow and
-   starts the rest as those finish. The renders go on if the AI app reloads. Progress: ae_farm {action: "status",
-   run}; cancel: status with cancel: true.
+   starts the rest as those finish. The renders go on if the AI app reloads. Progress: ae_farm {action: "status"}
+   (the latest run; it only reports); cancel: status with cancel: true. A run reported as interrupted resumes with
+   ae_farm {action: "run_local", run} only when it is recent and the project is unchanged; otherwise tell the user
+   and give the commands status lists.
 5. **Verify:** ae_farm {action: "verify"} wherever the chunks ran. It looks at a few frames (all the same flat
    picture fails) and, with the project open in After Effects, compares 2 of them with its own render. join: true
    joins movie parts when that is lossless; proveFrames: n makes the pixel proof strict. The report gives the -s / -e
