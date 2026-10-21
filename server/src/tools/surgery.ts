@@ -52,6 +52,7 @@ function compF(c) {
   try { o.egp = c.motionGraphicsTemplateControllerCount || 0; if (o.egp) o.egpName = c.motionGraphicsTemplateName || ""; } catch (e) {}
   return o;
 }
+function allIds() { var o = []; for (var i = 1; i <= app.project.numItems; i++) o.push(app.project.item(i).id); return o; }
 function allComps() { var o = [], P = app.project; for (var i = 1; i <= P.numItems; i++) { var it = P.item(i); if (it instanceof CompItem) o.push({ id: it.id, name: it.name }); } return o; }
 function byPath(L, path) { var p = L; for (var k = 0; k < path.length; k++) p = p.property(path[k]); return p; }
 function eps(L) { try { var g = L.property("ADBE Layer Overrides"); return g ? g.numProperties : 0; } catch (e) { return 0; } }
@@ -160,7 +161,7 @@ var ex = [];
 for (var n1 = 1; n1 <= app.project.numItems; n1++) { var it = app.project.item(n1); if (it instanceof CompItem) compExprs(it, ex); }
 var rq = [];
 try { for (var r1 = 1; r1 <= app.project.renderQueue.numItems; r1++) { try { rq.push(app.project.renderQueue.item(r1).comp.id); } catch (e) {} } } catch (e) {}
-return { project: app.project.file ? app.project.file.fsName : null, P: compF(P), C: compF(C), L: Lf, pLayers: pl, cLayers: cl, comps: allComps(), rq: rq, exprs: ex, bounds: bounds, rotated: rotated };`;
+return { ids: allIds(), project: app.project.file ? app.project.file.fsName : null, P: compF(P), C: compF(C), L: Lf, pLayers: pl, cLayers: cl, comps: allComps(), rq: rq, exprs: ex, bounds: bounds, rotated: rotated };`;
 
 /** Deep duplicate facts: the comp tree under the root (each comp once), the project's names, the tree's expressions. */
 export const DFACTS_JSX = `${COMMON_JSX}
@@ -187,7 +188,7 @@ for (var k = 0; k < order.length; k++) {
 var names = [], ex = [];
 for (var n1 = 1; n1 <= app.project.numItems; n1++) names.push(app.project.item(n1).name);
 for (var k2 = 0; k2 < order.length; k2++) compExprs(order[k2], ex);
-return { project: app.project.file ? app.project.file.fsName : null, root: R.id, tree: tree, comps: allComps(), itemNames: names, exprs: ex };`;
+return { ids: allIds(), project: app.project.file ? app.project.file.fsName : null, root: R.id, tree: tree, comps: allComps(), itemNames: names, exprs: ex };`;
 
 /** helpers of the two surgeries: setting expressions on locked layers, the result's fingerprint, created items */
 const EDIT_JSX = `
@@ -195,11 +196,63 @@ function r4(n) { return aemcp.round(n); }
 function byPath(L, path) { var p = L; for (var k = 0; k < path.length; k++) p = p.property(path[k]); return p; }
 function unlocked(L, f) { var lk = L.locked; if (lk) L.locked = false; try { f(); } finally { if (lk) L.locked = true; } }
 function setExpr(L, path, text) { unlocked(L, function () { byPath(L, path).expression = text; }); }
+// itemByID throws ("internal verification failure {Item Not Found}") for an id that is gone: look it up by hand
+function byId(id) { var P = app.project; for (var i = 1; i <= P.numItems; i++) if (P.item(i).id === id) return P.item(i); return null; }
 function itemIds() { var o = {}, P = app.project; for (var i = 1; i <= P.numItems; i++) o["i" + P.item(i).id] = true; return o; }
 function createdSince(before) {
   var o = [], P = app.project;
   for (var i = 1; i <= P.numItems; i++) { var it = P.item(i); if (!before["i" + it.id]) o.push(it.id); }
   return o;
+}
+function walkProps(g, ip, f) {
+  for (var k = 1; k <= g.numProperties; k++) {
+    var p = null;
+    try { p = g.property(k); } catch (e) {}
+    if (!p) continue;
+    if (p.propertyType === PropertyType.PROPERTY) f(p, ip.concat([k])); else walkProps(p, ip.concat([k]), f);
+  }
+}
+function layerIds(c) { var o = {}; for (var i = 1; i <= c.numLayers; i++) { var id = c.layer(i).id; if (id === undefined) return null; o["l" + id] = true; } return o; }
+function newLayer(c, had) {
+  if (!had) return c.layer(1); // no Layer.id (before AE 22): After Effects puts the copy at the top
+  for (var i = 1; i <= c.numLayers; i++) if (!had["l" + c.layer(i).id]) return c.layer(i);
+  return null;
+}
+// what links a layer to others: parent, track matte layer, expressions, layer parameters (Layer Control...)
+function detach(L) {
+  var d = { lk: L.locked, parent: null, matte: null, mtype: null, exprs: [], lidx: [] };
+  if (d.lk) L.locked = false;
+  try { if (L.parent) { d.parent = L.parent; L.setParentWithJump(null); } } catch (e) { d.parent = L.parent; L.parent = null; }
+  try { if (L.trackMatteLayer && L.setTrackMatte) { d.matte = L.trackMatteLayer; d.mtype = L.trackMatteType; if (L.removeTrackMatte) L.removeTrackMatte(); else L.setTrackMatte(null, TrackMatteType.NO_TRACK_MATTE); } } catch (e) {}
+  walkProps(L, [], function (p, ip) {
+    var x = "";
+    try { x = p.canSetExpression ? p.expression : ""; } catch (e) {}
+    if (x) { d.exprs.push({ p: ip, x: x, on: !!p.expressionEnabled }); p.expression = ""; }
+    try { if (p.propertyValueType === PropertyValueType.LAYER_INDEX && p.numKeys === 0 && p.value) { d.lidx.push({ p: ip, v: p.value }); p.setValue(0); } } catch (e) {}
+  });
+  return d;
+}
+function reattach(L, d) {
+  if (d.parent) L.setParentWithJump(d.parent);
+  if (d.matte) L.setTrackMatte(d.matte, d.mtype);
+  for (var i = 0; i < d.exprs.length; i++) { var p = byPath(L, d.exprs[i].p); p.expression = d.exprs[i].x; p.expressionEnabled = d.exprs[i].on; }
+  for (var k = 0; k < d.lidx.length; k++) byPath(L, d.lidx[k].p).setValue(d.lidx[k].v);
+  if (d.lk) L.locked = true;
+}
+// the links of every layer of a comp, as text: compared before and after the copies
+function linkState(c) {
+  var o = [];
+  for (var i = 1; i <= c.numLayers; i++) {
+    var L = c.layer(i), row = [L.name, L.locked ? 1 : 0, L.parent ? L.parent.index : 0];
+    try { row.push(L.trackMatteLayer ? L.trackMatteLayer.index : 0, L.trackMatteType); } catch (e) {}
+    walkProps(L, [], function (p, ip) {
+      try { if (p.canSetExpression && p.expression !== "") row.push(ip.join(".") + "=" + p.expression + (p.expressionEnabled ? "" : " (off)")); } catch (e) {}
+      try { if (p.propertyValueType === PropertyValueType.LAYER_INDEX) row.push(ip.join(".") + "#" + p.value); } catch (e) {}
+      try { if (p.propertyType === PropertyType.PROPERTY && p.matchName.indexOf("ADBE Transform Group") < 0 && p.parentProperty && p.parentProperty.matchName === "ADBE Transform Group") row.push(ip.join(".") + ":" + String(p.value)); } catch (e) {}
+    });
+    o.push(row.join("|"));
+  }
+  return o.join("\\n");
 }
 function fingerprint(c) {
   var o = [];
@@ -219,7 +272,7 @@ function fingerprint(c) {
  * plan's facts before anything changes; any failure returns { rollback: true } (the call's undo group is undone).
  */
 export const UNPRECOMPOSE_JSX = `${EDIT_JSX}
-var before = itemIds(), P = app.project.itemByID(args.P), C = app.project.itemByID(args.C);
+var before = itemIds(), P = byId(args.P), C = byId(args.C);
 function stale(why) { return { rollback: true, error: "The project changed since the plan (" + why + "). Nothing was changed; plan again." }; }
 if (!(P instanceof CompItem) || !(C instanceof CompItem)) return stale("a comp is gone");
 if (P.numLayers !== args.pCount || C.numLayers !== args.cCount) return stale("the number of layers changed");
@@ -227,7 +280,7 @@ var L0 = P.layer(args.L), s0 = null;
 try { s0 = L0.source; } catch (e) {}
 if (L0.name !== args.Lname || !s0 || s0.id !== C.id) return stale("layer " + args.L + " is not the precomp layer any more");
 for (var v = 0; v < args.edits.length; v++) {
-  var ed = args.edits[v], cc = app.project.itemByID(ed.c);
+  var ed = args.edits[v], cc = byId(ed.c);
   if (!cc || cc.numLayers < ed.l || byPath(cc.layer(ed.l), ed.p).expression !== ed.old) return stale("an expression changed");
 }
 try {
@@ -237,7 +290,7 @@ try {
   for (var a = 0; a < args.edits.length; a++) {
     var e1 = args.edits[a];
     if (args.rehearsal && e1.c !== P.id) continue;
-    var host = e1.c === P.id ? T : app.project.itemByID(e1.c);
+    var host = e1.c === P.id ? T : byId(e1.c);
     setExpr(host.layer(e1.l), e1.p, e1.text);
   }
   // 2. the null that carries L's transform, at L's index
@@ -268,15 +321,31 @@ try {
       }
     }
   }
-  // 3. C's layers, copied into T in C's order at L's place
-  var map = {}, locks = [], Ls = LT.startTime, Lin = LT.inPoint, Lout = LT.outPoint;
-  for (var j = 1; j <= C.numLayers; j++) {
-    C.layer(j).copyToComp(T);
-    var X = T.layer(1);
-    if (X.locked) { X.locked = false; locks.push(X); }
-    X.moveBefore(LT);
-    map["c" + j] = X;
+  // 3. C's layers, copied into T at L's place. While an undo group is open, After Effects refuses to copy a layer
+  // with a parent or a linked expression ("Can't copy a layer with a parent or with a linked expression, while an Undo
+  // Group is open"): each source layer is detached first (parent with jump, track matte layer, expressions, layer
+  // parameters), copied, and put back exactly; the copy gets them from the stash. The source is read back afterwards.
+  var map = {}, locks = [], stash = {}, Ls = LT.startTime, Lin = LT.inPoint, Lout = LT.outPoint, srcBefore = linkState(C);
+  for (var j = 1; j <= C.numLayers; j++) stash["c" + j] = detach(C.layer(j));
+  try {
+    for (var j2 = 1; j2 <= C.numLayers; j2++) {
+      var had = layerIds(T);
+      C.layer(j2).copyToComp(T);
+      // the copy: the layer that wasn't there before (not "index 1": where it lands is not ours to assume)
+      var X = newLayer(T, had);
+      if (!X) throw new Error("After Effects did not add the copy of layer " + j2 + " to the comp");
+      // the source was unlocked to detach it: the copy is locked again at the end like its original
+      if (X.locked) X.locked = false;
+      if (stash["c" + j2].lk) locks.push(X);
+      map["c" + j2] = X;
+    }
+  } finally {
+    for (var j3 = 1; j3 <= C.numLayers; j3++) reattach(C.layer(j3), stash["c" + j3], null, null);
   }
+  if (linkState(C) !== srcBefore) throw new Error('the source comp "' + C.name + '" could not be put back exactly after copying its layers');
+  // C's order, right above L, the null on top
+  for (var o1 = 1; o1 <= C.numLayers; o1++) map["c" + o1].moveBefore(LT);
+  if (N && C.numLayers) N.moveBefore(map["c1"]);
   for (var m = 0; m < args.moved.length; m++) {
     var mv = args.moved[m], Y = map["c" + mv.ci];
     if (Y.name !== mv.to) Y.name = mv.to;
@@ -290,19 +359,33 @@ try {
     else { if (nin !== Y.inPoint) Y.inPoint = nin; if (nout !== Y.outPoint) Y.outPoint = nout; }
     if (mv.matte && Y.setTrackMatte) Y.setTrackMatte(map["c" + mv.matte.ci], TrackMatteType[mv.matte.type]);
   }
-  for (var me = 0; me < args.movedEdits.length; me++) { var m1 = args.movedEdits[me]; byPath(map["c" + m1.ci], m1.p).expression = m1.text; }
+  // the copies' expressions: the stashed ones, rewritten where the plan says
+  var rewrite = {};
+  for (var me = 0; me < args.movedEdits.length; me++) { var m1 = args.movedEdits[me]; rewrite[m1.ci + ":" + m1.p.join(",")] = m1.text; }
+  for (var c2 = 1; c2 <= C.numLayers; c2++) {
+    var ex = stash["c" + c2].exprs, Xc = map["c" + c2];
+    for (var x1 = 0; x1 < ex.length; x1++) {
+      var key = c2 + ":" + ex[x1].p.join(","), pr = byPath(Xc, ex[x1].p);
+      pr.expression = rewrite[key] !== undefined ? rewrite[key] : ex[x1].x;
+      pr.expressionEnabled = ex[x1].on;
+    }
+  }
   if (args.carry) {
     var Z = map["c" + args.carry.ci];
     if (args.carry.blend) Z.blendingMode = BlendingMode[args.carry.blend];
     if (args.carry.opacity !== undefined) Z.property("ADBE Transform Group").property("ADBE Opacity").setValue(args.carry.opacity);
   }
   // 4. L's children follow the null; L goes
-  for (var i = 1; i <= T.numLayers; i++) { var ch = T.layer(i); if (ch !== LT && ch.parent && ch.parent.index === LT.index) unlocked(ch, function () { ch.setParentWithJump(N); }); }
+  for (var i = 1; i <= T.numLayers; i++) { var ch = T.layer(i); if (i !== LT.index && ch.parent && ch.parent.index === LT.index) unlocked(ch, function () { ch.setParentWithJump(N); }); }
   if (LT.locked) LT.locked = false;
   LT.remove();
   // 5. effect parameters that point at a layer: the moved layer's final index
   for (var lp = 0; lp < args.layerParams.length; lp++) { var q = args.layerParams[lp]; byPath(map["c" + q.ci], q.p).setValue(map["c" + q.toCi].index); }
   for (var u = 0; u < locks.length; u++) locks[u].locked = true;
+  // read the order back: the null, then C's layers in C's order, consecutive
+  var first = C.numLayers ? map["c1"].index : 0;
+  for (var v1 = 1; v1 <= C.numLayers; v1++) if (map["c" + v1].index !== first + v1 - 1) throw new Error("the moved layers did not end up in the precomp's order (layer " + v1 + " is at " + map["c" + v1].index + ")");
+  if (N && C.numLayers && N.index !== first - 1) throw new Error("the null did not end up right above the moved layers");
   if (args.removeC && !args.rehearsal) C.remove();
   var fp = fingerprint(T);
   if (args.expect !== undefined && args.expect !== null && fp !== args.expect)
@@ -318,15 +401,15 @@ try {
 export const DEEPDUP_JSX = `${EDIT_JSX}
 var before = itemIds();
 function stale(why) { return { rollback: true, error: "The project changed since the plan (" + why + "). Nothing was changed; plan again." }; }
-for (var v = 0; v < args.copies.length; v++) { var c0 = app.project.itemByID(args.copies[v].id); if (!(c0 instanceof CompItem) || c0.name !== args.copies[v].from) return stale("a comp of the tree is gone or renamed"); }
+for (var v = 0; v < args.copies.length; v++) { var c0 = byId(args.copies[v].id); if (!(c0 instanceof CompItem) || c0.name !== args.copies[v].from) return stale("a comp of the tree is gone or renamed"); }
 for (var v2 = 0; v2 < args.edits.length; v2++) {
-  var ed = args.edits[v2], cc = app.project.itemByID(ed.c);
+  var ed = args.edits[v2], cc = byId(ed.c);
   if (!cc || cc.numLayers < ed.l || byPath(cc.layer(ed.l), ed.p).expression !== ed.old) return stale("an expression changed");
 }
 try {
   var map = {}, made = [];
   for (var i = 0; i < args.copies.length; i++) {
-    var src = app.project.itemByID(args.copies[i].id), d = src.duplicate();
+    var src = byId(args.copies[i].id), d = src.duplicate();
     d.name = args.copies[i].to;
     map["i" + src.id] = d;
     made.push({ id: src.id, copy: d.id, name: d.name });
@@ -356,20 +439,22 @@ try {
   return { rollback: true, error: e.message || String(e), line: e.line };
 }`;
 
-/** Remove the rehearsal's items by hand (comps first, then footage such as a null's solid, then empty folders). */
+/**
+ * Remove by hand what the rehearsal (or a stopped surgery) left: every item that wasn't in the project before (`before`:
+ * item ids), comps first, then footage nothing uses (a null's solid stays in the project when its comp is removed), then
+ * empty folders. Items are looked up by hand each time (itemByID throws for an id that is gone).
+ */
 export const CLEANUP_JSX = `
-var P = app.project, done = [], left = [];
-for (var pass = 0; pass < 3; pass++) {
-  for (var i = 0; i < args.ids.length; i++) {
-    var it = P.itemByID(args.ids[i]);
-    if (!it) continue;
-    var isComp = it instanceof CompItem, isFolder = it instanceof FolderItem;
-    if ((pass === 0 && !isComp) || (pass === 1 && (isComp || isFolder)) || (pass === 2 && !isFolder)) continue;
-    if (isFolder && it.numItems > 0) { left.push(it.name); continue; }
-    var nm = it.name;
-    try { it.remove(); done.push(nm); } catch (e) { left.push(nm); }
-  }
-}
+var P = app.project, keep = {}, done = [], left = [];
+for (var k = 0; k < args.before.length; k++) keep["i" + args.before[k]] = true;
+function fresh(test) { var o = []; for (var i = 1; i <= P.numItems; i++) { var it = P.item(i); if (!keep["i" + it.id] && test(it)) o.push(it); } return o; }
+function drop(it) { var nm = ""; try { nm = it.name; it.remove(); done.push(nm); } catch (e) { left.push(nm || "item"); } }
+var cs = fresh(function (it) { return it instanceof CompItem; });
+for (var a = 0; a < cs.length; a++) drop(cs[a]);
+var fs = fresh(function (it) { return it instanceof FootageItem; });
+for (var b = 0; b < fs.length; b++) { var used = 0; try { used = fs[b].usedIn.length; } catch (e) {} if (used) left.push(fs[b].name + " (in use)"); else drop(fs[b]); }
+var ds = fresh(function (it) { return it instanceof FolderItem; });
+for (var c = ds.length - 1; c >= 0; c--) { if (ds[c].numItems > 0) left.push(ds[c].name + " (not empty)"); else drop(ds[c]); }
 return { removed: done, left: left };`;
 
 // ---------- the tool ----------
@@ -527,13 +612,25 @@ export async function runSurgery(a: SurgeryInput, perm: { mode: string; allowShe
           },
         }
       : undefined;
+  // what the project held before: whatever a rehearsal or a stopped surgery leaves beyond it is removed by hand
+  const before = (dup ? df!.ids : uf!.ids) ?? [];
+  const sweep = async (what: string) => {
+    if (!before.length) return "";
+    try {
+      const c = await runJsx(CLEANUP_JSX, { before }, { undoGroup: "Surehand MCP precomp surgery rehearsal", timeoutMs: 120_000 });
+      const r = c.ok ? parse<{ removed: string[]; left: string[] }>(c.result) : { removed: [], left: [`(the cleanup failed: ${c.error?.message ?? ""})`] };
+      return r.left.length ? `\nWhat ${what} left could not all be removed: ${r.left.join(", ")}. It can be deleted.` : "";
+    } catch (e: any) {
+      return `\nThe cleanup after ${what} failed: ${e?.message ?? e}`;
+    }
+  };
   // the rehearsal
   const reh = await runJsx(dup ? DEEPDUP_JSX : UNPRECOMPOSE_JSX, jsxArgs(true), { undoGroup: "Surehand MCP precomp surgery rehearsal", timeoutMs: 600_000, rollback: "requested", depth: 6, bridge: approval });
-  if (!reh.ok) return errorResult(`${reh.error?.message ?? "The rehearsal failed"}\nNothing was changed (checkpoint ${cp}).`);
+  if (!reh.ok) return errorResult(`${reh.error?.message ?? "The rehearsal failed"}\nNothing was changed (checkpoint ${cp}).${await sweep("the rehearsal")}`);
   const rr = parse<{ rollback?: true; error?: string; T?: number; root?: number; created: number[]; fingerprint: string }>(reh.result);
   if (rr.rollback) {
     const rb = reh.rollback;
-    return errorResult(`The rehearsal on a scratch copy stopped: ${String(rr.error).replace(/\.$/, "")}. ${rb?.verified ? "It was undone: nothing changed." : rollbackProblem(rb ?? { undone: false, verified: false, problem: "no result" }, "the rehearsal")}\nCheckpoint: ${cp}`);
+    return errorResult(`The rehearsal on a scratch copy stopped: ${String(rr.error).replace(/\.$/, "")}. ${rb?.verified ? "It was undone: nothing changed." : rollbackProblem(rb ?? { undone: false, verified: false, problem: "no result" }, "the rehearsal")}\nCheckpoint: ${cp}${await sweep("the rehearsal")}`);
   }
   const scratch = dup ? rr.root! : rr.T!;
   let cmp: Comparison | string;
@@ -544,9 +641,7 @@ export async function runSurgery(a: SurgeryInput, perm: { mode: string; allowShe
   } finally {
     // the scratch goes in every case, by hand (never Edit > Undo: the proof's renders are on the undo stack)
   }
-  const clean = await runJsx(CLEANUP_JSX, { ids: rr.created }, { undoGroup: "Surehand MCP precomp surgery rehearsal", timeoutMs: 120_000 });
-  const cleaned = clean.ok ? parse<{ removed: string[]; left: string[] }>(clean.result) : { removed: [], left: ["(the cleanup failed: " + (clean.error?.message ?? "") + ")"] };
-  const leftNote = cleaned.left.length ? `\nThe rehearsal's scratch items could not all be removed: ${cleaned.left.join(", ")}. They can be deleted.` : "";
+  const leftNote = await sweep("the rehearsal");
   const proofMs = Date.now() - t0;
   if (typeof cmp === "string" || !proven(cmp)) {
     const verdict = typeof cmp === "string" ? `NOT PROVEN: ${cmp}` : cmp.text;
@@ -573,11 +668,11 @@ export async function runSurgery(a: SurgeryInput, perm: { mode: string; allowShe
     depth: 6,
     report: reportScope({ comp: dup ? undefined : uf!.P.id }),
   });
-  if (!real.ok) return errorResult(`The rehearsal was proven identical, but applying it failed: ${real.error?.message}\nCheckpoint: ${cp}${leftNote}`);
+  if (!real.ok) return errorResult(`The rehearsal was proven identical, but applying it failed: ${real.error?.message}\nCheckpoint: ${cp}${leftNote}${await sweep(`the ${what}`)}`);
   const rs = parse<{ rollback?: true; error?: string; root?: number; made?: { id: number; copy: number; name: string }[]; moved?: { ci: number; name: string; index: number }[]; nullIndex?: number }>(real.result);
   if (rs.rollback) {
     const rb = real.rollback;
-    return errorResult(`The rehearsal was proven identical, but applying it stopped: ${String(rs.error).replace(/\.$/, "")}. ${rb?.verified ? (rb.undone ? "It was undone: nothing changed." : "Nothing had changed yet.") : rollbackProblem(rb ?? { undone: false, verified: false, problem: "no result" }, `the ${what}`)}\nCheckpoint: ${cp}${leftNote}`);
+    return errorResult(`The rehearsal was proven identical, but applying it stopped: ${String(rs.error).replace(/\.$/, "")}. ${rb?.verified ? (rb.undone ? "It was undone: nothing changed." : "Nothing had changed yet.") : rollbackProblem(rb ?? { undone: false, verified: false, problem: "no result" }, `the ${what}`)}\nCheckpoint: ${cp}${leftNote}${await sweep(`the ${what}`)}`);
   }
   const frames = cmp.view?.frames.filter((x) => !x.missing).length ?? 0;
   const head = cmp.text.split("\n")[0].replace(/^Verdict: /, "").replace(/\.$/, "");
@@ -586,6 +681,7 @@ export async function runSurgery(a: SurgeryInput, perm: { mode: string; allowShe
     `Checkpoint saved first: ${cp}`,
     dup ? `New root comp: "${(plan as DPlan).copies[0].to}" (id ${rs.root}).` : "",
     ...lines,
+    rs.moved ? `Read back from "${uf!.P.name}" after the surgery: ${[...(rs.nullIndex ? [{ index: rs.nullIndex, name: (plan as UPlan).nullLayer?.name ?? "" }] : []), ...rs.moved].sort((x, y) => x.index - y.index).map((m) => `${m.index} "${m.name}"`).join(", ")}.` : "",
     "",
     "Proof (the rehearsal on a scratch copy against the original, then the same surgery applied and checked layer for layer against the rehearsal):",
     ...cmp.text.split("\n").slice(1),

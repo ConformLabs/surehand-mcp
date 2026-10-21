@@ -97,7 +97,9 @@ layer.name, .index, .enabled, .solo, .locked, .shy, .inPoint, .outPoint, .startT
 layer.threeDLayer, .blendingMode = BlendingMode.SCREEN, .adjustmentLayer, .motionBlur, .label (0-16)
 layer.moveToBeginning(), .moveBefore(l), .moveAfter(l), .duplicate(), .remove(), .selected = true
 layer.setTrackMatte(matteLayer, TrackMatteType.ALPHA)   // AE 23+
-layer.copyToComp(otherComp)   // returns nothing: the copy is otherComp.layer(1), without its parent
+layer.copyToComp(otherComp)   // returns nothing; find the copy by Layer.id (don't assume index 1); no parent.
+                              // Inside an undo group (every ae_run_script) AE refuses a layer with a parent or a
+                              // linked expression: detach (setParentWithJump(null), stash expressions), copy, put back
 layer.setParentWithJump(p)    // parent without changing the layer's values (.parent = p compensates the transform)
 avLayer.replaceSource(item, false)   // false: don't let AE rename references in expressions
 comp.duplicate()              // "<name> 2"; precomp layers in it still show the same precomps

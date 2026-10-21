@@ -38,7 +38,8 @@ vi.mock("../src/jsx.js", async (orig) => {
       if (kind === "render") {
         if (args.comps.some((c: any) => c.id !== undefined)) onCompare?.();
         const out = args.comps.map((spec: any) => {
-          const c = spec.id !== undefined ? fake.app.project.itemByID(spec.id) : typeof spec.ref === "number" ? fake.app.project.itemByID(spec.ref) : fake.comp(spec.ref);
+          const byId = (id: number) => fake.items().find((i: any) => i.id === id);
+          const c = spec.id !== undefined ? byId(spec.id) : typeof spec.ref === "number" ? byId(spec.ref) : fake.comp(spec.ref);
           if (!c) return { id: spec.id, missing: true };
           const times: number[] = spec.times ?? args.times ?? Array.from({ length: args.frames ?? 5 }, (_, i) => (i * (c.duration - 1 / c.frameRate)) / Math.max(1, (args.frames ?? 5) - 1));
           const frames = times.map((t: number, j: number) => {
@@ -269,7 +270,7 @@ describe("un-precompose: the plan", () => {
     comps.push({ name: "Other", layers: [{ name: "Again", type: "precomp", source: "Logo Comp" }] });
     const p = planUnprecompose(facts(comps), { removeSource: true });
     expect(p.removeC).toBe(false);
-    expect(blocking(p).map((x) => x.text)).toEqual([expect.stringMatching(/"Logo Comp" can't be removed: it is used in "Other"/)]);
+    expect(blocking(p).map((x) => x.text)).toEqual([expect.stringMatching(/"Logo Comp" can't be removed: used in "Other"/)]);
     // a rewrite to comp("Logo Comp") needs it
     const w = spot({}, [{ expr: { "Transform/Position": "[thisComp.width, 0]" } }]);
     w[1].layers[2].expr = undefined;
@@ -287,6 +288,25 @@ describe("un-precompose: the plan", () => {
     const q = planUnprecompose(facts(spot(), "Logo"), { bakeNull: true });
     expect(q.nullLayer).not.toBeNull();
     expect(q.nullNote).toMatch(/A null is kept: baking it away is exact only when "Logo"'s transform is the identity/);
+  });
+
+  it("a precomp layer named like its comp: comp(\"Logo\") and thisComp.layer(\"Logo\") are told apart", () => {
+    const comps = spot();
+    comps[0].name = "Logo";
+    comps[1].layers[1].source = "Logo";
+    comps[1].layers[2].expr = { "Transform/Opacity": 'comp("Logo").layer("Title").transform.opacity' };
+    comps[0].layers[0].expr = { "Transform/Opacity": 'comp("Logo").layer("Mark").transform.opacity + thisComp.layer("Mark").transform.opacity' };
+    const p = planUnprecompose(facts(comps));
+    // comp("Logo") is the source comp, which stays: nothing to rewrite or block
+    expect(blocking(p)).toEqual([]);
+    expect(p.movedRewrites.map((r) => r.new)).toEqual([]);
+    expect(p.rewrites).toEqual([]);
+    // the layer by that name blocks; the comp by that name doesn't
+    comps[1].layers[2].expr = { "Transform/Opacity": 'thisComp.layer("Logo").transform.opacity + comp("Logo").width' };
+    expect(blocking(planUnprecompose(facts(comps))).map((x) => x.text)).toEqual([expect.stringMatching(/thisComp.layer\("Logo"\): refers to the precomp layer "Logo"/)]);
+    // removing the comp: comp("Logo") references to it keep it
+    comps[1].layers[2].expr = { "Transform/Opacity": 'comp("Logo").layer("Title").transform.opacity' };
+    expect(blocking(planUnprecompose(facts(comps), { removeSource: true })).map((x) => x.text).join("\n")).toMatch(/"Logo" can't be removed: expressions refer to it by name/);
   });
 
   it("names the resampling risk of a scaled precomp layer", () => {
@@ -394,6 +414,78 @@ describe("un-precompose: the tool", () => {
     const main = fake.comp("Main");
     expect(main.layer("Title 2").trackMatteLayer.name).toBe("Glow");
     expect(main.layer("Mark").property("ADBE Effect Parade").property(1).property(1).value).toBe(3);
+  });
+
+  it("copyToComp's rule (no parent or linked expression while an undo group is open) is enforced by the fake", () => {
+    ae(plain());
+    const r = fake.run('app.project.item(1).layer("Glow").copyToComp(app.project.item(2)); return 1;', {}, { undoGroup: "x" });
+    expect(r.error.message).toMatch(/Can't copy a layer with a parent or with a linked expression, while an Undo Group is open/);
+  });
+
+  it("linked layers (parent, expressions, track matte, Layer Control) are detached to copy them and put back exactly in the source", async () => {
+    const comps = plain({}, [
+      { matte: { layer: "Glow", type: "ALPHA" }, expr: { "Transform/Opacity": 'thisComp.layer("Mark").transform.opacity' } },
+      { effects: [{ name: "Ctrl", layerParam: 3 }], expr: { "Transform/Rotation": { x: "time * 0", on: false } } },
+      { locked: true },
+    ]);
+    ae(comps);
+    const src = fake.comp("Logo Comp");
+    const snap = () => JSON.stringify(src.layers.map((l: any) => [l.name, l.locked, l.parent?.name ?? null, l.trackMatteLayer?.name ?? null, l.trackMatteType]));
+    const before = snap(), main = fake.comp("Main"), pics = pictures(main);
+    const ex = (c: any, l: string, m: string) => c.layer(l).property("ADBE Transform Group").property(m);
+    const r = await runSurgery({ action: "unprecompose", comp: "Main", layer: "Logo" }, FULL);
+    expect(r.isError, text(r)).toBeFalsy();
+    expect(pictures(main)).toEqual(pics);
+    // the source is as it was: links, expressions (and their switches), layer parameters, locks
+    expect(snap()).toBe(before);
+    expect(ex(src, "Title", "ADBE Opacity").expression).toBe('thisComp.layer("Mark").transform.opacity');
+    expect([ex(src, "Mark", "ADBE Rotate Z").expression, ex(src, "Mark", "ADBE Rotate Z").expressionEnabled]).toEqual(["time * 0", false]);
+    expect(src.layer("Mark").property("ADBE Effect Parade").property(1).property(1).value).toBe(3);
+    // the copies have them too, pointed at the moved layers
+    expect(main.layer("Glow").parent.name).toBe("Mark");
+    expect(main.layer("Glow").locked).toBe(true);
+    expect(main.layer("Title 2").trackMatteLayer.name).toBe("Glow");
+    expect(ex(main, "Title 2", "ADBE Opacity").expression).toBe('thisComp.layer("Mark").transform.opacity');
+    expect([ex(main, "Mark", "ADBE Rotate Z").expression, ex(main, "Mark", "ADBE Rotate Z").expressionEnabled]).toEqual(["time * 0", false]);
+    expect(main.layer("Mark").property("ADBE Effect Parade").property(1).property(1).value).toBe(5);
+  });
+
+  it("the source can't be put back exactly: refused loudly, undone, and nothing is left behind (no stray null solid)", async () => {
+    ae(plain());
+    const glow = fake.comp("Logo Comp").layer("Glow"), jump = glow.setParentWithJump;
+    // After Effects keeps the layer unparented
+    glow.setParentWithJump = (p: any) => (p ? undefined : jump(p));
+    const before = fake.state();
+    const r = await runSurgery({ action: "unprecompose", comp: "Main", layer: "Logo" }, FULL);
+    expect(r.isError).toBe(true);
+    expect(text(r)).toMatch(/The rehearsal on a scratch copy stopped: the source comp "Logo Comp" could not be put back exactly after copying its layers\. It was undone: nothing changed\./);
+    expect(fake.state()).toBe(before);
+    expect(fake.items().map((i: any) => i.name).filter((n: string) => /^Null/.test(n))).toEqual([]);
+  });
+
+  it("stacking order: right wherever After Effects puts a copy (here: above the selected layer, as pasting does), read back in the report", async () => {
+    const comps: SComp[] = [
+      { name: "Pre1b", layers: [{ name: "Title", type: "text", position: [960, 540], rect: [-100, -30, 200, 60] }, { name: "Box", size: [300, 300], keys: { position: [[0, [400, 400]], [4, [1500, 700]]] } }] },
+      { name: "Main1b", layers: [{ name: "Pre1b", type: "precomp", source: "Pre1b" }] },
+    ];
+    ae(comps, { copyInsert: "aboveSelection" });
+    const main = fake.comp("Main1b"), pics = pictures(main);
+    const r = await runSurgery({ action: "unprecompose", comp: "Main1b", layer: "Pre1b" }, FULL);
+    expect(r.isError, text(r)).toBeFalsy();
+    expect(names(main)).toEqual(["Pre1b (null)", "Title", "Box"]);
+    expect(pictures(main)).toEqual(pics);
+    expect(text(r)).toMatch(/Read back from "Main1b" after the surgery: 1 "Pre1b \(null\)", 2 "Title", 3 "Box"\./);
+  });
+
+  it("the rehearsal's null solid is removed with its scratch comp; a missing id never stops the cleanup", async () => {
+    ae(plain());
+    const n = fake.items().length;
+    const r = await runSurgery({ action: "unprecompose", comp: "Main", layer: "Logo" }, FULL);
+    expect(r.isError, text(r)).toBeFalsy();
+    expect(text(r)).not.toMatch(/could not all be removed/);
+    // the real null's solid is the only new item
+    expect(fake.items().map((i: any) => i.name).filter((x: string) => /^Null/.test(x))).toHaveLength(1);
+    expect(fake.items().length).toBe(n + 1);
   });
 
   it("refused: nothing changed, no checkpoint, the reason for each problem", async () => {

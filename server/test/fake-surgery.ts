@@ -2,7 +2,12 @@
 // any property, effects with layer parameters, nulls, and what the surgery uses: layer.copyToComp, moveBefore / moveAfter,
 // remove, setParentWithJump, setTrackMatte, comp.duplicate, layers.addNull, replaceSource, item.usedIn, folders.
 // What it copies from After Effects:
-// - copyToComp puts the copy at the top (index 1) of the other comp and returns nothing; the copy has no parent
+// - copyToComp returns nothing and puts the copy at the top (index 1) of the other comp ("aboveSelection": above the
+//   selected layer, as pasting does; new layers are selected); the copy has no parent. While an undo group is open it
+//   refuses a layer with a parent or a linked expression (as AE 26.5: "Can't copy a layer with a parent or with a linked
+//   expression, while an Undo Group is open"); here a track matte layer or a layer parameter counts as a link too
+// - itemByID throws for an id that is gone ("internal verification failure, sorry! {Item Not Found}")
+// - removing a comp leaves the solids of its nulls in the project
 // - a layer's keyframes are in comp time and move with its startTime
 // - a locked layer can't be changed (renaming, setting a property, removing it throws)
 // - addNull makes a 100x100 solid ("Null 1") in the project and puts the null at the top
@@ -173,8 +178,14 @@ function eachProp(g: any, f: (p: any) => void) {
 
 const LAYER_FIELDS = ["name", "enabled", "locked", "guideLayer", "solo", "threeDLayer", "blendingMode", "motionBlur", "collapseTransformation", "timeRemapEnabled", "preserveTransparency", "adjustmentLayer", "frameBlendingType", "autoOrient", "trackMatteType", "label", "stretch", "_in", "_out", "_start", "_parent", "_matte", "source", "_comp", "_ident"] as const;
 
-export function fakeSurgeryAE(opts: { comps: SComp[]; file?: string | null; active?: string; rq?: string[] }) {
+export function fakeSurgeryAE(opts: { comps: SComp[]; file?: string | null; active?: string; rq?: string[]; copyInsert?: "top" | "aboveSelection" }) {
   let nextId = 1;
+  let groupOpen = false;
+  /** a new layer is the only selected one in its comp */
+  const select = (L: any) => {
+    for (const x of L._comp.layers) x.selected = false;
+    L.selected = true;
+  };
   let items: any[] = [];
   const log: string[] = [];
   const byName = (n: string) => items.find((i) => i.name === n);
@@ -210,6 +221,7 @@ export function fakeSurgeryAE(opts: { comps: SComp[]; file?: string | null; acti
       const L = mkLayer(c, { name: solid.name, type: "null", anchor: [50, 50], outPoint: dur ?? c.duration });
       L.source = solid;
       c.layers.unshift(L);
+      select(L);
       log.push(`addNull ${c.name}`);
       return L;
     };
@@ -246,6 +258,8 @@ export function fakeSurgeryAE(opts: { comps: SComp[]; file?: string | null; acti
 
   function layerBase(Cls: any): any {
     const L: any = new Cls();
+    L.id = nextId++;
+    L.selected = false;
     const guard = (what: string) => {
       if (L.locked) throw new Error(`After Effects error: can't ${what}, the layer is locked.`);
     };
@@ -286,6 +300,10 @@ export function fakeSurgeryAE(opts: { comps: SComp[]; file?: string | null; acti
       L._matte = m;
       L.trackMatteType = type;
     };
+    L.removeTrackMatte = () => {
+      L._matte = null;
+      L.trackMatteType = TrackMatteType.NO_TRACK_MATTE;
+    };
     L.moveBefore = (o: any) => {
       const a = L._comp.layers;
       a.splice(a.indexOf(L), 1);
@@ -307,10 +325,18 @@ export function fakeSurgeryAE(opts: { comps: SComp[]; file?: string | null; acti
       log.push(`remove layer ${L.name}`);
     };
     L.copyToComp = (into: any) => {
+      if (groupOpen) {
+        let linked = !!L._parent || !!L._matte;
+        eachProp(L, (p) => (linked ||= p.expression !== "" || (p.propertyValueType === PVT.LAYER_INDEX && !!p._value)));
+        if (linked) throw new Error("After Effects error: Can't copy a layer with a parent or with a linked expression, while an Undo Group is open.");
+      }
       const c = cloneLayer(L, into);
       c._parent = null;
       c._matte = null;
-      into.layers.unshift(c);
+      const sel = into.layers.findIndex((x: any) => x.selected);
+      if (opts.copyInsert === "aboveSelection" && sel >= 0) into.layers.splice(sel, 0, c);
+      else into.layers.unshift(c);
+      select(c);
       log.push(`copyToComp ${L.name} -> ${into.name}`);
     };
     L.replaceSource = (src: any, fix: boolean) => {
@@ -407,7 +433,11 @@ export function fakeSurgeryAE(opts: { comps: SComp[]; file?: string | null; acti
       return items.length;
     },
     item: (i: number) => items[i - 1],
-    itemByID: (id: number) => items.find((i) => i.id === id) ?? null,
+    itemByID: (id: number) => {
+      const it = items.find((i) => i.id === id);
+      if (!it) throw new Error("After Effects error: internal verification failure, sorry! {Item Not Found}");
+      return it;
+    },
     get activeItem() {
       return opts.active ? byName(opts.active) : comps[comps.length - 1];
     },
@@ -460,10 +490,16 @@ export function fakeSurgeryAE(opts: { comps: SComp[]; file?: string | null; acti
   }
 
   /** a JSX body run like the bridge does; `rollback: "requested"` puts the project back when the body asks for it */
-  const run = (jsx: string, args: Record<string, unknown>, o: { rollback?: string } = {}) => {
+  const run = (jsx: string, args: Record<string, unknown>, o: { rollback?: string; undoGroup?: string | false } = {}) => {
     const restore = snapshot();
     const fn = new Function("aemcp", "app", "$", ...names, `return function (args, log) {\n${jsx}\n};`)(aemcp, app, $, ...values);
-    const res = JSON.parse(aemcp.run(fn, args, { undoGroup: false, depth: 10 }));
+    groupOpen = !!o.undoGroup;
+    let res: any;
+    try {
+      res = JSON.parse(aemcp.run(fn, args, { undoGroup: false, depth: 10 }));
+    } finally {
+      groupOpen = false;
+    }
     if (o.rollback === "requested" && res.ok && res.result?.rollback) {
       restore();
       res.rollback = { undone: true, verified: true };

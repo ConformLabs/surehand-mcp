@@ -139,6 +139,8 @@ export interface BoundsF {
 }
 
 export interface UFacts {
+  /** every item id in the project when it was read (what a cleanup must leave) */
+  ids?: number[];
   project: string | null;
   P: CompF;
   C: CompF;
@@ -156,6 +158,7 @@ export interface UFacts {
 }
 
 export interface DFacts {
+  ids?: number[];
   project: string | null;
   root: number;
   /** every comp in the tree (root first), with its layers' precomp sources */
@@ -576,7 +579,7 @@ export function planUnprecompose(f: UFacts, o: UOptions = {}): UPlan {
   }
   if (refsC.length) keepWhy.push(`expressions refer to it by name (${refsC.slice(0, 3).join("; ")}${refsC.length > 3 ? `; and ${refsC.length - 3} more` : ""})`);
   if (removeC && keepWhy.length) {
-    block(`"${C.name}" can't be removed: it is ${keepWhy.join("; ")}`);
+    block(`"${C.name}" can't be removed: ${keepWhy.join("; ")}`);
     removeC = false;
     u.removeC = false;
   }
