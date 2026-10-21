@@ -26,6 +26,15 @@ describe.skipIf(!existsSync(bundle))("surehand-ae command line", () => {
     expect(JSON.parse(j.stdout)).toEqual({ ok: false, error: expect.stringMatching(/Unknown command/) });
   });
 
+  it("farm check runs without After Effects and says how it is used", () => {
+    const u = run("farm");
+    expect(u.status).toBe(2);
+    expect(u.stdout).toMatch(/usage: surehand-ae farm check <manifest\.json>/);
+    const j = run("farm", "check", join(home, "none.farm-manifest.json"), "--json");
+    expect(j.status).toBe(2);
+    expect(JSON.parse(j.stdout)).toEqual({ ok: false, error: expect.stringMatching(/can't be read/) });
+  });
+
   it("clients --json and connect --json answer with the panel's shapes", () => {
     const c = run("clients", "--json");
     expect(c.status).toBe(0);

@@ -329,7 +329,7 @@ export function compareFrames(list: { comp: string; compId: number; time: number
 
 // ---------- the manifest ----------
 
-const ADOBE_FX = /^(ADBE |CC |APC |AE\.ADBE|ADBE_|CS )/;
+export const ADOBE_FX = /^(ADBE |CC |APC |AE\.ADBE|ADBE_|CS )/;
 const fmtBytes = (n: number) => (n < 1000 ? `${n} B` : n < 1e6 ? `${r2(n / 1e3)} KB` : n < 1e9 ? `${r2(n / 1e6)} MB` : `${r2(n / 1e9)} GB`);
 const list = (a: string[], max = 6) => (a.length <= max ? a.join(", ") : `${a.slice(0, max).join(", ")} and ${a.length - max} more`);
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;

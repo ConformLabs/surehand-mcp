@@ -199,5 +199,5 @@ export const CATEGORIES: Record<string, string[]> = {
   checks: ["ae_preflight", "ae_versions_from_data", "ae_localize", "ae_stress_test"],
   "see & measure": ["ae_render_frame", "ae_render_contact_sheet", "ae_get_layer_bounds", "ae_sample_pixels"],
   "essential graphics": ["ae_essential_graphics", "ae_export_mogrt"],
-  render: ["ae_list_render_queue", "ae_add_to_render_queue", "ae_get_render_settings", "ae_set_render_settings", "ae_queue_in_media_encoder", "ae_render_background", "ae_render_jobs", "ae_render_queue_start", "ae_clear_render_queue", "ae_render_profile"],
+  render: ["ae_list_render_queue", "ae_add_to_render_queue", "ae_get_render_settings", "ae_set_render_settings", "ae_queue_in_media_encoder", "ae_render_background", "ae_render_jobs", "ae_render_queue_start", "ae_clear_render_queue", "ae_render_profile", "ae_farm"],
 };

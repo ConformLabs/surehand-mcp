@@ -17,7 +17,7 @@
 
 Surehand MCP connects **Claude** (Desktop / Code), **ChatGPT** (desktop app or web), Cursor, Codex, VS Code (GitHub Copilot), Windsurf / Devin Desktop, LM Studio, or any MCP client to **Adobe® After Effects®**.
 The AI can run any script inside After Effects (modern JavaScript, converted for AE's ExtendScript engine automatically),
-read information back, and use up to 113 ready-made tools for projects, comps, layers, keyframes (Graph Editor level),
+read information back, and use up to 114 ready-made tools for projects, comps, layers, keyframes (Graph Editor level),
 text styling and animators, footage, effects, shapes, masks, 3D cameras/lights/materials, audio, color management,
 Essential Graphics and rendering (including background renders with aerender). Batch edits run many steps as one
 undo step, checkpoints keep safety copies of the project, structural changes can be proven not to change the render,
@@ -194,7 +194,7 @@ To rotate the token, delete `token` from `~/.surehand/ae/config.json` and re-run
 | `ae_get_scripting_guide` | ExtendScript cheat sheet for the model (also an MCP resource `aemcp://docs/extendscript`). |
 
 **Tool profiles.** Every tool description is sent to the AI in every chat, so by default only a **core set of
-29 tools** is loaded (about 9k tokens instead of 46k for all 113), and **every other tool stays available on demand**:
+29 tools** is loaded (about 9k tokens instead of 47k for all 114), and **every other tool stays available on demand**:
 `ae_tools` lists all tools by category (or gives full parameter details of chosen ones), and `ae_call` runs any tool by
 name with the same validation, permissions, change report and activity log. Loading everything up front is optional:
 switch to **All tools** in the Surehand panel in After Effects (**☰ › Tools the AI sees › All tools**), in Claude Desktop's
@@ -292,7 +292,9 @@ unknown effect name gets suggestions.
 - **Render:** `ae_list_render_queue`, `ae_add_to_render_queue`, `ae_get_render_settings` / `ae_set_render_settings` (every
   render-settings and output-module setting as editable key/value pairs), `ae_queue_in_media_encoder`,
   `ae_render_background` + `ae_render_jobs` (aerender in a separate process, with progress and cancel; After Effects stays
-  usable), `ae_render_queue_start`, `ae_clear_render_queue`
+  usable), `ae_render_queue_start`, `ae_clear_render_queue`, `ae_farm` (what a render needs on a farm node and a check
+  of a node against it, frame chunks for processes here or other machines with their scripts, local parallel runs, and
+  proof that the chunks add up; see Render farm below)
 
 Comps can be referenced by id, name, or omitted for the active comp; layers by 1-based index or name; properties by
 paths like `"Transform/Position"` or `"Effects/Gaussian Blur/Blurriness"` (display names or match names).
@@ -623,6 +625,69 @@ fonts and plug-ins on the recipient's machine (only this machine is checked), th
 Effects finds collected footage relative to the project, as with Collect Files), frames between the samples, audio,
 and expressions at other times than each comp's work area start. In the copies used for the proof, the render queue
 holds only the sample frames, so your own queued renders never run.
+
+### Render farm
+
+A render that works here can fail on a farm node or a colleague's machine: a plug-in or font that isn't installed
+there, footage on a path only this machine sees, another After Effects version, an OCIO config that isn't there.
+`ae_farm` measures what a render needs instead of guessing, and splits long renders into chunks whose result is proven
+complete. Your own render queue items and output modules are the source of truth: nothing is rendered with settings
+of its own. It never runs anything on another machine; other machines get a manifest to check against and scripts to
+run there.
+
+- **`manifest`**: for the queued render queue items (or `rqIndex`), exactly what a node needs: the After Effects
+  version and build, bit depth, colour settings (working space, linear blending, OCIO config and whether it is inside
+  the project folder), expressions engine, Multi-Frame Rendering where the preference can be read, every effect by match
+  name (third-party ones marked, versions where After Effects reports them, the comps using them), the fonts of the
+  text layers the render reaches, and every file the render pulls in through its precomps: path, size, an image
+  sequence's frame range and gaps, proxies the render uses, and whether the path is local to this machine (home folder,
+  Desktop, a local disk) or on a share (a network mount, a UNC path, or a folder you name with `sharedPaths`).
+  Output modules: format, codec where scripting exposes it, path, and whether the folder exists and is writable.
+  `save: true` writes `<project>.farm-manifest.json` and `.txt` next to the project (never over existing ones without
+  `overwrite: true`).
+- **`check`**: a machine against a manifest: After Effects and aerender installed and the version, the project,
+  footage (every frame of a sequence), proxies, OCIO config and output folders reachable, fonts in the font folders
+  (PostScript names read from the font files), third-party plug-ins in the Plug-ins folders (by their match names), and
+  the expressions engine. On a node, without After Effects:
+  `surehand-ae farm check <manifest.json> [--map /Volumes/Jobs=J:\Jobs] [--ae <install folder>] [--json]`
+  (exit code 0 ready, 1 missing or different, 3 not everything could be checked). In a chat, the running After
+  Effects' own lists of effects and fonts count too.
+- **`plan`**: one render queue item split into frame ranges for `processes` on this machine or for named `machines`
+  (each with its platform, aerender, path map and relative speed). Each chunk gets its aerender command (`-project`,
+  `-rqindex`, `-s` / `-e` as the frame numbers After Effects shows (from the comp's start frame: 90000-90099 for a
+  4-second comp at 25 fps that starts at 01:00:00:00), an `-output` where needed, `-mfr` on a share of the CPU when several processes share a
+  machine), and each machine a script (`.command` on macOS, `.bat` on Windows), written with `farm-plan.json` next to
+  the project. Image sequences: every chunk writes into the same sequence; a plan is refused when the output module
+  numbers files from "Starting #" (every chunk would overwrite the same files), and too short `[####]` padding is
+  flagged. Movies: each chunk writes its own file, plus the ffmpeg concat step that joins them; the plan says when
+  that isn't lossless (long-GOP codecs such as H.264, AAC audio, PCM joins that fall between samples) and recommends
+  rendering an image sequence instead. Refused: several output modules on the item, render settings with their own
+  frame rate, an audio-only output. The time estimate comes from `ae_render_profile`'s measurements of the comp, else
+  from a few frames sampled now, and says what it leaves out (aerender's start-up, encoding).
+- **`run_local`**: the chunks as parallel aerender processes on this machine, as background-render jobs (logs,
+  progress, cancel, the panel's job files): at most as many at once as the cores and memory allow, the others start as
+  those finish. On Windows each starts once the one before has rendered its first frame (two aerender processes
+  started at the same moment collide there); a chunk whose aerender ends before its first frame is started again
+  once, and `status` says so with its log. Without `plan` it uses the plan next to the open project (and says which), and refuses when several
+  render queue items have one. Existing output is never rendered over without `overwrite: true`; a plan is refused
+  once the project was saved again. The renders go on when the AI app reloads the server: `status` finds the run again
+  from its files and shows each chunk's progress and time per frame (aerender's total time over its frames).
+  `status` only reports (the latest run of the open project; `all: true` for every run): it never starts or retries
+  a render. A run whose chunks were still waiting when the server stopped is reported as interrupted, with the
+  aerender commands of what is left; `run_local` with its `run` resumes it, but only within 6 hours of its start
+  and while the project is unchanged since its plan.
+- **`verify`**: wherever the chunks ran, proof of the result. Sequences: every frame present once, no extras, no
+  empty or cut-off files (a complete PNG, a JPEG end marker, a DPX size field; other formats by header), with the exact
+  missing frames and the `-s` / `-e` ranges to render again (missing, empty and cut-off frames). A few frames are
+  looked at: when they are all the same flat picture (what frames outside the comp render as), it fails. With After
+  Effects open on the project, 2 sampled frames are also compared with its own render of them (a tolerance of 4/255
+  for colour conversion; it fails on a different picture, by area: over 1% of the frame, or spread over a quarter of
+  it; small local differences such as text edges, which aerender and the app anti-alias a little differently, are a
+  note with their pixel count and place). Movies: each part's frame count and duration with ffprobe,
+  then the joined file's frame count, size, frame rate and codec against the comp and the output module; `join: true`
+  joins the parts when that is lossless (never over an existing file). `proveFrames` makes the pixel proof strict, on
+  as many frames as asked (the `ae_prove_identical` comparison and tolerance). The verdict is **PASS**, **FAIL (n)** or
+  **INCOMPLETE** with what couldn't be checked.
 
 Your open project is never edited, but scripts in After Effects can't save a copy of a project without opening it: the
 package is made with Save As, and your project is opened again from disk at the end. So the project must be saved (a

@@ -316,6 +316,8 @@ export interface FakeCompSpec {
   renderer?: string;
   /** Essential Graphics controllers (name, value and type of the Essential Property a precomp layer gets) */
   egp?: { name: string; value: unknown; type: string; /** the property it drives (essentialPropertySource): layer name and path of names; "" = the layer (media) */ source?: { layer: string; path: string } }[];
+  /** the comp's displayed start frame (Start Timecode: displayStartTime = startFrame / fps; default 0) */
+  startFrame?: number;
   /** render cost (ms) of the comp itself, before its layers (default 10) */
   renderMs?: number;
 }
@@ -337,7 +339,8 @@ export interface FakeFootageSpec {
 export interface FakeProjectSpec {
   comps: FakeCompSpec[];
   footage?: FakeFootageSpec[];
-  rq?: { comp: string; render: boolean }[];
+  /** render queue items; start / dur: the time span (default the whole comp); settings: getSettings() (render settings); om: more output module settings (Format, "Use Comp Frame Number"...), file: its output file; extraOms: more output modules */
+  rq?: { comp: string; render: boolean; start?: number; dur?: number; settings?: Record<string, unknown>; om?: Record<string, unknown>; file?: string; extraOms?: number }[];
   installedEffects?: { matchName: string; displayName: string }[];
   /** null: an After Effects without the font API */
   fonts?: { postScriptName: string; familyName: string; styleName: string; isSubstitute: boolean }[] | null;
@@ -514,7 +517,7 @@ export function fakeProject(spec: FakeProjectSpec) {
     const it: any = Object.assign(new CompItem(), {
       id: nextId++, name, width: c.width ?? 1920, height: c.height ?? 1080, pixelAspect: 1, frameRate: c.fps ?? 25, duration: c.duration ?? 10,
       motionBlur: !!c.motionBlur, shutterAngle: 180, shutterPhase: -90, motionBlurSamplesPerFrame: c.samples ?? 16, motionBlurAdaptiveSampleLimit: 128,
-      frameBlending: true, renderer: c.renderer ?? "ADBE Advanced 3d", usedIn: [], layers: [] as any[], time: 0, frameDuration: 1 / (c.fps ?? 25), displayStartTime: 0,
+      frameBlending: true, renderer: c.renderer ?? "ADBE Advanced 3d", usedIn: [], layers: [] as any[], time: 0, frameDuration: 1 / (c.fps ?? 25), displayStartTime: (c.startFrame ?? 0) / (c.fps ?? 25),
       bgColor: [0, 0, 0], workAreaStart: 0, workAreaDuration: c.duration ?? 10, parentFolder: root, resolutionFactor: [1, 1],
     });
     it.saveFrameToPng = (t: number, f: { fsName: string }) => {
@@ -803,13 +806,25 @@ export function fakeProject(spec: FakeProjectSpec) {
     om.setSettings = (o: any) => {
       if (o.Format && (spec.png ?? "settings") === "settings") om.format = o.Format;
     };
-    om.getSettings = () => ({ Format: om.format });
-    const q: any = { comp, om, status: render ? RQS.QUEUED : RQS.UNQUEUED, timeSpanStart: 0, timeSpanDuration: comp?.duration, outputModule: () => om, applyTemplate() {},
-      remove: () => (writes.push("renderQueue.remove"), rqItems.splice(rqItems.indexOf(q), 1)) };
+    om.getSettings = () => ({ ...(om.extra ?? {}), Format: om.format, "Output File Info": { "Full Flat Path": om.file?.fsName ?? "" } });
+    const q: any = { comp, om, oms: [om], status: render ? RQS.QUEUED : RQS.UNQUEUED, timeSpanStart: 0, timeSpanDuration: comp?.duration, outputModule: (i = 1) => q.oms[i - 1], applyTemplate() {},
+      remove: () => (writes.push("renderQueue.remove"), rqItems.splice(rqItems.indexOf(q), 1)), getSettings: () => q.rs ?? {} };
     Object.defineProperty(q, "render", { get: () => q.status === RQS.QUEUED, set: (v: boolean) => (q.status = v ? RQS.QUEUED : RQS.UNQUEUED), enumerable: true });
+    Object.defineProperty(q, "numOutputModules", { get: () => q.oms.length });
     return q;
   };
-  const rqItems: any[] = (spec.rq ?? []).map((r) => rqItem(byName(r.comp), r.render, { fsName: `/renders/${r.comp}.mov` }));
+  const rqItems: any[] = (spec.rq ?? []).map((r) => {
+    const q = rqItem(byName(r.comp), r.render, { fsName: r.file ?? `/renders/${r.comp}.mov` });
+    if (r.start !== undefined) q.timeSpanStart = r.start;
+    if (r.dur !== undefined) q.timeSpanDuration = r.dur;
+    if (r.settings) q.rs = r.settings;
+    if (r.om) {
+      q.om.extra = r.om;
+      if (typeof r.om.Format === "string") q.om.format = r.om.Format;
+    }
+    for (let k = 0; k < (r.extraOms ?? 0); k++) q.oms.push({ name: "Extra", file: { fsName: `/renders/${r.comp}_${k + 2}.mov` }, getSettings: () => ({ Format: "QuickTime" }) });
+    return q;
+  });
   const rendered: string[] = [];
 
   // the project on disk: save writes the open project's state (also as JSON a fake aerender can read), open restores it
@@ -837,7 +852,7 @@ export function fakeProject(spec: FakeProjectSpec) {
     file: p,
     footage: items.filter((i) => i instanceof FootageItem).map((i: any) => ({ id: i.id, name: i.name, file: i.file?.fsName ?? null, missing: !!i.footageMissing, proxy: i.proxySource?.file?.fsName ?? null })),
     comps: comps.map((c) => ({ id: c.id, name: c.name, fps: c.frameRate, sources: c.layers.map((l: any) => l.source?.id).filter((x: any) => x !== undefined) })),
-    rq: rqItems.map((r) => ({ compId: r.comp.id, comp: r.comp.name, fps: r.comp.frameRate, start: r.timeSpanStart, dur: r.timeSpanDuration, render: r.render, format: r.om.format, out: r.om.file?.fsName ?? null })),
+    rq: rqItems.map((r) => ({ compId: r.comp.id, comp: r.comp.name, fps: r.comp.frameRate, start: r.timeSpanStart, dur: r.timeSpanDuration, render: r.render, format: r.om.format, out: r.om.file?.fsName ?? null, startFrame: Math.round(r.comp.displayStartTime * r.comp.frameRate), frames: Math.round(r.comp.duration * r.comp.frameRate) })),
   });
   const projRaw: any = {
       file: fileOf(spec.file ?? "/jobs/Inherited.aep"), bitsPerChannel: spec.bpc ?? 16, expressionEngine: "javascript-1.0", rootFolder: root,

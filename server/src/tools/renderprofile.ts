@@ -271,7 +271,7 @@ function saveProfile(p: Profile) {
   writeFileSync(join(profilesRoot(), `${p.id}.json`), JSON.stringify(p, null, 1));
 }
 
-function loadProfile(id?: string): Profile | string {
+export function loadProfile(id?: string): Profile | string {
   if (id !== undefined && !/^[\w-]+$/.test(id)) return `"${id}" is not a profile id.`;
   let pick = id;
   if (pick === undefined) {

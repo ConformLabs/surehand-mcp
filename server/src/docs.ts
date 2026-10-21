@@ -36,6 +36,8 @@ Also:
 - Sending a project to someone: ae_handoff_package collects it with its footage, lists what the recipient needs, and
   with verify proves the package renders the same.
 - Slow render? ae_render_profile measures where the time goes over the timeline and proves speed-ups before keeping them.
+- Render farm or a long render: ae_farm lists what a render needs on a node, checks a node, splits it into chunks and
+  proves the result complete.
 - Will a comp hold up with other inputs? ae_stress_test measures worst cases (long German, Arabic, CJK, huge numbers,
   the user's rows) on a scratch copy, and expressions that break in other AE languages.
 - Un-precompose or deep-duplicate a precomp tree: ae_precomp_surgery (rewrites expression references exactly, proves it).
@@ -164,6 +166,12 @@ rqi.applyTemplate("Best Settings"); var om = rqi.outputModule(1); om.applyTempla
 app.project.renderQueue.render();      // blocks until done
 comp.saveFrameToPng(time, new File("/tmp/frame.png"));
 \`\`\`
+- renderQueue.render() blocks After Effects. For long renders use ae_render_background (aerender, a separate process);
+  to split one across processes or machines, ae_farm plans frame chunks with the item's own settings, runs them here
+  (run_local) and proves the result complete (verify). Don't script aerender chunks by hand: a sequence whose output
+  module numbers files from "Starting #" makes every chunk overwrite the same files.
+- rqi.getSettings(GetSettingsFormat.STRING) / om.getSettings(...) read every render setting and output module setting
+  as text (ae_get_render_settings shows them).
 
 ## Misc
 - app.beginUndoGroup / endUndoGroup are handled for you.
