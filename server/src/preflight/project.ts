@@ -74,6 +74,8 @@ export interface PData {
   partial?: { reason: string; at?: number };
   /** indexes of the layersMustBeIn patterns that match any layer name in the delivered comp (visible or not) */
   pm?: number[];
+  /** explicit sample frames (PArgs.frames): sample i is at frame fr[i], not i * step */
+  fr?: number[];
 }
 
 /** What the JSX needs to know from the spec. */
@@ -90,13 +92,18 @@ export interface PArgs {
   deep?: number[];
   glyphs: boolean;
   timeBudgetSeconds: number;
+  /** sample these frames (ascending) instead of every step-th frame */
+  frames?: number[];
 }
 
 export const PREFLIGHT_JSX = `
 var T0 = new Date().getTime(), budget = (args.timeBudgetSeconds || 120) * 1000;
 var c = aemcp.findComp(args.comp), P = app.project;
 var fd = c.frameDuration, step = args.step || 1, nF = Math.max(1, Math.round(c.duration / fd)), nS = Math.ceil(nF / step);
+// explicit frames (ae_stress_test: key frames and visibility edges): sample i is at frame args.frames[i]
+if (args.frames && args.frames.length) nS = args.frames.length;
 var D = { v: 1, comp: { id: c.id, name: c.name, w: c.width, h: c.height, fps: c.frameRate, dur: c.duration, par: c.pixelAspect, fd: fd }, project: {}, step: step, n: nS, items: [], feat: {} };
+if (args.frames && args.frames.length) D.fr = args.frames;
 try { D.ae = app.version; } catch (e) {}
 try { D.comp.dst = c.displayStartTime; } catch (e) {}
 try { D.comp.df = c.dropFrame; } catch (e) {}
@@ -172,7 +179,7 @@ function shown(L) {
 // a nesting context: the delivered comp, or a precomp seen through a layer. times[i]: the local time of global
 // sample i, or null where the context isn't visible (the precomp layer is inactive, transparent or past its source)
 var root = { comp: c, times: [], path: c.name, up: null, via: null };
-for (var i0 = 0; i0 < nS; i0++) root.times.push(i0 * step * fd);
+for (var i0 = 0; i0 < nS; i0++) root.times.push((D.fr ? D.fr[i0] : i0 * step) * fd);
 function child(ctx, Lp) {
   var src = Lp.source, t = [], op = xf(Lp, "ADBE Opacity"), opA = isAnim(op), opC = op.value, rm = false, any = false, rmp = null;
   try { rm = Lp.timeRemapEnabled; } catch (e) {}
@@ -634,7 +641,7 @@ export function checkFromXray(spec: Spec, x: XData): { findings: Finding[]; notR
 /** Safe areas over time and the text checks, from the items the JSX collected. */
 export function checkItems(spec: Spec, d: PData): ProjectResult {
   const findings: Finding[] = [], notRun: NotRun[] = [], notes: string[] = [];
-  const { w: W, h: H } = d.comp, tOf = (i: number) => Math.round(i * d.step * d.comp.fd * 1e6) / 1e6;
+  const { w: W, h: H } = d.comp, tOf = (i: number) => Math.round((d.fr ? d.fr[i] : i * d.step) * d.comp.fd * 1e6) / 1e6;
   const at = (i0: number, i1: number): number | [number, number] => (i0 === i1 ? tOf(i0) : [tOf(i0), tOf(i1)]);
   const sa = spec.safeAreas, tx = spec.text;
   const textArea: Area | undefined = sa && sa.textMustBeIn !== "none" ? (sa.textMustBeIn ?? "title") : undefined;

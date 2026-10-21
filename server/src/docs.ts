@@ -36,6 +36,8 @@ Also:
 - Sending a project to someone: ae_handoff_package collects it with its footage, lists what the recipient needs, and
   with verify proves the package renders the same.
 - Slow render? ae_render_profile measures where the time goes over the timeline and proves speed-ups before keeping them.
+- Will a comp hold up with other inputs? ae_stress_test measures worst cases (long German, Arabic, CJK, huge numbers,
+  the user's rows) on a scratch copy, and expressions that break in other AE languages.
 - Un-precompose or deep-duplicate a precomp tree: ae_precomp_surgery (rewrites expression references exactly, proves it).
 - Exact timing: the keyframe table (ae_get_keyframes / ae_set_keyframe_table: frames or seconds, exact speed and
   influence), ae_copy_ease, ae_retime_keyframes (whole frames), ae_audit_easing. Layout: ae_align_layers moves layers by

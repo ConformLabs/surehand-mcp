@@ -162,6 +162,7 @@ const EXPECTED: Record<string, Hints> = {
   ae_preflight: [false, false, true, true], // never changes the project; may download ffmpeg (with consent) and writes temporary thumbnails
   ae_versions_from_data: D, // builds comps (one undo step); with render and overwrite: true it replaces output files
   ae_localize: D, // import builds comps (one undo step); export with overwrite: true replaces files
+  ae_stress_test: E, // sets values only on scratch copies (removed again); writes contact sheet PNGs (never replaces one without overwrite)
   ae_tools: R,
   ae_call: SCRIPT, // runs any tool, including ae_run_script
 };

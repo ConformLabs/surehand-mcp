@@ -10,6 +10,7 @@ import { registerPreflightTools } from "../src/tools/preflight.js";
 import { registerReformatTools } from "../src/tools/reformat.js";
 import { registerVersionsTools } from "../src/tools/versions.js";
 import { registerLocalizeTools } from "../src/tools/localize.js";
+import { registerStressTools } from "../src/tools/stress.js";
 import { registerFileTools } from "../src/tools/files.js";
 import { registerHandoffTools } from "../src/tools/handoff.js";
 import { registerOnDemandTools } from "../src/tools/ondemand.js";
@@ -38,6 +39,7 @@ export function registeredTools(): Set<string> {
   registerReformatTools(stub);
   registerVersionsTools(stub);
   registerLocalizeTools(stub);
+  registerStressTools(stub);
   registerFileTools(stub);
   registerHandoffTools(stub);
   stub.registerTool("ae_get_scripting_guide", {}, async () => ({}));

@@ -6,7 +6,9 @@ import { buildSync } from "esbuild";
 import { readFileSync } from "node:fs";
 import { brotliCompressSync, constants } from "node:zlib";
 
-export const VIEW_NAMES = ["preflight", "changes", "xray"];
+export const VIEW_NAMES = ["preflight", "changes", "xray", "stress"];
+/** views built on another view's styles (stress: Preflight's rows, frame and marks) */
+const BASE_CSS = { stress: ["preflight"] };
 const SRC = new URL("../src/views/", import.meta.url);
 /** must match FONT_SLOT in src/views/fonts.ts */
 const FONT_SLOT = "/*surehand:fonts*/";
@@ -26,7 +28,7 @@ export function buildViews() {
       minify: true,
       legalComments: "none",
     }).outputFiles[0].text;
-    const css = shared + "\n" + readFileSync(new URL(`${name}.css`, SRC), "utf8");
+    const css = [shared, ...(BASE_CSS[name] ?? []).map((b) => readFileSync(new URL(`${b}.css`, SRC), "utf8")), readFileSync(new URL(`${name}.css`, SRC), "utf8")].join("\n");
     out[name] =
       '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">' +
       `<title>Surehand</title><style>${FONT_SLOT}\n${css}</style></head><body><div id="app"></div>` +

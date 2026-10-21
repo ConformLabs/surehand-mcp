@@ -17,7 +17,7 @@
 
 Surehand MCP connects **Claude** (Desktop / Code), **ChatGPT** (desktop app or web), Cursor, Codex, VS Code (GitHub Copilot), Windsurf / Devin Desktop, LM Studio, or any MCP client to **Adobe® After Effects®**.
 The AI can run any script inside After Effects (modern JavaScript, converted for AE's ExtendScript engine automatically),
-read information back, and use up to 112 ready-made tools for projects, comps, layers, keyframes (Graph Editor level),
+read information back, and use up to 113 ready-made tools for projects, comps, layers, keyframes (Graph Editor level),
 text styling and animators, footage, effects, shapes, masks, 3D cameras/lights/materials, audio, color management,
 Essential Graphics and rendering (including background renders with aerender). Batch edits run many steps as one
 undo step, checkpoints keep safety copies of the project, structural changes can be proven not to change the render,
@@ -194,7 +194,7 @@ To rotate the token, delete `token` from `~/.surehand/ae/config.json` and re-run
 | `ae_get_scripting_guide` | ExtendScript cheat sheet for the model (also an MCP resource `aemcp://docs/extendscript`). |
 
 **Tool profiles.** Every tool description is sent to the AI in every chat, so by default only a **core set of
-29 tools** is loaded (about 9k tokens instead of 42k for all 112), and **every other tool stays available on demand**:
+29 tools** is loaded (about 9k tokens instead of 46k for all 113), and **every other tool stays available on demand**:
 `ae_tools` lists all tools by category (or gives full parameter details of chosen ones), and `ae_call` runs any tool by
 name with the same validation, permissions, change report and activity log. Loading everything up front is optional:
 switch to **All tools** in the Surehand panel in After Effects (**☰ › Tools the AI sees › All tools**), in Claude Desktop's
@@ -281,7 +281,9 @@ unknown effect name gets suggestions.
 - **Checks:** `ae_preflight` (check the delivered comp and its render against your own delivery spec; see Preflight below),
   `ae_versions_from_data` (a CSV / JSON file becomes versions of a comp, then every row is checked; see Versions from data below),
   `ae_localize` (texts out to translators as CSV / XLIFF, translations back in as a version per language, fitted by your rules
-  and checked; Hebrew and Arabic right to left; see Localization below)
+  and checked; Hebrew and Arabic right to left; see Localization below), `ae_stress_test` (worst-case inputs through
+  every control a comp exposes, each result measured, plus expressions that break in other AE languages; see Stress
+  test below)
 - **Project:** `ae_project_health` (missing footage/fonts/effects, expression errors, unused footage, empty comps/folders,
   duplicate comp names); `ae_project_xray` (explains an inherited project: what the render queue pulls in, what
   every expression depends on and which links are fragile, what is missing, footage specs, what makes it heavy);
@@ -431,6 +433,33 @@ built in: every format, colour, size and margin comes from your data and your ow
   Untranslated strings FAIL (or warn with `allowUntranslated: true`).
 - **Drift** (`action: "drift"`): which master texts changed since the export, per language, compared with the
   file's source text; the import warns about them too.
+
+### Stress test
+
+`ae_stress_test` finds what breaks in an editor's or client's hands before they do: it pushes worst-case inputs
+through every variable a comp exposes and **measures** each result.
+
+- **What it varies:** the comp's Essential Graphics controllers (text, numbers, checkboxes, menus, colours, media
+  replacement) and text that reads data, or the layers you name. Inputs are test data, not looks: German and Finnish
+  long strings scaled from the current text, Hebrew and Arabic with digits, Japanese, Chinese, Korean, Thai, Hindi,
+  combining marks, emoji, all caps, empty, one character, no spaces; zero, negative, huge, past the slider limit,
+  many decimals, both separator styles, percent; every checkbox and menu state. Your own values or CSV / JSON rows
+  work too. Combinations are sampled evenly up to a cap, and the report says what was kept.
+- **What it measures**, at the animation's key frames and where each text starts and stops being visible: box
+  overflow and by how many pixels and lines (After Effects 24.6+), the frame / title- / action-safe area (your
+  margins), the size text renders at (your minimum, or smaller than the comp's own text), missing glyphs (25.1+) and
+  substituted fonts, right-to-left and complex scripts without the direction or composer they need, line count and
+  breaks inside a word (24.3+), overlap with layers you name, and whether a number shows right in the text that shows
+  it. What already fails in the comp as it is is listed once, as the baseline.
+- **Expressions in other languages:** references by an English display name (`effect("Slider Control")("Slider")`,
+  `thisLayer("Transform")("Opacity")`, default shape and mask names) break in After Effects in another language; each
+  is listed with the language-safe form (index, match name or attribute).
+- **Never touches your comp:** every variant is set on a scratch copy that the same step removes; your comp is read
+  back afterwards (every property value) and must be identical, or the report says so (`proveUnchanged: true` adds a
+  pixel proof). Read-only mode returns the plan and the expression scan.
+- **The report:** PASS / FAIL with what breaks, where, at which frame and by how much ("Title overflows its box by
+  184 px; 3 lines, the box shows 2 at f48"), a grid of variants and checks, and a contact sheet PNG per failing
+  variant. Where the AI app shows views, the grid comes with each failing frame marked.
 
 ### Change report
 

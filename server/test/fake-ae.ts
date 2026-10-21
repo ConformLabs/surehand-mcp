@@ -268,13 +268,18 @@ export interface FakeLayerSpec {
   opacity?: number;
   startTime?: number;
   /** animated values by match name ("ADBE Position", "ADBE Opacity", "ADBE Text Document"...): value at a time */
-  anim?: Record<string, (t: number) => unknown>;
+  anim?: Record<string, (t: number, layer?: any) => unknown>;
   /** sourceRectAtTime [left, top, width, height] (default: text [0,-50,400,60], others the source size) */
   rect?: number[] | ((t: number, text: string, doc: any) => number[]);
   /** text layers: the text (default: the layer name), font size (default 50), paragraph box overflow (or by the text shown) */
   text?: string;
   fontSize?: number;
   boxOverflow?: boolean | ((text: string, doc: any) => boolean);
+  /** text: composed lines (TextDocument.composedLineCount, AE 24.3+), and where each line ends (composedLineRange) */
+  lines?: (text: string, doc: any) => number;
+  lineEnds?: (text: string, doc: any) => number[];
+  /** text: the font is a substitute (fontObject.isSubstitute) */
+  substitute?: boolean;
   /** paragraph text: the box [w, h] (boxTextSize; boxTextPos [0, -fontSize]); makes boxText true */
   box?: number[];
   /** ParagraphJustification name (default LEFT_JUSTIFY), ParagraphDirection name (default left to right) */
@@ -287,9 +292,11 @@ export interface FakeLayerSpec {
   /** text layers: fill colour (default white) */
   fillColor?: number[];
   /** more properties at a path ("Contents/Rectangle 1/Fill 1/Color"): value, type (PropertyValueType name), keyframes, expression */
-  props?: Record<string, { value: unknown; type: string; keyed?: boolean; expression?: string }>;
+  props?: Record<string, { value: unknown; type: string; keyed?: boolean; expression?: string; /** setValue keeps at most this (clamps) */ max?: number; /** setValue throws outside this, as a Slider does in AE 26.5 */ range?: [number, number]; /** setValue keeps this many decimals */ decimals?: number }>;
   /** characters the text's font has no glyph for (the font gets hasGlyphsFor, as in AE 25.1+) */
   glyphsMissing?: string;
+  /** as seen in AE 26.5: a text with any of these characters gets this font instead (the font object follows it) */
+  fontFallback?: { chars: string; font: string };
   /** per-character fonts (style runs, AE 24+ characterRange): the font of character i, and what it lacks */
   charFonts?: { font: string; missing?: string }[];
   /** auto-orient along the path */
@@ -308,7 +315,7 @@ export interface FakeCompSpec {
   samples?: number;
   renderer?: string;
   /** Essential Graphics controllers (name, value and type of the Essential Property a precomp layer gets) */
-  egp?: { name: string; value: unknown; type: string }[];
+  egp?: { name: string; value: unknown; type: string; /** the property it drives (essentialPropertySource): layer name and path of names; "" = the layer (media) */ source?: { layer: string; path: string } }[];
   /** render cost (ms) of the comp itself, before its layers (default 10) */
   renderMs?: number;
 }
@@ -537,10 +544,30 @@ export function fakeProject(spec: FakeProjectSpec) {
     // comp.layers.add(item): a precomp layer, with the item's Essential Properties when it is a comp that has them
     it.layers.add = (item: any) => {
       const children: any[] = [group("Transform", "ADBE Transform Group", [prop("Scale", "ADBE Scale", { value: [100, 100, 100], propertyValueType: PVT_FULL.ThreeD })])];
-      const L: any = Object.assign(new AVLayer(), { index: it.layers.length + 1, id: 1000 + nextId++, name: item.name, enabled: true, source: item, parent: null, inPoint: 0, outPoint: it.duration, startTime: 0, stretch: 100, children });
+      const L: any = Object.assign(new AVLayer(), { index: it.layers.length + 1, id: 1000 + nextId++, name: item.name, enabled: true, source: item, parent: null, inPoint: 0, outPoint: it.duration, startTime: 0, stretch: 100, children, containingComp: it });
       L.property = (k: number | string) => (typeof k === "number" ? L.children[k - 1] : L.children.find((x: any) => x.name === k || x.matchName === k)) ?? null;
       const eg = item.__egp as FakeCompSpec["egp"];
-      if (eg) L.essentialProperty = group("Essential Properties", "ADBE Layer Overrides", eg.map((e) => prop(e.name, e.name, { value: clone(e.value), propertyValueType: (PVT_FULL as any)[e.type] })));
+      if (eg)
+        L.essentialProperty = group(
+          "Essential Properties",
+          "ADBE Layer Overrides",
+          eg.map((e) => {
+            const p = prop(e.name, e.name, { value: clone(e.value), propertyValueType: (PVT_FULL as any)[e.type] });
+            if (e.source) {
+              const src = e.source;
+              Object.defineProperty(raw.get(p) ?? p, "essentialPropertySource", {
+                get: () => {
+                  const SL = item.layers.find((x: any) => x.name === src.layer);
+                  if (!SL || !src.path) return SL ?? null;
+                  let x: any = SL;
+                  for (const seg of src.path.split("/")) x = x?.property(seg);
+                  return x ?? null;
+                },
+              });
+            }
+            return p;
+          }),
+        );
       const w = watch(L, L.name);
       it.layers.push(w);
       return w;
@@ -555,6 +582,19 @@ export function fakeProject(spec: FakeProjectSpec) {
       return L;
     };
     it.layers.addText = (text: string) => newText(text);
+    // comp.layers.addSolid: a solid footage item (in the project) and a layer showing it
+    it.layers.addSolid = (_color: number[], name: string, w: number, h: number) => {
+      const solid: any = Object.assign(new FootageItem(), { id: nextId++, name, width: w, height: h, pixelAspect: 1, duration: 10, mainSource: new SolidSource(), usedIn: [], parentFolder: root });
+      solid.remove = () => {
+        const k = items.indexOf(solid);
+        if (k >= 0) items.splice(k, 1);
+      };
+      items.push(solid);
+      addLayers(it, { name: it.name, layers: [{ name, source: name }] });
+      const L = it.layers[it.layers.length - 1];
+      (raw.get(L) ?? L).index = it.layers.length;
+      return L;
+    };
     it.layers.addBoxText = (box: number[], text: string) => newText(text, box);
     it.remove = () => {
       const k = items.findIndex((x) => x.id === it.id);
@@ -575,6 +615,24 @@ export function fakeProject(spec: FakeProjectSpec) {
     };
     walk(a, b);
   };
+  // as in After Effects: every property knows its group, its index in it and its depth under the layer
+  const linkProps = (L: any) => {
+    const walk = (g: any, depth: number) => {
+      (g.children ?? []).forEach((c: any, k: number) => {
+        const r = raw.get(c) ?? c;
+        r.parentProperty = g;
+        r.propertyIndex = k + 1;
+        r.propertyDepth = depth + 1;
+        r.propertyGroup = (n: number) => {
+          let x = c;
+          for (let i = 0; i < n; i++) x = x.parentProperty;
+          return x;
+        };
+        if (c.children) walk(c, depth + 1);
+      });
+    };
+    walk(L, 0);
+  };
   const effectGroups = (l: FakeLayerSpec) =>
     (l.effects ?? []).map((e) => group(e.name, e.matchName, [], { enabled: e.enabled !== false, costMs: e.costMs ?? 0 }));
   const T = (n: string) => (PVT_FULL as any)[n];
@@ -594,7 +652,7 @@ export function fakeProject(spec: FakeProjectSpec) {
       ]);
       const children: any[] = [transform];
       if (type !== "camera") children.push(group("Effects", "ADBE Effect Parade", effectGroups(ls)));
-      const fontObj = (ps: string, missing: string) => ({ postScriptName: ps, hasGlyphsFor: (ch: string) => !missing.includes(ch) });
+      const fontObj = (ps: string, missing: string) => ({ postScriptName: ps, familyName: ps.replace(/-.*$/, ""), hasGlyphsFor: (ch: string) => !missing.includes(ch) });
       const G: any = globals;
       const doc = (text: string) => {
         const isBox = ls.boxOverflow !== undefined || ls.box !== undefined;
@@ -603,6 +661,16 @@ export function fakeProject(spec: FakeProjectSpec) {
           ...(isBox ? { boxTextSize: clone(ls.box ?? [400, 200]), boxTextPos: [0, -(ls.fontSize ?? 50)], boxVerticalAlignment: G.BoxVerticalAlignment.TOP } : {}),
           ...(spec.noRtlApi ? {} : { direction: G.ParagraphDirection[ls.direction ?? "DIRECTION_LEFT_TO_RIGHT"], _ce: G.ComposerEngine[ls.composer ?? "LATIN_CJK_ENGINE"], digitSet: G.DigitSet.DEFAULT_DIGITS }),
           ...(ls.charFonts ? { characterRange: (i: number) => ({ font: ls.charFonts![i].font, fontObject: fontObj(ls.charFonts![i].font, ls.charFonts![i].missing ?? "") }) } : {}) };
+        if (ls.fontFallback) {
+          const fb = ls.fontFallback;
+          d._font = d.font;
+          Object.defineProperty(d, "font", {
+            get() { return Array.from(String(this.text)).some((c) => fb.chars.includes(c)) ? fb.font : this._font; },
+            set(v) { this._font = v; },
+            enumerable: true,
+            configurable: true,
+          });
+        }
         // the font object follows the font (a font map changes it): the project's per-font glyph list, else the layer's
         if (ls.glyphsMissing !== undefined || spec.fontGlyphsMissing)
           Object.defineProperty(d, "fontObject", { get() { return fontObj(this.font, spec.fontGlyphsMissing?.[this.font] ?? ls.glyphsMissing ?? ""); }, enumerable: true, configurable: true });
@@ -613,11 +681,15 @@ export function fakeProject(spec: FakeProjectSpec) {
             set(v) { if (v !== G.ComposerEngine.UNIVERSAL_TYPE_ENGINE) throw new Error("After Effects error: only ComposerEngine.UNIVERSAL_TYPE_ENGINE can be written"); this._ce = v; },
             enumerable: true, configurable: true,
           });
+        if (ls.lines) Object.defineProperty(d, "composedLineCount", { get() { return ls.lines!(this.text, this); }, enumerable: true, configurable: true });
+        if (ls.lineEnds) d.composedLineRange = function (this: any, k: number) { return { characterStart: k ? ls.lineEnds!(this.text, this)[k - 1] : 0, characterEnd: ls.lineEnds!(this.text, this)[k] }; };
+        if (ls.substitute) Object.defineProperty(d, "fontObject", { get() { return { postScriptName: this.font, isSubstitute: true }; }, enumerable: true, configurable: true });
         const bo = ls.boxOverflow;
         if (isBox) Object.defineProperty(d, "boxOverflow", { get() { return typeof bo === "function" ? bo(this.text, this) : (bo ?? false); }, enumerable: true, configurable: true });
         return d;
       };
       const textAnim = an["ADBE Text Document"];
+      const self: { L?: any } = {};
       if (type === "text" && ls.textKeys) {
         // keyframed Source Text (hold keyframes): keyValue / setValueAtKey per keyframe
         const keys = ls.textKeys.map((k) => ({ t: k.t, v: doc(k.text) }));
@@ -632,7 +704,7 @@ export function fakeProject(spec: FakeProjectSpec) {
         });
         (st as any).__keys = keys;
         children.push(group("Text", "ADBE Text Properties", [st]));
-      } else if (type === "text") children.push(group("Text", "ADBE Text Properties", [prop("Source Text", "ADBE Text Document", { value: doc(ls.text ?? ls.name), propertyValueType: T("TEXT_DOCUMENT") }, textAnim && ((t: number) => doc(String(textAnim(t)))))]));
+      } else if (type === "text") children.push(group("Text", "ADBE Text Properties", [prop("Source Text", "ADBE Text Document", { value: doc(ls.text ?? ls.name), propertyValueType: T("TEXT_DOCUMENT") }, textAnim && ((t: number) => doc(String(textAnim(t, self.L)))))]));
       const at = (path: string, leaf: (name: string) => any) => {
         const segs = path.split("/");
         let g: any = { children };
@@ -647,7 +719,21 @@ export function fakeProject(spec: FakeProjectSpec) {
         return g;
       };
       for (const [path, p] of Object.entries(ls.props ?? {}))
-        at(path, (s) => prop(s, s, { value: clone(p.value), propertyValueType: T(p.type), numKeys: p.keyed ? 2 : 0, ...(p.expression ? { expression: p.expression } : {}) }));
+        at(path, (s) =>
+          prop(s, s, {
+            value: clone(p.value), propertyValueType: T(p.type), numKeys: p.keyed ? 2 : 0, ...(p.expression ? { expression: p.expression } : {}),
+            ...(p.max !== undefined || p.range || p.decimals !== undefined
+              ? {
+                  setValue(this: any, v: number) {
+                    if (p.range && (v < p.range[0] || v > p.range[1])) throw new Error(`After Effects error: Value ${v} out of range ${p.range[0]} to ${p.range[1]}.`);
+                    let x = p.max !== undefined ? Math.min(v, p.max) : v;
+                    if (p.decimals !== undefined) x = Math.round(x * 10 ** p.decimals) / 10 ** p.decimals;
+                    this.value = x;
+                  },
+                }
+              : {}),
+          }),
+        );
       for (const [path, e] of Object.entries(ls.expressions ?? {})) {
         const g = at(path, (s) => prop(s, s));
         Object.assign(g, { expression: e.expr, expressionError: e.error ?? "", expressionEnabled: e.enabled !== false });
@@ -684,7 +770,15 @@ export function fakeProject(spec: FakeProjectSpec) {
       L.audioEnabled = false;
       Object.defineProperty(L, "numProperties", { get: () => L.children.length });
       L.property = (k: number | string) => (typeof k === "number" ? L.children[k - 1] : L.children.find((x: any) => x.name === k || x.matchName === k)) ?? null;
-      comp.layers.push(watch(L, ls.name));
+      L.containingComp = comp;
+      L.remove = () => {
+        const k = comp.layers.indexOf(self.L);
+        if (k >= 0) comp.layers.splice(k, 1);
+        comp.layers.forEach((x: any, j: number) => ((raw.get(x) ?? x).index = j + 1));
+      };
+      self.L = watch(L, ls.name);
+      comp.layers.push(self.L);
+      linkProps(self.L);
     });
     c.layers.forEach((ls, li) => {
       if (ls.parent) comp.layers[li].parent = comp.layers[ls.parent - 1];
