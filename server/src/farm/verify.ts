@@ -227,7 +227,28 @@ export async function verifyMovie(plan: FarmPlan, ff: FfmpegPaths, o: { join?: b
 
 // ---------- pixel proof ----------
 
-export interface ProofFrame { frame: number; result: "identical" | "within tolerance" | "differs" | "not compared"; maxDiff?: number; detail?: string }
+/** "0.02%", "3.4%" */
+export const areaPct = (n: number, total: number) => {
+  const p = (100 * n) / Math.max(1, total);
+  return `${p >= 1 ? Math.round(p * 10) / 10 : p >= 0.01 ? Math.round(p * 100) / 100 : "<0.01"}%`;
+};
+
+/**
+ * A difference that is a different picture, not local detail: more than 1% of the frame beyond the tolerance, or
+ * spread over a quarter of the frame and more than 0.1% of it. Seen live on Windows: aerender and the app anti-alias
+ * text edges a little differently (206 px of 921,600, max 209/255) — that is local detail.
+ */
+export function substantial(p: ProofFrame): boolean {
+  if (p.result !== "differs" || !p.over || !p.total) return false;
+  const boxArea = p.box ? (p.box[2] * p.box[3]) / p.total : 0;
+  return p.over / p.total > 0.01 || (boxArea > 0.25 && p.over / p.total > 0.001);
+}
+
+export interface ProofFrame {
+  frame: number; result: "identical" | "within tolerance" | "differs" | "not compared"; maxDiff?: number; detail?: string;
+  /** pixels beyond the tolerance, of all, and the box around them [x, y, w, h] */
+  over?: number; total?: number; box?: [number, number, number, number];
+}
 
 /** An image without alpha in its file: the local render (straight alpha) composited over black, as an RGB render is. */
 export function overBlack(img: Image): Image {
@@ -256,7 +277,8 @@ export function compareProof(pairs: { frame: number; farm: string | null; local:
       if (a.width !== b.width || a.height !== b.height) return { frame: p.frame, result: "not compared", detail: `the render is ${a.width}x${a.height}, the local render ${b.width}x${b.height} (output resized or rendered at another resolution)` };
       if (opaque(a) && !opaque(b)) b = overBlack(b);
       const d = diffImages(a, b, tolerance);
-      return { frame: p.frame, result: d.over ? "differs" : d.changed ? "within tolerance" : "identical", maxDiff: Math.round(d.maxDiff * 100) / 100, ...(d.over ? { detail: `${d.over} px beyond the tolerance` } : {}) };
+      const where = d.box ? `x ${d.box[0]}-${d.box[0] + d.box[2] - 1}, y ${d.box[1]}-${d.box[1] + d.box[3] - 1}` : "";
+      return { frame: p.frame, result: d.over ? "differs" : d.changed ? "within tolerance" : "identical", maxDiff: Math.round(d.maxDiff * 100) / 100, over: d.over, total: d.total, ...(d.box ? { box: d.box } : {}), ...(d.over ? { detail: `${d.over} px beyond the tolerance (${areaPct(d.over, d.total)} of the frame) inside ${where}` } : {}) };
     } catch (e: any) {
       return { frame: p.frame, result: "not compared", detail: String(e?.message ?? e) };
     }

@@ -1,7 +1,7 @@
 // Background renders with aerender (After Effects' command-line renderer): After Effects stays
 // usable while a separate render process works, with progress, status and cancel.
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { spawn, type ChildProcess } from "node:child_process";
+import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { closeSync, createWriteStream, existsSync, fstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { z } from "zod";
@@ -38,6 +38,8 @@ interface Job {
   /** found again from its files after the server restarted (no exit code seen) */
   recovered?: boolean;
   onExit?: (j: Job) => void;
+  /** called once, when aerender reports its first rendered frame (it has started up) */
+  onFirstFrame?: (j: Job) => void;
 }
 
 const jobs = new Map<string, Job>();
@@ -146,7 +148,10 @@ function ingest(job: Job, text: string, at = Date.now()) {
     if (pr) {
       if (pr.frame > job.frameRendered && pr.seconds !== null && job.frameSeconds.length < 100_000) job.frameSeconds.push(pr.seconds);
       if (pr.frame > job.frameRendered) {
-        if (!job.progressAt) job.progressAt = { first: at, firstFrame: pr.frame, last: at, lastFrame: pr.frame };
+        if (!job.progressAt) {
+          job.progressAt = { first: at, firstFrame: pr.frame, last: at, lastFrame: pr.frame };
+          if (job.onFirstFrame) setImmediate(() => job.onFirstFrame?.(job));
+        }
         else Object.assign(job.progressAt, { last: at, lastFrame: pr.frame });
       }
       job.frameRendered = Math.max(job.frameRendered, pr.frame);
@@ -160,7 +165,7 @@ function ingest(job: Job, text: string, at = Date.now()) {
 const failedLog = (j: Job) => j.tail.some((l) => /aerender ERROR|^ERROR/i.test(l));
 
 export interface StartJob {
-  bin: string; cli: string[]; comp: string; output: string; project: string; frames: number; group?: string; chunk?: number; onExit?: (j: Job) => void;
+  bin: string; cli: string[]; comp: string; output: string; project: string; frames: number; group?: string; chunk?: number; onExit?: (j: Job) => void; onFirstFrame?: (j: Job) => void;
   /** a process of its own that writes straight into its log and outlives this server (a reload of the AI app) */
   detached?: boolean;
 }
@@ -176,7 +181,7 @@ export function startAerenderJob(o: StartJob): Job {
   const job: Job = {
     id, comp: o.comp, output: o.output, project: o.project, status: "running",
     startedAt: new Date().toISOString(), frames: o.frames, frameRendered: 0, log: logPath, tail: [], frameSeconds: [],
-    ...(o.group ? { group: o.group, chunk: o.chunk } : {}), onExit: o.onExit,
+    ...(o.group ? { group: o.group, chunk: o.chunk } : {}), onExit: o.onExit, onFirstFrame: o.onFirstFrame,
   };
   let written = 0;
   const progress = () => {
@@ -258,22 +263,39 @@ export function startAerenderJob(o: StartJob): Job {
     finish();
     job.exitCode = code;
     job.endedAt = new Date().toISOString();
-    if (job.status === "running") job.status = code === 0 && !failedLog(job) ? "done" : "failed";
+    if (job.status === "running") job.status = code === 0 && !failedLog(job) && !(job.group && job.frameRendered < job.frames) ? "done" : "failed";
+    if (job.group && code === 0 && job.frameRendered < job.frames) job.tail.push(`(aerender ended after ${job.frameRendered} of ${job.frames} frames)`);
     end();
   });
   jobs.set(id, job);
   return job;
 }
 
-const alive = (pid?: number) => {
-  if (!pid) return false;
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (e: any) {
-    return e?.code === "EPERM";
-  }
+/**
+ * Whether a job's process still runs. Windows: asked with tasklist, by pid and image name (a signal-0 check said
+ * "running" for a detached aerender that was gone, seen live on Windows 11), so a reused pid doesn't count either.
+ */
+export const processCheck = {
+  alive(pid?: number): boolean {
+    if (!pid) return false;
+    if (process.platform === "win32") {
+      try {
+        const r = spawnSync("tasklist", ["/FI", `PID eq ${pid}`, "/FO", "CSV", "/NH"], { encoding: "utf8", timeout: 10_000, windowsHide: true });
+        if (r.status !== 0 || r.error) return true; // can't tell: don't call it dead
+        return r.stdout.split(/\r?\n/).some((l) => l.includes(`"${pid}"`) && /aerender|afterfx/i.test(l));
+      } catch {
+        return true;
+      }
+    }
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch (e: any) {
+      return e?.code === "EPERM";
+    }
+  },
 };
+const alive = (pid?: number) => processCheck.alive(pid);
 
 /**
  * A job this server did not start (it started before a restart): its renders/<id>.json and log, and whether its
@@ -298,7 +320,17 @@ function recover(id: string): Job | undefined {
 
 /** A recovered job: its log read again, and whether its process still runs. */
 function refresh(job: Job) {
-  if (!job.recovered) return;
+  if (!job.recovered) {
+    // a job of this session whose process is gone but whose exit was never seen: failed, with its log's last lines
+    if (job.status === "running" && job.pid && Date.now() - Date.parse(job.startedAt) > 3000 && !alive(job.pid)) {
+      job.status = job.frameRendered >= job.frames && !failedLog(job) ? "done" : "failed";
+      job.endedAt ??= new Date().toISOString();
+      job.tail.push(`(aerender is gone after ${job.frameRendered} of ${job.frames} frames; its exit was not seen)`);
+      job.proc = undefined;
+      writeJobFile(job);
+    }
+    return;
+  }
   const st = { status: job.status, frameRendered: job.frameRendered };
   job.tail = [];
   job.frameSeconds = [];

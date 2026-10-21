@@ -7,7 +7,7 @@ import { accessSync, constants, existsSync } from "node:fs";
 import { dirname } from "node:path";
 import { fontFolders, indexFonts } from "./fonts.js";
 import type { Manifest } from "./manifest.js";
-import { aerenderNextTo, cmpVersion, findAeInstalls, majorOf, mapPath, readAeInstall, type AeInstall, type PathMapping, type Platform } from "./paths.js";
+import { aerenderNextTo, compareAeVersions, findAeInstalls, majorOf, mapPath, readAeInstall, type AeInstall, type PathMapping, type Platform } from "./paths.js";
 import { findMatchNames, pluginFolders } from "./plugins.js";
 import { listFrames, patternOfFrame, runsOf, runsText } from "./seq.js";
 
@@ -60,7 +60,8 @@ export function checkManifest(m: Manifest, o: CheckOptions): CheckResult {
     const hm = majorOf(haveVersion);
     if (wantMajor !== null && hm < wantMajor) add("After Effects", "version", "different", `${haveVersion} here, the project was saved in ${want}: an older After Effects can't open it`);
     else if (wantMajor !== null && hm > wantMajor) add("After Effects", "version", "warning", `${haveVersion} here, the project was saved in ${want}: a newer version converts the project and can render differently`);
-    else if (cmpVersion(haveVersion, want) !== 0) add("After Effects", "version", "warning", `${haveVersion} here, ${want} where the manifest was made (same major version; renders can still differ)`);
+    else if (compareAeVersions(haveVersion, want) === "version") add("After Effects", "version", "warning", `${haveVersion} here, ${want} where the manifest was made (same major version; renders can still differ)`);
+    else if (compareAeVersions(haveVersion, want) === "build") add("After Effects", "version", "warning", `${haveVersion} here, ${want} where the manifest was made (the same version, another build)`);
     else add("After Effects", "version", "ok", haveVersion);
   }
   if (installs.length > 1 && !o.live) notes.push(`After Effects installs found: ${installs.map((i) => `${i.version ?? "?"} (${i.folder})`).join(", ")}; checked ${ae?.folder}`);

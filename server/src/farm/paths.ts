@@ -285,6 +285,24 @@ export function readAeInstall(folder: string, platform: Platform = platformOf())
   return { folder: dir, version, aerender: existsSync(aer) ? aer : null, versionFrom: from };
 }
 
+/**
+ * An After Effects version in the forms it comes in: app.version "26.5x89" (x = build), Info.plist "26.5" or
+ * "25.2.0.110", AfterFX.exe "26.5.0.89". Major, minor and patch (missing parts are 0), and the build where it says.
+ */
+export function aeVersionParts(v: string | null | undefined): { main: [number, number, number]; build: number | null } | null {
+  const m = /^\s*(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:\.(\d+))?(?:x(\d+))?/i.exec(v ?? "");
+  if (!m) return null;
+  const build = m[5] ?? m[4];
+  return { main: [Number(m[1]), Number(m[2] ?? 0), Number(m[3] ?? 0)], build: build !== undefined ? Number(build) : null };
+}
+/** "same" (also when only one side says its build), "build" (same version, other build), "version" (another version). */
+export function compareAeVersions(a: string | null | undefined, b: string | null | undefined): "same" | "build" | "version" {
+  const x = aeVersionParts(a), y = aeVersionParts(b);
+  if (!x || !y) return cmpVersion(a, b) === 0 ? "same" : "version";
+  if (x.main.some((n, i) => n !== y.main[i])) return "version";
+  return x.build !== null && y.build !== null && x.build !== y.build ? "build" : "same";
+}
+
 export function cmpVersion(a: string | null | undefined, b: string | null | undefined): number {
   const pa = (a ?? "").split(/[^\d]+/).filter(Boolean).map(Number), pb = (b ?? "").split(/[^\d]+/).filter(Boolean).map(Number);
   for (let i = 0; i < Math.max(pa.length, pb.length); i++) {

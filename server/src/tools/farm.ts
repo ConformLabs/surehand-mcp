@@ -22,7 +22,7 @@ import { buildManifest, formatManifest, manifestName, type FarmScan, type Manife
 import { aerenderNextTo, platformOf, readMounts, type PathMapping } from "../farm/paths.js";
 import { buildPlan, defaultPlanFolder, fileStamp, findProfile, fmtDuration, formatPlan, maxLocalProcesses, PlanRefusal, planFileName, planScripts, type FarmPlan, type MachineSpec } from "../farm/plan.js";
 import { listFrames, parseTemplate, runsOf, runsText } from "../farm/seq.js";
-import { blankRender, compareProof, farmFrame, pictureFacts, readPlanFile, sequenceProblems, verifyMovie, verifySequence, type PictureFacts, type ProofFrame } from "../farm/verify.js";
+import { blankRender, compareProof, farmFrame, pictureFacts, substantial, readPlanFile, sequenceProblems, verifyMovie, verifySequence, type PictureFacts, type ProofFrame } from "../farm/verify.js";
 import { expandHome } from "./files.js";
 import { approveDownload } from "./preflight.js";
 import { captureProof, DEFAULT_TOLERANCE, proofDir } from "./prove.js";
@@ -244,7 +244,15 @@ async function resolvePlan(a: FarmInput, fallback: boolean): Promise<{ plan: Far
 
 // ---------- run_local and status ----------
 
-interface Run { id: string; plan: FarmPlan; planFile: string | null; chunks: { index: number; job?: RenderJob; state: "waiting" | "started" }[]; max: number; startedAt: string; cancelled?: boolean }
+interface RunChunk { index: number; job?: RenderJob; state: "waiting" | "started"; /** the job that died before its first frame, when this chunk was started again */ retriedFrom?: string }
+interface Run { id: string; plan: FarmPlan; planFile: string | null; chunks: RunChunk[]; max: number; startedAt: string; cancelled?: boolean; timer?: ReturnType<typeof setTimeout> }
+
+/**
+ * Starting aerender processes one after another: the next starts once the previous one has rendered its first frame
+ * (or after staggerTimeoutMs). Seen live on Windows 11: two started at the same moment, one wrote only its version line
+ * and exited. On by default on Windows; replaceable in tests.
+ */
+export const farmTiming = { stagger: process.platform === "win32", staggerTimeoutMs: 180_000 };
 const runs = new Map<string, Run>();
 const RUNS_KEPT = 20;
 const runFile = (id: string) => appFile("renders", `${id}.farm.json`);
@@ -253,7 +261,7 @@ const runFile = (id: string) => appFile("renders", `${id}.farm.json`);
 function saveRun(run: Run) {
   try {
     mkdirSync(appFile("renders"), { recursive: true });
-    writeFileSync(runFile(run.id), JSON.stringify({ id: run.id, planFile: run.planFile, plan: run.plan, max: run.max, startedAt: run.startedAt, cancelled: run.cancelled, chunks: run.chunks.map((c) => ({ index: c.index, job: c.job?.id })) }));
+    writeFileSync(runFile(run.id), JSON.stringify({ id: run.id, planFile: run.planFile, plan: run.plan, max: run.max, startedAt: run.startedAt, cancelled: run.cancelled, chunks: run.chunks.map((c) => ({ index: c.index, job: c.job?.id, ...(c.retriedFrom ? { retriedFrom: c.retriedFrom } : {}) })) }));
   } catch {}
 }
 function pruneRuns() {
@@ -276,9 +284,9 @@ function recoverRuns(only?: string) {
     try {
       const d = JSON.parse(readFileSync(appFile("renders", n), "utf8"));
       const run: Run = { id, plan: d.plan, planFile: d.planFile ?? null, max: d.max, startedAt: d.startedAt, cancelled: d.cancelled, chunks: [] };
-      run.chunks = d.chunks.map((c: { index: number; job?: string }) => {
+      run.chunks = d.chunks.map((c: { index: number; job?: string; retriedFrom?: string }) => {
         const job = c.job ? renderJob(c.job) : undefined;
-        return { index: c.index, job, state: c.job ? "started" : "waiting" };
+        return { index: c.index, job, state: c.job ? "started" : "waiting", ...(c.retriedFrom ? { retriedFrom: c.retriedFrom } : {}) };
       });
       runs.set(id, run);
     } catch {}
@@ -296,12 +304,36 @@ export function existingOutputs(plan: FarmPlan): string[] {
   return [...new Set([...mv.parts, mv.final])].filter((f) => existsSync(f));
 }
 
+/** A chunk whose aerender died before rendering a frame (a start-up collision) is started again, once. */
+function retryDead(run: Run): number {
+  let n = 0;
+  for (const c of run.chunks) {
+    const j = c.job ? renderJob(c.job.id) ?? c.job : undefined;
+    if (!j || c.retriedFrom || run.cancelled || j.status !== "failed" || j.frameRendered > 0) continue;
+    c.retriedFrom = j.id;
+    c.job = undefined;
+    c.state = "waiting";
+    n++;
+  }
+  return n;
+}
+
 function startNext(run: Run) {
   if (run.cancelled) return;
-  let started = false;
+  let started = retryDead(run) > 0;
+  const starting = () =>
+    run.chunks.some((x) => x.job?.status === "running" && x.job.frameRendered === 0 && Date.now() - Date.parse(x.job.startedAt) < farmTiming.staggerTimeoutMs);
   for (const c of run.chunks) {
     if (run.chunks.filter((x) => x.job?.status === "running").length >= run.max) break;
     if (c.state !== "waiting") continue;
+    if (farmTiming.stagger && starting()) {
+      // the next one starts when this one renders its first frame, or after the timeout
+      if (!run.timer) {
+        run.timer = setTimeout(() => ((run.timer = undefined), startNext(run)), farmTiming.staggerTimeoutMs);
+        run.timer.unref?.();
+      }
+      break;
+    }
     const ch = run.plan.chunks.find((x) => x.index === c.index)!;
     const m = run.plan.machines[0];
     if (ch.output) mkdirSync(dirname(ch.output), { recursive: true });
@@ -311,6 +343,7 @@ function startNext(run: Run) {
     c.job = startAerenderJob({
       bin: m.aerender, cli: ch.args, comp: run.plan.comp.name, output: ch.output ?? run.plan.output.path ?? "", project: m.project, frames: ch.frames, group: run.id, chunk: ch.index, detached: true,
       onExit: () => startNext(run),
+      onFirstFrame: () => startNext(run),
     });
   }
   if (started) saveRun(run);
@@ -387,10 +420,10 @@ function statusAction(a: FarmInput): CallToolResult {
     const left = all.filter((x) => !x.j || x.j.status === "running").reduce((n, x) => n + x.ch.frames - (x.j?.frameRendered ?? 0), 0);
     const state = run.cancelled ? "cancelled" : done === all.length ? "done" : failed && !all.some((x) => x.j?.status === "running" || x.c.state === "waiting") ? "finished with failures" : "running";
     out.push(`Run ${run.id}: ${state}. ${framesDone} of ${run.plan.frames.frames} frames rendered; ${done} of ${all.length} chunks done${failed ? `, ${failed} failed or cancelled` : ""}.${Number.isFinite(spf) && left > 0 && state === "running" ? ` About ${fmtDuration((left * spf) / run.max)} left at ${perFrameText(spf)} per frame, ${run.max} at once.` : ""}`);
-    if (resumed > 0) out.push(`  (started ${resumed} waiting chunk${resumed === 1 ? "" : "s"} now: the server had restarted)`);
+    if (resumed > 0) out.push(`  (started ${resumed} waiting chunk${resumed === 1 ? "" : "s"} now)`);
     for (const x of all) {
       const j = x.j, s = j ? secondsPerFrame(j) : null;
-      out.push(`  ${x.c.index}. frames ${chunkFrames(run.plan, x.ch)}: ${!j ? "waiting" : `${j.status}, ${Math.min(j.frameRendered, x.ch.frames)}/${x.ch.frames}${s !== null ? `, ${perFrameText(s)} per frame` : ""}${j.status === "failed" ? ` (${j.tail.slice(-2).join(" | ")}; log ${j.log})` : ""}`}`);
+      out.push(`  ${x.c.index}. frames ${chunkFrames(run.plan, x.ch)}: ${!j ? "waiting" : `${j.status}, ${Math.min(j.frameRendered, x.ch.frames)}/${x.ch.frames}${s !== null ? `, ${perFrameText(s)} per frame` : ""}${j.status === "failed" ? ` (${j.tail.slice(-2).join(" | ")}; log ${j.log})` : ""}`}${x.c.retriedFrom ? ` (started again once: its first aerender, job ${x.c.retriedFrom}, ended before rendering a frame${(() => { const d = renderJob(x.c.retriedFrom!); return d ? `: ${d.tail.slice(-2).join(" | ")}; log ${d.log}` : ""; })()})` : ""}`);
     }
     if (state !== "running") out.push(`  Verify: ae_farm {action: "verify"${run.planFile ? `, plan: "${run.planFile}"` : `, rqIndex: ${run.plan.rqIndex}`}}`);
   }
@@ -401,8 +434,6 @@ function statusAction(a: FarmInput): CallToolResult {
 
 /** Tolerance of the pixel proof verify runs by itself (not asked for): colour conversion in the output may differ a little. */
 const AUTO_PROOF_TOLERANCE = 4;
-/** A difference this large in the automatic proof means another picture, not another colour conversion. */
-const AUTO_PROOF_FAIL = 64;
 
 async function verifyAction(a: FarmInput, mode: string): Promise<CallToolResult> {
   if (a.join && mode === "read-only") return errorResult(`${READ_ONLY_REFUSAL} (join writes the joined file; verify without join is read-only.)`);
@@ -475,9 +506,12 @@ async function verifyAction(a: FarmInput, mode: string): Promise<CallToolResult>
           }
           proof = compareProof(pairs, tol);
           const bad = proof.filter((p) => p.result === "differs");
-          const fail = explicitProof ? bad : bad.filter((p) => (p.maxDiff ?? 0) > AUTO_PROOF_FAIL);
-          if (fail.length) problems.push(`${fail.length} of ${proof.length} sampled frames differ from a render here: ${fail.map((p) => `${p.frame} (max ${p.maxDiff}/255)`).join(", ")}`);
-          else if (bad.length) notes.push(`sampled frames differ slightly from After Effects' own frame render (max ${Math.max(...bad.map((p) => p.maxDiff ?? 0))}/255): expected from the output's colour conversion or bit depth; proveFrames with a tolerance makes it a strict proof`);
+          // asked for (proveFrames): every difference beyond the tolerance fails, with where it is; automatic: only a
+          // difference by area (another picture), small local ones (text edges) are a note
+          const fail = explicitProof ? bad : bad.filter(substantial);
+          const small = bad.filter((p) => !fail.includes(p));
+          if (fail.length) problems.push(`${fail.length} of ${proof.length} sampled frames differ from a render here: ${fail.map((p) => `${p.frame}: ${p.detail}, max ${p.maxDiff}/255`).join("; ")}`);
+          if (small.length) notes.push(`small local differences from After Effects' own frame render (for example text edges, which aerender and the app anti-alias a little differently): ${small.map((p) => `${p.frame}: ${p.detail}, max ${p.maxDiff}/255`).join("; ")}. proveFrames makes the proof strict`);
           const nc = proof.filter((p) => p.result === "not compared");
           if (nc.length) skip(`frames ${nc.map((p) => p.frame).join(", ")}: ${nc[0].detail}`);
           out.push(`Pixel proof${explicitProof ? "" : " (automatic, 2 frames)"} (tolerance ${tol}/255; against After Effects' own frame render, without the render settings' quality, resolution or proxies): ${proof.map((p) => `${p.frame} ${p.result}${p.maxDiff !== undefined ? ` (max ${p.maxDiff})` : ""}`).join(", ")}.`);

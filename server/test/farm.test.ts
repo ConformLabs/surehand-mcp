@@ -36,18 +36,18 @@ vi.mock("../src/tools/prove.js", async (original) => {
   };
 });
 
-const { farm, farmRuns, existingOutputs } = await import("../src/tools/farm.js");
+const { farm, farmRuns, existingOutputs, farmTiming } = await import("../src/tools/farm.js");
 const { FARM_SCAN_JSX, FARM_CHECK_JSX } = await import("../src/farm/jsx.js");
 const { splitFrames, buildPlan, planScripts, joinSafety, commandLine, aerenderArgs, maxLocalProcesses, frameCost, PlanRefusal, formatPlan } = await import("../src/farm/plan.js");
 const { itemFrames, outputInfo, buildManifest, reachOf } = await import("../src/farm/manifest.js");
-const { classifyPath, parseMountOutput, parseNetUse, mapPath, shQuote, batQuote, plistVersion, exeVersion, readAeInstall, defaultAerender } = await import("../src/farm/paths.js");
+const { classifyPath, parseMountOutput, parseNetUse, mapPath, shQuote, batQuote, plistVersion, exeVersion, readAeInstall, defaultAerender, compareAeVersions } = await import("../src/farm/paths.js");
 const { postScriptNames, indexFonts } = await import("../src/farm/fonts.js");
 const { findMatchNames } = await import("../src/farm/plugins.js");
 const { checkManifest } = await import("../src/farm/check.js");
-const { verifySequence, imageFileState, compareProof, blankRender, pictureFacts } = await import("../src/farm/verify.js");
+const { verifySequence, imageFileState, compareProof, blankRender, pictureFacts, substantial } = await import("../src/farm/verify.js");
 const { footageSequence } = await import("../src/farm/seq.js");
 const { farmCommand } = await import("../src/cli/farm.js");
-const { parseProgress, parseTotal, secondsPerFrame, perFrameText, renderJobs, forgetJobs } = await import("../src/tools/renderjobs.js");
+const { parseProgress, parseTotal, secondsPerFrame, perFrameText, renderJobs, forgetJobs, startAerenderJob, renderJob, processCheck, cancelJob } = await import("../src/tools/renderjobs.js");
 const { encodePng } = await import("../src/png.js");
 const { resetConfigCache } = await import("../src/config.js");
 
@@ -67,6 +67,10 @@ const a = process.argv.slice(2), arg = (k) => (a.includes(k) ? a[a.indexOf(k) + 
 if (process.env.FAKE_AERENDER_LOG) fs.appendFileSync(process.env.FAKE_AERENDER_LOG, JSON.stringify(a) + "\\n");
 const p = JSON.parse(fs.readFileSync(arg("-project"), "utf8")), rq = p.rq[Number(arg("-rqindex")) - 1];
 const s = Number(arg("-s")), e = Number(arg("-e")), out = arg("-output") || rq.out;
+// start-up: FAKE_COLLIDE (a folder): a process that starts while another is still starting writes only its version line and exits (seen on Windows); FAKE_DIE_ONCE (a marker file): the chunk starting at FAKE_DIE_S does that once
+const version = () => { console.log("aerender version 26.5x89"); process.exit(0); };
+if (process.env.FAKE_DIE_ONCE && String(s) === process.env.FAKE_DIE_S && !fs.existsSync(process.env.FAKE_DIE_ONCE)) { fs.writeFileSync(process.env.FAKE_DIE_ONCE, "x"); version(); }
+if (process.env.FAKE_COLLIDE) { const lock = path.join(process.env.FAKE_COLLIDE, "starting"); try { fs.mkdirSync(lock); } catch (e) { version(); } Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1000); fs.rmdirSync(lock); }
 const skip = (process.env.FAKE_SKIP || "").split(",").filter(Boolean).map(Number), trunc = (process.env.FAKE_TRUNC || "").split(",").filter(Boolean).map(Number);
 const T = []; for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; T[n] = c >>> 0; }
 const crc = (b) => { let c = 0xffffffff; for (const x of b) c = T[(c ^ x) & 255] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
@@ -124,7 +128,7 @@ afterAll(() => {
   process.env.HOME = saved.HOME;
   process.env.USERPROFILE = saved.USERPROFILE;
   if (saved.CONFIG !== undefined) process.env.SUREHAND_AE_CONFIG = saved.CONFIG;
-  for (const k of ["FAKE_AERENDER_LOG", "FAKE_SKIP", "FAKE_TRUNC", "FAKE_CODEC", "FAKE_AUDIO", "FAKE_BLANK"]) delete process.env[k];
+  for (const k of ["FAKE_AERENDER_LOG", "FAKE_SKIP", "FAKE_TRUNC", "FAKE_CODEC", "FAKE_AUDIO", "FAKE_BLANK", "FAKE_COLLIDE", "FAKE_DIE_ONCE", "FAKE_DIE_S"]) delete process.env[k];
   resetConfigCache();
   rmSync(home, { recursive: true, force: true });
 });
@@ -170,7 +174,8 @@ beforeEach(() => {
   exe(join(work, "AE", "aerender"), FAKE_AERENDER);
   aerenderLog = join(work, "aerender.log");
   process.env.FAKE_AERENDER_LOG = aerenderLog;
-  for (const k of ["FAKE_SKIP", "FAKE_TRUNC", "FAKE_CODEC", "FAKE_AUDIO", "FAKE_BLANK"]) delete process.env[k];
+  for (const k of ["FAKE_SKIP", "FAKE_TRUNC", "FAKE_CODEC", "FAKE_AUDIO", "FAKE_BLANK", "FAKE_COLLIDE", "FAKE_DIE_ONCE", "FAKE_DIE_S"]) delete process.env[k];
+  farmTiming.stagger = false;
   fp = fakeProject(spec());
   fp.app.project.save(); // the project on disk, for the fake aerender
 });
@@ -763,7 +768,7 @@ describe.skipIf(!posix)("run_local and verify (fake aerender)", () => {
     writeFileSync(join(work, "out", "main_0099.png"), a);
     const v = text(await farm({ action: "verify", plan }));
     expect(v).toMatch(/^FAIL \(1\)/);
-    expect(v).toMatch(/2 of 2 sampled frames differ from a render here: 0 \(max 99\/255\), 99 \(max 99\/255\)/);
+    expect(v).toMatch(/2 of 2 sampled frames differ from a render here: 0: 8 px beyond the tolerance \(100% of the frame\) inside x 0-3, y 0-1, max 99\/255; 99: /);
   });
 
   it("run_local and verify without plan use the plan next to the open project; refused when it is ambiguous or missing", async () => {
@@ -790,6 +795,67 @@ describe.skipIf(!posix)("run_local and verify (fake aerender)", () => {
     expect(st).toMatch(/^Run farm\w+: done\. 100 of 100 frames rendered; 3 of 3 chunks done\./);
     expect(st).toMatch(/2\. frames 33-66: done, 34\/34, 2 s per frame/);
     expect(text(await farm({ action: "status" }))).toContain(`Run ${id}: done`);
+  });
+
+  it("Windows start-up collisions: staggered starts (the next once the previous renders a frame) avoid them", async () => {
+    const plan = await planFile();
+    process.env.FAKE_COLLIDE = mkdtempSync(join(home, "collide-"));
+    farmTiming.stagger = true;
+    const id = runIdOf(text(await farm({ action: "run_local", plan })));
+    await waitForRun(id);
+    expect(aerenderRuns()).toHaveLength(3);
+    expect(renderJobs().filter((j) => j.group === id).map((j) => j.status)).toEqual(["done", "done", "done"]);
+    expect(text(await farm({ action: "verify", plan }))).toMatch(/^PASS/);
+  });
+
+  it("without staggering the collision is seen: a chunk that ended before its first frame is FAILED with its log", async () => {
+    const plan = await planFile({ processes: 2 });
+    process.env.FAKE_COLLIDE = mkdtempSync(join(home, "collide-"));
+    const id = runIdOf(text(await farm({ action: "run_local", plan })));
+    await waitForRun(id);
+    // the retry starts while the other is still starting, so it collides again: failed, said with aerender's last line
+    const st = text(await farm({ action: "status", run: id }));
+    expect(st).toMatch(/finished with failures/);
+    // whichever of the two started second
+    expect(st).toMatch(/[12]\. frames (0-49|50-99): failed, 0\/50 \(aerender version 26\.5x89 \| \(aerender ended after 0 of 50 frames\); log .*\) \(started again once: its first aerender, job r\w+, ended before rendering a frame: aerender version 26\.5x89/);
+  });
+
+  it("a chunk that dies before its first frame is started again once, and status says so", async () => {
+    const plan = await planFile();
+    process.env.FAKE_DIE_ONCE = join(work, "died-once");
+    process.env.FAKE_DIE_S = "33";
+    const id = runIdOf(text(await farm({ action: "run_local", plan })));
+    await waitForRun(id);
+    for (let i = 0; i < 100 && farmRuns.get(id)!.chunks.some((c: any) => !c.job || c.job.status === "running"); i++) await new Promise((r) => setTimeout(r, 50));
+    await waitForRun(id);
+    const st = text(await farm({ action: "status", run: id }));
+    expect(st).toMatch(/^Run farm\w+: done\. 100 of 100 frames rendered; 3 of 3 chunks done\./);
+    expect(st).toMatch(/2\. frames 33-66: done, 34\/34, 2 s per frame \(started again once: its first aerender, job r\w+, ended before rendering a frame: aerender version 26\.5x89/);
+    expect(aerenderRuns().filter((a) => a[a.indexOf("-s") + 1] === "33")).toHaveLength(2);
+    expect(text(await farm({ action: "verify", plan }))).toMatch(/^PASS/);
+  });
+
+  it("a job whose process is gone without an exit seen is FAILED with its log's last lines", async () => {
+    const bin = join(work, "sleeper");
+    exe(bin, "#!/usr/bin/env node\nconsole.log('aerender version 26.5x89'); setTimeout(() => {}, 20000);\n");
+    const j = startAerenderJob({ bin, cli: [], comp: "Main", output: "", project: "", frames: 50, group: "farmtest", chunk: 1, detached: true });
+    for (let i = 0; i < 100 && !j.tail.length; i++) await new Promise((r) => setTimeout(r, 50));
+    const real = processCheck.alive;
+    try {
+      j.startedAt = new Date(Date.now() - 10_000).toISOString();
+      expect(renderJob(j.id)!.status).toBe("running");
+      processCheck.alive = () => false;
+      const k = renderJob(j.id)!;
+      expect(k.status).toBe("failed");
+      expect(k.tail.slice(-2)).toEqual(["aerender version 26.5x89", "(aerender is gone after 0 of 50 frames; its exit was not seen)"]);
+      expect(JSON.parse(readFileSync(join(home, ".surehand", "ae", "renders", `${j.id}.json`), "utf8")).status).toBe("failed");
+    } finally {
+      processCheck.alive = real;
+      try {
+        process.kill(j.pid!);
+      } catch {}
+    }
+    void cancelJob;
   });
 
   it("movies: a part per chunk, probed; joined by stream copy when it is lossless; the total checked", async () => {
@@ -872,6 +938,32 @@ describe("verify on its own", () => {
     expect(t.truncated.map((x) => x.file)).toEqual(["s_1006.png"]);
   });
 
+  it("the automatic proof fails a different picture by area, not text edges that anti-alias differently", () => {
+    const d = mkdtempSync(join(home, "area-"));
+    const W = 100, H = 100;
+    const base = new Uint8Array(W * H * 3).fill(50);
+    const edges = base.slice();
+    for (let i = 0; i < 30; i++) edges[(4000 + i * 7) * 3] = 255; // 30 px (0.3%) in one place
+    const other = base.slice().fill(200, 0, W * 40 * 3); // 40% of the frame
+    writeFileSync(join(d, "a.png"), encodePng(W, H, base));
+    writeFileSync(join(d, "b.png"), encodePng(W, H, edges));
+    writeFileSync(join(d, "c.png"), encodePng(W, H, other));
+    const [e, o] = compareProof([{ frame: 1, farm: join(d, "a.png"), local: join(d, "b.png") }, { frame: 2, farm: join(d, "a.png"), local: join(d, "c.png") }], 4);
+    expect(e).toMatchObject({ result: "differs", over: 30, total: 10000 });
+    expect(e.detail).toMatch(/^30 px beyond the tolerance \(0\.3% of the frame\) inside x 0-\d+, y 40-42$/);
+    expect(substantial(e)).toBe(false);
+    expect(substantial(o)).toBe(true);
+    expect(o.detail).toMatch(/4000 px beyond the tolerance \(40% of the frame\) inside x 0-99, y 0-39/);
+  });
+
+  it("After Effects versions compare without their build notation", () => {
+    expect(compareAeVersions("26.5", "26.5x89")).toBe("same");
+    expect(compareAeVersions("26.5.0.89", "26.5x89")).toBe("same");
+    expect(compareAeVersions("26.5.0.90", "26.5x89")).toBe("build");
+    expect(compareAeVersions("26.5.1", "26.5x89")).toBe("version");
+    expect(compareAeVersions("25.2.0.110", "25.2")).toBe("same");
+  });
+
   it("flat pictures: all the same flat frame is a blank render; flat but different frames, or a picture, are not", () => {
     const d = mkdtempSync(join(home, "flat-"));
     const flat = (v: number) => encodePng(2, 2, new Uint8Array(12).fill(v));
@@ -907,7 +999,7 @@ describe("verify on its own", () => {
       0.5,
     );
     expect(r.map((x) => x.result)).toEqual(["identical", "differs", "not compared", "identical", "not compared"]);
-    expect(r[1]).toMatchObject({ maxDiff: 80, detail: "1 px beyond the tolerance" });
+    expect(r[1]).toMatchObject({ maxDiff: 80, detail: expect.stringMatching(/^1 px beyond the tolerance \(50% of the frame\) inside x 1-1, y 0-0$/) });
     expect(r[2].detail).toMatch(/2x1, the local render 1x1/);
   });
 });

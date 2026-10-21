@@ -666,7 +666,9 @@ run there.
   from a few frames sampled now, and says what it leaves out (aerender's start-up, encoding).
 - **`run_local`**: the chunks as parallel aerender processes on this machine, as background-render jobs (logs,
   progress, cancel, the panel's job files): at most as many at once as the cores and memory allow, the others start as
-  those finish. Without `plan` it uses the plan next to the open project (and says which), and refuses when several
+  those finish. On Windows each starts once the one before has rendered its first frame (two aerender processes
+  started at the same moment collide there); a chunk whose aerender ends before its first frame is started again
+  once, and `status` says so with its log. Without `plan` it uses the plan next to the open project (and says which), and refuses when several
   render queue items have one. Existing output is never rendered over without `overwrite: true`; a plan is refused
   once the project was saved again. The renders go on when the AI app reloads the server: `status` finds the run again
   from its files and shows each chunk's progress and time per frame (aerender's total time over its frames).
@@ -675,7 +677,9 @@ run there.
   missing frames and the `-s` / `-e` ranges to render again (missing, empty and cut-off frames). A few frames are
   looked at: when they are all the same flat picture (what frames outside the comp render as), it fails. With After
   Effects open on the project, 2 sampled frames are also compared with its own render of them (a tolerance of 4/255
-  for colour conversion; only a clearly different picture fails). Movies: each part's frame count and duration with ffprobe,
+  for colour conversion; it fails on a different picture, by area: over 1% of the frame, or spread over a quarter of
+  it; small local differences such as text edges, which aerender and the app anti-alias a little differently, are a
+  note with their pixel count and place). Movies: each part's frame count and duration with ffprobe,
   then the joined file's frame count, size, frame rate and codec against the comp and the output module; `join: true`
   joins the parts when that is lossless (never over an existing file). `proveFrames` makes the pixel proof strict, on
   as many frames as asked (the `ae_prove_identical` comparison and tolerance). The verdict is **PASS**, **FAIL (n)** or
