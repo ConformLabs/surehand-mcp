@@ -175,6 +175,14 @@ export async function fullSelftest(before?: ProjectState): Promise<number> {
   }
   console.log(`  expression engine: ${features.expressionEngine} · scripts can write files: ${features.scriptsCanWriteFiles}\n`);
 
+  // what an interrupted earlier run left behind (only the self-test names items __aemcp_fulltest*): its checks count
+  // items by these names, so a leftover "found 2" would fail them
+  const stale = await runJsx(
+    `var n = 0; for (var i = app.project.numItems; i >= 1; i--) { if (i > app.project.numItems) continue; var it = app.project.item(i); if (it.name.indexOf("__aemcp_fulltest") === 0) { it.remove(); n++; } } return n;`,
+    {},
+    { undoGroup: "Surehand MCP self-test cleanup" },
+  );
+  if (stale.ok && (stale.result as number) > 0) warn(`removed ${stale.result} item(s) left by an earlier self-test run`);
   const start = await runJsx("var m = 0; for (var i = 1; i <= app.project.numItems; i++) m = Math.max(m, app.project.item(i).id); return { maxId: m, rq: app.project.renderQueue.numItems };", {}, { undoGroup: false });
   const { maxId, rq } = start.result as { maxId: number; rq: number };
   const tmpDir = appFile("tmp");

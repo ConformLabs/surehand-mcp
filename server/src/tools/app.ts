@@ -24,7 +24,7 @@ app.executeCommand(id); return { executed: args.command, id: id };`,
     report: true,
     // the step undone can be in any comp: compare them all (a rename and a value in another comp read "Changes: none")
     reportAll: true,
-    jsx: `var n = args.steps || 1; for (var i = 0; i < n; i++) app.executeCommand(16); return { undone: n };`,
+    jsx: `return aemcp.undoRedo(16, args.steps || 1, "undo");`,
   },
   {
     name: "ae_redo",
@@ -34,7 +34,7 @@ app.executeCommand(id); return { executed: args.command, id: id };`,
     noUndo: true,
     report: true,
     reportAll: true,
-    jsx: `var n = args.steps || 1; for (var i = 0; i < n; i++) app.executeCommand(2035); return { redone: n };`,
+    jsx: `return aemcp.undoRedo(2035, args.steps || 1, "redo");`,
   },
   {
     name: "ae_purge",

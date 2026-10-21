@@ -130,6 +130,27 @@ aemcp = (function () {
   function isAE(name) { try { return typeof $.global[name] !== "undefined"; } catch (e) { return false; } }
   function inst(v, ctor) { try { return isAE(ctor) && v instanceof $.global[ctor]; } catch (e) { return false; } }
   A.fail = function (msg) { var e = new Error(msg); e.aemcpUser = true; throw e; };
+  /**
+   * Edit > Undo (16) or Redo (2035) n times, counting only the steps After Effects really took: app.project.revision
+   * changes on every undo and redo, and a modal dialog (or an empty history) makes the command do nothing.
+   */
+  A.undoRedo = function (cmd, n, word) {
+    var hasRev = false, done = 0;
+    try { hasRev = typeof app.project.revision === "number"; } catch (e) {}
+    for (var i = 0; i < n; i++) {
+      var r0 = hasRev ? app.project.revision : 0;
+      app.executeCommand(cmd);
+      if (hasRev && app.project.revision === r0) break;
+      done++;
+    }
+    var why = "a dialog may be open in After Effects (close it and try again), or there is nothing left to " + word;
+    if (hasRev && done === 0) A.fail("After Effects didn't " + word + " anything: " + why + ".");
+    var out = {};
+    out[word === "undo" ? "undone" : "redone"] = done;
+    if (done < n) out.note = "Only " + done + " of " + n + " steps: then After Effects didn't " + word + " anything; " + why + ".";
+    if (!hasRev) out.unverified = "This After Effects has no project.revision, so whether each " + word + " happened couldn't be checked.";
+    return out;
+  };
 
   // ---------- "Allow Scripts to Write Files and Access Network" ----------
   // Off, scripts sent through the Surehand bridge (CEP evalScript) can still read and write files, but

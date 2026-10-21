@@ -4,6 +4,7 @@
 //
 //   npm run test:mac
 //   npm run test:mac -- --allow-no-ae   (pass even if no After Effects is open)
+//   npm run test:mac -- --restart-wait 0   (an After Effects still running an older extension: test it as it is; default: wait up to 15 min for a restart)
 //
 // After Effects only loads a new extension when it starts: an open AE keeps running the
 // previous one, which this reports (restart AE and run again to test the new extension too).
@@ -27,6 +28,9 @@ if (process.platform !== "darwin") {
 const allowNoAe = process.argv.includes("--allow-no-ae");
 const waitArg = process.argv.indexOf("--wait-minutes");
 const waitMinutes = waitArg > 0 && Number.isFinite(Number(process.argv[waitArg + 1])) ? Number(process.argv[waitArg + 1]) : 30;
+// an After Effects still running an older extension than this build: wait this long for it to be restarted (0: test it as it is)
+const restartArg = process.argv.indexOf("--restart-wait");
+const restartMinutes = restartArg > 0 && Number.isFinite(Number(process.argv[restartArg + 1])) ? Number(process.argv[restartArg + 1]) : 15;
 const bundle = fileURLToPath(new URL("../dist/surehand-ae.mjs", import.meta.url));
 const buildVersion = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
 const home = realHome();
@@ -92,16 +96,33 @@ const alive = (pid) => {
 };
 // this version's extension registers in ~/.surehand/ae/instances; a 1.3 extension (an After Effects not restarted
 // since the update) in ~/.aemcp/instances
-let instances = [];
-for (const dir of [join(home, ".surehand", "ae", "instances"), join(home, ".aemcp", "instances")]) {
-  try {
-    instances.push(
-      ...readdirSync(dir)
-        .filter((f) => f.endsWith(".json"))
-        .map((f) => JSON.parse(readFileSync(join(dir, f), "utf8")))
-        .filter((i) => i.port && alive(i.pid) && !instances.some((j) => j.port === i.port)), // skip files left behind by an After Effects that crashed
-    );
-  } catch {}
+const readInstances = () => {
+  const out = [];
+  for (const dir of [join(home, ".surehand", "ae", "instances"), join(home, ".aemcp", "instances")]) {
+    try {
+      out.push(
+        ...readdirSync(dir)
+          .filter((f) => f.endsWith(".json"))
+          .map((f) => JSON.parse(readFileSync(join(dir, f), "utf8")))
+          .filter((i) => i.port && alive(i.pid) && !out.some((j) => j.port === i.port)), // skip files left behind by an After Effects that crashed
+      );
+    } catch {}
+  }
+  return out;
+};
+let instances = readInstances();
+// the extension was just installed, but a running After Effects keeps the one it started with: its self-test would mix
+// an older extension with this server. Wait for After Effects to be restarted instead of failing halfway.
+const stale = () => instances.filter((i) => i.version && i.version !== buildVersion);
+if (stale().length && restartMinutes > 0) {
+  console.log(`\n== restart After Effects to load v${buildVersion}'s extension: ${stale().map((i) => `After Effects ${i.host?.appVersion ?? "?"} still runs v${i.version}`).join(", ")}`);
+  console.log(`  waiting up to ${restartMinutes} min (--restart-wait 0 tests it as it is)`);
+  const until = Date.now() + restartMinutes * 60_000;
+  while (stale().length && Date.now() < until) {
+    await new Promise((r) => setTimeout(r, 5000));
+    instances = readInstances();
+  }
+  console.log(stale().length ? "  ! still not restarted: testing as it is" : "  ✔ every After Effects runs this extension now");
 }
 
 let failed = 0;
