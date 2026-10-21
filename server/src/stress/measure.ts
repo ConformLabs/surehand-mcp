@@ -285,6 +285,17 @@ export function measureVariant(o: MeasureInput): Measured {
     }
   }
 
+  // After Effects can swap the font for only some characters (seen in AE 26.5: Vietnamese combining marks in a Latin
+  // font): the layer still reads as the designed font, and Preflight's finding names the fallback. Name the designed one.
+  if (checks.glyphs)
+    for (const f of findings) {
+      if (f.check !== "text.glyphs" || f.layerIndex === undefined) continue;
+      const m = /^font (\S+) has no glyph for (.+)$/.exec(f.message);
+      const designed = base.get(f.layerIndex)?.font;
+      if (!m || !designed || m[1] === designed) continue;
+      f.message = `${designed} has no glyphs for ${m[2]}; After Effects drew them with ${m[1]}, which has none either: they don't show`;
+    }
+
   // lines: breaks inside a word, the user's line limit
   if (checks.lines) {
     let any = false;
