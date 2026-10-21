@@ -176,6 +176,7 @@ beforeEach(() => {
   process.env.FAKE_AERENDER_LOG = aerenderLog;
   for (const k of ["FAKE_SKIP", "FAKE_TRUNC", "FAKE_CODEC", "FAKE_AUDIO", "FAKE_BLANK", "FAKE_COLLIDE", "FAKE_COLLIDE_WAIT", "FAKE_DIE_ONCE", "FAKE_DIE_S"]) delete process.env[k];
   farmTiming.stagger = false;
+  farmTiming.maxLocal = 4; // not this machine's cores and memory (CI runners allow one process)
   fp = fakeProject(spec());
   fp.app.project.save(); // the project on disk, for the fake aerender
 });

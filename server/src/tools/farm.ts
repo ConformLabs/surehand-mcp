@@ -252,7 +252,7 @@ interface Run { id: string; plan: FarmPlan; planFile: string | null; chunks: Run
  * (or after staggerTimeoutMs). Seen live on Windows 11: two started at the same moment, one wrote only its version line
  * and exited. On by default on Windows; replaceable in tests.
  */
-export const farmTiming = { stagger: process.platform === "win32", staggerTimeoutMs: 180_000 };
+export const farmTiming: { stagger: boolean; staggerTimeoutMs: number; maxLocal?: number } = { stagger: process.platform === "win32", staggerTimeoutMs: 180_000 };
 const runs = new Map<string, Run>();
 const RUNS_KEPT = 20;
 const runFile = (id: string) => appFile("renders", `${id}.farm.json`);
@@ -373,7 +373,7 @@ async function runLocalAction(a: FarmInput, mode: string): Promise<CallToolResul
     const what = plan.sequence ? `${existing.length} frame file${existing.length === 1 ? "" : "s"} of this render exist already (${basename(existing[0])}${existing.length > 1 ? ` ... ${basename(existing[existing.length - 1])}` : ""})` : `${existing.map((f) => basename(f)).join(", ")} exist${existing.length === 1 ? "s" : ""} already`;
     return errorResult(`${what}. Nothing was started. Pass overwrite: true to render over ${existing.length === 1 ? "it" : "them"}, or move ${existing.length === 1 ? "it" : "them"} away.`);
   }
-  const lim = maxLocalProcesses();
+  const lim = farmTiming.maxLocal ? { max: farmTiming.maxLocal, why: "set for tests" } : maxLocalProcesses();
   const max = Math.max(1, Math.min(plan.chunks.length, lim.max));
   if (plan.chunks.length > lim.max) notes.push(`${plan.chunks.length} chunks, at most ${lim.max} at once here (${lim.why}): the others start as these finish`);
   const tail = notes.length ? `\nNotes:\n${notes.map((n) => `  - ${n}`).join("\n")}` : "";
