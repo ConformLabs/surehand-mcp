@@ -239,7 +239,13 @@ async function request(path: string, init: RequestOptions = {}): Promise<any> {
     init.cancel?.removeEventListener("abort", onCancel);
   }
   const body = await res.json().catch(() => ({}));
-  if (res.status === 401) throw new BridgeError("Bridge rejected the token. Re-run the installer so server and AE share ~/.surehand/ae/config.json, then restart AE.", "AUTH");
+  if (res.status === 401) {
+    // right after an update After Effects still runs the previous panel, which doesn't accept this server yet:
+    // restarting After Effects is all it takes, so don't send the user to the installer
+    const stale = staleBridgeVersion(port);
+    if (stale) throw new BridgeError(restartToFinishUpdate(stale), "AUTH");
+    throw new BridgeError("Bridge rejected the token. Re-run the installer so server and AE share ~/.surehand/ae/config.json, then restart AE.", "AUTH");
+  }
   if (body.blocked) throw new BridgeError(explainBlocked(body), "BLOCKED");
   // paused in the panel: nothing ran; a clean message, not a bridge error
   if (body.paused) throw new BridgeError(PAUSED_MESSAGE, "PAUSED");
