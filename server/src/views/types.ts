@@ -184,3 +184,118 @@ export interface FrameView {
   width: number;
   height: number;
 }
+
+/** The stress test view's resource (here, beside X-ray's: the tool module and the views module both need it). */
+export const STRESS_VIEW_URI = "ui://surehand/stress.html";
+
+/** A check column of the stress test grid; "other" holds numbers, values that couldn't be set and expression errors. */
+export type StressColumn = "fit" | "safe" | "size" | "glyphs" | "lines" | "other";
+export type StressCell = "ok" | "bad" | "warn" | "na";
+
+/** One measured problem of a variant (or of the comp as it is: the baseline). Frames count from the comp's start (0). */
+export interface StressFinding {
+  /** "text.overflow", "safeAreas.title", "text.glyphs", "number.format"... and the grid column it counts in */
+  check: string;
+  column: StressColumn;
+  severity: "fail" | "warn";
+  message: string;
+  /** the comp's own layer (index: for Show in AE), or "Precomp › Layer" when nested */
+  layer?: string;
+  layerIndex?: number;
+  frame?: number;
+  frameEnd?: number;
+  /** seconds and timecode of `frame` */
+  time?: number;
+  tc?: string;
+  /** comp pixels [x0, y0, x1, y1]: the layer's bounds there, its paragraph box (media: the area it covered), the safe area */
+  box?: Rect;
+  textBox?: Rect;
+  area?: { name: "title" | "action" | "frame"; rect: Rect };
+  /** the measured amount, comp px (overflow, overshoot, overlap, uncovered) */
+  amountPx?: number;
+}
+
+/** What a variant measured on a text layer of the comp. */
+export interface StressLayer {
+  layer: string;
+  layerIndex: number;
+  text: string;
+  font?: string;
+  fontSize?: number;
+  /** the size it renders at in the comp (font size through the layer's scale) */
+  renderedPx?: number;
+  lines?: number;
+  linesNeeded?: number;
+  overflowPx?: number;
+  box?: Rect;
+  direction?: string;
+  composer?: string;
+  substituted?: boolean;
+}
+
+export interface StressVariant {
+  /** "de-long@Title", "row-3", "own-1@Price", "de-long@all" */
+  id: string;
+  name: string;
+  set: "generated" | "together" | "own" | "data" | "combination";
+  caseId?: string;
+  group?: string;
+  /** the muted sub-line: "Title · 52 chars, compounds" */
+  detail: string;
+  /** what was set: the control and the input exactly as typed */
+  inputs: { target: string; value: string; detail?: string }[];
+  status: "fail" | "warn" | "pass" | "incomplete" | "notRun";
+  cells: Record<StressColumn, StressCell>;
+  /** findings new with this variant (what already fails in the comp as it is is in the baseline) */
+  findings: StressFinding[];
+  layers: StressLayer[];
+  /** why a check couldn't run */
+  notRun: { column: StressColumn; reason: string }[];
+  /** the contact sheet of its failing frames, and its first failing frame (ae_view_stress_frame reads it) */
+  sheet?: string;
+  frame?: { file: string; frame: number; time: number; tc: string; width: number; height: number };
+}
+
+/** An expression that breaks in After Effects in another language. */
+export interface StressLanguageRisk {
+  comp: string;
+  compId: number;
+  layer: string;
+  layerIndex: number;
+  property: string;
+  ref: string;
+  code: string;
+  severity: "fail" | "warn";
+  message: string;
+  fix: string;
+  suggestion?: string;
+}
+
+/** ae_stress_test: everything the run measured (the text report is built from the same data). */
+export interface StressView {
+  view: "stress";
+  /** the run's id (its frames are kept under it for ae_view_stress_frame) */
+  run: string;
+  verdict: "PASS" | "FAIL" | "WARNINGS" | "INCOMPLETE";
+  verdictLine: string;
+  comp: { id: number; name: string; width: number; height: number; fps: number; duration: number; dst?: number; df?: boolean };
+  counts: { variants: number; failed: number; warnings: number; passed: number; incomplete: number; notRun: number; languageRisks: number; targets: number; frames: number };
+  targets: { id: string; name: string; kind: string; source: "egp" | "layer" | "data"; layer?: number; layerName?: string; current?: string; problem?: string }[];
+  /** the frames every variant was measured at */
+  frames: number[];
+  columns: { id: StressColumn; label: string; ran: boolean; why?: string }[];
+  /** failing first, then warnings, incomplete, passed, not run */
+  variants: StressVariant[];
+  /** what fails in the comp as it is, before any variant */
+  baseline: StressFinding[];
+  languages: StressLanguageRisk[];
+  /** the cap: how many variants there would have been, and how the kept ones were picked */
+  sampled?: { total: number; kept: number; how: string };
+  /** the user's comp read back after the run (and the pixel proof, when asked) */
+  restore: { verified: boolean; values: number; partial?: boolean; differences: string[]; proof?: string };
+  notes: string[];
+  /** where the contact sheets are */
+  folder?: string;
+  /** this run's arguments (Run again) */
+  args?: Record<string, unknown>;
+}

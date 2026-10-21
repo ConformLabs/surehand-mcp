@@ -18,7 +18,8 @@ import { appFile } from "../paths.js";
 import { decodePng } from "../png.js";
 import { timecode } from "../preflight/report.js";
 import { withFonts } from "../views/fonts.js";
-import { VIEW_ERROR_KEY, VIEW_META_KEY, XRAY_VIEW_URI, type FrameView } from "../views/types.js";
+import { STRESS_VIEW_URI, VIEW_ERROR_KEY, VIEW_META_KEY, XRAY_VIEW_URI, type FrameView } from "../views/types.js";
+import { stressFramePath } from "../stress/files.js";
 import { xrayNodeView } from "./xray-view.js";
 import { RENDER_KIT_JSX, renderCleanupNote, runRender, waitForFiles } from "./core.js";
 import { enableViewTools } from "./profile.js";
@@ -35,6 +36,11 @@ export const VIEWS: Record<string, { uri: string; title: string; description: st
     uri: XRAY_VIEW_URI,
     title: "Project X-ray",
     description: "What renders, from the render queue down to the footage, with what's missing, fragile, heavy while hidden or unused.",
+  },
+  stress: {
+    uri: STRESS_VIEW_URI,
+    title: "Stress test",
+    description: "Which worst-case inputs break a template: a grid of variants and checks, each failing frame marked, and the expressions that break in other After Effects languages.",
   },
   changes: {
     uri: CHANGES_VIEW_URI,
@@ -259,6 +265,36 @@ export function registerViews(server: McpServer) {
   );
 
   registerXrayNode(server);
+
+  registerViewTool(
+    server,
+    "ae_view_stress_frame",
+    {
+      title: "Stress test frame for a view",
+      description: "For the in-chat views: the failing frame a stress test kept for a variant, as a small still (JPEG). Reads the run's own file; doesn't use After Effects.",
+      inputSchema: {
+        run: z.string().regex(/^[\w-]+$/).describe("The stress test run (from its result)."),
+        file: z.string().regex(/^[\w.@+-]+\.png$/).describe("The variant's frame file (from its result)."),
+        maxSize: z.number().int().min(64).max(960).optional().describe("Longest side of the still in pixels (default 480)."),
+      },
+      // reads files under ~/.surehand/ae/stress only
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      _meta: { ui: { visibility: ["app"] } },
+    },
+    async (args: { run: string; file: string; maxSize?: number }) => {
+      try {
+        const p = stressFramePath(args.run, args.file);
+        if (!p) return errorResult("This stress test's frame is gone (only the latest runs are kept). Run the test again to see it.");
+        const png = decodePng(readFileSync(p));
+        const size = stillSize(png.width, png.height, 1, args.maxSize ?? 480);
+        const jpeg = encodeJpeg(size.width, size.height, downscale(png, size.width, size.height), 80);
+        const view: FrameView = { view: "frame", comp: args.file, time: 0, compWidth: png.width, compHeight: png.height, ...size };
+        return { content: [{ type: "image", data: jpeg.toString("base64"), mimeType: "image/jpeg" }, { type: "text", text: `Frame ${args.file} (${size.width}x${size.height}).` }], _meta: { [VIEW_META_KEY]: view } };
+      } catch (e) {
+        return viewError(e);
+      }
+    },
+  );
 }
 
 export { XRAY_VIEW_URI };

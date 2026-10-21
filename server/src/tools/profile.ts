@@ -52,7 +52,7 @@ export const CORE_TOOLS = new Set([
  * ~600: their tools/list JSON / 4); the two app-only tools are hidden from the AI by the AI app. AI apps without
  * views keep today's core set. ae_prove_identical is core already.
  */
-export const VIEW_TOOLS = new Set(["ae_preflight", "ae_project_xray", "ae_project_history"]);
+export const VIEW_TOOLS = new Set(["ae_preflight", "ae_project_xray", "ae_project_history", "ae_stress_test"]);
 
 /** A tool only the in-chat views call (`_meta.ui.visibility: ["app"]`): never shown to the AI, never in ae_tools / ae_call. */
 export function isAppOnly(config: { _meta?: Record<string, any> } | undefined): boolean {
@@ -196,7 +196,7 @@ export const CATEGORIES: Record<string, string[]> = {
   audio: ["ae_audio_to_keyframes", "ae_audio_markers"],
   footage: ["ae_set_footage_interpretation", "ae_set_proxy", "ae_relink_footage"],
   "files & export": ["ae_find_files", "ae_export_frames", "ae_handoff_package"],
-  checks: ["ae_preflight", "ae_versions_from_data", "ae_localize"],
+  checks: ["ae_preflight", "ae_versions_from_data", "ae_localize", "ae_stress_test"],
   "see & measure": ["ae_render_frame", "ae_render_contact_sheet", "ae_get_layer_bounds", "ae_sample_pixels"],
   "essential graphics": ["ae_essential_graphics", "ae_export_mogrt"],
   render: ["ae_list_render_queue", "ae_add_to_render_queue", "ae_get_render_settings", "ae_set_render_settings", "ae_queue_in_media_encoder", "ae_render_background", "ae_render_jobs", "ae_render_queue_start", "ae_clear_render_queue", "ae_render_profile"],

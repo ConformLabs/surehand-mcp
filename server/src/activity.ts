@@ -29,7 +29,7 @@ export interface ActivityEntry {
   /** the project the call changed ("" when unsaved), and the After Effects (bridge port and process) that ran it */
   project?: string;
   instance?: { port: number; pid?: number };
-  /** ae_preflight / ae_versions_from_data / ae_localize / ae_prove_identical: the verdict and its line */
+  /** ae_preflight / ae_versions_from_data / ae_localize / ae_stress_test / ae_prove_identical: the verdict and its line */
   result?: { verdict: string; summary: string };
 }
 
@@ -54,7 +54,7 @@ export function activityDetails(
   if (call?.undoSteps) out.undoSteps = call.undoSteps;
   if (call?.instance) out.instance = call.instance;
   const first = text.split("\n")[0] ?? "";
-  if (tool === "ae_preflight" || tool === "ae_versions_from_data" || tool === "ae_localize") {
+  if (tool === "ae_preflight" || tool === "ae_versions_from_data" || tool === "ae_localize" || tool === "ae_stress_test") {
     const m = /^(PASS|FAIL|WARNINGS|INCOMPLETE)\b/.exec(first);
     if (m) out.result = { verdict: m[1], summary: [first, text.split("\n")[1] ?? ""].filter(Boolean).join(" · ").slice(0, 300) };
   } else if (tool === "ae_prove_identical") {
