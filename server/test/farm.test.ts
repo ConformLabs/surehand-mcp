@@ -67,10 +67,10 @@ const a = process.argv.slice(2), arg = (k) => (a.includes(k) ? a[a.indexOf(k) + 
 if (process.env.FAKE_AERENDER_LOG) fs.appendFileSync(process.env.FAKE_AERENDER_LOG, JSON.stringify(a) + "\\n");
 const p = JSON.parse(fs.readFileSync(arg("-project"), "utf8")), rq = p.rq[Number(arg("-rqindex")) - 1];
 const s = Number(arg("-s")), e = Number(arg("-e")), out = arg("-output") || rq.out;
-// start-up: FAKE_COLLIDE (a folder): a process that starts while another is still starting writes only its version line and exits (seen on Windows); FAKE_DIE_ONCE (a marker file): the chunk starting at FAKE_DIE_S does that once
+// start-up: FAKE_COLLIDE (a folder): a process that starts while another is still starting writes only its version line and exits (seen on Windows; with FAKE_COLLIDE_WAIT the first one stays in start-up until the second has come, so the collision does not depend on timing); FAKE_DIE_ONCE (a marker file): the chunk starting at FAKE_DIE_S does that once
 const version = () => { console.log("aerender version 26.5x89"); process.exit(0); };
 if (process.env.FAKE_DIE_ONCE && String(s) === process.env.FAKE_DIE_S && !fs.existsSync(process.env.FAKE_DIE_ONCE)) { fs.writeFileSync(process.env.FAKE_DIE_ONCE, "x"); version(); }
-if (process.env.FAKE_COLLIDE) { const lock = path.join(process.env.FAKE_COLLIDE, "starting"); try { fs.mkdirSync(lock); } catch (e) { version(); } Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1000); fs.rmdirSync(lock); }
+if (process.env.FAKE_COLLIDE) { const lock = path.join(process.env.FAKE_COLLIDE, "starting"); const arrived = path.join(process.env.FAKE_COLLIDE, "arrived"); try { fs.mkdirSync(lock); } catch (e) { fs.writeFileSync(arrived, ""); version(); } const until = Date.now() + (process.env.FAKE_COLLIDE_WAIT ? 15000 : 1000); while (Date.now() < until && !(process.env.FAKE_COLLIDE_WAIT && fs.existsSync(arrived))) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20); fs.rmdirSync(lock); }
 const skip = (process.env.FAKE_SKIP || "").split(",").filter(Boolean).map(Number), trunc = (process.env.FAKE_TRUNC || "").split(",").filter(Boolean).map(Number);
 const T = []; for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; T[n] = c >>> 0; }
 const crc = (b) => { let c = 0xffffffff; for (const x of b) c = T[(c ^ x) & 255] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
@@ -128,7 +128,7 @@ afterAll(() => {
   process.env.HOME = saved.HOME;
   process.env.USERPROFILE = saved.USERPROFILE;
   if (saved.CONFIG !== undefined) process.env.SUREHAND_AE_CONFIG = saved.CONFIG;
-  for (const k of ["FAKE_AERENDER_LOG", "FAKE_SKIP", "FAKE_TRUNC", "FAKE_CODEC", "FAKE_AUDIO", "FAKE_BLANK", "FAKE_COLLIDE", "FAKE_DIE_ONCE", "FAKE_DIE_S"]) delete process.env[k];
+  for (const k of ["FAKE_AERENDER_LOG", "FAKE_SKIP", "FAKE_TRUNC", "FAKE_CODEC", "FAKE_AUDIO", "FAKE_BLANK", "FAKE_COLLIDE", "FAKE_COLLIDE_WAIT", "FAKE_DIE_ONCE", "FAKE_DIE_S"]) delete process.env[k];
   resetConfigCache();
   rmSync(home, { recursive: true, force: true });
 });
@@ -174,7 +174,7 @@ beforeEach(() => {
   exe(join(work, "AE", "aerender"), FAKE_AERENDER);
   aerenderLog = join(work, "aerender.log");
   process.env.FAKE_AERENDER_LOG = aerenderLog;
-  for (const k of ["FAKE_SKIP", "FAKE_TRUNC", "FAKE_CODEC", "FAKE_AUDIO", "FAKE_BLANK", "FAKE_COLLIDE", "FAKE_DIE_ONCE", "FAKE_DIE_S"]) delete process.env[k];
+  for (const k of ["FAKE_SKIP", "FAKE_TRUNC", "FAKE_CODEC", "FAKE_AUDIO", "FAKE_BLANK", "FAKE_COLLIDE", "FAKE_COLLIDE_WAIT", "FAKE_DIE_ONCE", "FAKE_DIE_S"]) delete process.env[k];
   farmTiming.stagger = false;
   fp = fakeProject(spec());
   fp.app.project.save(); // the project on disk, for the fake aerender
@@ -811,9 +811,10 @@ describe.skipIf(!posix)("run_local and verify (fake aerender)", () => {
   it("without staggering the collision is seen: the chunk that ended before its first frame is started again once, said with its log", async () => {
     const plan = await planFile({ processes: 2 });
     process.env.FAKE_COLLIDE = mkdtempSync(join(home, "collide-"));
+    process.env.FAKE_COLLIDE_WAIT = "1";
     const id = runIdOf(text(await farm({ action: "run_local", plan })));
     await waitForRun(id);
-    // whichever of the two started second collided; its retry collides again or renders, depending on timing
+    // whichever of the two started second collided; its retry starts once the first has started up, and renders
     const st = text(await farm({ action: "status", run: id }));
     expect(st).toMatch(/: (finished with failures|done)\./);
     expect(aerenderRuns()).toHaveLength(3);
