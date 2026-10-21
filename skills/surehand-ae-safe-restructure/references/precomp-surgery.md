@@ -62,7 +62,8 @@ frames?, times?, tolerance?}
 ## The result
 
 - DONE and proven: the verdict, frames compared and time, checkpoint, what moved or was copied, every rewrite
-  (before → after), the change list. Un-precompose: one undo step. Deep duplicate: the copy set, removed with remove_copies.
+  (before → after), the change list. The way back: un-precompose, the checkpoint (ae_checkpoint restore with the id given;
+  ae_undo may take several steps, After Effects can split the step); deep duplicate, remove_copies with the copy set id.
 - DIFFERS / NOT PROVEN: nothing applied (the scratch copy was removed); frames that differ, difference image, likely
   cause. A scaled or rotated precomp layer is the usual one: the precomp was rendered, then resampled as a whole; the
   moved layers are transformed in one step. Report it; the user decides (a higher tolerance only if they accept it).

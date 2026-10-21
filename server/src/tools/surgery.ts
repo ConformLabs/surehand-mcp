@@ -4,8 +4,11 @@
 // How it stays safe: read the facts (no undo step), plan in TypeScript, save a checkpoint, capture reference frames,
 // REHEARSE the surgery on a scratch copy (un-precompose: a duplicate of the parent comp; deep duplicate: the copies
 // themselves), compare the scratch with the reference, remove the scratch by hand, and only when the proof says
-// IDENTICAL apply the same surgery to the project in one undo step. Its result must match the rehearsal's
-// (layer by layer), otherwise that step is undone at once. DIFFERS: the project was never changed.
+// IDENTICAL apply the same surgery to the project in one undo group. Its result must match the rehearsal's
+// (layer by layer), otherwise it is undone at once. DIFFERS: the project was never changed. After Effects can split a
+// call's undo group (seen live in AE 26.5: an ae_undo after an un-precompose took back only the precomp layer's removal;
+// after a deep duplicate, single source replacements), so no single-undo promise is made: the way back is the checkpoint
+// (un-precompose) or remove_copies (deep duplicate).
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { randomBytes } from "node:crypto";
@@ -747,10 +750,11 @@ export async function runSurgery(a: SurgeryInput, perm: { mode: string; allowShe
   if (!project) return errorResult(`Save the project first: the ${what} saves a checkpoint before it changes anything. Nothing was changed.`);
   const out: string[] = [];
   const t0 = Date.now();
-  let cp: string;
+  let cp: string, cpId = "";
   try {
     const c = await saveCheckpoint(dup ? "before-deep-duplicate" : "before-unprecompose");
     cp = c.file;
+    cpId = c.id;
   } catch (e: any) {
     return errorResult(`The checkpoint could not be saved, so nothing was changed: ${e?.message ?? e}`);
   }
@@ -784,7 +788,7 @@ export async function runSurgery(a: SurgeryInput, perm: { mode: string; allowShe
       ? {
           approval: {
             tool: dup ? "Deep duplicate" : "Un-precompose",
-            summary: `${lines[0]}\nRehearsed on a scratch copy and proven first; applied in one undo step only if the picture is identical.\n${approvalSummary("ae_precomp_surgery", a as unknown as Record<string, unknown>)}`,
+            summary: `${lines[0]}\nRehearsed on a scratch copy and proven first; applied only if the picture is identical.\n${approvalSummary("ae_precomp_surgery", a as unknown as Record<string, unknown>)}`,
           },
         }
       : undefined;
@@ -836,7 +840,7 @@ export async function runSurgery(a: SurgeryInput, perm: { mode: string; allowShe
     if (typeof cmp !== "string" && cmp.image) content.push({ type: "image", data: cmp.image.data, mimeType: "image/png" }, { type: "text", text: cmp.image.label });
     return { isError: true, content };
   }
-  // proven: the same surgery on the project, one undo step, checked against the rehearsal
+  // proven: the same surgery on the project, in one undo group, checked against the rehearsal
   const real = await runJsx(dup ? DEEPDUP_JSX : UNPRECOMPOSE_JSX, jsxArgs(false, rr.fingerprint), {
     undoGroup: dup ? "Surehand MCP deep duplicate" : "Surehand MCP un-precompose",
     timeoutMs: 600_000,
@@ -865,7 +869,7 @@ export async function runSurgery(a: SurgeryInput, perm: { mode: string; allowShe
     "",
     dup
       ? "The originals are unchanged: the deep duplicate only added the copies above (with their expressions rewritten inside them). Made in one undo group, but After Effects doesn't always keep comp duplicates and source replacements in one undo step, so ae_undo may take several steps; the exact way back is remove_copies."
-      : 'One undo step ("Surehand MCP un-precompose"); ae_undo reverts it. Expression rewrites in other comps are exact text edits, listed above; the pixel proof covers the parent comp.',
+      : `Made in one undo group ("Surehand MCP un-precompose"), but After Effects can split such a step (it was seen to undo only the removal of the precomp layer first), so ae_undo may take several steps and is not a reliable way back. The exact way back is the checkpoint saved first: ae_checkpoint {action: "restore", id: "${cpId}"} (opens it as a new file next to the project). Expression rewrites in other comps are exact text edits, listed above; the pixel proof covers the parent comp.`,
   );
   const changes = formatChanges(real.changes);
   return { content: [{ type: "text", text: out.filter((x) => x !== "").join("\n") + leftNote + (changes ? `\n\n${changes}` : "") }] };
@@ -883,7 +887,7 @@ export function registerSurgeryTools(server: McpServer) {
         "unlinked tree; comp(\"X\") references inside it point at the copies. Refuses, with the exact reason, what can't be done exactly " +
         "(effects, masks or time remap on the precomp layer, blend modes that would blend with other layers, computed references...). dryRun: " +
         "the plan only. Otherwise: checkpoint, rehearsal on a scratch copy, ae_prove_identical comparison, and only if IDENTICAL the same " +
-        "change (un-precompose: one undo step); DIFFERS: nothing is applied, with the frames that differ and the likely cause. remove_copies: " +
+        "change in one undo group (After Effects may split it: the way back is the checkpoint, or remove_copies for a deep duplicate); DIFFERS: nothing is applied, with the frames that differ and the likely cause. remove_copies: " +
         "removes exactly the comps a deep duplicate made, refused if anything outside them uses one.",
       inputSchema: {
         action: z.enum(["unprecompose", "deep_duplicate", "remove_copies"]),
@@ -894,7 +898,7 @@ export function registerSurgeryTools(server: McpServer) {
         removeSource: z.boolean().optional().describe("unprecompose: also remove the source comp, only if nothing else uses it (refused otherwise). Default: keep it."),
         bakeNull: z.boolean().optional().describe("unprecompose: leave out the null when the precomp layer's transform is the identity (exact); otherwise a null is kept and the result says why."),
         suffix: z.string().min(1).max(60).optional().describe('deep_duplicate: added to each copy\'s name (default " copy"; a number is added when the name is taken).'),
-        folder: z.string().optional().describe("Not supported: After Effects records every move into a folder as an undo step of its own, so the copies stay next to their originals (one undo step). Move them afterwards with ae_move_items."),
+        folder: z.string().optional().describe("Not supported: After Effects records every move into a folder as an undo step of its own, so the copies stay next to their originals. Move them afterwards with ae_move_items."),
         override: z
           .array(z.enum(["expressions", "bounds"]))
           .optional()
@@ -904,7 +908,7 @@ export function registerSurgeryTools(server: McpServer) {
         tolerance: z.number().min(0).max(255).optional().describe(`Allowed difference per channel, 0-255 (default ${DEFAULT_TOLERANCE}, as ae_prove_identical; 0 = bit-identical).`),
         maxSize: z.number().int().min(64).max(4096).optional().describe("Longest rendered side for the proof (default 1920)."),
       },
-      // edits in one undo step (rehearsal on a scratch copy first; the project is saved for a checkpoint)
+      // edits in one undo group (rehearsal on a scratch copy first; the project is saved for a checkpoint)
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     },
     async (input: SurgeryInput) => {

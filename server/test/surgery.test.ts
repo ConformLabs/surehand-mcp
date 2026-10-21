@@ -352,7 +352,8 @@ describe("un-precompose: the tool", () => {
     const t = text(r);
     expect(t).toMatch(/^DONE and proven: IDENTICAL: all 6 frames are bit-identical to the reference \(6 frames compared/);
     expect(t).toMatch(/Checkpoint saved first: /);
-    expect(t).toMatch(/One undo step \("Surehand MCP un-precompose"\)/);
+    expect(t).not.toMatch(/One undo step/);
+    expect(t).toMatch(/Made in one undo group \("Surehand MCP un-precompose"\), but After Effects can split such a step .* ae_undo may take several steps and is not a reliable way back\. The exact way back is the checkpoint saved first: ae_checkpoint \{action: "restore", id: "[\w-]+"\}/);
     expect(names(main)).toEqual(["Top", "Logo (null)", "Title 2", "Mark", "Glow", "Title", "BG"]);
     expect(pictures(main)).toEqual(before);
     // parents: top-level layers on the null, Glow still on Mark; Mark stays locked
@@ -367,7 +368,7 @@ describe("un-precompose: the tool", () => {
     expect(calls.map((c) => c.kind)).toEqual(["jsx", "checkpoint", "render", "jsx", "render", "jsx", "jsx"]);
     expect(calls[6].opts).toMatchObject({ undoGroup: "Surehand MCP un-precompose", rollback: "requested" });
     expect(calls[6].args.expect).toEqual(expect.any(String));
-    // ONE undo step puts the parent comp back exactly, the null's solid included
+    // in the fake (an After Effects that keeps the group whole) one undo step puts the parent comp back exactly, the null's solid included
     expect(fake.undo()).toBe("Surehand MCP un-precompose");
     expect(fake.state()).toBe(start);
   });
@@ -725,7 +726,7 @@ describe("deep duplicate", () => {
     // each comp copied once, next to its original; the rehearsal's copies are gone
     expect(fake.items().filter((i: any) => / copy$/.test(i.name)).map((i: any) => i.name)).toEqual(["Main copy", "Scene A copy", "Shared copy", "Scene B copy"]);
     expect(fake.comp("Main copy").layer("B").locked).toBe(true);
-    // ONE undo step takes everything back: the copies, the re-pointed sources, the rewrites
+    // in the fake (an After Effects that keeps the group whole) one undo step takes everything back
     expect(fake.undo()).toBe("Surehand MCP deep duplicate");
     expect(fake.state()).toBe(start);
   });

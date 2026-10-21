@@ -31,8 +31,8 @@ reproduce, and proves the picture before it changes anything (details: reference
    Show the user what moves, what is renamed, every expression rewrite and every problem.
 2. Problems: report each reason as given. Never work around one with a script. An `override` only when the user
    accepts that those references stay as they are and the pixel proof decides.
-3. Run it without dryRun. DONE means proven IDENTICAL and applied (un-precompose: one undo step; deep duplicate: undo it
-   with {action: "remove_copies", id}). DIFFERS means nothing was applied: report the frames, the difference and the
+3. Run it without dryRun. DONE means proven IDENTICAL and applied. The way back is the one the result names (the
+   checkpoint for an un-precompose, {action: "remove_copies", id} for a deep duplicate), not a count of ae_undo steps. DIFFERS means nothing was applied: report the frames, the difference and the
    likely cause, and let the user decide.
 
 ## Prove every structural edit
