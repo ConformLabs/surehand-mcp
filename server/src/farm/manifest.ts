@@ -111,7 +111,7 @@ export function renderInfo(rs: Record<string, string> | undefined): RenderInfo {
   };
 }
 
-/** The frames a render queue item renders, counted from the comp's start at 0 (aerender's -s / -e count the same way). */
+/** The frames a render queue item renders, counted from the comp's start at 0 (aerender's -s / -e take them plus the comp's displayed start frame: displayStart). */
 export function itemFrames(it: Pick<ScanItem, "start" | "dur" | "comp">): { first: number; last: number; count: number; fps: number } {
   const fd = it.comp.fd || 1 / it.comp.fps;
   const first = Math.round(it.start / fd + 1e-6);
@@ -142,7 +142,8 @@ export interface Manifest {
   items: {
     rqIndex: number; status: string;
     comp: { id: number; name: string; width: number; height: number; fps: number; duration: number; displayStartFrame: number };
-    frames: { first: number; last: number; count: number };
+    /** first / last count from the comp's start at 0; shownFirst / shownLast are the numbers After Effects shows (and aerender's -s / -e take) */
+    frames: { first: number; last: number; count: number; shownFirst: number; shownLast: number };
     render: RenderInfo;
     outputs: (OutputInfo & { folder: string | null; folderExists: boolean; folderWritable: boolean; location: ManifestPath | null })[];
     comps: string[];
@@ -249,7 +250,7 @@ export function buildManifest(scan: FarmScan, o: ManifestOptions): Manifest {
     return {
       rqIndex: it.index, status: it.status,
       comp: { id: it.comp.id, name: it.comp.name, width: it.comp.w, height: it.comp.h, fps: it.comp.fps, duration: it.comp.dur, displayStartFrame: displayStart(it) },
-      frames: { first: fr.first, last: fr.last, count: fr.count },
+      frames: { first: fr.first, last: fr.last, count: fr.count, shownFirst: fr.first + displayStart(it), shownLast: fr.last + displayStart(it) },
       render: renderInfo(it.rs),
       outputs,
       comps: [...(reach.get(it.index) ?? [])].map((id) => compName.get(id) ?? String(id)),
@@ -367,7 +368,7 @@ export function formatManifest(m: Manifest, savedAt?: string): string {
     `Multi-Frame Rendering: ${m.multiFrameRendering.on === null ? "unknown" : m.multiFrameRendering.on ? "on" : "off"} (${m.multiFrameRendering.note}).`,
   );
   for (const it of m.items) {
-    out.push("", `Render queue item ${it.rqIndex} (${it.status}): "${it.comp.name}" ${it.comp.width}x${it.comp.height} @ ${it.comp.fps} fps, frames ${it.frames.first}-${it.frames.last} (${it.frames.count}) counted from the comp start at 0${it.comp.displayStartFrame ? `; displayed from ${it.comp.displayStartFrame}` : ""}.`);
+    out.push("", `Render queue item ${it.rqIndex} (${it.status}): "${it.comp.name}" ${it.comp.width}x${it.comp.height} @ ${it.comp.fps} fps, frames ${it.frames.shownFirst}-${it.frames.shownLast} (${it.frames.count}${it.comp.displayStartFrame ? `; the comp starts at frame ${it.comp.displayStartFrame}` : ""}).`);
     const r = it.render;
     const rs = [r.resolution && `resolution ${r.resolution}`, r.quality && `quality ${r.quality}`, r.proxyUse && `proxies: ${r.proxyUse}`, r.fpsOverride && `frame rate ${r.fpsOverride} (render settings)`, r.timeSpan && `time span ${r.timeSpan}`].filter(Boolean);
     if (rs.length) out.push(`  Render settings: ${rs.join(", ")}.`);

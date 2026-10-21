@@ -2,7 +2,7 @@
 // usable while a separate render process works, with progress, status and cancel.
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { spawn, type ChildProcess } from "node:child_process";
-import { createWriteStream, existsSync, mkdirSync, readdirSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { closeSync, createWriteStream, existsSync, fstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { z } from "zod";
 import { runJsx } from "../jsx.js";
@@ -23,19 +23,28 @@ interface Job {
   log: string;
   tail: string[];
   proc?: ChildProcess;
+  /** the aerender process (a detached job outlives this server; after a restart it is found again by its pid) */
+  pid?: number;
   exitCode?: number | null;
   /** a chunked render (ae_farm run_local): the run it belongs to and its chunk */
   group?: string;
   chunk?: number;
-  /** each frame's render time in seconds, as aerender prints it ("PROGRESS: ... (n): 3 Seconds") */
+  /** each frame's render time in seconds, as aerender prints it ("PROGRESS: ... (n): 3 Seconds": whole seconds only) */
   frameSeconds: number[];
+  /** when the first and the latest progress line came (ms), and their frame counts: the measured time per frame */
+  progressAt?: { first: number; firstFrame: number; last: number; lastFrame: number };
+  /** "Total Time Elapsed: N Seconds" at the end of aerender's log */
+  totalSeconds?: number;
+  /** found again from its files after the server restarted (no exit code seen) */
+  recovered?: boolean;
   onExit?: (j: Job) => void;
 }
 
 const jobs = new Map<string, Job>();
 export type RenderJob = Job;
-export const renderJob = (id: string) => jobs.get(id);
 export const renderJobs = () => [...jobs.values()];
+/** Tests: forget this session's jobs, as a restarted server would (they are found again from their files). */
+export const forgetJobs = () => jobs.clear();
 const LOG_DIR = () => appFile("renders");
 
 /** How many background renders keep their files (renders/<id>.log and .json). */
@@ -87,12 +96,16 @@ export function aerenderPath(appPackage: string): string | null {
 
 /**
  * renders/<id>.json for the Surehand MCP panel, kept up to date while the job runs:
- * {id, comp, frames, done, status, output, startedAt, endedAt?} (done = frames rendered so far).
+ * {id, comp, frames, done, status, output, startedAt, endedAt?} (done = frames rendered so far), plus what finds a
+ * detached job again after a restart (pid, log, group, chunk, project).
  */
-export function writeJobFile(j: Pick<Job, "id" | "comp" | "frames" | "frameRendered" | "status" | "output" | "startedAt" | "endedAt">) {
+export function writeJobFile(j: Pick<Job, "id" | "comp" | "frames" | "frameRendered" | "status" | "output" | "startedAt" | "endedAt"> & Partial<Job>) {
   try {
     mkdirSync(LOG_DIR(), { recursive: true });
-    const o = { id: j.id, comp: j.comp, frames: j.frames, done: j.status === "done" ? j.frames || j.frameRendered : j.frameRendered, status: j.status, output: j.output, startedAt: j.startedAt, ...(j.endedAt ? { endedAt: j.endedAt } : {}) };
+    const o = {
+      id: j.id, comp: j.comp, frames: j.frames, done: j.status === "done" ? j.frames || j.frameRendered : j.frameRendered, status: j.status, output: j.output, startedAt: j.startedAt, ...(j.endedAt ? { endedAt: j.endedAt } : {}),
+      ...(j.pid ? { pid: j.pid } : {}), ...(j.log ? { log: j.log } : {}), ...(j.project ? { project: j.project } : {}), ...(j.group ? { group: j.group, chunk: j.chunk } : {}),
+    };
     writeFileSync(join(LOG_DIR(), `${j.id}.json`), JSON.stringify(o));
   } catch {} // never fails a render
 }
@@ -102,8 +115,55 @@ export function parseProgress(line: string): { frame: number; seconds: number | 
   const m = line.match(/PROGRESS:.*\((\d+)\)(?::\s*([\d.]+)\s*Seconds?)?/i);
   return m ? { frame: Number(m[1]), seconds: m[2] !== undefined ? Number(m[2]) : null } : null;
 }
+/** "PROGRESS:  Total Time Elapsed: 2 Seconds" (also minutes and hours). */
+export function parseTotal(line: string): number | null {
+  const m = /Total Time Elapsed:\s*(.+)$/i.exec(line);
+  if (!m) return null;
+  let s = 0, any = false;
+  for (const [, n, u] of m[1].matchAll(/([\d.]+)\s*(hour|hr|minute|min|second|sec)/gi)) {
+    any = true;
+    s += Number(n) * (/^h/i.test(u) ? 3600 : /^m/i.test(u) ? 60 : 1);
+  }
+  return any ? s : null;
+}
 
-export interface StartJob { bin: string; cli: string[]; comp: string; output: string; project: string; frames: number; group?: string; chunk?: number; onExit?: (j: Job) => void }
+/** The measured render time per frame (s): aerender's total over the frames, else the time between progress lines, else its whole-second figures. */
+export function secondsPerFrame(j: Pick<Job, "frameRendered" | "frameSeconds" | "progressAt" | "totalSeconds" | "status">): number | null {
+  if (j.totalSeconds !== undefined && j.frameRendered > 0 && j.status !== "running") return j.totalSeconds / j.frameRendered;
+  const p = j.progressAt;
+  if (p && p.lastFrame > p.firstFrame) return (p.last - p.first) / 1000 / (p.lastFrame - p.firstFrame);
+  return j.frameSeconds.length ? medianOf(j.frameSeconds) : null;
+}
+/** "0.06 s" / "62 ms" / "2.4 s" */
+export const perFrameText = (s: number) => (s < 1 ? `${Math.round(s * 1000)} ms` : `${Math.round(s * 10) / 10} s`);
+
+/** Reads aerender's output into the job: progress, per-frame times, the last lines. */
+function ingest(job: Job, text: string, at = Date.now()) {
+  for (const line of text.split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    // e.g. "PROGRESS:  0;00;00;05 (6): 0 Seconds"
+    const pr = parseProgress(line);
+    if (pr) {
+      if (pr.frame > job.frameRendered && pr.seconds !== null && job.frameSeconds.length < 100_000) job.frameSeconds.push(pr.seconds);
+      if (pr.frame > job.frameRendered) {
+        if (!job.progressAt) job.progressAt = { first: at, firstFrame: pr.frame, last: at, lastFrame: pr.frame };
+        else Object.assign(job.progressAt, { last: at, lastFrame: pr.frame });
+      }
+      job.frameRendered = Math.max(job.frameRendered, pr.frame);
+    }
+    const total = parseTotal(line);
+    if (total !== null) job.totalSeconds = total;
+    job.tail.push(line.trim());
+    if (job.tail.length > 50) job.tail.shift();
+  }
+}
+const failedLog = (j: Job) => j.tail.some((l) => /aerender ERROR|^ERROR/i.test(l));
+
+export interface StartJob {
+  bin: string; cli: string[]; comp: string; output: string; project: string; frames: number; group?: string; chunk?: number; onExit?: (j: Job) => void;
+  /** a process of its own that writes straight into its log and outlives this server (a reload of the AI app) */
+  detached?: boolean;
+}
 
 /** Starts aerender as a background job: its log, the panel's renders/<id>.json, progress and cancel (ae_render_jobs). */
 export function startAerenderJob(o: StartJob): Job {
@@ -111,40 +171,72 @@ export function startAerenderJob(o: StartJob): Job {
   // keep the folder from growing forever: the newest renders only (never one still running)
   pruneRenders(LOG_DIR(), RENDERS_KEPT - 1, new Set([...jobs.values()].filter((j) => j.status === "running").map((j) => j.id)));
   let id = `r${Date.now().toString(36)}`;
-  for (let k = 1; jobs.has(id); k++) id = `r${Date.now().toString(36)}${k.toString(36)}`;
+  for (let k = 1; jobs.has(id) || existsSync(join(LOG_DIR(), `${id}.json`)); k++) id = `r${Date.now().toString(36)}${k.toString(36)}`;
   const logPath = join(LOG_DIR(), `${id}.log`);
-  const logStream = createWriteStream(logPath);
   const job: Job = {
     id, comp: o.comp, output: o.output, project: o.project, status: "running",
     startedAt: new Date().toISOString(), frames: o.frames, frameRendered: 0, log: logPath, tail: [], frameSeconds: [],
     ...(o.group ? { group: o.group, chunk: o.chunk } : {}), onExit: o.onExit,
   };
-  const proc = spawn(o.bin, o.cli, { stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
-  job.proc = proc;
-  writeJobFile(job);
   let written = 0;
-  const onData = (d: Buffer) => {
-    const text = d.toString();
-    logStream.write(text);
-    for (const line of text.split(/\r?\n/)) {
-      if (!line.trim()) continue;
-      // e.g. "PROGRESS:  0;00;00;05 (6): 0 Seconds"
-      const pr = parseProgress(line);
-      if (pr) {
-        if (pr.frame > job.frameRendered && pr.seconds !== null && job.frameSeconds.length < 100_000) job.frameSeconds.push(pr.seconds);
-        job.frameRendered = Math.max(job.frameRendered, pr.frame);
-      }
-      job.tail.push(line.trim());
-      if (job.tail.length > 50) job.tail.shift();
-    }
+  const progress = () => {
     // progress for the panel, at most twice a second
     if (Date.now() - written > 500) {
       written = Date.now();
       writeJobFile(job);
     }
   };
-  proc.stdout!.on("data", onData);
-  proc.stderr!.on("data", onData);
+  let proc: ChildProcess, poll: ReturnType<typeof setInterval> | undefined, finish: () => void = () => {};
+  if (o.detached) {
+    // aerender writes into its log file itself (no pipe to this server), so it goes on when the server stops;
+    // the log is read as it grows
+    const fd = openSync(logPath, "w");
+    try {
+      proc = spawn(o.bin, o.cli, { stdio: ["ignore", fd, fd], detached: true, windowsHide: true });
+    } finally {
+      closeSync(fd);
+    }
+    proc.unref();
+    let offset = 0;
+    const read = () => {
+      try {
+        const rfd = openSync(logPath, "r");
+        try {
+          const size = fstatSync(rfd).size;
+          if (size > offset) {
+            const b = Buffer.alloc(size - offset);
+            readSync(rfd, b, 0, b.length, offset);
+            offset = size;
+            ingest(job, b.toString());
+            progress();
+          }
+        } finally {
+          closeSync(rfd);
+        }
+      } catch {}
+    };
+    poll = setInterval(read, 250);
+    poll.unref?.();
+    finish = () => {
+      clearInterval(poll);
+      read();
+    };
+  } else {
+    const logStream = createWriteStream(logPath);
+    proc = spawn(o.bin, o.cli, { stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+    const onData = (d: Buffer) => {
+      const text = d.toString();
+      logStream.write(text);
+      ingest(job, text);
+      progress();
+    };
+    proc.stdout!.on("data", onData);
+    proc.stderr!.on("data", onData);
+    finish = () => logStream.end();
+  }
+  job.proc = proc;
+  job.pid = proc.pid;
+  writeJobFile(job);
   let ended = false;
   const end = () => {
     if (ended) return;
@@ -156,30 +248,94 @@ export function startAerenderJob(o: StartJob): Job {
     } catch {}
   };
   proc.on("error", (e) => {
+    finish();
     job.status = "failed";
     job.tail.push(String(e));
     job.endedAt = new Date().toISOString();
-    logStream.end();
     end();
   });
   proc.on("exit", (code) => {
-    logStream.end();
+    finish();
     job.exitCode = code;
     job.endedAt = new Date().toISOString();
-    if (job.status === "running") job.status = code === 0 && !job.tail.some((l) => /aerender ERROR|^ERROR/i.test(l)) ? "done" : "failed";
+    if (job.status === "running") job.status = code === 0 && !failedLog(job) ? "done" : "failed";
     end();
   });
   jobs.set(id, job);
   return job;
 }
 
+const alive = (pid?: number) => {
+  if (!pid) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e: any) {
+    return e?.code === "EPERM";
+  }
+};
+
+/**
+ * A job this server did not start (it started before a restart): its renders/<id>.json and log, and whether its
+ * process still runs. A job whose process is gone counts as done when every frame was rendered and the log has no error.
+ */
+function recover(id: string): Job | undefined {
+  if (!/^r[0-9a-z]+$/.test(id)) return undefined;
+  let d: any;
+  try {
+    d = JSON.parse(readFileSync(join(LOG_DIR(), `${id}.json`), "utf8"));
+  } catch {
+    return undefined;
+  }
+  const job: Job = {
+    id, comp: d.comp, output: d.output, project: d.project ?? "", status: d.status, startedAt: d.startedAt, endedAt: d.endedAt, frames: d.frames, frameRendered: 0,
+    log: d.log ?? join(LOG_DIR(), `${id}.log`), tail: [], frameSeconds: [], pid: d.pid, recovered: true, ...(d.group ? { group: d.group, chunk: d.chunk } : {}),
+  };
+  refresh(job);
+  jobs.set(id, job);
+  return job;
+}
+
+/** A recovered job: its log read again, and whether its process still runs. */
+function refresh(job: Job) {
+  if (!job.recovered) return;
+  const st = { status: job.status, frameRendered: job.frameRendered };
+  job.tail = [];
+  job.frameSeconds = [];
+  job.frameRendered = 0;
+  try {
+    ingest(job, readFileSync(job.log, "utf8"), Date.parse(job.startedAt));
+  } catch {}
+  if (job.status === "running" && !alive(job.pid)) {
+    job.status = job.frameRendered >= job.frames && !failedLog(job) ? "done" : "failed";
+    job.endedAt ??= new Date().toISOString();
+    job.tail.push(`(aerender ended while the server was restarting; its exit code was not seen)`);
+  }
+  if (st.status !== job.status || st.frameRendered !== job.frameRendered) writeJobFile(job);
+}
+
+/** A job of this session, or one found again from its files after the server restarted. */
+export function renderJob(id: string): Job | undefined {
+  const j = jobs.get(id);
+  if (j) {
+    refresh(j);
+    return j;
+  }
+  return recover(id);
+}
+
 /** Stops a running job (its status becomes "cancelled"). */
 export function cancelJob(j: Job) {
-  if (j.status === "running" && j.proc) {
-    j.status = "cancelled";
-    j.proc.kill();
-    writeJobFile(j);
-  }
+  if (j.status !== "running") return;
+  if (j.proc) j.proc.kill();
+  else if (j.pid && alive(j.pid)) {
+    try {
+      process.kill(j.pid);
+    } catch {}
+  } else return;
+  j.status = "cancelled";
+  j.endedAt ??= new Date().toISOString();
+  writeJobFile(j);
 }
 
 const medianOf = (a: number[]) => {
@@ -190,6 +346,7 @@ const medianOf = (a: number[]) => {
 function view(j: Job) {
   const pct = j.frames ? Math.min(100, Math.round((j.frameRendered / j.frames) * 100)) : null;
   const rendering = j.tail.some((l) => /PROGRESS:.*\(\d+\)/.test(l));
+  const spf = secondsPerFrame(j);
   return {
     id: j.id,
     comp: j.comp,
@@ -206,9 +363,10 @@ function view(j: Job) {
     log: j.log,
     lastLines: j.tail.slice(-6),
     ...(j.group ? { group: j.group, chunk: j.chunk } : {}),
-    ...(j.frameSeconds.length ? { secondsPerFrame: medianOf(j.frameSeconds) } : {}),
+    ...(spf !== null ? { secondsPerFrame: Math.round(spf * 1000) / 1000 } : {}),
   };
 }
+
 
 export function registerRenderJobs(server: McpServer) {
   server.registerTool(

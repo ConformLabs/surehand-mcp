@@ -9,7 +9,7 @@ import { VERSION } from "../config.js";
 import { appFile } from "../paths.js";
 import type { Profile } from "../tools/renderprofile.js";
 import { displayStart, itemFrames, outputInfo, renderInfo, type OutputInfo, type ScanItem } from "./manifest.js";
-import { batQuote, defaultAerender, mapPath, shQuote, type PathMapping, type Platform } from "./paths.js";
+import { batQuote, defaultAerender, mapPath, platformOf, shQuote, type PathMapping, type Platform } from "./paths.js";
 import { parseTemplate } from "./seq.js";
 
 // ---------- splitting ----------
@@ -141,6 +141,9 @@ export interface MachineSpec { name: string; platform?: Platform; aerender?: str
 export interface Chunk extends Range {
   index: number;
   machine: string;
+  /** aerender's -s / -e: the frame numbers After Effects shows (the comp's start frame + first / last, which count from the comp's start at 0) */
+  s: number;
+  e: number;
   /** a movie chunk's own file (sequences write into the user's own sequence) */
   output?: string;
   args: string[];
@@ -290,7 +293,7 @@ export function buildPlan(o: PlanInput): FarmPlan {
     const mappedOut = mapPath(out.path!, map);
     const outArg = output ? mapPath(output, map) : mappedOut !== out.path ? mappedOut : undefined;
     m.chunks.push(i + 1);
-    return { index: i + 1, first: p.first, last: p.last, frames: p.frames, machine: m.name, ...(output ? { output } : {}), args: aerenderArgs({ project: m.project, rqIndex: it.index, first: p.first, last: p.last, output: outArg, mfr: mfrFor(procs) }) };
+    return { index: i + 1, first: p.first, last: p.last, s: p.first + dstart, e: p.last + dstart, frames: p.frames, machine: m.name, ...(output ? { output } : {}), args: aerenderArgs({ project: m.project, rqIndex: it.index, first: p.first + dstart, last: p.last + dstart, output: outArg, mfr: mfrFor(procs) }) };
   });
   if (!local) for (const m of machines) if (m.project === o.project && !/^(\\\\|\/\/|\/Volumes\/)/.test(o.project)) notes.push(`${m.name} opens the project at ${o.project}: make sure that path (and the output ${out.path}) exists there, on a share or the same folder, or pass a pathMap`);
 
@@ -366,7 +369,7 @@ export function planScripts(plan: FarmPlan, folder: string, ffmpeg = "ffmpeg"): 
     const cs = plan.chunks.filter((c) => c.machine === m.name);
     if (!cs.length) continue;
     const name = m.local ? "render_chunks" : `render_${safeName(m.name)}`;
-    const title = `"${plan.comp.name}" frames ${cs.map((c) => `${c.first}-${c.last}`).join(", ")} on ${m.name}`;
+    const title = `"${plan.comp.name}" frames ${cs.map((c) => `${c.s}-${c.e}`).join(", ")} on ${m.name}`;
     const guard = (c: Chunk, win: boolean) => {
       if (!c.output) return "";
       const o = c.args[c.args.indexOf("-output") + 1];
@@ -377,7 +380,7 @@ export function planScripts(plan: FarmPlan, folder: string, ffmpeg = "ffmpeg"): 
       for (const c of cs) t += guard(c, true);
       if (cs.length === 1) t += `${commandLine("windows", m.aerender, cs[0].args)}\r\nexit /b %ERRORLEVEL%\r\n`;
       // several processes: each in its own window (cmd /c ends it when aerender finishes)
-      else for (const c of cs) t += `start "chunk ${c.index} (frames ${c.first}-${c.last})" cmd /c "${commandLine("windows", m.aerender, c.args)}"\r\n`;
+      else for (const c of cs) t += `start "chunk ${c.index} (frames ${c.s}-${c.e})" cmd /c "${commandLine("windows", m.aerender, c.args)}"\r\n`;
       files.push({ path: join(folder, `${name}.bat`), text: t, executable: false });
     } else {
       let t = shHead(title) + cs.map((c) => guard(c, false)).join("");
@@ -407,26 +410,26 @@ export function planScripts(plan: FarmPlan, folder: string, ffmpeg = "ffmpeg"): 
 export function formatPlan(p: FarmPlan, o: { dryRun?: boolean; written?: string[] } = {}): string {
   const out: string[] = [];
   const who = p.machines.length === 1 && p.machines[0].local ? `${p.chunks.length} process${p.chunks.length === 1 ? "" : "es"} on this machine` : `${p.machines.length} machines`;
-  out.push(`${o.dryRun ? "Dry run: " : ""}Render queue item ${p.rqIndex} ("${p.comp.name}", frames ${p.frames.first}-${p.frames.last}, ${p.frames.frames} frames) in ${p.chunks.length} chunk${p.chunks.length === 1 ? "" : "s"} for ${who}.`);
+  out.push(`${o.dryRun ? "Dry run: " : ""}Render queue item ${p.rqIndex} ("${p.comp.name}", frames ${p.frames.first + p.comp.displayStartFrame}-${p.frames.last + p.comp.displayStartFrame}, ${p.frames.frames} frames) in ${p.chunks.length} chunk${p.chunks.length === 1 ? "" : "s"} for ${who}.`);
   out.push(`Output: ${p.output.format ?? "?"}${p.output.codec ? ` / ${p.output.codec}` : ""} -> ${p.output.path} (${p.kind}).`);
   if (p.sequence) out.push(`Sequence: every chunk writes into the same sequence, files ${p.sequence.firstFile}-${p.sequence.lastFile} ([${"#".repeat(p.sequence.pad)}], numbered by ${p.sequence.numbering}).`);
   if (p.movie && p.chunks.length > 1) {
     out.push(`Movie: each chunk writes its own file (${basename(p.movie.parts[0])} ...); join: ${p.movie.join.safe === "yes" ? "lossless stream copy" : p.movie.join.safe === "no" ? "NOT LOSSLESS" : "decided after the render"}.`);
     for (const w of p.movie.join.why) out.push(`  - ${w}`);
-    if (p.movie.command) out.push(`  join: ffmpeg ${p.movie.command.join(" ")}`);
+    if (p.movie.command) out.push(`  join: ${commandLine(platformOf(), "ffmpeg", p.movie.command)}`);
   }
   if (p.estimate.seconds !== undefined) out.push(`Estimate: about ${fmtDuration(p.estimate.seconds)} of rendering in total; about ${fmtDuration(p.estimate.wallSeconds!)} with the chunks in parallel (${p.estimate.note}).`);
   else out.push(`Estimate: none (${p.estimate.note}).`);
   out.push("", "Chunks:");
   for (const c of p.chunks) {
     const m = p.machines.find((x) => x.name === c.machine)!;
-    out.push(`  ${c.index}. frames ${c.first}-${c.last} (${c.frames})${p.machines.length > 1 || !m.local ? ` on ${c.machine}` : ""}${c.estimateSeconds !== undefined ? `, ~${fmtDuration(c.estimateSeconds)}` : ""}${c.output ? ` -> ${basename(c.output)}` : ""}`);
+    out.push(`  ${c.index}. frames ${c.s}-${c.e} (${c.frames})${p.machines.length > 1 || !m.local ? ` on ${c.machine}` : ""}${c.estimateSeconds !== undefined ? `, ~${fmtDuration(c.estimateSeconds)}` : ""}${c.output ? ` -> ${basename(c.output)}` : ""}`);
     out.push(`     ${commandLine(m.platform, m.aerender, c.args)}`);
   }
   if (o.written?.length) out.push("", `Written to ${p.folder}:`, ...o.written.map((w) => `  ${basename(w)}`));
   if (p.issues.length) out.push("", "Check before rendering:", ...p.issues.map((i) => `  - ${i}`));
   if (p.notes.length) out.push("", "Notes:", ...p.notes.map((n) => `  - ${n}`));
-  out.push("", "aerender renders the project as saved on disk. -s / -e count frames from the comp's start at 0.");
+  out.push("", `aerender renders the project as saved on disk. -s / -e are the comp's frame numbers as After Effects shows them${p.comp.displayStartFrame ? ` (it starts at frame ${p.comp.displayStartFrame})` : ""}.`);
   return out.join("\n") + "\n";
 }
 

@@ -80,6 +80,8 @@ export interface SequenceReport {
   template: string;
   expected: [number, number];
   present: number;
+  /** file numbers to render again: missing, empty, cut off or damaged */
+  rerender: number[];
   missing: number[];
   /** files whose number is outside the range */
   extra: string[];
@@ -99,6 +101,7 @@ export function verifySequence(template: string, first: number, last: number): S
   const byNum = new Map<number, SeqFile[]>();
   for (const f of files) byNum.set(f.num, [...(byNum.get(f.num) ?? []), f]);
   const missing: number[] = [], extra: string[] = [], duplicates: string[][] = [], empty: string[] = [], truncated: SequenceReport["truncated"] = [];
+  const bad = new Set<number>();
   let checked: SequenceReport["checked"] = "complete";
   for (let n = first; n <= last; n++) if (!byNum.has(n)) missing.push(n);
   const inRange: SeqFile[] = [];
@@ -112,17 +115,18 @@ export function verifySequence(template: string, first: number, last: number): S
       inRange.push(f);
       if (f.bytes === 0) {
         empty.push(f.name);
+        bad.add(n);
         continue;
       }
       const st = imageFileState(join(p.dir, f.name));
-      if (st.state === "truncated" || st.state === "empty" || st.state === "not this format") truncated.push({ file: f.name, detail: st.state === "not this format" ? "not a file of this format" : st.detail });
+      if (st.state === "truncated" || st.state === "empty" || st.state === "not this format") (truncated.push({ file: f.name, detail: st.state === "not this format" ? "not a file of this format" : st.detail }), bad.add(n));
       if (st.state === "header only") checked = "header";
     }
   }
   const sizes = inRange.map((f) => f.bytes).filter((b) => b > 0).sort((a, b) => a - b);
   const med = sizes.length ? sizes[sizes.length >> 1] : 0;
   const small = sizes.length >= 5 ? inRange.filter((f) => f.bytes > 0 && f.bytes < med * 0.25 && !truncated.some((t) => t.file === f.name)).map((f) => f.name) : [];
-  return { template, expected: [first, last], present: last - first + 1 - missing.length, missing, extra, duplicates, empty, truncated, small, checked };
+  return { template, expected: [first, last], present: last - first + 1 - missing.length, rerender: [...new Set([...missing, ...bad])].sort((a, b) => a - b), missing, extra, duplicates, empty, truncated, small, checked };
 }
 
 // ---------- movies ----------
@@ -303,4 +307,30 @@ export function readPlanFile(path: string): FarmPlan {
   const p = JSON.parse(readFileSync(path, "utf8"));
   if (p?.surehandFarmPlan !== 1) throw new Error(`${path} is not an ae_farm plan (farm-plan.json).`);
   return p as FarmPlan;
+}
+
+// ---------- is there a picture at all ----------
+
+export interface PictureFacts { frame: number; flat: boolean; transparent: boolean; key: string }
+
+/** Whether a frame is one flat colour (or fully transparent), and a key to tell identical frames apart. */
+export function pictureFacts(frame: number, png: string): PictureFacts {
+  const img = decodePng(readFileSync(png));
+  const d = img.data;
+  let flat = true, transparent = true, h = 2166136261;
+  for (let i = 0; i < d.length; i++) {
+    if (flat && d[i] !== d[i % 4]) flat = false;
+    if (transparent && i % 4 === 3 && d[i] !== 0) transparent = false;
+    h = Math.imul(h ^ d[i], 16777619) >>> 0;
+  }
+  return { frame, flat, transparent, key: `${img.width}x${img.height}:${h.toString(16)}` };
+}
+
+/**
+ * Sampled frames that are all the same flat picture (empty, transparent, one colour): what a render of frames outside
+ * the comp, or with its layers missing, looks like. null when the samples show a picture.
+ */
+export function blankRender(facts: PictureFacts[]): string | null {
+  if (facts.length < 2 || !facts.every((f) => f.flat) || new Set(facts.map((f) => f.key)).size !== 1) return null;
+  return `the sampled frames ${facts.map((f) => `${f.frame}`).join(", ")} are all the same flat picture (${facts[0].transparent ? "fully transparent" : "one colour"}): frames outside the comp (a wrong -s / -e) or missing layers render like this. If the comp really is one flat colour there, ignore this`;
 }

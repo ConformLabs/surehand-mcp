@@ -12,19 +12,42 @@ vi.mock("../src/jsx.js", async (original) => {
   const real = await original<typeof import("../src/jsx.js")>();
   return { ...real, runJsx: async (body: string, args: any) => fp.run(body, args ?? {}) };
 });
+// After Effects' own frame render (the pixel proof): every pixel is (frame from 0) % 200 + 1, as the fake aerender renders it
+let localRenders = 0;
+vi.mock("../src/tools/prove.js", async (original) => {
+  const real = await original<typeof import("../src/tools/prove.js")>();
+  const { encodePng: enc } = await import("../src/png.js");
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  return {
+    ...real,
+    captureProof: async (input: { comps: number[]; times: number[] }) => {
+      localRenders++;
+      const id = `proof-${localRenders}`;
+      const dir = real.proofDir(id);
+      fs.mkdirSync(dir, { recursive: true });
+      const frames = input.times.map((t, i) => {
+        const file = `${input.comps[0]}_${i}.png`;
+        fs.writeFileSync(path.join(dir, file), enc(4, 2, new Uint8Array(24).fill((Math.round(t * 25) % 200) + 1)));
+        return { time: t, file };
+      });
+      return { id, createdAt: "", project: null, maxSize: 0, comps: [{ id: input.comps[0], name: "", width: 4, height: 2, pixelAspect: 1, frameRate: 25, renderW: 4, renderH: 2, frames }] };
+    },
+  };
+});
 
 const { farm, farmRuns, existingOutputs } = await import("../src/tools/farm.js");
 const { FARM_SCAN_JSX, FARM_CHECK_JSX } = await import("../src/farm/jsx.js");
-const { splitFrames, buildPlan, planScripts, joinSafety, commandLine, aerenderArgs, maxLocalProcesses, frameCost, PlanRefusal } = await import("../src/farm/plan.js");
+const { splitFrames, buildPlan, planScripts, joinSafety, commandLine, aerenderArgs, maxLocalProcesses, frameCost, PlanRefusal, formatPlan } = await import("../src/farm/plan.js");
 const { itemFrames, outputInfo, buildManifest, reachOf } = await import("../src/farm/manifest.js");
 const { classifyPath, parseMountOutput, parseNetUse, mapPath, shQuote, batQuote, plistVersion, exeVersion, readAeInstall, defaultAerender } = await import("../src/farm/paths.js");
 const { postScriptNames, indexFonts } = await import("../src/farm/fonts.js");
 const { findMatchNames } = await import("../src/farm/plugins.js");
 const { checkManifest } = await import("../src/farm/check.js");
-const { verifySequence, imageFileState, compareProof } = await import("../src/farm/verify.js");
+const { verifySequence, imageFileState, compareProof, blankRender, pictureFacts } = await import("../src/farm/verify.js");
 const { footageSequence } = await import("../src/farm/seq.js");
 const { farmCommand } = await import("../src/cli/farm.js");
-const { parseProgress, renderJobs } = await import("../src/tools/renderjobs.js");
+const { parseProgress, parseTotal, secondsPerFrame, perFrameText, renderJobs, forgetJobs } = await import("../src/tools/renderjobs.js");
 const { encodePng } = await import("../src/png.js");
 const { resetConfigCache } = await import("../src/config.js");
 
@@ -33,8 +56,11 @@ const posix = process.platform !== "win32";
 
 // ---------- fakes ----------
 
-// writes the frames -s..-e of the render queue item (-rqindex) into its output ([####] = the frame number), or one
-// "movie" (a JSON file ffprobe below reads) for a movie format; FAKE_SKIP / FAKE_TRUNC: frames left out / cut off
+// As the real aerender (seen live in AE 26.5): -s / -e are the comp's frame numbers as After Effects shows them (its
+// start frame + frames from 0), and "Use Comp Frame Number" names the files by those numbers. A frame outside the comp
+// renders as a flat empty picture (value 0); inside, every pixel is (frame from 0) % 200 + 1, as the local render below.
+// Movies: one "movie" (a JSON file ffprobe below reads). FAKE_SKIP / FAKE_TRUNC: frames left out / cut off;
+// FAKE_BLANK: every frame empty.
 const FAKE_AERENDER = `#!/usr/bin/env node
 const fs = require("fs"), zlib = require("zlib"), path = require("path");
 const a = process.argv.slice(2), arg = (k) => (a.includes(k) ? a[a.indexOf(k) + 1] : undefined);
@@ -50,15 +76,17 @@ fs.mkdirSync(path.dirname(out), { recursive: true });
 if (/\\[#+\\]/.test(out)) {
   for (let f = s; f <= e; f++) {
     if (skip.includes(f)) continue;
+    const k = f - rq.startFrame, inside = k >= 0 && k < rq.frames && !process.env.FAKE_BLANK;
     const name = out.replace(/\\[(#+)\\]/, (m, h) => String(f).padStart(h.length, "0"));
-    const b = png(f & 255);
+    const b = png(inside ? (k % 200) + 1 : 0);
     fs.writeFileSync(name, trunc.includes(f) ? b.subarray(0, b.length - 12) : b);
-    console.log("PROGRESS:  0;00;00;" + f + " (" + (f - s + 1) + "): 2 Seconds");
+    console.log("PROGRESS:  0;00;00;" + f + " (" + (f - s + 1) + "): 0 Seconds");
   }
 } else {
   fs.writeFileSync(out, JSON.stringify({ fakeMovie: 1, frames: e - s + 1 - skip.length, codec: process.env.FAKE_CODEC || "prores", width: 1920, height: 1080, fps: rq.fps, audio: process.env.FAKE_AUDIO || null }));
-  console.log("PROGRESS:  0;00;00;" + e + " (" + (e - s + 1) + "): 1 Seconds");
+  console.log("PROGRESS:  0;00;00;" + e + " (" + (e - s + 1) + "): 0 Seconds");
 }
+console.log("PROGRESS:  Total Time Elapsed: " + 2 * (e - s + 1) + " Seconds");
 `;
 const FAKE_FFPROBE = `#!/usr/bin/env node
 const fs = require("fs"); const a = process.argv.slice(2); const f = a[a.indexOf("-i") + 1].replace(/^file:/, "");
@@ -96,7 +124,7 @@ afterAll(() => {
   process.env.HOME = saved.HOME;
   process.env.USERPROFILE = saved.USERPROFILE;
   if (saved.CONFIG !== undefined) process.env.SUREHAND_AE_CONFIG = saved.CONFIG;
-  for (const k of ["FAKE_AERENDER_LOG", "FAKE_SKIP", "FAKE_TRUNC", "FAKE_CODEC", "FAKE_AUDIO"]) delete process.env[k];
+  for (const k of ["FAKE_AERENDER_LOG", "FAKE_SKIP", "FAKE_TRUNC", "FAKE_CODEC", "FAKE_AUDIO", "FAKE_BLANK"]) delete process.env[k];
   resetConfigCache();
   rmSync(home, { recursive: true, force: true });
 });
@@ -142,7 +170,7 @@ beforeEach(() => {
   exe(join(work, "AE", "aerender"), FAKE_AERENDER);
   aerenderLog = join(work, "aerender.log");
   process.env.FAKE_AERENDER_LOG = aerenderLog;
-  for (const k of ["FAKE_SKIP", "FAKE_TRUNC", "FAKE_CODEC", "FAKE_AUDIO"]) delete process.env[k];
+  for (const k of ["FAKE_SKIP", "FAKE_TRUNC", "FAKE_CODEC", "FAKE_AUDIO", "FAKE_BLANK"]) delete process.env[k];
   fp = fakeProject(spec());
   fp.app.project.save(); // the project on disk, for the fake aerender
 });
@@ -235,6 +263,15 @@ describe("commands and quoting", () => {
     expect(parseProgress("PROGRESS:  0;00;00;05 (6): 3 Seconds")).toEqual({ frame: 6, seconds: 3 });
     expect(parseProgress("PROGRESS:  0:00:01:00 (26): 1 Second")).toEqual({ frame: 26, seconds: 1 });
     expect(parseProgress("PROGRESS:  Total Time Elapsed: 2 Seconds")).toBeNull();
+  });
+
+  it("time per frame: aerender's total over the frames (its per-frame figure is whole seconds)", () => {
+    expect(parseTotal("PROGRESS:  Total Time Elapsed: 2 Seconds")).toBe(2);
+    expect(parseTotal("PROGRESS:  Total Time Elapsed: 1 Min, 5 Seconds")).toBe(65);
+    const j = { frameRendered: 33, frameSeconds: Array(33).fill(0), totalSeconds: 2, status: "done" as const };
+    expect(perFrameText(secondsPerFrame(j)!)).toBe("61 ms");
+    expect(secondsPerFrame({ frameRendered: 10, frameSeconds: [0], status: "running", progressAt: { first: 0, firstFrame: 1, last: 4500, lastFrame: 10 } })).toBe(0.5);
+    expect(perFrameText(2.345)).toBe("2.3 s");
   });
 });
 
@@ -538,6 +575,8 @@ describe("plan", () => {
     expect(mov.movie!.parts).toEqual(["/Jobs/out/Main_part01of02.mov", "/Jobs/out/Main_part02of02.mov"]);
     expect(mov.chunks[1].args).toContain("/Jobs/out/Main_part02of02.mov");
     expect(mov.movie!.join.safe).toBe("yes");
+    // the join as shown is the command to type: the parts list's folder has a space
+    expect(formatPlan(mov)).toContain("join: ffmpeg -hide_banner -n -f concat -safe 0 -i '/Jobs/Spot farm/rq1/Main_parts.txt' -map 0:v -c copy /Jobs/out/Main.mov");
     expect(mov.movie!.command).toEqual(["-hide_banner", "-n", "-f", "concat", "-safe", "0", "-i", "/Jobs/Spot farm/rq1/Main_parts.txt", "-map", "0:v", "-c", "copy", "/Jobs/out/Main.mov"]);
     const h264 = buildPlan(planIn({ processes: 2, item: { oms: [{ index: 1, name: "x", file: "/Jobs/out/Main.mp4", settings: { Format: "H.264" } }] } }));
     expect(h264.movie!.join.safe).toBe("no");
@@ -631,12 +670,12 @@ describe.skipIf(!posix)("run_local and verify (fake aerender)", () => {
     expect(aerenderRuns().map((a) => [a[a.indexOf("-s") + 1], a[a.indexOf("-e") + 1]]).sort()).toEqual([["0", "32"], ["33", "66"], ["67", "99"]]);
     const jobs = renderJobs().filter((j) => j.group === id);
     expect(jobs.map((j) => j.status)).toEqual(["done", "done", "done"]);
-    expect(jobs[0].frameSeconds.every((s) => s === 2)).toBe(true);
+    expect(secondsPerFrame(jobs[0])).toBe(2); // aerender's total time over the frames (its per-frame figure is whole seconds: 0)
     const st = text(await farm({ action: "status", run: id }));
     expect(st).toMatch(/^Run farm\w+: done\. 100 of 100 frames rendered; 3 of 3 chunks done\./);
     expect(st).toMatch(/1\. frames 0-32: done, 33\/33, 2 s per frame/);
     const v = text(await farm({ action: "verify", plan }));
-    expect(v).toMatch(/^PASS: the chunked render of "Main" is complete: 100 frames, every file present once and complete/);
+    expect(v).toMatch(/^PASS: the chunked render of "Main" is complete: 100 frames \(0-99\), every file present once and complete, 2 sampled frames match a render here\./);
     // the panel's job files
     expect(readdirSync(join(home, ".surehand", "ae", "renders")).some((n) => n === `${jobs[0].id}.json`)).toBe(true);
   });
@@ -670,13 +709,87 @@ describe.skipIf(!posix)("run_local and verify (fake aerender)", () => {
     writeFileSync(join(work, "out", "main_0100.png"), readFileSync(join(work, "out", "main_0012.png"))); // past the last frame
     writeFileSync(join(work, "out", "main_0005.png"), "");
     const v = text(await farm({ action: "verify", plan }));
-    expect(v).toMatch(/^FAIL \(5\): the chunked render of "Main" \(frames 0-99\) is not complete\./);
+    expect(v).toMatch(/^FAIL \(5\): the chunked render of "Main" \(frames 0-99\) is not complete or not right\./);
     expect(v).toMatch(/4 frames missing: 40-42, 77/);
     expect(v).toMatch(/1 frame number written twice: main_0012\.png \+ main_00012\.png|1 frame number written twice: main_00012\.png \+ main_0012\.png/);
     expect(v).toMatch(/1 empty \(0-byte\) file: main_0005\.png/);
     expect(v).toMatch(/1 cut-off or damaged file: main_0010\.png \(no IEND at the end\)/);
     expect(v).toMatch(/1 file outside frames 0-99: main_0100\.png/);
-    expect(v).toMatch(/To render the missing frames again: .* for frames 40-42, 77/);
+    expect(v).toContain("To render them again (missing, empty or cut off): aerender -project ... -rqindex 1 -s 5 -e 5 | -s 10 -e 10 | -s 40 -e 42 | -s 77 -e 77 (frames 5, 10, 40-42, 77, as After Effects numbers them).");
+  });
+
+  it("a comp that starts at 01:00:00:00: -s / -e are the frame numbers After Effects shows, and the files follow them", async () => {
+    fp = fakeProject(spec({ comps: spec().comps.map((c) => (c.name === "Main" ? { ...c, startFrame: 90000 } : c)), rq: [{ comp: "Main", render: true, file: join(work, "out2", "tc_[#####].png"), om: { Format: "PNG Sequence", "Use Comp Frame Number": "true" } }] }));
+    fp.app.project.save();
+    const plan = await planFile({ processes: 2 });
+    const p = JSON.parse(readFileSync(plan, "utf8"));
+    expect(p.chunks.map((c: any) => [c.s, c.e])).toEqual([[90000, 90049], [90050, 90099]]);
+    expect(p.sequence).toMatchObject({ firstFile: 90000, lastFile: 90099 });
+    const shownPlan = text(await farm({ action: "plan", processes: 2, estimate: "none", dryRun: true }));
+    expect(shownPlan).toMatch(/\("Main", frames 90000-90099, 100 frames\)/);
+    expect(shownPlan).toMatch(/1\. frames 90000-90049 \(50\)\n.* -rqindex 1 -s 90000 -e 90049 /);
+    expect(shownPlan).toMatch(/-s \/ -e are the comp's frame numbers as After Effects shows them \(it starts at frame 90000\)/);
+    const id = runIdOf(text(await farm({ action: "run_local", plan })));
+    await waitForRun(id);
+    expect(aerenderRuns().map((a) => a[a.indexOf("-s") + 1]).sort()).toEqual(["90000", "90050"]);
+    expect(text(await farm({ action: "status", run: id }))).toMatch(/1\. frames 90000-90049: done, 50\/50/);
+    const v = text(await farm({ action: "verify", plan }));
+    expect(v).toMatch(/^PASS: the chunked render of "Main" is complete: 100 frames \(90000-90099\), every file present once and complete, 2 sampled frames match a render here/);
+    // what the old plan did (-s 0 -e 99): frames before the comp starts, all empty; verify must not pass them
+    unlinkSync(join(work, "out2", "tc_90010.png"));
+    expect(text(await farm({ action: "verify", plan }))).toContain("-s 90010 -e 90010 (frames 90010, as After Effects numbers them)");
+  });
+
+  it("verify never passes frames that are all the same empty picture", async () => {
+    const plan = await planFile();
+    process.env.FAKE_BLANK = "1";
+    const id = runIdOf(text(await farm({ action: "run_local", plan })));
+    await waitForRun(id);
+    // without After Effects' own render to compare with, the samples alone fail it
+    fp.app.project.file = null;
+    const v = text(await farm({ action: "verify", plan }));
+    expect(v).toMatch(/^FAIL \(1\)/);
+    expect(v).toMatch(/the sampled frames 0, 50, 99 are all the same flat picture \(one colour\): frames outside the comp \(a wrong -s \/ -e\)/);
+    expect(v).toMatch(/the pixel proof: After Effects has an unsaved project open/);
+  });
+
+  it("the automatic pixel proof fails a render of other frames", async () => {
+    const plan = await planFile();
+    const id = runIdOf(text(await farm({ action: "run_local", plan })));
+    await waitForRun(id);
+    // the files of frames 0 and 99 swapped: every file is there and complete, but the picture is wrong
+    const a = readFileSync(join(work, "out", "main_0000.png")), b = readFileSync(join(work, "out", "main_0099.png"));
+    writeFileSync(join(work, "out", "main_0000.png"), b);
+    writeFileSync(join(work, "out", "main_0099.png"), a);
+    const v = text(await farm({ action: "verify", plan }));
+    expect(v).toMatch(/^FAIL \(1\)/);
+    expect(v).toMatch(/2 of 2 sampled frames differ from a render here: 0 \(max 99\/255\), 99 \(max 99\/255\)/);
+  });
+
+  it("run_local and verify without plan use the plan next to the open project; refused when it is ambiguous or missing", async () => {
+    expect(text(await farm({ action: "run_local" }))).toMatch(/No plan for this project next to it\. Nothing was started\. Make one first/);
+    const plan = await planFile();
+    const r = text(await farm({ action: "run_local" }));
+    expect(r).toMatch(/^Started run farm\w+: 3 chunks/);
+    expect(r).toContain(`Using the plan ${plan}`);
+    await waitForRun(runIdOf(r));
+    expect(text(await farm({ action: "verify" }))).toMatch(/^PASS/);
+    // a second item with a plan: which one?
+    expect((await farm({ action: "plan", rqIndex: 2, estimate: "none" })).isError).toBeFalsy();
+    expect(text(await farm({ action: "run_local" }))).toMatch(/There are plans for render queue items (1, 2|2, 1) of this project\. Nothing was started\. Pass rqIndex/);
+    expect(text(await farm({ action: "verify", rqIndex: 1 }))).toMatch(/^PASS/);
+  });
+
+  it("a run is found again after the server restarts: status reads the jobs' files and logs", async () => {
+    const plan = await planFile();
+    const id = runIdOf(text(await farm({ action: "run_local", plan })));
+    await waitForRun(id);
+    farmRuns.clear();
+    forgetJobs();
+    const st = text(await farm({ action: "status", run: id }));
+    expect(st).toMatch(/^Run farm\w+: done\. 100 of 100 frames rendered; 3 of 3 chunks done\./);
+    expect(st).toMatch(/2\. frames 33-66: done, 34\/34, 2 s per frame/);
+    expect(text(await farm({ action: "status" }))).toContain(`Run ${id}: done`);
   });
 
   it("movies: a part per chunk, probed; joined by stream copy when it is lossless; the total checked", async () => {
@@ -757,6 +870,21 @@ describe("verify on its own", () => {
     const t = verifySequence(join(d, "s_[####].png"), 1001, 1010);
     expect(t.missing).toEqual([1005]);
     expect(t.truncated.map((x) => x.file)).toEqual(["s_1006.png"]);
+  });
+
+  it("flat pictures: all the same flat frame is a blank render; flat but different frames, or a picture, are not", () => {
+    const d = mkdtempSync(join(home, "flat-"));
+    const flat = (v: number) => encodePng(2, 2, new Uint8Array(12).fill(v));
+    writeFileSync(join(d, "a.png"), flat(0));
+    writeFileSync(join(d, "b.png"), flat(7));
+    writeFileSync(join(d, "c.png"), encodePng(2, 2, new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])));
+    writeFileSync(join(d, "t.png"), encodePng(2, 2, new Uint8Array(16), 4));
+    const f = (n: string, k: number) => pictureFacts(k, join(d, n));
+    expect(blankRender([f("a.png", 1), f("a.png", 2), f("a.png", 3)])).toMatch(/1, 2, 3 are all the same flat picture \(one colour\)/);
+    expect(blankRender([f("t.png", 1), f("t.png", 2)])).toMatch(/fully transparent/);
+    expect(blankRender([f("a.png", 1), f("b.png", 2)])).toBeNull();
+    expect(blankRender([f("c.png", 1), f("c.png", 2)])).toBeNull();
+    expect(blankRender([f("a.png", 1)])).toBeNull();
   });
 
   it("the pixel proof: identical, beyond the tolerance, a size that doesn't match, an RGB render against an RGBA local one", () => {

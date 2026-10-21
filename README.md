@@ -654,7 +654,8 @@ run there.
   Effects' own lists of effects and fonts count too.
 - **`plan`**: one render queue item split into frame ranges for `processes` on this machine or for named `machines`
   (each with its platform, aerender, path map and relative speed). Each chunk gets its aerender command (`-project`,
-  `-rqindex`, `-s` / `-e`, an `-output` where needed, `-mfr` on a share of the CPU when several processes share a
+  `-rqindex`, `-s` / `-e` as the frame numbers After Effects shows (from the comp's start frame: 90000-90099 for a
+  4-second comp at 25 fps that starts at 01:00:00:00), an `-output` where needed, `-mfr` on a share of the CPU when several processes share a
   machine), and each machine a script (`.command` on macOS, `.bat` on Windows), written with `farm-plan.json` next to
   the project. Image sequences: every chunk writes into the same sequence; a plan is refused when the output module
   numbers files from "Starting #" (every chunk would overwrite the same files), and too short `[####]` padding is
@@ -665,14 +666,19 @@ run there.
   from a few frames sampled now, and says what it leaves out (aerender's start-up, encoding).
 - **`run_local`**: the chunks as parallel aerender processes on this machine, as background-render jobs (logs,
   progress, cancel, the panel's job files): at most as many at once as the cores and memory allow, the others start as
-  those finish. Existing output is never rendered over without `overwrite: true`; a plan is refused once the project
-  was saved again. `status` shows each chunk's progress and per-frame times from aerender's log.
+  those finish. Without `plan` it uses the plan next to the open project (and says which), and refuses when several
+  render queue items have one. Existing output is never rendered over without `overwrite: true`; a plan is refused
+  once the project was saved again. The renders go on when the AI app reloads the server: `status` finds the run again
+  from its files and shows each chunk's progress and time per frame (aerender's total time over its frames).
 - **`verify`**: wherever the chunks ran, proof of the result. Sequences: every frame present once, no extras, no
   empty or cut-off files (a complete PNG, a JPEG end marker, a DPX size field; other formats by header), with the exact
-  missing frames and the `-s` / `-e` ranges to render again. Movies: each part's frame count and duration with ffprobe,
+  missing frames and the `-s` / `-e` ranges to render again (missing, empty and cut-off frames). A few frames are
+  looked at: when they are all the same flat picture (what frames outside the comp render as), it fails. With After
+  Effects open on the project, 2 sampled frames are also compared with its own render of them (a tolerance of 4/255
+  for colour conversion; only a clearly different picture fails). Movies: each part's frame count and duration with ffprobe,
   then the joined file's frame count, size, frame rate and codec against the comp and the output module; `join: true`
-  joins the parts when that is lossless (never over an existing file). `proveFrames` compares sampled frames pixel by
-  pixel with a render here (the `ae_prove_identical` comparison). The verdict is **PASS**, **FAIL (n)** or
+  joins the parts when that is lossless (never over an existing file). `proveFrames` makes the pixel proof strict, on
+  as many frames as asked (the `ae_prove_identical` comparison and tolerance). The verdict is **PASS**, **FAIL (n)** or
   **INCOMPLETE** with what couldn't be checked.
 
 Your open project is never edited, but scripts in After Effects can't save a copy of a project without opening it: the

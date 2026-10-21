@@ -316,6 +316,8 @@ export interface FakeCompSpec {
   renderer?: string;
   /** Essential Graphics controllers (name, value and type of the Essential Property a precomp layer gets) */
   egp?: { name: string; value: unknown; type: string; /** the property it drives (essentialPropertySource): layer name and path of names; "" = the layer (media) */ source?: { layer: string; path: string } }[];
+  /** the comp's displayed start frame (Start Timecode: displayStartTime = startFrame / fps; default 0) */
+  startFrame?: number;
   /** render cost (ms) of the comp itself, before its layers (default 10) */
   renderMs?: number;
 }
@@ -515,7 +517,7 @@ export function fakeProject(spec: FakeProjectSpec) {
     const it: any = Object.assign(new CompItem(), {
       id: nextId++, name, width: c.width ?? 1920, height: c.height ?? 1080, pixelAspect: 1, frameRate: c.fps ?? 25, duration: c.duration ?? 10,
       motionBlur: !!c.motionBlur, shutterAngle: 180, shutterPhase: -90, motionBlurSamplesPerFrame: c.samples ?? 16, motionBlurAdaptiveSampleLimit: 128,
-      frameBlending: true, renderer: c.renderer ?? "ADBE Advanced 3d", usedIn: [], layers: [] as any[], time: 0, frameDuration: 1 / (c.fps ?? 25), displayStartTime: 0,
+      frameBlending: true, renderer: c.renderer ?? "ADBE Advanced 3d", usedIn: [], layers: [] as any[], time: 0, frameDuration: 1 / (c.fps ?? 25), displayStartTime: (c.startFrame ?? 0) / (c.fps ?? 25),
       bgColor: [0, 0, 0], workAreaStart: 0, workAreaDuration: c.duration ?? 10, parentFolder: root, resolutionFactor: [1, 1],
     });
     it.saveFrameToPng = (t: number, f: { fsName: string }) => {
@@ -850,7 +852,7 @@ export function fakeProject(spec: FakeProjectSpec) {
     file: p,
     footage: items.filter((i) => i instanceof FootageItem).map((i: any) => ({ id: i.id, name: i.name, file: i.file?.fsName ?? null, missing: !!i.footageMissing, proxy: i.proxySource?.file?.fsName ?? null })),
     comps: comps.map((c) => ({ id: c.id, name: c.name, fps: c.frameRate, sources: c.layers.map((l: any) => l.source?.id).filter((x: any) => x !== undefined) })),
-    rq: rqItems.map((r) => ({ compId: r.comp.id, comp: r.comp.name, fps: r.comp.frameRate, start: r.timeSpanStart, dur: r.timeSpanDuration, render: r.render, format: r.om.format, out: r.om.file?.fsName ?? null })),
+    rq: rqItems.map((r) => ({ compId: r.comp.id, comp: r.comp.name, fps: r.comp.frameRate, start: r.timeSpanStart, dur: r.timeSpanDuration, render: r.render, format: r.om.format, out: r.om.file?.fsName ?? null, startFrame: Math.round(r.comp.displayStartTime * r.comp.frameRate), frames: Math.round(r.comp.duration * r.comp.frameRate) })),
   });
   const projRaw: any = {
       file: fileOf(spec.file ?? "/jobs/Inherited.aep"), bitsPerChannel: spec.bpc ?? 16, expressionEngine: "javascript-1.0", rootFolder: root,
