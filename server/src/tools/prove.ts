@@ -311,6 +311,8 @@ export interface Comparison {
   image?: { data: string; label: string };
   /** for the in-chat view: every reference frame and how it compared, and this comparison's stamp */
   view?: { id: string; createdAt: string; compared: string; head: string; tolerance: number; maxDiff: number; comps: string[]; frames: ProofFrame[] };
+  /** the largest share (0-1) of a frame's pixels beyond the tolerance */
+  share?: number;
 }
 
 /**
@@ -365,7 +367,7 @@ export async function compareProof(input: { id?: string; tolerance?: number; aga
   const problems: string[] = [];
   const differing: string[] = [];
   const notes: string[] = [];
-  let frames = 0, top = 0;
+  let frames = 0, top = 0, share = 0;
   let worst: { score: [number, number]; a: Image; b: Image; label: string } | null = null;
   const viewFrames: ProofFrame[] = [], compared = `${stamp()}-${randomBytes(2).toString("hex")}`;
   const vf = (c: CompProof, i: number, more: Partial<ProofFrame>) =>
@@ -418,6 +420,7 @@ export async function compareProof(input: { id?: string; tolerance?: number; aga
         }
         const d = diffImages(a, b, tol);
         top = Math.max(top, d.maxDiff);
+        share = Math.max(share, d.over / d.total);
         vf(c, i, { differs: d.over > 0, maxDiff: r2(d.maxDiff) });
         if (!d.changed) lines.push(`  ${label}: identical`);
         else if (!d.over) lines.push(`  ${label}: identical within tolerance (max channel difference ${r2(d.maxDiff)}/255 on ${d.changed} px, max ΔE ${r2(d.maxDeltaE)})`);
@@ -458,12 +461,13 @@ export async function compareProof(input: { id?: string; tolerance?: number; aga
   }
   const text = [head, `Proof ${m.id} (reference captured ${m.createdAt}).`, ...lines, ...notes].join("\n");
   const view = { id: m.id, createdAt: m.createdAt, compared, head, tolerance: tol, maxDiff: r2(top), comps: m.comps.map((c) => c.name), frames: viewFrames };
-  if (!worst) return { verdict, text, view };
+  if (!worst) return { verdict, text, view, share };
   const pic = diffPicture(worst.a, worst.b, tol);
   return {
     verdict,
     text,
     view,
+    share,
     image: {
       data: pic.png.toString("base64"),
       label: `Difference image of ${worst.label} (${pic.width}x${pic.height}): black = identical, dark blue = within the tolerance, gray to white = beyond it (brighter = larger).`,

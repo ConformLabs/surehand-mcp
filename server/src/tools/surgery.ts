@@ -18,6 +18,19 @@ import { saveCheckpoint } from "./workflow.js";
 
 // ---------- ExtendScript ----------
 
+/** 2D layer-to-comp matrices [a, b, c, d, e, f] (x' = a x + c y + e, y' = b x + d y + f), through parents, from values */
+const MATH_JSX = `
+function val(p, t) { return p.valueAtTime(t, false); }
+function local(x, t) {
+  var g = x.property("ADBE Transform Group"), a = val(g.property("ADBE Anchor Point"), t), s = val(g.property("ADBE Scale"), t), r = val(g.property("ADBE Rotate Z"), t) * Math.PI / 180, pp = g.property("ADBE Position"), p;
+  p = pp.dimensionsSeparated ? [val(g.property("ADBE Position_0"), t), val(g.property("ADBE Position_1"), t)] : val(pp, t);
+  var cs = Math.cos(r), sn = Math.sin(r), m0 = cs * s[0] / 100, m1 = sn * s[0] / 100, m2 = -sn * s[1] / 100, m3 = cs * s[1] / 100;
+  return [m0, m1, m2, m3, p[0] - (m0 * a[0] + m2 * a[1]), p[1] - (m1 * a[0] + m3 * a[1])];
+}
+function mul(A, B) { return [A[0] * B[0] + A[2] * B[1], A[1] * B[0] + A[3] * B[1], A[0] * B[2] + A[2] * B[3], A[1] * B[2] + A[3] * B[3], A[0] * B[4] + A[2] * B[5] + A[4], A[1] * B[4] + A[3] * B[5] + A[5]]; }
+function world(x, t, d) { var m = local(x, t), p = null; try { p = x.parent; } catch (e) {} return p && d < 50 ? mul(world(p, t, d + 1), m) : m; }
+`;
+
 /** shared: every expression of a set of comps, with index and match-name paths; layer kinds */
 const COMMON_JSX = `
 function r4(n) { return aemcp.round(n); }
@@ -59,7 +72,7 @@ function eps(L) { try { var g = L.property("ADBE Layer Overrides"); return g ? g
 `;
 
 /** Un-precompose facts: the parent comp P, the precomp layer L, its source C, and every expression in the project. */
-export const UFACTS_JSX = `${COMMON_JSX}
+export const UFACTS_JSX = `${COMMON_JSX}${MATH_JSX}
 var P = aemcp.findComp(args.comp), L = aemcp.findLayer(P, args.layer), C = null;
 try { C = L.source; } catch (e) {}
 if (!(C instanceof CompItem)) aemcp.fail('Layer ' + L.index + ' "' + L.name + '" in "' + P.name + '" is not a precomp layer (its source is not a composition).');
@@ -119,15 +132,6 @@ for (var c1 = 1; c1 <= C.numLayers; c1++) {
 }
 // what C's frame cut off: each visible layer's box (sourceRectAtTime through its transform and parents in C), and whether
 // that part shows in P (exact when L isn't rotated: L's frame and the box are mapped into P)
-function val(p, t) { return p.valueAtTime(t, false); }
-function local(x, t) {
-  var g = x.property("ADBE Transform Group"), a = val(g.property("ADBE Anchor Point"), t), s = val(g.property("ADBE Scale"), t), r = val(g.property("ADBE Rotate Z"), t) * Math.PI / 180, pp = g.property("ADBE Position"), p;
-  p = pp.dimensionsSeparated ? [val(g.property("ADBE Position_0"), t), val(g.property("ADBE Position_1"), t)] : val(pp, t);
-  var cs = Math.cos(r), sn = Math.sin(r), m0 = cs * s[0] / 100, m1 = sn * s[0] / 100, m2 = -sn * s[1] / 100, m3 = cs * s[1] / 100;
-  return [m0, m1, m2, m3, p[0] - (m0 * a[0] + m2 * a[1]), p[1] - (m1 * a[0] + m3 * a[1])];
-}
-function mul(A, B) { return [A[0] * B[0] + A[2] * B[1], A[1] * B[0] + A[3] * B[1], A[0] * B[2] + A[2] * B[3], A[1] * B[2] + A[3] * B[3], A[0] * B[4] + A[2] * B[5] + A[4], A[1] * B[4] + A[3] * B[5] + A[5]]; }
-function world(x, t, d) { var m = local(x, t), p = null; try { p = x.parent; } catch (e) {} return p && d < 50 ? mul(world(p, t, d + 1), m) : m; }
 function box(m, x0, y0, w, h) {
   var xs = [x0, x0 + w, x0 + w, x0], ys = [y0, y0, y0 + h, y0 + h], b = [1e12, 1e12, -1e12, -1e12];
   for (var k = 0; k < 4; k++) { var X = m[0] * xs[k] + m[2] * ys[k] + m[4], Y = m[1] * xs[k] + m[3] * ys[k] + m[5]; b[0] = Math.min(b[0], X); b[1] = Math.min(b[1], Y); b[2] = Math.max(b[2], X); b[3] = Math.max(b[3], Y); }
@@ -191,7 +195,7 @@ for (var k2 = 0; k2 < order.length; k2++) compExprs(order[k2], ex);
 return { ids: allIds(), project: app.project.file ? app.project.file.fsName : null, root: R.id, tree: tree, comps: allComps(), itemNames: names, exprs: ex };`;
 
 /** helpers of the two surgeries: setting expressions on locked layers, the result's fingerprint, created items */
-const EDIT_JSX = `
+const EDIT_JSX = `${MATH_JSX}
 function r4(n) { return aemcp.round(n); }
 function byPath(L, path) { var p = L; for (var k = 0; k < path.length; k++) p = p.property(path[k]); return p; }
 function unlocked(L, f) { var lk = L.locked; if (lk) L.locked = false; try { f(); } finally { if (lk) L.locked = true; } }
@@ -203,6 +207,17 @@ function createdSince(before) {
   var o = [], P = app.project;
   for (var i = 1; i <= P.numItems; i++) { var it = P.item(i); if (!before["i" + it.id]) o.push(it.id); }
   return o;
+}
+function en0(v) { try { return v === AutoOrientType.NO_AUTO_ORIENT; } catch (e) { return true; } }
+function mats(m) { var o = []; for (var i = 0; i < 6; i++) o.push(r4(m[i])); return "[" + o.join(", ") + "]"; }
+function vstr(v) { if (v instanceof Array) { var o = []; for (var i = 0; i < v.length; i++) o.push(r4(v[i])); return "[" + o.join(", ") + "]"; } return String(r4(v)); }
+// a layer's parent and local transform values, for a failed check
+function diag(what, x, t) {
+  var g = x.property("ADBE Transform Group"), pp = g.property("ADBE Position"), par = null;
+  try { par = x.parent; } catch (e) {}
+  return what + " " + JSON.stringify(x.name) + " (layer " + x.index + ", parent " + (par ? JSON.stringify(par.name) : "none") + "): anchor " + vstr(val(g.property("ADBE Anchor Point"), t)) +
+    ", position " + (pp.dimensionsSeparated ? vstr([val(g.property("ADBE Position_0"), t), val(g.property("ADBE Position_1"), t)]) : vstr(val(pp, t))) +
+    ", scale " + vstr(val(g.property("ADBE Scale"), t)) + ", rotation " + vstr(val(g.property("ADBE Rotate Z"), t));
 }
 function walkProps(g, ip, f) {
   for (var k = 1; k <= g.numProperties; k++) {
@@ -375,6 +390,22 @@ try {
     if (args.carry.blend) Z.blendingMode = BlendingMode[args.carry.blend];
     if (args.carry.opacity !== undefined) Z.property("ADBE Transform Group").property("ADBE Opacity").setValue(args.carry.opacity);
   }
+  // check the placement by the numbers before L goes: every moved layer must sit in P exactly where the precomp layer
+  // showed it (L's matrix in P applied to the original's matrix in C), at the start, middle and end of L's span
+  if (en0(LT.autoOrient)) {
+    var tt = [Lin, (Lin + Lout) / 2, Math.max(Lin, Lout - T.frameDuration)];
+    for (var c3 = 1; c3 <= C.numLayers; c3++) {
+      for (var t3 = 0; t3 < tt.length; t3++) {
+        var want3 = mul(world(LT, tt[t3], 0), world(C.layer(c3), tt[t3] - Ls, 0)), got3 = world(map["c" + c3], tt[t3], 0), off3 = 0;
+        for (var q3 = 0; q3 < 6; q3++) off3 = Math.max(off3, Math.abs(want3[q3] - got3[q3]) * (q3 < 4 ? 1000 : 1));
+        if (off3 > 0.01) {
+          var Mv = map["c" + c3];
+          throw new Error("placement check failed for " + JSON.stringify(Mv.name) + " at " + r4(tt[t3]) + "s: expected matrix " + mats(want3) + ", got " + mats(got3) +
+            "; " + diag("the layer", Mv, tt[t3]) + "; " + diag("its original in " + C.name, C.layer(c3), tt[t3] - Ls) + "; " + (N ? diag("the null", N, tt[t3]) + "; " : "") + diag("the precomp layer", LT, tt[t3]));
+        }
+      }
+    }
+  }
   // 4. L's children follow the null; L goes
   for (var i = 1; i <= T.numLayers; i++) { var ch = T.layer(i); if (i !== LT.index && ch.parent && ch.parent.index === LT.index) unlocked(ch, function () { ch.setParentWithJump(N); }); }
   if (LT.locked) LT.locked = false;
@@ -542,10 +573,29 @@ export function unprecomposeTimes(f: UFacts, frames = 6): number[] {
 
 const proven = (c: Comparison) => c.verdict === "identical" || c.verdict === "identical within tolerance";
 
-/** What likely made the proof differ, from the plan's risks. */
-function likelyCause(risks: string[]): string {
-  if (!risks.length) return "Likely cause: nothing in the plan predicts a difference; look at the frames and the difference image (an expression reading the comp's name or index, an effect drawing outside a layer, or a render setting).";
-  return `Likely cause${risks.length > 1 ? "s" : ""}, most likely first:\n${risks.map((r) => `  - ${r}`).join("\n")}`;
+/** a risk about resampling (a scaled, rotated or sub-pixel precomp layer) */
+const RESAMPLING = /resampl/;
+
+/**
+ * What likely made the proof differ. Resampling (the precomp rendered, then transformed as a whole, against each layer
+ * transformed once) only shows as small differences along edges: it is named only when the difference is small
+ * (max channel difference up to 48/255 on at most 1% of a frame's pixels). A larger one means the layers are not
+ * placed or shown as they were, whatever the plan's risks say.
+ */
+export function likelyCause(risks: string[], diff: { maxDiff: number; share: number }): string {
+  const small = diff.maxDiff <= 48 && diff.share <= 0.01;
+  const resampling = risks.filter((r) => RESAMPLING.test(r)), other = risks.filter((r) => !RESAMPLING.test(r));
+  const size = `up to ${Math.round(diff.maxDiff * 100) / 100}/255 on ${Math.round(diff.share * 10000) / 100}% of a frame`;
+  if (small && resampling.length)
+    return `Likely cause (a small difference, ${size}, as resampling makes along edges):\n${[...resampling, ...other].map((r) => `  - ${r}`).join("\n")}`;
+  if (!small)
+    return (
+      `Likely cause: the difference is too large for resampling (${size}): the moved layers are not placed, timed or shown as they were in the precomp. ` +
+      "This is a bug or an After Effects behaviour the surgery doesn't handle; the frames and the area above show where." +
+      (other.length ? `\nAlso in the plan:\n${other.map((r) => `  - ${r}`).join("\n")}` : "")
+    );
+  if (!other.length) return `Likely cause: nothing in the plan predicts a difference (${size}); look at the frames and the difference image (an expression reading the comp's name or index, an effect drawing outside a layer, or a render setting).`;
+  return `Likely cause${other.length > 1 ? "s" : ""} (${size}), most likely first:\n${other.map((r) => `  - ${r}`).join("\n")}`;
 }
 
 export async function runSurgery(a: SurgeryInput, perm: { mode: string; allowShell: boolean }): Promise<CallToolResult> {
@@ -651,7 +701,7 @@ export async function runSurgery(a: SurgeryInput, perm: { mode: string; allowShe
       "",
       verdict,
       "",
-      differs ? likelyCause(plan.risks) : "",
+      differs && typeof cmp !== "string" ? likelyCause(plan.risks, { maxDiff: cmp.view?.maxDiff ?? 255, share: cmp.share ?? 1 }) : "",
       "",
       "The plan that was rehearsed:",
       ...lines,

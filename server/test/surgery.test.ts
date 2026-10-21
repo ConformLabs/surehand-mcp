@@ -56,7 +56,7 @@ vi.mock("../src/jsx.js", async (orig) => {
   };
 });
 
-const { runSurgery, UFACTS_JSX, DFACTS_JSX, UNPRECOMPOSE_JSX, DEEPDUP_JSX, CLEANUP_JSX } = await import("../src/tools/surgery.js");
+const { runSurgery, likelyCause, UFACTS_JSX, DFACTS_JSX, UNPRECOMPOSE_JSX, DEEPDUP_JSX, CLEANUP_JSX } = await import("../src/tools/surgery.js");
 const { planUnprecompose, planDeepDuplicate, blocking } = await import("../src/surgery/plan.js");
 
 const FULL = { mode: "full", allowShell: false };
@@ -477,6 +477,39 @@ describe("un-precompose: the tool", () => {
     expect(text(r)).toMatch(/Read back from "Main1b" after the surgery: 1 "Pre1b \(null\)", 2 "Title", 3 "Box"\./);
   });
 
+  it("the placement is checked by the numbers before the precomp layer goes: a moved layer that isn't where the precomp showed it stops the rehearsal, with the values", async () => {
+    const comps: SComp[] = [
+      { name: "Pre", layers: [{ name: "Title", type: "text", position: [960, 540] }, { name: "Box", size: [300, 300], position: [400, 400] }] },
+      { name: "Main", layers: [{ name: "Pre", type: "precomp", source: "Pre", position: [700, 500], scale: [50, 50, 100] }] },
+    ];
+    ae(comps, { jumpIgnored: true });
+    const before = fake.state();
+    const r = await runSurgery({ action: "unprecompose", comp: "Main", layer: "Pre" }, FULL);
+    expect(r.isError).toBe(true);
+    const t = text(r);
+    expect(t).toMatch(/The rehearsal on a scratch copy stopped: placement check failed for "Title" at 0s: expected matrix \[0\.5, 0, 0, 0\.5, 700, 500\], got \[1, 0, 0, 1, 960, 540\]/);
+    expect(t).toMatch(/the layer "Title" \(layer 2, parent none\): anchor \[0, 0\], position \[960, 540\], scale \[100, 100, 100\], rotation 0; .*the null "Pre \(null\)" \(layer 1, parent none\): anchor \[960, 540\], position \[700, 500\], scale \[50, 50, 100\]/);
+    expect(fake.state()).toBe(before);
+  });
+
+  it("the diagnostic script (test/fixtures/surgery-diagnostic.js) runs the steps on a throwaway duplicate and leaves the project as it was", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { transpileUserCode } = await import("../src/transpile.js");
+    const code = readFileSync(new URL("./fixtures/surgery-diagnostic.js", import.meta.url), "utf8");
+    ae(plain());
+    const before = fake.state();
+    const t = transpileUserCode(code);
+    expect(t.syntaxError).toBeUndefined();
+    const r = fake.run(`var __fn = eval(${JSON.stringify(t.source)});\nreturn __fn(args, log);`, { comp: "Main", layer: "Logo", t: 1 }, { undoGroup: "Surehand MCP" });
+    expect(r.ok, r.error?.message).toBe(true);
+    const lines: string[] = r.result.split("\n");
+    const after = lines.filter((l) => l.startsWith("after the precomp layer was removed"));
+    expect(after).toHaveLength(3);
+    expect(after.every((l) => l.endsWith("ok"))).toBe(true);
+    expect(r.result).toMatch(/null with the precomp layer's values \| \d+ Logo \(null\) \| parent none \| anchor \[400, 200\] position \[960, 540\] scale \[50, 50, 100\]/);
+    expect(fake.state()).toBe(before);
+  });
+
   it("the rehearsal's null solid is removed with its scratch comp; a missing id never stops the cleanup", async () => {
     ae(plain());
     const n = fake.items().length;
@@ -511,7 +544,8 @@ describe("un-precompose: the tool", () => {
     expect(t).toMatch(/^DIFFERS: the un-precompose was NOT applied\. It was rehearsed on a scratch copy, the copy did not render identical to the original, and the copy was removed: the project is as it was \(checkpoint /);
     expect(t).toMatch(/Verdict: DIFFERS in 6 of 6 frames/);
     expect(t).toMatch(/"Main" \(id \d+\) against "Main \(Surehand rehearsal\)" \(id \d+\)/);
-    expect(t).toMatch(/Likely cause[\s\S]*"Logo" is scaled \(50%, 50%\)/);
+    // the whole frame differs: far too much for resampling, which is not named as the cause
+    expect(t).toMatch(/Likely cause: the difference is too large for resampling \(up to \d+(\.\d+)?\/255 on 100% of a frame\): the moved layers are not placed, timed or shown as they were/);
     expect(r.content.some((c: any) => c.type === "image")).toBe(true);
     expect(fake.state()).toBe(before);
   });
@@ -548,6 +582,22 @@ describe("un-precompose: the tool", () => {
     const r = await runSurgery({ action: "unprecompose", comp: "Main", layer: "Logo" }, { mode: "read-only", allowShell: false });
     expect(r.isError).toBe(true);
     expect(fake.state()).toBe(before);
+  });
+});
+
+describe("the likely cause of a DIFFERS", () => {
+  const risks = ['"L" is scaled (50%, 50%): the precomp was rendered first and then resampled once as a whole', 'Main > 1 "A" > Opacity: reads the comp\'s name'];
+  it("resampling only for a small difference along edges", () => {
+    expect(likelyCause(risks, { maxDiff: 20, share: 0.004 })).toMatch(/^Likely cause \(a small difference, up to 20\/255 on 0.4% of a frame, as resampling makes along edges\):\n {2}- "L" is scaled/);
+  });
+  it("a large difference is the placement, whatever the plan's risks say", () => {
+    const t = likelyCause(risks, { maxDiff: 229, share: 0.07 });
+    expect(t).toMatch(/^Likely cause: the difference is too large for resampling \(up to 229\/255 on 7% of a frame\): the moved layers are not placed/);
+    expect(t).not.toMatch(/scaled/);
+    expect(t).toMatch(/Also in the plan:\n {2}- Main > 1 "A" > Opacity: reads the comp's name/);
+  });
+  it("a small difference with no resampling risk lists the other risks", () => {
+    expect(likelyCause([risks[1]], { maxDiff: 3, share: 0.001 })).toMatch(/^Likely cause \(up to 3\/255 on 0.1% of a frame\), most likely first:\n {2}- Main > 1 "A"/);
   });
 });
 
