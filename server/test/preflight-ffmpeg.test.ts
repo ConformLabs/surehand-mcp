@@ -181,7 +181,7 @@ describe("the one-time download", () => {
     const dir2 = tmp();
     await expect(installFfmpeg(build(`${base}/winold.zip`, sha(files["/winold.zip"])), dir2, { platform: "win32" })).rejects.toThrow(/did not start correctly.*Nothing was installed/);
     expect(readdirSync(dir2)).toEqual([]);
-  });
+  }, 30_000); // unzips a real archive: about 2 s alone, slower when the whole suite runs at once
 
   it.skipIf(process.platform !== "darwin")("one download for every caller; a caller that cancels doesn't cancel it for the others", async () => {
     const home = tmp();

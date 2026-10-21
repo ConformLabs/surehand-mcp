@@ -5,6 +5,7 @@
 //   npm run test:windows                    (host "ron-pc" from ~/.ssh/config)
 //   AEMCP_WIN_HOST=other-pc npm run test:windows
 //   npm run test:windows -- --allow-no-ae   (pass even if no After Effects is open)
+//   npm run test:windows -- --restart-wait 0   (an After Effects still running an older extension: test it as it is; default: wait up to 15 min for a restart)
 //
 // Needs key-based SSH to the PC (OpenSSH server on Windows). SSH cannot open windows on the
 // PC's desktop, so After Effects has to be opened there by hand.
@@ -14,6 +15,9 @@ import { fileURLToPath } from "node:url";
 
 const host = process.env.AEMCP_WIN_HOST || "ron-pc";
 const allowNoAe = process.argv.includes("--allow-no-ae");
+// an After Effects still running an older extension than this build: wait this long for it to be restarted (0: test it as it is)
+const restartArg = process.argv.indexOf("--restart-wait");
+const restartMinutes = restartArg > 0 && Number.isFinite(Number(process.argv[restartArg + 1])) ? Number(process.argv[restartArg + 1]) : 15;
 const bundle = fileURLToPath(new URL("../dist/surehand-ae.mjs", import.meta.url));
 const buildVersion = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
 const SSH = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10"];
@@ -54,11 +58,26 @@ if (!/Extension:/.test(instOut)) {
   process.exit(1);
 }
 
-const list = remote(
-  `powershell -NoProfile -Command "Get-ChildItem $env:USERPROFILE\\.surehand\\ae\\instances\\*.json, $env:USERPROFILE\\.aemcp\\instances\\*.json -ErrorAction SilentlyContinue | ForEach-Object { $j = Get-Content $_ -Raw | ConvertFrom-Json; '{0} {1}' -f $j.port, $j.host.appVersion }"`,
-  { quiet: true },
-);
-const instances = list.out.split(/\r?\n/).map((l) => l.trim().split(" ")).filter((p, i, all) => /^\d+$/.test(p[0]) && all.findIndex((q) => q[0] === p[0]) === i);
+// [port, After Effects version, extension version] of each After Effects on the PC
+const listInstances = () =>
+  remote(
+    `powershell -NoProfile -Command "Get-ChildItem $env:USERPROFILE\\.surehand\\ae\\instances\\*.json, $env:USERPROFILE\\.aemcp\\instances\\*.json -ErrorAction SilentlyContinue | ForEach-Object { $j = Get-Content $_ -Raw | ConvertFrom-Json; '{0} {1} {2}' -f $j.port, $j.host.appVersion, $j.version }"`,
+    { quiet: true },
+  ).out.split(/\r?\n/).map((l) => l.trim().split(" ")).filter((p, i, all) => /^\d+$/.test(p[0]) && all.findIndex((q) => q[0] === p[0]) === i);
+let instances = listInstances();
+// the extension was just installed, but a running After Effects keeps the one it started with: its self-test would mix
+// an older extension with this server. Wait for After Effects to be restarted on the PC instead of failing halfway.
+const stale = () => instances.filter((p) => p[2] && p[2] !== buildVersion);
+if (stale().length && restartMinutes > 0) {
+  console.log(`\n== restart After Effects on the PC to load v${buildVersion}'s extension: ${stale().map((p) => `After Effects ${p[1]} still runs v${p[2]}`).join(", ")}`);
+  console.log(`  waiting up to ${restartMinutes} min (--restart-wait 0 tests it as it is)`);
+  const until = Date.now() + restartMinutes * 60_000;
+  while (stale().length && Date.now() < until) {
+    await new Promise((r) => setTimeout(r, 10_000));
+    instances = listInstances();
+  }
+  console.log(stale().length ? "  ! still not restarted: testing as it is" : "  ✔ every After Effects on the PC runs this extension now");
+}
 // the installed server: ~/.aemcp's only while a 1.3 installation could not be moved (see .surehand\migration.log)
 const moved = remote(`if exist "%USERPROFILE%\\.surehand\\ae\\server\\surehand-ae.mjs" (echo new) else (echo old)`, { quiet: true }).out.trim();
 const server = moved === "old" ? ".aemcp\\server\\ae-mcp.mjs" : ".surehand\\ae\\server\\surehand-ae.mjs";
