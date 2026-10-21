@@ -34,9 +34,6 @@ measures the result.
 AI app ──MCP──> surehand-ae server (Node, on your computer) ──localhost──> Surehand panel (CEP, inside After Effects) ──> ExtendScript
 ```
 
-*Formerly AE MCP. Same tools, same install folder and AI-app settings; only the name changed (see
-[Upgrading from 1.3](#upgrading-from-13)).*
-
 <a name="example-prompts"></a>
 
 ## What you can ask it
@@ -128,7 +125,7 @@ What every installer (`.pkg`, `Setup.exe`, or **1. Install** from the zip) does:
 - uses the private Node.js 24 that the `.pkg` / `Setup.exe` put in `~/.surehand/node`; the zip's scripts use the
   Node.js on your PATH, or download a private Node.js 22 LTS into `~/.surehand/node` (checksum-verified)
 - copies the MCP server to `~/.surehand/ae/server/surehand-ae.mjs` (one self-contained file)
-- installs the After Effects extension (`com.aemcp`) into your user CEP extensions folder. The extension is signed,
+- installs the After Effects extension into your user CEP extensions folder. The extension is signed,
   so it loads without enabling unsigned extensions (`PlayerDebugMode`)
 - creates `~/.surehand/ae/config.json` with a random access token
 - registers the server, under the name `surehand-ae`, with the AI apps it finds: **Claude Desktop**, **Claude
@@ -981,7 +978,7 @@ views (Claude Code, Windsurf, LM Studio) get the same results as text.
 ## Command line
 
 The installed server is also a command: `surehand-ae <command>` (or `node ~/.surehand/ae/server/surehand-ae.mjs
-<command>`; `ae-mcp` stays as an alias). `surehand-ae --help` lists everything.
+<command>`). `surehand-ae --help` lists everything.
 
 | Command | What it does |
 |---|---|
@@ -1007,7 +1004,7 @@ label?}}]}`; `update --check` → `{latest, current, updateAvailable, url, check
 `ae_preflight` / `ae_prove_identical`, `result: {verdict, summary}`; background renders keep
 `~/.surehand/ae/renders/<id>.json` up to date.
 
-**Environment variables** (each also works with the older `AEMCP_` prefix): `SUREHAND_AE_CONFIG` (config file;
+**Environment variables:** `SUREHAND_AE_CONFIG` (config file;
 instances are looked up next to it), `SUREHAND_AE_BRIDGE_PORT`, `SUREHAND_AE_TOKEN`, `SUREHAND_AE_HTTP_PORT`,
 `SUREHAND_AE_HTTP_TOKEN`, `SUREHAND_AE_TOOLS` (`core` / `full`), `SUREHAND_AE_INSTANCE`,
 `SUREHAND_AE_BLOCKED_AFTER_SECONDS`, `SUREHAND_AE_STARTUP_WAIT_SECONDS`, `SUREHAND_AE_NO_UPDATE_CHECK`,
@@ -1028,18 +1025,15 @@ GitHub at most once a day; turn off with `"updateCheck": false` in `~/.surehand/
 releases, checked and installed the same way. Turning it off (`--channel stable`) never goes back to an older
 version: a newer beta stays until a newer stable release is out.
 
-### Upgrading from 1.3
+### Updating from 1.3
 
-Automatic. Version 1.3 kept everything in `~/.aemcp`. The first time 1.4 runs (installer, update, or just starting),
-it moves it: settings, checkpoints, project history and your other files to `~/.surehand/ae`, the private Node.js and
-ffmpeg to `~/.surehand`, and points the AI apps that ran the old server at the new one (`after-effects` becomes
-`surehand-ae`; an `after-effects` entry that isn't ours is left alone). Nothing is deleted: if something can't be
-moved (a file in use), everything stays where it was, keeps working from there, and the move is tried again later;
-the reason is in `~/.surehand/migration.log`. Until After Effects is restarted once, the old extension still runs in
-it and uses `~/.aemcp`, so a copy of `config.json`, an `instances` folder, a small `server/ae-mcp.mjs` that starts the
-new server and `MOVED.txt` stay there; uninstalling removes them too. With the Claude Desktop extension: the 1.4
-`.mcpb` is a new extension to Claude Desktop (named `surehand-ae`), so after installing it remove the old **After
-Effects MCP** entry in **Settings > Extensions**.
+Automatic. The first time 1.4 runs (installer, update, or just starting), your settings, checkpoints, project
+history, access token and AI app connections carry over, so a ChatGPT connector URL keeps working. Nothing is
+deleted: if something can't be moved (a file in use), everything keeps working where it was and the move is tried
+again later; the reason is in `~/.surehand/migration.log`. Restart After Effects once to load the new panel; until
+then Surehand says so. With the Claude Desktop extension: the 1.4 `.mcpb` installs as a new extension
+(`surehand-ae`), so after installing it remove the previous version's entry in **Settings > Extensions**. What moves
+where is under [Names](#names) for developers.
 
 ## Troubleshooting
 
@@ -1177,6 +1171,8 @@ To add a tool, add an entry to one of the arrays in `server/src/tools/*.ts`: a z
 function body that receives `args` and can use the `aemcp` helpers. The tool counts in this README are checked by
 `server/test/readme-tool-count.test.ts`.
 
+<a name="names"></a>
+
 **Names.** The family is Surehand (Photoshop and Premiere may follow), so this app's names are `surehand-ae`: the
 command (`ae-mcp` stays as an alias), the server file `surehand-ae.mjs`, the MCP server name and the key in each AI
 app's settings (`SERVER_NAME`; 1.3 used `after-effects`), the `.mcpb` `name` (its `display_name` is "Surehand MCP"),
@@ -1185,6 +1181,13 @@ and the folders `~/.surehand/ae` (this app) and `~/.surehand` (shared: `node/`, 
 Effects extension id `com.aemcp` (and its bundle ids), the `aemcp` helper object and `aemcp://` resource URIs.
 Environment variables are `SUREHAND_AE_*`; the `AEMCP_*` names still work. Releases carry the server as
 `surehand-ae.mjs` and also as `ae-mcp.mjs` (what 1.3's updater downloads). The npm package name is `surehand-mcp`.
+
+**Moving from 1.3** (`server/src/migrate.ts`): 1.3 kept everything in `~/.aemcp`. 1.4 moves settings,
+checkpoints, project history and other files to `~/.surehand/ae`, the private Node.js and ffmpeg to `~/.surehand`,
+and points AI apps that ran the old server at the new one (`after-effects` becomes `surehand-ae`; an
+`after-effects` entry that isn't ours is left alone). Until After Effects is restarted once, the old extension still
+runs and uses `~/.aemcp`, so a copy of `config.json`, an `instances` folder, a small `server/ae-mcp.mjs` that starts
+the new server and `MOVED.txt` stay there; uninstalling removes them too.
 
 <a name="testing-on-windows"></a>
 
