@@ -745,7 +745,7 @@ describe("deep duplicate", () => {
     expect(text(rm)).toMatch(/^Removed copy set [\w-]+: "Main copy", "Scene A copy", "Shared copy", "Scene B copy"\. The originals were never changed\./);
     expect(fake.state()).toBe(start);
     // nothing left to remove: the latest set's comps are gone
-    expect(text(await runSurgery({ action: "remove_copies" }, FULL))).toMatch(/Already gone: "Main copy", "Scene A copy", "Shared copy", "Scene B copy"/);
+    expect(text(await runSurgery({ action: "remove_copies" }, FULL))).toMatch(/^Nothing to remove for copy set [\w-]+\. The originals were never changed\.\nAlready gone: "Main copy", "Scene A copy", "Shared copy", "Scene B copy"/);
   });
 
   it("remove_copies refuses while anything outside the copies uses one, and in another project", async () => {

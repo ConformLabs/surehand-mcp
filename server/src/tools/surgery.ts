@@ -712,7 +712,8 @@ async function removeCopies(a: SurgeryInput, perm: { mode: string; allowShell: b
   if (res.refused)
     return { isError: true, content: [{ type: "text", text: `REFUSED: nothing was removed. Copy set ${set.id} is in use outside its own copies:\n${res.refused.map((p) => `  - ${p}`).join("\n")}${gone}` }] };
   const changes = formatChanges(r.changes);
-  return { content: [{ type: "text", text: `Removed copy set ${set.id}: ${res.removed!.map((n) => `"${n}"`).join(", ")}. The originals were never changed.${gone}${changes ? `\n\n${changes}` : ""}` }] };
+  const removed = res.removed!.length ? `Removed copy set ${set.id}: ${res.removed!.map((n) => `"${n}"`).join(", ")}.` : `Nothing to remove for copy set ${set.id}.`;
+  return { content: [{ type: "text", text: `${removed} The originals were never changed.${gone}${changes ? `\n\n${changes}` : ""}` }] };
 }
 
 export async function runSurgery(a: SurgeryInput, perm: { mode: string; allowShell: boolean }): Promise<CallToolResult> {
