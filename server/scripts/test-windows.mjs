@@ -72,11 +72,14 @@ if (stale().length && restartMinutes > 0) {
   console.log(`\n== restart After Effects on the PC to load v${buildVersion}'s extension: ${stale().map((p) => `After Effects ${p[1]} still runs v${p[2]}`).join(", ")}`);
   console.log(`  waiting up to ${restartMinutes} min (--restart-wait 0 tests it as it is)`);
   const until = Date.now() + restartMinutes * 60_000;
-  while (stale().length && Date.now() < until) {
+  // wait for each of those After Effects to come back on this extension: while it restarts it isn't registered at all
+  const waitFor = stale().map((p) => p[0]);
+  const back = () => waitFor.every((port) => instances.some((p) => p[0] === port && p[2] === buildVersion));
+  while (!back() && Date.now() < until) {
     await new Promise((r) => setTimeout(r, 10_000));
     instances = listInstances();
   }
-  console.log(stale().length ? "  ! still not restarted: testing as it is" : "  ✔ every After Effects on the PC runs this extension now");
+  console.log(back() ? "  ✔ every After Effects on the PC runs this extension now" : stale().length ? "  ! still not restarted: testing as it is" : "  ! not every After Effects came back: testing the ones open");
 }
 // the installed server: ~/.aemcp's only while a 1.3 installation could not be moved (see .surehand\migration.log)
 const moved = remote(`if exist "%USERPROFILE%\\.surehand\\ae\\server\\surehand-ae.mjs" (echo new) else (echo old)`, { quiet: true }).out.trim();

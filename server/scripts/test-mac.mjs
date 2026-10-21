@@ -118,11 +118,14 @@ if (stale().length && restartMinutes > 0) {
   console.log(`\n== restart After Effects to load v${buildVersion}'s extension: ${stale().map((i) => `After Effects ${i.host?.appVersion ?? "?"} still runs v${i.version}`).join(", ")}`);
   console.log(`  waiting up to ${restartMinutes} min (--restart-wait 0 tests it as it is)`);
   const until = Date.now() + restartMinutes * 60_000;
-  while (stale().length && Date.now() < until) {
+  // wait for each of those After Effects to come back on this extension: while it restarts it isn't registered at all
+  const waitFor = stale().map((i) => i.port);
+  const back = () => waitFor.every((port) => instances.some((i) => i.port === port && i.version === buildVersion));
+  while (!back() && Date.now() < until) {
     await new Promise((r) => setTimeout(r, 5000));
     instances = readInstances();
   }
-  console.log(stale().length ? "  ! still not restarted: testing as it is" : "  ✔ every After Effects runs this extension now");
+  console.log(back() ? "  ✔ every After Effects runs this extension now" : stale().length ? "  ! still not restarted: testing as it is" : "  ! not every After Effects came back: testing the ones open");
 }
 
 let failed = 0;
