@@ -17,7 +17,7 @@ export function stressFixture(): StressView {
       findings: [
         { check: "text.overflow", column: "fit", severity: "fail", layer: "Name", layerIndex: 2, message: "overflows its box by 184 px; 3 lines, the box shows 2 (text is cut off)", frame: 48, time: 1.92, tc: "00:00:01:23", box: [200, 830, 1060, 900], textBox: [200, 830, 1060, 900], amountPx: 184 },
         { check: "safeAreas.title", column: "safe", severity: "fail", layer: "Name", layerIndex: 2, message: "outside title-safe by up to 96 px on the right", frame: 48, time: 1.92, tc: "00:00:01:23", box: [200, 830, 1824, 900], area: { name: "title", rect: [192, 108, 1728, 972] }, amountPx: 96 },
-        { check: "text.lines", column: "lines", severity: "fail", layer: "Name", layerIndex: 2, message: "3 lines; the limit is 2", frame: 48, time: 1.92, tc: "00:00:01:23" },
+        { check: "text.lines", column: "lines", severity: "fail", layer: "Name", layerIndex: 2, message: "the limit is 2 lines", frame: 48, time: 1.92, tc: "00:00:01:23" },
       ],
       layers: [{ layer: "Name", layerIndex: 2, text: "Maximilian Donaudampfschifffahrtsgesellschaft", font: "SpaceGrotesk-SemiBold", fontSize: 64, renderedPx: 64, lines: 2, linesNeeded: 3, overflowPx: 184, box: [200, 830, 1824, 900] }],
       notRun: [],

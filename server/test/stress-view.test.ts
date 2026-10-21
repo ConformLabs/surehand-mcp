@@ -53,9 +53,9 @@ describe("the view's model", () => {
   it("the open frame marks the box and the safe area dashed and outlines what is cut off", () => {
     const de = stressFixture().variants[0];
     expect(M.leadFinding(de)!.check).toBe("text.overflow");
-    expect(M.frameMarks(de.findings[0])).toEqual({ dashed: [[200, 830, 1060, 900]], hit: { rect: [200, 900, 1060, 1084], warn: false } });
+    expect(M.frameMarks(de.findings[0], de.findings)).toEqual({ dashed: [[192, 108, 1728, 972]], hit: { rect: [200, 830, 1060, 900], warn: false } });
     expect(M.frameMarks(de.findings[1])).toEqual({ dashed: [[192, 108, 1728, 972]], hit: { rect: [200, 830, 1824, 900], warn: false } });
-    expect(M.openMessage(de)).toBe("Name overflows its box by 184 px; 3 lines, the box shows 2 (text is cut off); outside title-safe by up to 96 px on the right; 3 lines; the limit is 2.");
+    expect(M.openMessage(de)).toBe("Name overflows its box by 184 px; 3 lines, the box shows 2 (text is cut off); outside title-safe by up to 96 px on the right; the limit is 2 lines.");
     expect(M.fixRequest(stressFixture(), de)).toMatch(/^Fix the stress test failure "German · longest" \[de-long@Name\] in "Lower_Third" at 00:00:01:23 \(Name = "Maximilian Donaudampfschifffahrtsgesellschaft"\): Name overflows its box by 184 px/);
   });
 });

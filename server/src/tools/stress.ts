@@ -29,89 +29,73 @@ import { XRAY_JSX } from "./xray.js";
 import { CONTACT_SHEET_JSX, RENDER_FRAME_JSX, runRender, waitForFiles } from "./core.js";
 import { captureProof, compareProof } from "./prove.js";
 import { saveCheckpoint } from "./workflow.js";
-import { capText, compRef, errorResult, layerRef, propPath } from "./registry.js";
+import { capText, errorResult } from "./registry.js";
 import { registerViewTool, viewError } from "./views.js";
 
 const KINDS = ["text", "number", "checkbox", "dropdown", "color", "media"] as const;
-const margin = z.union([z.number().min(0).max(0.5), z.object({ x: z.number().min(0).max(0.5), y: z.number().min(0).max(0.5) }).strict()]);
-const numberFormat = z
-  .object({
-    decimals: z.number().int().min(0).max(10).optional(),
-    decimalSeparator: z.string().max(3).optional(),
-    thousandsSeparator: z.string().max(3).optional(),
-    prefix: z.string().max(20).optional(),
-    suffix: z.string().max(20).optional(),
-    negative: z.enum(["minus-before-prefix", "minus-after-prefix", "parentheses"]).optional(),
-    plusSign: z.boolean().optional(),
-  })
-  .strict();
+// The schema is kept short (it is sent in every chat of an AI app with views): the detail is in the README and the
+// surehand-ae-delivery skill (references/stress-test.md).
+const margin = z.union([z.number().min(0).max(0.5), z.object({ x: z.number(), y: z.number() })]);
+// versions' NumberFormat (src/versions/data.ts): decimals, decimalSeparator, thousandsSeparator, prefix, suffix, negative, plusSign
+const numberFormat = z.record(z.string(), z.any());
 const valueSchema = z.union([z.string(), z.number(), z.boolean(), z.array(z.number()).min(3).max(4)]);
 
 export const inputSchema = {
-  action: z.enum(["run", "expressions"]).optional().describe('"run" (default): the variants and the expression scan. "expressions": only the scan for expressions that break in other After Effects languages (reads only).'),
-  comp: compRef.describe("The comp to test (a template). Default: the active comp."),
+  action: z.enum(["run", "expressions"]).optional().describe('"expressions": only the language scan.'),
+  comp: z.union([z.number(), z.string()]).optional().describe("Default: the active comp."),
   targets: z
     .array(
       z
         .object({
-          egp: z.string().optional().describe("An Essential Graphics controller, by its name."),
-          layer: layerRef.optional().describe("A layer of the comp itself (a text layer, or with property / kind media)."),
-          property: propPath.optional().describe("With layer: the property to vary (default: a text layer's Source Text)."),
-          kind: z.enum(KINDS).optional().describe("What the value is (default: from the property)."),
-          maxLines: z.number().int().min(1).optional().describe("The most lines this text may take (the user's rule)."),
-          maxWidthPx: z.number().min(1).optional().describe("Point text: the most width it may take, comp px (the user's rule)."),
-          numberFormat: numberFormat.optional().describe("A number control: the format the text that shows it must have (exact check)."),
+          egp: z.string().optional(),
+          layer: z.union([z.number(), z.string()]).optional(),
+          property: z.union([z.string(), z.array(z.union([z.string(), z.number()]))]).optional(),
+          kind: z.enum(KINDS).optional(),
+          maxLines: z.number().optional(),
+          maxWidthPx: z.number().optional(),
+          numberFormat: numberFormat.optional().describe("As in ae_versions_from_data."),
         })
         .strict(),
     )
     .max(40)
     .optional()
-    .describe("What to vary. Default: every Essential Graphics controller of the comp, and text layers whose Source Text reads data (footage(...).dataValue / sourceData)."),
-  sets: z.array(z.string()).optional().describe('Only these cases (ids like "de-long", "ar-rtl", "n-huge") or groups ("length", "rtl", "cjk", "complex", "edge", "number", "state", "color", "media"). Default: all.'),
-  exclude: z.array(z.string()).optional().describe("Leave out these case ids or groups."),
-  values: z
-    .array(z.object({ target: z.string().describe("The control or layer name."), values: z.array(valueSchema).min(1).max(200) }).strict())
-    .max(40)
-    .optional()
-    .describe("The user's own values per control (real names, prices, translations), each a variant of its own."),
-  data: z
-    .union([z.string(), z.array(z.record(z.string(), z.any())).min(1).max(1000)])
-    .optional()
-    .describe("The user's own rows: a .csv / .tsv / .json file or inline rows; each row is one variant (needs columns)."),
-  columns: z.record(z.string(), z.string()).optional().describe('data: column -> control or layer name, e.g. {"Name": "Title", "Price": "Price"}.'),
-  rows: z.string().optional().describe('data: only these rows, e.g. "1-20".'),
+    .describe("Default: every Essential Graphics controller, and text that reads data."),
+  sets: z.array(z.string()).optional().describe('Case ids or groups ("rtl", "cjk", "number"...).'),
+  exclude: z.array(z.string()).optional(),
+  values: z.array(z.object({ target: z.string(), values: z.array(valueSchema) })).optional().describe("Own values per control."),
+  data: z.union([z.string(), z.array(z.record(z.string(), z.any()))]).optional().describe("CSV / JSON file or rows; each row a variant."),
+  columns: z.record(z.string(), z.string()).optional().describe("data: column -> control."),
+  rows: z.string().optional(),
   csvDelimiter: z.string().length(1).optional(),
-  combinations: z
-    .enum(["single", "together", "all"])
-    .optional()
-    .describe('"single" (default): one control at a time, the others as they are. "together": also each text case on every text at once. "all": also combinations across controls, sampled evenly up to maxVariants.'),
-  maxVariants: z.number().int().min(1).max(500).optional().describe("Cap on variants (default 80); over it they are sampled evenly per control, and the report says what was kept."),
-  frames: z.array(z.number().int().min(0)).max(60).optional().describe("Measure at these frames (from the comp's start, 0). Default: the key frames of the animation and where each text starts and stops being visible."),
-  maxFrames: z.number().int().min(1).max(60).optional().describe("Most frames measured per variant (default 12)."),
+  combinations: z.enum(["single", "together", "all"]).optional(),
+  maxVariants: z.number().int().min(1).max(500).optional(),
+  frames: z.array(z.number()).optional(),
+  maxFrames: z.number().int().min(1).max(60).optional(),
   checks: z
     .object({
-      overflow: z.boolean().optional().describe("Paragraph text must not overflow its box (default true; After Effects 24.6+)."),
-      safeArea: z.enum(["frame", "title", "action", "none"]).optional().describe('Text must stay inside this area at every measured frame (default "frame"; title / action need the margin).'),
-      title: margin.optional().describe("Title-safe margin per side, a fraction of the frame (from the user's spec)."),
-      action: margin.optional().describe("Action-safe margin per side, a fraction of the frame (from the user's spec)."),
-      minFontSizePx: z.number().min(0).optional().describe("The smallest size text may render at in the comp, px (the user's)."),
-      minCapHeightPx: z.number().min(0).optional().describe("The smallest cap height, comp px (Preflight's estimate)."),
-      glyphs: z.boolean().optional().describe("Every character must exist in its font, and the font must be installed (default true; glyphs need After Effects 25.1+)."),
-      lines: z.boolean().optional().describe("Count lines and find breaks inside a word (default true; After Effects 24.3+)."),
-      overlap: z.array(z.string()).max(20).optional().describe("Varied text must not overlap these layers (names, * wildcards)."),
-      numbers: z.boolean().optional().describe("A number set on a control must show right in the text that shows it (default true)."),
-      direction: z.boolean().optional().describe("Right-to-left and complex scripts must get the direction and composer they need (default true)."),
+      overflow: z.boolean().optional(),
+      safeArea: z.enum(["frame", "title", "action", "none"]).optional(),
+      title: margin.optional(),
+      action: margin.optional(),
+      minFontSizePx: z.number().optional(),
+      minCapHeightPx: z.number().optional(),
+      glyphs: z.boolean().optional(),
+      lines: z.boolean().optional(),
+      overlap: z.array(z.string()).optional(),
+      numbers: z.boolean().optional(),
+      direction: z.boolean().optional(),
     })
     .strict()
-    .optional(),
-  contactSheets: z.boolean().optional().describe("A contact sheet PNG of each failing variant's failing frames (default true)."),
-  maxSheets: z.number().int().min(0).max(50).optional().describe("Most contact sheets (default 12)."),
-  outputFolder: z.string().optional().describe("Absolute folder for the contact sheets (default: the run's folder under ~/.surehand/ae/stress)."),
-  overwrite: z.boolean().optional().describe("Replace contact sheets already in outputFolder (default false: skip them and say so)."),
-  proveUnchanged: z.boolean().optional().describe("Also prove with pixels (ae_prove_identical's engine) that your comp renders the same after the run (default false: values are read back)."),
-  checkpoint: z.boolean().optional().describe("Save a project checkpoint first (see ae_checkpoint)."),
-  dryRun: z.boolean().optional().describe("Only discover the controls and list the variants and frames; sets nothing."),
-  timeBudgetSeconds: z.number().min(10).max(3600).optional().describe("Stop starting new variants after this long and report what was measured (default 300)."),
+    .optional()
+    .describe("Margins and minimums are the user's; never invent them."),
+  contactSheets: z.boolean().optional(),
+  maxSheets: z.number().optional(),
+  outputFolder: z.string().optional(),
+  overwrite: z.boolean().optional(),
+  proveUnchanged: z.boolean().optional(),
+  checkpoint: z.boolean().optional(),
+  dryRun: z.boolean().optional(),
+  timeBudgetSeconds: z.number().min(10).max(3600).optional(),
 };
 
 export type StressArgs = {
@@ -296,7 +280,7 @@ export async function runStress(a: StressArgs, perm: { mode: string } = permissi
   }
   const plan = planVariants(targets, { sets: a.sets, exclude: a.exclude, combinations: a.combinations ?? "single", maxVariants: a.maxVariants ?? 80, own, rows, rowsSource });
   const frames = a.frames?.length
-    ? [...new Set(a.frames.filter((f) => f < nFrames))].sort((x, y) => x - y)
+    ? [...new Set(a.frames.map(Math.round).filter((f) => f >= 0 && f < nFrames))].sort((x, y) => x - y)
     : pickFrames({ frames: nFrames, keys: disc.keys.map((t) => t / comp.fd), edges: disc.edges.map((t) => t / comp.fd), max: a.maxFrames ?? 12 });
   if (!frames.length) return errorResult(`frames: none is inside "${comp.name}" (it has ${nFrames} frames, 0 to ${nFrames - 1}).`);
   for (const t of targets) if (t.problem) notes.push(`${t.name}: not tested: ${t.problem}`);
@@ -434,7 +418,8 @@ export async function runStress(a: StressArgs, perm: { mode: string } = permissi
   mkdirSync(runDir, { recursive: true });
   const sheetDir = a.outputFolder ?? runDir;
   const wantSheets = a.contactSheets !== false;
-  const failing = orderVariants(variants).filter((v) => v.status === "fail" || v.status === "warn").slice(0, a.maxSheets ?? 12);
+  // only variants with something to see at a frame (a value the control refuses has nothing to show)
+  const failing = orderVariants(variants).filter((v) => (v.status === "fail" || v.status === "warn") && v.findings.some((f) => f.frame !== undefined)).slice(0, a.maxSheets ?? 12);
   if (wantSheets && failing.length) {
     mkdirSync(sheetDir, { recursive: true });
     for (const v of failing) {
@@ -662,15 +647,10 @@ export function registerStressTools(server: McpServer) {
       _meta: { ui: { resourceUri: STRESS_VIEW_URI } },
       title: "Stress test",
       description:
-        "Push worst-case inputs through every variable a template comp exposes (its Essential Graphics controllers, text that reads data, or the " +
-        "layers you name) and measure each result at the animation's key frames: text overflowing its box (by how many px, how many lines), " +
-        "leaving the frame / title- / action-safe, rendering smaller, glyphs the font lacks or a substituted font, Arabic / Hebrew / Devanagari " +
-        "without the direction or composer they need, breaks inside a word, overlap with named layers, a number that shows wrong. Inputs: generated " +
-        "worst cases (long German and Finnish, right to left, CJK, Thai, Hindi, combining marks, emoji, caps, empty, one character, no spaces; " +
-        "zero, negative, huge, many decimals, separators, percent; every checkbox and menu state) and the user's own values or CSV / JSON rows. " +
-        "Also lists expressions that break in After Effects in another language, with the language-safe form. Everything runs on a scratch copy " +
-        "removed in the same step; your comp is read back afterwards and must be identical. Returns PASS / FAIL with what breaks at which frame " +
-        "and by how much, a grid, and a contact sheet per failing variant. dryRun: true lists the controls, variants and frames only.",
+        "Stress-test a comp with worst-case inputs (long German, RTL, CJK, empty, huge numbers, the user's rows) through its Essential " +
+        "Graphics controllers or named layers, measured on a scratch copy: box overflow, safe area, text size, glyphs, lines, numbers; plus " +
+        "expressions that break in other AE languages. Your comp is read back unchanged. Returns PASS / FAIL per variant with frame and px, " +
+        "contact sheets. dryRun lists the plan.",
       inputSchema,
       // sets values only on scratch copies (removed again); writes contact sheet PNGs (never replaces one without overwrite)
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },

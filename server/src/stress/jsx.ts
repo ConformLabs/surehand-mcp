@@ -168,6 +168,13 @@ export interface TextExtra {
   lead?: number;
   /** the font is a substitute (not installed) */
   sub?: 1;
+  /** the font changed from the comp's own (After Effects switched it: a font that can't draw the text): the designed
+   * font (PostScript and family name), the characters it has no glyph for, the family now used, and 1 when nothing is drawn */
+  of?: string;
+  ofam?: string;
+  om?: string[];
+  fam?: string;
+  blank?: 1;
   dir?: string;
   ce?: string;
   /** composed lines (AE 24.3+), and the character each line ends at */
@@ -261,7 +268,7 @@ var __pf = function (args) {
 ${PREFLIGHT_JSX}
 };
 var c = aemcp.findComp(args.comp), T0 = new Date().getTime(), d = null;
-var out = { done: 0, name: "", results: [] }, fr = args.frames, fd = c.frameDuration;
+var out = { done: 0, name: "", results: [] }, fr = args.frames, fd = c.frameDuration, baseFont = {};
 // the expressions of the copy's own layers: their errors are read after each variant
 var exprs = [];
 function exWalk(g, path, L) {
@@ -293,6 +300,25 @@ function extras() {
     try { o.font = td.font; o.fs = aemcp.round(td.fontSize); } catch (e) {}
     try { o.lead = td.autoLeading ? aemcp.round(td.fontSize * 1.2) : aemcp.round(td.leading); } catch (e) {}
     try { if (td.fontObject && td.fontObject.isSubstitute) o.sub = 1; } catch (e) {}
+    // After Effects swaps the font of a text its font can't draw (seen in AE 26.5: CJK in a Latin font becomes Myriad Pro)
+    var b0 = baseFont["l" + i];
+    if (b0 && o.font !== undefined && o.font !== b0.font) {
+      o.of = b0.font;
+      if (b0.fam) o.ofam = b0.fam;
+      try { o.fam = td.fontObject.familyName; } catch (e) {}
+      if (b0.fo && b0.fo.hasGlyphsFor !== undefined) {
+        var seenC = {}, om = [], s0 = String(td.text);
+        for (var ci = 0; ci < s0.length && om.length < 40; ci++) {
+          var ch = s0.charAt(ci), cc = s0.charCodeAt(ci);
+          if (cc >= 0xD800 && cc <= 0xDBFF && ci + 1 < s0.length) { ch = s0.substr(ci, 2); ci++; }
+          if (/^\\s$/.test(ch) || seenC["c" + ch]) continue;
+          seenC["c" + ch] = true;
+          try { if (!b0.fo.hasGlyphsFor(ch)) om.push(ch); } catch (e) {}
+        }
+        o.om = om;
+      }
+      try { if (/\\S/.test(String(td.text)) && !(L.sourceRectAtTime(t, false).width > 0)) o.blank = 1; } catch (e) {}
+    }
     try { if (typeof ParagraphDirection !== "undefined") o.dir = String(aemcp.enumName(ParagraphDirection, td.direction)).replace("DIRECTION_", ""); } catch (e) {}
     try { if (typeof ComposerEngine !== "undefined") o.ce = String(aemcp.enumName(ComposerEngine, td.composerEngine)); } catch (e) {}
     lineInfo(td, o);
@@ -326,6 +352,16 @@ function extras() {
 try {
   d = stScratch(c, args.targets);
   out.name = d.name;
+  // each text layer's own font, before any variant (After Effects may swap it for one variant's text)
+  for (var bi = 1; bi <= d.numLayers; bi++) {
+    var BL = d.layer(bi);
+    if (!(BL instanceof TextLayer)) continue;
+    try {
+      var btd = stSource(BL).valueAtTime(timeFor(BL), false), bo = { font: btd.font };
+      try { bo.fo = btd.fontObject; bo.fam = btd.fontObject.familyName; } catch (e) {}
+      baseFont["l" + bi] = bo;
+    } catch (e) {}
+  }
   for (var li = 1; li <= d.numLayers; li++) exWalk(d.layer(li), "", d.layer(li));
   for (var vi = 0; vi < args.variants.length; vi++) {
     if (vi > 0 && new Date().getTime() - T0 > args.budgetMs) break;
@@ -357,11 +393,10 @@ export const PREP_JSX =
   APPLY +
   `
 var c = aemcp.findComp(args.comp), d = stScratch(c, args.targets), media = [];
-try {
-  for (var s = 0; s < args.sets.length; s++) stSet(d, args.targets[args.sets[s].t], args.sets[s].v);
-} catch (e) { stCleanup(d); throw e; }
+var refused = [];
+for (var s = 0; s < args.sets.length; s++) { try { stSet(d, args.targets[args.sets[s].t], args.sets[s].v); } catch (e) { refused.push(e.message || String(e)); } }
 for (var k = 0; k < stMedia.length; k++) media.push(stMedia[k].id);
-return { id: d.id, name: d.name, media: media };`;
+return { id: d.id, name: d.name, media: media, refused: refused };`;
 
 /** Removes scratch items by id (only items whose name marks them as scratch). */
 export const REMOVE_JSX = `

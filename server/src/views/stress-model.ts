@@ -67,14 +67,16 @@ export function openMessage(v: StressVariant): string {
 }
 
 /** What the frame marks: the safe area and the text's box dashed, the problem outlined. */
-export function frameMarks(f: StressFinding | undefined): { dashed: Rect[]; hit?: { rect: Rect; warn: boolean } } {
+export function frameMarks(f: StressFinding | undefined, others: StressFinding[] = []): { dashed: Rect[]; hit?: { rect: Rect; warn: boolean } } {
   if (!f) return { dashed: [] };
   const dashed: Rect[] = [];
-  if (f.area && f.area.name !== "frame") dashed.push(f.area.rect);
-  if (f.textBox) dashed.push(f.textBox);
-  let hit: Rect | undefined = f.box;
-  // a paragraph that overflows: the part below its box that is cut off
-  if (f.check === "text.overflow" && f.textBox && f.amountPx) hit = [f.textBox[0], f.textBox[3], f.textBox[2], f.textBox[3] + f.amountPx];
+  // the safe area dashed when any of the variant's findings at that frame is about it
+  const area = [f, ...others].find((x) => x.area && x.area.name !== "frame" && (x === f || x.frame === f.frame))?.area;
+  if (area) dashed.push(area.rect);
+  // a paragraph that overflows: its designed box outlined (the text is cut off at its bottom edge)
+  const overflow = f.check === "text.overflow" && !!f.textBox;
+  if (f.textBox && !overflow) dashed.push(f.textBox);
+  const hit: Rect | undefined = overflow ? f.textBox : f.box;
   return { dashed, ...(hit ? { hit: { rect: hit, warn: f.severity === "warn" } } : {}) };
 }
 

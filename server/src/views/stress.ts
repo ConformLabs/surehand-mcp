@@ -63,7 +63,7 @@ function frameFor(d: StressView, v: StressVariant): HTMLElement {
   );
   if (!v.frame) return el("div", { class: "frame noimg" }, side);
   const box = (r: Rect) => ({ left: pct(r[0] / W), top: pct(r[1] / H), width: pct((r[2] - r[0]) / W), height: pct((r[3] - r[1]) / H) });
-  const marks = frameMarks(f);
+  const marks = frameMarks(f, v.findings);
   const still = el(
     "div",
     { class: "still", style: { aspectRatio: `${v.frame.width} / ${v.frame.height}` } },

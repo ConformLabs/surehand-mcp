@@ -163,16 +163,23 @@ export function measureVariant(o: MeasureInput): Measured {
   }
 
   // values that could not be set, or that After Effects kept differently
+  // (the message starts with the control's name, so `layer` is left out: only its index, for Show in AE)
+  const wantOf = (ti: number) => o.variant?.sets.find((s) => o.targetIndex.get(s.target) === ti)?.value;
   for (const [ti, msg] of res.err) {
     const t = o.targets[ti];
-    findings.push({ check: "set", column: "other", severity: "fail", layer: t?.layerName, layerIndex: t?.layer, message: `${t?.name ?? "the control"} could not be set: ${msg}` });
+    const want = wantOf(ti);
+    findings.push({ check: "set", column: "other", severity: "fail", layerIndex: t?.layer, message: setProblem(t?.name ?? "The control", want, msg) });
   }
   for (const [ti, got] of res.rb) {
-    const t = o.targets[ti], want = o.variant?.sets.find((s) => o.targetIndex.get(s.target) === ti)?.value;
+    const t = o.targets[ti], want = wantOf(ti);
     if (!t || want === undefined) continue;
     if ((t.kind === "number" || t.kind === "dropdown" || t.kind === "checkbox") && typeof want === "number" && typeof got === "number") {
-      if (Math.abs(got - want) > 1e-6 * Math.max(1, Math.abs(want)))
-        findings.push({ check: "number.input", column: "other", severity: "fail", layer: t.layerName, layerIndex: t.layer, message: `${t.name} set to ${want}; After Effects keeps ${got} (the control's range): this input can't be entered` });
+      if (Math.abs(got - want) > 1e-6 * Math.max(1, Math.abs(want))) {
+        // kept to fewer decimals: the control's precision; else a value it won't hold
+        const dec = (String(got).split(".")[1] ?? "").length;
+        const why = Math.abs(got - want) < 0.5 && dec < 10 ? `the control keeps ${dec} decimal${dec === 1 ? "" : "s"}` : "the control's range";
+        findings.push({ check: "number.input", column: "other", severity: "fail", layerIndex: t.layer, message: `${t.name} set to ${want}; After Effects keeps ${got} (${why})${why.includes("range") ? ": this input can't be entered" : ""}` });
+      }
     }
   }
 
@@ -255,6 +262,18 @@ export function measureVariant(o: MeasureInput): Measured {
   // font substituted, direction, composer
   for (const x of res.x) {
     if (!relevant(x)) continue;
+    // After Effects swapped the designed font for this text: name the designed one, and what the swap did
+    if (x.of && checks.glyphs) {
+      const before = findings.filter((f) => f.check === "text.glyphs" && f.layerIndex === x.li && !f.layer?.includes(" › "));
+      for (const f of before) findings.splice(findings.indexOf(f), 1);
+      const designed = x.ofam ?? x.of, now = x.fam ?? x.font;
+      const chars = (x.om ?? []).slice(0, 12).join(" ") + ((x.om?.length ?? 0) > 12 ? " …" : "");
+      const fallbackLacks = x.blank || before.length > 0;
+      const message = x.om?.length
+        ? `${designed} has no glyphs for ${chars}; After Effects fell back to ${now}, ${fallbackLacks ? `which has none either: ${x.blank ? "nothing is drawn" : "they don't show"}` : "so the text shows in a different font than designed"}`
+        : `After Effects switched the font from ${designed} to ${now} for this text${x.blank ? ": nothing is drawn" : ""}`;
+      findings.push({ check: "text.glyphs", column: "glyphs", severity: "fail", layer: x.ln, layerIndex: x.li, frame: frameOf(x.t), message });
+    }
     if (x.sub && checks.glyphs) findings.push({ check: "text.font", column: "glyphs", severity: "fail", layer: x.ln, layerIndex: x.li, message: `font ${x.font} is not installed: After Effects shows a substitute` });
     if (!checks.direction || !o.variant || !targetLayers.has(x.li)) continue;
     if (RTL.test(x.text) && x.dir && x.dir !== "RIGHT_TO_LEFT")
@@ -274,8 +293,11 @@ export function measureVariant(o: MeasureInput): Measured {
       if (x.lines === undefined) continue;
       any = true;
       const max = checks.maxLines?.[x.ln];
-      if (max !== undefined && x.lines > max)
-        findings.push({ check: "text.lines", column: "lines", severity: "fail", layer: x.ln, layerIndex: x.li, frame: frameOf(x.t), message: `${x.lines} lines; the limit is ${max}` });
+      // a paragraph that overflows needs more lines than it shows; its overflow finding already says how many
+      const n = x.linesNeed ?? x.lines;
+      const said = findings.some((f) => f.check === "text.overflow" && f.layerIndex === x.li && /\d+ lines/.test(f.message));
+      if (max !== undefined && n > max)
+        findings.push({ check: "text.lines", column: "lines", severity: "fail", layer: x.ln, layerIndex: x.li, frame: frameOf(x.t), message: said ? `the limit is ${max} line${max === 1 ? "" : "s"}` : `${n} lines; the limit is ${max}` });
       const chars = Array.from(x.text);
       for (const e of x.ends ?? []) {
         const a = x.text[e - 1] ?? "", b = x.text[e] ?? "";
@@ -388,6 +410,21 @@ export function measureVariant(o: MeasureInput): Measured {
   for (const [li, ln, prop, err] of res.ee)
     if (!baseErr.has(`${li}|${prop}`)) findings.push({ check: "expression.error", column: "other", severity: "fail", layer: ln, layerIndex: li, message: `expression error on ${prop}: ${err}` });
   return { findings, layers, notRun, notes };
+}
+
+const grouped = (s: string) => {
+  const n = Number(s);
+  return Number.isFinite(n) ? n.toLocaleString("en-US", { maximumFractionDigits: 10 }).replace(/^-/, "−") : s;
+};
+/**
+ * A value After Effects refused, in the user's words. Its range error ("... out of range -1000000 to 1000000") becomes
+ * "Price accepts −1,000,000 to 1,000,000: 1,234,567.89 can't be entered (...)"; anything else is quoted without AE's prefix.
+ */
+export function setProblem(name: string, want: unknown, msg: string): string {
+  const m = /out of range\s*\(?\s*(-?[\d.,e+]+)\s*(?:to|-|,)\s*(-?[\d.,e+]+)/i.exec(msg);
+  if (m && typeof want === "number")
+    return `${name} accepts ${grouped(m[1])} to ${grouped(m[2])}: ${grouped(String(want))} can't be entered (raise the slider's range, or format larger numbers in the expression)`;
+  return `${name} could not be set to ${JSON.stringify(want)}: ${msg.replace(/^After Effects error:\s*/i, "")}`;
 }
 
 /** What is wrong with how a text shows the number `input` (null: fine). The user's format, when given, exactly. */

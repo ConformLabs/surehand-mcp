@@ -238,7 +238,7 @@ function project(over: Partial<FakeProjectSpec> = {}): FakeProjectSpec {
               { matchName: "ADBE Slider Control", name: "Slider Control" },
             ],
             props: {
-              "Effects/Price/Slider": { value: 1299, type: "OneD", max: 1_000_000 },
+              "Effects/Price/Slider": { value: 1299, type: "OneD", range: [-1_000_000, 1_000_000], decimals: 4 },
               "Effects/Show logo/Checkbox": { value: 1, type: "OneD" },
               "Effects/Slider Control/Slider": { value: 0, type: "OneD" },
             },
@@ -263,10 +263,10 @@ describe("a whole run", () => {
   it("measures every variant on a scratch copy: what breaks, at which frame, by how much; the comp is read back unchanged", async () => {
     fake = fakeProject(project());
     const itemsBefore = fake.items.length;
-    const r = await runStress({ contactSheets: false, sets: ["de-long", "ja", "one-char", "n-negative", "n-limit", "n-huge", "on", "off"] }, { mode: "full" });
+    const r = await runStress({ contactSheets: false, sets: ["de-long", "ja", "one-char", "n-negative", "n-limit", "n-huge", "n-decimals", "on", "off"] }, { mode: "full" });
     const t = text(r), v = viewOf(r);
     expect(r.isError).toBeFalsy();
-    expect(t.split("\n")[0]).toMatch(/^FAIL \(5 of 8 variants break; 3 expressions break in other AE languages\)/);
+    expect(t.split("\n")[0]).toMatch(/^FAIL \(6 of 9 variants break; 3 expressions break in other AE languages\)/);
     // overflow by how much, with lines: "Spring sale" 11 chars fits 1 line; German needs more than the box's 2
     const de = v.variants.find((x: any) => x.id === "de-long@Title");
     expect(de.status).toBe("fail");
@@ -283,15 +283,20 @@ describe("a whole run", () => {
     expect(ja.cells.glyphs).toBe("bad");
     // numbers: the template drops the sign; a slider can't take the input
     expect(v.variants.find((x: any) => x.id === "n-negative@Price").findings.map((f: any) => f.message).join()).toMatch(/minus sign is lost/);
-    expect(v.variants.find((x: any) => x.id === "n-limit@Price").findings.map((f: any) => f.message).join()).toMatch(/keeps 1000000 \(the control's range\)/);
-    expect(v.variants.find((x: any) => x.id === "n-huge@Price").findings.map((f: any) => f.check)).toEqual(["number.input"]);
+    // a value the slider refuses: its range in the user's words, not After Effects' error; no frame to render
+    const huge = v.variants.find((x: any) => x.id === "n-huge@Price");
+    expect(huge.findings.map((f: any) => f.message)).toEqual(["Price accepts −1,000,000 to 1,000,000: 1,234,567.89 can't be entered (raise the slider's range, or format larger numbers in the expression)"]);
+    expect(huge.findings[0].layer).toBeUndefined();
+    expect(t).toMatch(/\n {8}- Price accepts −1,000,000 to 1,000,000: 9,999,999,999 can't be entered/);
+    // a value the slider rounds: its precision, not its range
+    expect(v.variants.find((x: any) => x.id === "n-decimals@Price").findings.map((f: any) => f.message)).toEqual(["Price set to 3.14159265; After Effects keeps 3.1416 (the control keeps 4 decimals)"]);
     // the passes and the checkbox states
     for (const id of ["one-char@Title", "on@Show logo", "off@Show logo"]) expect(v.variants.find((x: any) => x.id === id).status).toBe("pass");
     // failing first
-    expect(v.variants.slice(0, 5).every((x: any) => x.status === "fail")).toBe(true);
+    expect(v.variants.slice(0, 6).every((x: any) => x.status === "fail")).toBe(true);
     // the language scan: the effect's default name and the parameter's display name
     expect(v.languages.map((l: any) => l.code).sort()).toEqual(["effectDefaultName", "paramName", "paramName"]);
-    expect(v.counts).toMatchObject({ variants: 8, failed: 5, passed: 3, targets: 3, languageRisks: 3 });
+    expect(v.counts).toMatchObject({ variants: 9, failed: 6, passed: 3, targets: 3, languageRisks: 3 });
     // the user's comp: read back identical, the values as they were, no scratch item left
     expect(v.restore).toMatchObject({ verified: true, differences: [] });
     expect(t).toMatch(/Your comp is unchanged: \d+ values read back identical/);
@@ -341,6 +346,24 @@ describe("a whole run", () => {
     expect(v.baseline.some((f: any) => f.check === "text.overflow")).toBe(true);
     // the long one still overflows, but that is the baseline's finding
     expect(v.variants.find((x: any) => x.id === "double@Title").findings.some((f: any) => f.check === "text.overflow")).toBe(false);
+  });
+
+  it("a font that can't draw the text: the designed font is named, and what After Effects' fallback did", async () => {
+    const CJK = "東京都千代田区で特別キャンペーン開催中";
+    const plain = (fallbackDraws: boolean): FakeProjectSpec => ({
+      activeComp: "Card",
+      fontGlyphsMissing: { "IvyPrestoDisplay-LightItalic": CJK, "MyriadPro-Regular": fallbackDraws ? "" : CJK },
+      comps: [{ name: "Card", duration: 2, layers: [{ name: "Name", type: "text", text: "Ana", font: "IvyPrestoDisplay-LightItalic", fontFallback: { chars: CJK, font: "MyriadPro-Regular" }, position: [200, 500],
+        // nothing drawn when the fallback lacks the glyphs too (sourceRect width 0, as seen in AE 26.5)
+        rect: (_t, t) => [0, -50, fallbackDraws || !/[東京]/.test(t) ? Array.from(t).length * 30 : 0, 60] }] }],
+    });
+    fake = fakeProject(plain(false));
+    let v = viewOf(await runStress({ contactSheets: false, targets: [{ layer: "Name" }], sets: ["ja"] }, { mode: "full" }));
+    const f = v.variants[0].findings.filter((x: any) => x.check === "text.glyphs");
+    expect(f.map((x: any) => x.message)).toEqual(["IvyPrestoDisplay has no glyphs for 東 京 都 千 代 田 区 で 特 別 キ ャ …; After Effects fell back to MyriadPro, which has none either: nothing is drawn"]);
+    fake = fakeProject(plain(true));
+    v = viewOf(await runStress({ contactSheets: false, targets: [{ layer: "Name" }], sets: ["ja"] }, { mode: "full" }));
+    expect(v.variants[0].findings.find((x: any) => x.check === "text.glyphs").message).toMatch(/fell back to MyriadPro, so the text shows in a different font than designed$/);
   });
 
   it("right to left and complex scripts: the paragraph's direction and composer as the template has them", async () => {
