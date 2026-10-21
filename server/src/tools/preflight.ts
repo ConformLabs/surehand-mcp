@@ -77,7 +77,7 @@ export function targetSkips(spec: Spec, target: "project" | "file" | "both"): st
 }
 
 /** In "ask" mode: the same Allow / Deny request in After Effects as for other tools, before anything is downloaded. */
-async function approveDownload(build: FfmpegBuild): Promise<void> {
+export async function approveDownload(build: FfmpegBuild): Promise<void> {
   const summary =
     `Download FFmpeg ${build.version} once into ~/.surehand/ffmpeg for the Preflight file checks ` +
     `(${build.publisher}; ${build.licence}; checked against a pinned SHA-256):\n${build.archives.map((a) => a.url).join("\n")}`;

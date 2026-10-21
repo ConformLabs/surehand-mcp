@@ -1,6 +1,6 @@
 ---
 name: surehand-ae-delivery
-description: Checks After Effects comps and renders against the user's delivery spec, stress-tests them with worst-case inputs, builds checked versions. Use for QC, stress tests, versions, localization.
+description: Checks After Effects comps and renders against the user's delivery spec, stress-tests them, builds checked versions, readies farm renders. Use for QC, stress tests, versions, localization, farms.
 license: MIT
 ---
 
@@ -57,6 +57,13 @@ glyphs, fonts, bar sizes, footage). Follow references/versions-from-data.md for 
 Before a comp goes to editors or a client, ae_stress_test measures what breaks with worst-case inputs (long
 German, Arabic, CJK, empty, huge numbers, the user's own rows) on a scratch copy, and which expressions break in
 After Effects in another language. Follow references/stress-test.md for the workflow.
+
+## Render farm and chunked renders
+
+When a render goes to a farm or another machine, or a long render should be split across processes or machines, use
+ae_farm: a manifest of exactly what the render needs, a check of a node against it, a chunk plan with aerender
+commands and scripts built from the render queue item's own settings, local parallel runs, and a verify that proves
+every frame is there once and complete. Follow references/render-farm.md for the workflow.
 
 ## Localization
 

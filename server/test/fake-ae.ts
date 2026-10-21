@@ -337,7 +337,8 @@ export interface FakeFootageSpec {
 export interface FakeProjectSpec {
   comps: FakeCompSpec[];
   footage?: FakeFootageSpec[];
-  rq?: { comp: string; render: boolean }[];
+  /** render queue items; start / dur: the time span (default the whole comp); settings: getSettings() (render settings); om: more output module settings (Format, "Use Comp Frame Number"...), file: its output file; extraOms: more output modules */
+  rq?: { comp: string; render: boolean; start?: number; dur?: number; settings?: Record<string, unknown>; om?: Record<string, unknown>; file?: string; extraOms?: number }[];
   installedEffects?: { matchName: string; displayName: string }[];
   /** null: an After Effects without the font API */
   fonts?: { postScriptName: string; familyName: string; styleName: string; isSubstitute: boolean }[] | null;
@@ -803,13 +804,25 @@ export function fakeProject(spec: FakeProjectSpec) {
     om.setSettings = (o: any) => {
       if (o.Format && (spec.png ?? "settings") === "settings") om.format = o.Format;
     };
-    om.getSettings = () => ({ Format: om.format });
-    const q: any = { comp, om, status: render ? RQS.QUEUED : RQS.UNQUEUED, timeSpanStart: 0, timeSpanDuration: comp?.duration, outputModule: () => om, applyTemplate() {},
-      remove: () => (writes.push("renderQueue.remove"), rqItems.splice(rqItems.indexOf(q), 1)) };
+    om.getSettings = () => ({ ...(om.extra ?? {}), Format: om.format, "Output File Info": { "Full Flat Path": om.file?.fsName ?? "" } });
+    const q: any = { comp, om, oms: [om], status: render ? RQS.QUEUED : RQS.UNQUEUED, timeSpanStart: 0, timeSpanDuration: comp?.duration, outputModule: (i = 1) => q.oms[i - 1], applyTemplate() {},
+      remove: () => (writes.push("renderQueue.remove"), rqItems.splice(rqItems.indexOf(q), 1)), getSettings: () => q.rs ?? {} };
     Object.defineProperty(q, "render", { get: () => q.status === RQS.QUEUED, set: (v: boolean) => (q.status = v ? RQS.QUEUED : RQS.UNQUEUED), enumerable: true });
+    Object.defineProperty(q, "numOutputModules", { get: () => q.oms.length });
     return q;
   };
-  const rqItems: any[] = (spec.rq ?? []).map((r) => rqItem(byName(r.comp), r.render, { fsName: `/renders/${r.comp}.mov` }));
+  const rqItems: any[] = (spec.rq ?? []).map((r) => {
+    const q = rqItem(byName(r.comp), r.render, { fsName: r.file ?? `/renders/${r.comp}.mov` });
+    if (r.start !== undefined) q.timeSpanStart = r.start;
+    if (r.dur !== undefined) q.timeSpanDuration = r.dur;
+    if (r.settings) q.rs = r.settings;
+    if (r.om) {
+      q.om.extra = r.om;
+      if (typeof r.om.Format === "string") q.om.format = r.om.Format;
+    }
+    for (let k = 0; k < (r.extraOms ?? 0); k++) q.oms.push({ name: "Extra", file: { fsName: `/renders/${r.comp}_${k + 2}.mov` }, getSettings: () => ({ Format: "QuickTime" }) });
+    return q;
+  });
   const rendered: string[] = [];
 
   // the project on disk: save writes the open project's state (also as JSON a fake aerender can read), open restores it

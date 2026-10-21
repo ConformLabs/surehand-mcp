@@ -24,9 +24,18 @@ interface Job {
   tail: string[];
   proc?: ChildProcess;
   exitCode?: number | null;
+  /** a chunked render (ae_farm run_local): the run it belongs to and its chunk */
+  group?: string;
+  chunk?: number;
+  /** each frame's render time in seconds, as aerender prints it ("PROGRESS: ... (n): 3 Seconds") */
+  frameSeconds: number[];
+  onExit?: (j: Job) => void;
 }
 
 const jobs = new Map<string, Job>();
+export type RenderJob = Job;
+export const renderJob = (id: string) => jobs.get(id);
+export const renderJobs = () => [...jobs.values()];
 const LOG_DIR = () => appFile("renders");
 
 /** How many background renders keep their files (renders/<id>.log and .json). */
@@ -88,6 +97,96 @@ export function writeJobFile(j: Pick<Job, "id" | "comp" | "frames" | "frameRende
   } catch {} // never fails a render
 }
 
+/** One line of aerender's output: the frame count (the number in brackets) and that frame's time. */
+export function parseProgress(line: string): { frame: number; seconds: number | null } | null {
+  const m = line.match(/PROGRESS:.*\((\d+)\)(?::\s*([\d.]+)\s*Seconds?)?/i);
+  return m ? { frame: Number(m[1]), seconds: m[2] !== undefined ? Number(m[2]) : null } : null;
+}
+
+export interface StartJob { bin: string; cli: string[]; comp: string; output: string; project: string; frames: number; group?: string; chunk?: number; onExit?: (j: Job) => void }
+
+/** Starts aerender as a background job: its log, the panel's renders/<id>.json, progress and cancel (ae_render_jobs). */
+export function startAerenderJob(o: StartJob): Job {
+  mkdirSync(LOG_DIR(), { recursive: true });
+  // keep the folder from growing forever: the newest renders only (never one still running)
+  pruneRenders(LOG_DIR(), RENDERS_KEPT - 1, new Set([...jobs.values()].filter((j) => j.status === "running").map((j) => j.id)));
+  let id = `r${Date.now().toString(36)}`;
+  for (let k = 1; jobs.has(id); k++) id = `r${Date.now().toString(36)}${k.toString(36)}`;
+  const logPath = join(LOG_DIR(), `${id}.log`);
+  const logStream = createWriteStream(logPath);
+  const job: Job = {
+    id, comp: o.comp, output: o.output, project: o.project, status: "running",
+    startedAt: new Date().toISOString(), frames: o.frames, frameRendered: 0, log: logPath, tail: [], frameSeconds: [],
+    ...(o.group ? { group: o.group, chunk: o.chunk } : {}), onExit: o.onExit,
+  };
+  const proc = spawn(o.bin, o.cli, { stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+  job.proc = proc;
+  writeJobFile(job);
+  let written = 0;
+  const onData = (d: Buffer) => {
+    const text = d.toString();
+    logStream.write(text);
+    for (const line of text.split(/\r?\n/)) {
+      if (!line.trim()) continue;
+      // e.g. "PROGRESS:  0;00;00;05 (6): 0 Seconds"
+      const pr = parseProgress(line);
+      if (pr) {
+        if (pr.frame > job.frameRendered && pr.seconds !== null && job.frameSeconds.length < 100_000) job.frameSeconds.push(pr.seconds);
+        job.frameRendered = Math.max(job.frameRendered, pr.frame);
+      }
+      job.tail.push(line.trim());
+      if (job.tail.length > 50) job.tail.shift();
+    }
+    // progress for the panel, at most twice a second
+    if (Date.now() - written > 500) {
+      written = Date.now();
+      writeJobFile(job);
+    }
+  };
+  proc.stdout!.on("data", onData);
+  proc.stderr!.on("data", onData);
+  let ended = false;
+  const end = () => {
+    if (ended) return;
+    ended = true;
+    job.proc = undefined;
+    writeJobFile(job);
+    try {
+      job.onExit?.(job);
+    } catch {}
+  };
+  proc.on("error", (e) => {
+    job.status = "failed";
+    job.tail.push(String(e));
+    job.endedAt = new Date().toISOString();
+    logStream.end();
+    end();
+  });
+  proc.on("exit", (code) => {
+    logStream.end();
+    job.exitCode = code;
+    job.endedAt = new Date().toISOString();
+    if (job.status === "running") job.status = code === 0 && !job.tail.some((l) => /aerender ERROR|^ERROR/i.test(l)) ? "done" : "failed";
+    end();
+  });
+  jobs.set(id, job);
+  return job;
+}
+
+/** Stops a running job (its status becomes "cancelled"). */
+export function cancelJob(j: Job) {
+  if (j.status === "running" && j.proc) {
+    j.status = "cancelled";
+    j.proc.kill();
+    writeJobFile(j);
+  }
+}
+
+const medianOf = (a: number[]) => {
+  const s = [...a].sort((x, y) => x - y), m = s.length >> 1;
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+};
+
 function view(j: Job) {
   const pct = j.frames ? Math.min(100, Math.round((j.frameRendered / j.frames) * 100)) : null;
   const rendering = j.tail.some((l) => /PROGRESS:.*\(\d+\)/.test(l));
@@ -106,6 +205,8 @@ function view(j: Job) {
     endedAt: j.endedAt,
     log: j.log,
     lastLines: j.tail.slice(-6),
+    ...(j.group ? { group: j.group, chunk: j.chunk } : {}),
+    ...(j.frameSeconds.length ? { secondsPerFrame: medianOf(j.frameSeconds) } : {}),
   };
 }
 
@@ -169,55 +270,7 @@ return { project: p.file.fsName, comp: name, frames: frames, app: Folder.appPack
         if (args.startFrame !== undefined) cli.push("-s", String(args.startFrame));
         if (args.endFrame !== undefined) cli.push("-e", String(args.endFrame));
         if (args.output) mkdirSync(dirname(args.output), { recursive: true });
-
-        mkdirSync(LOG_DIR(), { recursive: true });
-        // keep the folder from growing forever: the newest renders only (never one still running)
-        pruneRenders(LOG_DIR(), RENDERS_KEPT - 1, new Set([...jobs.values()].filter((j) => j.status === "running").map((j) => j.id)));
-        const id = `r${Date.now().toString(36)}`;
-        const logPath = join(LOG_DIR(), `${id}.log`);
-        const logStream = createWriteStream(logPath);
-        const job: Job = {
-          id, comp: info.comp, output: args.output || "(render queue item output)", project: info.project, status: "running",
-          startedAt: new Date().toISOString(), frames: info.frames, frameRendered: 0, log: logPath, tail: [],
-        };
-        const proc = spawn(bin, cli, { stdio: ["ignore", "pipe", "pipe"] });
-        job.proc = proc;
-        writeJobFile(job);
-        let written = 0;
-        const onData = (d: Buffer) => {
-          const text = d.toString();
-          logStream.write(text);
-          for (const line of text.split(/\r?\n/)) {
-            if (!line.trim()) continue;
-            // e.g. "PROGRESS:  0;00;00;05 (6): 0 Seconds"
-            const m = line.match(/PROGRESS:.*\((\d+)\)/);
-            if (m) job.frameRendered = Math.max(job.frameRendered, Number(m[1]));
-            job.tail.push(line.trim());
-            if (job.tail.length > 50) job.tail.shift();
-          }
-          // progress for the panel, at most twice a second
-          if (Date.now() - written > 500) {
-            written = Date.now();
-            writeJobFile(job);
-          }
-        };
-        proc.stdout.on("data", onData);
-        proc.stderr.on("data", onData);
-        proc.on("error", (e) => {
-          job.status = "failed";
-          job.tail.push(String(e));
-          job.endedAt = new Date().toISOString();
-          writeJobFile(job);
-        });
-        proc.on("exit", (code) => {
-          logStream.end();
-          job.exitCode = code;
-          job.endedAt = new Date().toISOString();
-          if (job.status === "running") job.status = code === 0 && !job.tail.some((l) => /aerender ERROR|^ERROR/i.test(l)) ? "done" : "failed";
-          job.proc = undefined;
-          writeJobFile(job);
-        });
-        jobs.set(id, job);
+        const { id, log: logPath } = startAerenderJob({ bin, cli, comp: info.comp, output: args.output || "(render queue item output)", project: info.project, frames: info.frames });
         return {
           content: [
             {
@@ -249,11 +302,7 @@ return { project: p.file.fsName, comp: name, frames: frames, app: Folder.appPack
       if (cancel) {
         const j = jobs.get(cancel);
         if (!j) return errorResult(`No job ${cancel}`);
-        if (j.status === "running" && j.proc) {
-          j.status = "cancelled";
-          j.proc.kill();
-          writeJobFile(j);
-        }
+        cancelJob(j);
         return { content: [{ type: "text", text: JSON.stringify(view(j)) }] };
       }
       const list = [...jobs.values()].filter((j) => !id || j.id === id).map(view);

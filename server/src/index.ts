@@ -13,6 +13,7 @@ import { chatCommand } from "./cli/chat.js";
 import { checkpointDiffCommand, checkpointSaveCommand, checkpointsCommand } from "./cli/checkpoints.js";
 import { CLIENT_IDS, clientsJson, connectClient, disconnectClient, listClients, moveFromLegacy } from "./cli/clients.js";
 import { diagnostics } from "./cli/diagnostics.js";
+import { farmCommand } from "./cli/farm.js";
 import { install, reportSkills } from "./cli/install.js";
 import { installSkills, skillsStatus, uninstallSkills } from "./cli/skills.js";
 import { selftest, selftestJson } from "./cli/selftest.js";
@@ -138,6 +139,9 @@ Usage:
   surehand-ae skills install|uninstall [--json]
                          write them for the AI apps found (~/.claude/skills, ~/.agents/skills) and the zips to
                          upload in Claude Desktop chat (~/.surehand/ae/skills), or remove exactly those
+  surehand-ae farm check <manifest.json> [--ae <folder>] [--map <from>=<to>]... [--json]
+                         on a render node, without After Effects: does it have what the manifest (ae_farm) says
+                         the render needs? Exit 0 ready, 1 missing or different, 3 not everything checkable
   surehand-ae setup           only install/update the After Effects extension, the config and the skills
 
 Files: ~/.surehand/ae (config.json, checkpoints, history...); shared: ~/.surehand/node, ~/.surehand/ffmpeg.
@@ -230,6 +234,13 @@ async function main() {
     }
     case "diagnostics":
       return void console.log(await diagnostics());
+    case "farm": {
+      // the check a render node runs before it renders; no After Effects needed
+      const r = farmCommand(rest);
+      console.log(r.out);
+      process.exitCode = r.code;
+      return;
+    }
     case "chatgpt":
       return chatgpt(rest);
     case "chat":
