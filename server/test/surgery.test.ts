@@ -345,7 +345,7 @@ describe("un-precompose: the tool", () => {
   it("does it: proven identical, one step, the rehearsal removed; the picture is unchanged", async () => {
     ae(plain({}, [{ expr: { "Transform/Opacity": 'thisComp.layer("Mark").transform.opacity' } }, { locked: true }]));
     const main = fake.comp("Main");
-    const before = pictures(main);
+    const before = pictures(main), start = fake.state();
     const itemsBefore = fake.items().length;
     const r = await runSurgery({ action: "unprecompose", comp: "Main", layer: "Logo" }, FULL);
     expect(r.isError, text(r)).toBeFalsy();
@@ -367,6 +367,9 @@ describe("un-precompose: the tool", () => {
     expect(calls.map((c) => c.kind)).toEqual(["jsx", "checkpoint", "render", "jsx", "render", "jsx", "jsx"]);
     expect(calls[6].opts).toMatchObject({ undoGroup: "Surehand MCP un-precompose", rollback: "requested" });
     expect(calls[6].args.expect).toEqual(expect.any(String));
+    // ONE undo step puts the parent comp back exactly, the null's solid included
+    expect(fake.undo()).toBe("Surehand MCP un-precompose");
+    expect(fake.state()).toBe(start);
   });
 
   it("time: the layers move by the precomp layer's start and are trimmed to its span; one entirely outside is switched off", async () => {
@@ -586,6 +589,7 @@ describe("un-precompose: the tool", () => {
     // the whole frame differs: far too much for resampling, which is not named as the cause
     expect(t).toMatch(/Likely cause: the difference is too large for resampling \(up to \d+(\.\d+)?\/255 on 100% of a frame\): the moved layers are not placed, timed or shown as they were/);
     expect(r.content.some((c: any) => c.type === "image")).toBe(true);
+    expect(t).not.toMatch(/Could make the proof differ/);
     expect(fake.state()).toBe(before);
   });
 
@@ -635,12 +639,37 @@ describe("the likely cause of a DIFFERS", () => {
     expect(t).not.toMatch(/scaled/);
     expect(t).toMatch(/Also in the plan:\n {2}- Main > 1 "A" > Opacity: reads the comp's name/);
   });
+  it("each risk once, even when the plan lists it twice; the DIFFERS report doesn't repeat the plan's risks", () => {
+    const t = likelyCause([risks[0], risks[0], risks[1]], { maxDiff: 14.75, share: 0.002 });
+    expect(t.split("is scaled").length - 1).toBe(1);
+  });
   it("a small difference with no resampling risk lists the other risks", () => {
     expect(likelyCause([risks[1]], { maxDiff: 3, share: 0.001 })).toMatch(/^Likely cause \(up to 3\/255 on 0.1% of a frame\), most likely first:\n {2}- Main > 1 "A"/);
   });
 });
 
 describe("deep duplicate", () => {
+  it("folder is refused before anything changes: moves into a folder are undo steps of their own", async () => {
+    ae(tree());
+    const before = fake.state();
+    const r = await runSurgery({ action: "deep_duplicate", comp: "Main", folder: "Copies" }, FULL);
+    expect(r.isError).toBe(true);
+    expect(text(r)).toMatch(/^folder isn't supported: After Effects records every move into a folder as an undo step of its own/);
+    expect(fake.state()).toBe(before);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("the fake keeps a move into a folder out of the call's undo step, as After Effects does", () => {
+    ae(tree());
+    const before = fake.state();
+    fake.run('var f = app.project.items.addFolder("F"); app.project.item(1).parentFolder = f; return 1;', {}, { undoGroup: "x" });
+    expect(fake.undoSteps()).toEqual(["x", "move Outside"]);
+    fake.undo();
+    expect(fake.state()).not.toBe(before);
+    fake.undo();
+    expect(fake.state()).toBe(before);
+  });
+
   /** Main -> Scene A, Scene B; both show Shared; Scene A's expression names Shared and an outside comp */
   const tree = (): SComp[] => [
     { name: "Outside", layers: [{ name: "Ref" }] },
@@ -679,7 +708,8 @@ describe("deep duplicate", () => {
     ae(tree());
     const main = fake.comp("Main");
     const before = pictures(main);
-    const r = await runSurgery({ action: "deep_duplicate", comp: "Main", folder: "Copies" }, FULL);
+    const start = fake.state();
+    const r = await runSurgery({ action: "deep_duplicate", comp: "Main" }, FULL);
     expect(r.isError, text(r)).toBeFalsy();
     const t = text(r);
     expect(t).toMatch(/^DONE and proven: IDENTICAL: all 5 frames are bit-identical to the reference/);
@@ -692,10 +722,12 @@ describe("deep duplicate", () => {
     // the originals are untouched
     expect(fake.comp("Main").layers.map((l: any) => l.source?.name ?? null)).toEqual(["Scene A", "Scene B", null]);
     expect(fake.comp("Scene A").layer("S1").property("ADBE Transform Group").property("ADBE Position").expression).toMatch(/^comp\("Shared"\)/);
-    // each comp copied once, in a new folder; the rehearsal's copies and folder are gone
-    expect(fake.items().filter((i: any) => / copy$/.test(i.name)).map((i: any) => [i.name, i.parentFolder?.name])).toEqual([["Main copy", "Copies"], ["Scene A copy", "Copies"], ["Shared copy", "Copies"], ["Scene B copy", "Copies"]]);
-    expect(fake.items().filter((i: any) => i.name === "Copies")).toHaveLength(1);
+    // each comp copied once, next to its original; the rehearsal's copies are gone
+    expect(fake.items().filter((i: any) => / copy$/.test(i.name)).map((i: any) => i.name)).toEqual(["Main copy", "Scene A copy", "Shared copy", "Scene B copy"]);
     expect(fake.comp("Main copy").layer("B").locked).toBe(true);
+    // ONE undo step takes everything back: the copies, the re-pointed sources, the rewrites
+    expect(fake.undo()).toBe("Surehand MCP deep duplicate");
+    expect(fake.state()).toBe(start);
   });
 
   it("DIFFERS: no copy is left in the project", async () => {

@@ -8,6 +8,9 @@
 //   expression, while an Undo Group is open"); here a track matte layer or a layer parameter counts as a link too
 // - itemByID throws for an id that is gone ("internal verification failure, sorry! {Item Not Found}")
 // - removing a comp leaves the solids of its nulls in the project
+// - undo: a call in an undo group that changed something is one undo step (undo() puts the project back as it was
+//   before it); but moving an item into a folder (item.parentFolder = f) is an undo step of its own even inside a group,
+//   recorded after the group's step (seen in AE 26.5: each ae_undo after a deep duplicate into a folder took back one move)
 // - a layer's keyframes are in comp time and move with its startTime
 // - a locked layer can't be changed (renaming, setting a property, removing it throws)
 // - addNull makes a 100x100 solid ("Null 1") in the project and puts the null at the top
@@ -181,6 +184,9 @@ const LAYER_FIELDS = ["name", "enabled", "locked", "guideLayer", "solo", "threeD
 export function fakeSurgeryAE(opts: { comps: SComp[]; file?: string | null; active?: string; rq?: string[]; copyInsert?: "top" | "aboveSelection"; /** a broken After Effects for tests: setParentWithJump with a layer does nothing */ jumpIgnored?: boolean; /** called after setParentWithJump */ afterJump?: (L: any, p: any) => void }) {
   let nextId = 1;
   let groupOpen = false;
+  /** the undo history: what undoing each step does */
+  const undoStack: { name: string; undo: () => void }[] = [];
+  let pendingMoves: { name: string; undo: () => void }[] = [];
   /** a new layer is the only selected one in its comp */
   const select = (L: any) => {
     for (const x of L._comp.layers) x.selected = false;
@@ -210,6 +216,17 @@ export function fakeSurgeryAE(opts: { comps: SComp[]; file?: string | null; acti
       workAreaStart: 0, workAreaDuration: s.duration ?? 4, layers: [] as any[], parentFolder: s.folder ? byName(s.folder) ?? mkFolder(s.folder) : null, selectedLayers: [],
     });
     Object.defineProperty(c, "frameDuration", { get: () => 1 / c.frameRate });
+    let folder = c.parentFolder;
+    delete c.parentFolder;
+    Object.defineProperty(c, "parentFolder", {
+      get: () => folder,
+      set: (f: any) => {
+        const old = folder;
+        if (groupOpen && f !== old) pendingMoves.push({ name: `move ${c.name}`, undo: () => void (folder = old) });
+        folder = f;
+      },
+      enumerable: true,
+    });
     Object.defineProperty(c, "numLayers", { get: () => c.layers.length });
     Object.defineProperty(c, "usedIn", { get: () => usedIn(c) });
     c.layer = (k: number | string) => (typeof k === "number" ? c.layers[k - 1] : c.layers.find((l: any) => l.name === k)) ?? null;
@@ -493,7 +510,8 @@ export function fakeSurgeryAE(opts: { comps: SComp[]; file?: string | null; acti
 
   /** a JSX body run like the bridge does; `rollback: "requested"` puts the project back when the body asks for it */
   const run = (jsx: string, args: Record<string, unknown>, o: { rollback?: string; undoGroup?: string | false } = {}) => {
-    const restore = snapshot();
+    const restore = snapshot(), was = state();
+    pendingMoves = [];
     const fn = new Function("aemcp", "app", "$", ...names, `return function (args, log) {\n${jsx}\n};`)(aemcp, app, $, ...values);
     groupOpen = !!o.undoGroup;
     let res: any;
@@ -505,7 +523,11 @@ export function fakeSurgeryAE(opts: { comps: SComp[]; file?: string | null; acti
     if (o.rollback === "requested" && res.ok && res.result?.rollback) {
       restore();
       res.rollback = { undone: true, verified: true };
+    } else if (o.undoGroup && state() !== was) {
+      undoStack.push({ name: String(o.undoGroup), undo: restore });
+      undoStack.push(...pendingMoves);
     }
+    pendingMoves = [];
     return res;
   };
 
@@ -551,5 +573,11 @@ export function fakeSurgeryAE(opts: { comps: SComp[]; file?: string | null; acti
 
   const comp = (name: string): any => items.find((i) => i instanceof CompItem && i.name === name);
   const items_ = () => items;
-  return { app, run, state, picture, comp, items: items_, log };
+  /** Edit > Undo: the last undo step (its name), or null when there is none */
+  const undo = () => {
+    const s = undoStack.pop();
+    s?.undo();
+    return s?.name ?? null;
+  };
+  return { app, run, state, picture, comp, items: items_, log, undo, undoSteps: () => undoStack.map((s) => s.name) };
 }

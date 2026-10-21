@@ -534,8 +534,9 @@ does it exactly or not at all.
   The source comp is kept (`removeSource` removes it only if nothing else uses it).
 - **`deep_duplicate`** copies a comp and every nested precomp, each once (a precomp used in several places maps to one
   copy), points the copies' precomp layers at the copies, and rewrites `comp("X")` in the copies when X is in the tree
-  (references to comps outside it stay). `suffix` (default " copy", a number is added when the name is taken) and
-  `folder` (a new folder for the copies). Footage and solids are shared, not copied.
+  (references to comps outside it stay). `suffix` (default " copy", a number is added when the name is taken). The
+  copies are made next to their originals: After Effects records every move into a folder as an undo step of its own,
+  so moving them (`ae_move_items`) is left to a separate step. Footage and solids are shared, not copied.
 
 **Refused, with the exact reason**, when it can't be reproduced exactly: effects, masks, layer styles, time remapping,
 time stretch, track mattes, 3D, collapse transformations, motion blur or frame blending on the precomp layer; its blend

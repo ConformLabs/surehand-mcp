@@ -249,7 +249,6 @@ export interface DPlan {
   /** original comp id -> new name, in duplication order (root first) */
   copies: { id: number; from: string; to: string; swaps: { i: number; n: string; src: number }[] }[];
   rewrites: Rewrite[];
-  folder?: string;
   risks: string[];
 }
 
@@ -681,7 +680,6 @@ export function blocking(plan: { problems: Problem[] }, override: Override[] = [
 
 export interface DOptions {
   suffix?: string;
-  folder?: string;
   override?: Override[];
 }
 
@@ -750,5 +748,5 @@ export function planDeepDuplicate(f: DFacts, o: DOptions = {}): DPlan {
     for (const p of overridden) risks.push(p.text);
   }
   notes.push("Footage and solids are not duplicated: the copies use the same items.");
-  return { kind: "deep_duplicate", problems, warnings, notes: [...new Set(notes)], copies, rewrites, ...(o.folder ? { folder: o.folder } : {}), risks };
+  return { kind: "deep_duplicate", problems, warnings, notes: [...new Set(notes)], copies, rewrites, risks };
 }

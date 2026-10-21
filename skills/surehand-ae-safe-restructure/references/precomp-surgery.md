@@ -46,10 +46,12 @@ frames?, times?, tolerance?}
 
 ## deep_duplicate
 
-{action: "deep_duplicate", comp: <root>, dryRun?, suffix?, folder?, override?, frames?, times?, tolerance?}
+{action: "deep_duplicate", comp: <root>, dryRun?, suffix?, override?, frames?, times?, tolerance?}
 
 - Every comp of the tree is copied once; a precomp used in several places maps to one copy. The copies' precomp layers
   point at the copies. Footage and solids are shared.
+- The copies are made next to their originals. No folder option: After Effects records every move into a folder as an
+  undo step of its own, which would break the one undo step. To tidy up, ae_move_items afterwards (separate steps).
 - comp("X") inside the copies points at X's copy when X is in the tree; comps outside the tree stay.
 - Refused (override "expressions"): computed comp names, names that more than one comp has.
 - Reported: Essential Graphics controllers and overrides, expressions that read the comp's name (they show the copy's).

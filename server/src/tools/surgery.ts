@@ -462,10 +462,6 @@ try {
     }
   }
   for (var e = 0; e < args.edits.length; e++) { var x = args.edits[e]; setExpr(map["i" + x.c].layer(x.l), x.p, x.text); }
-  if (args.folder) {
-    var F = app.project.items.addFolder(args.folder);
-    for (var f = 0; f < args.copies.length; f++) map["i" + args.copies[f].id].parentFolder = F;
-  }
   var fp = [];
   for (var g = 0; g < args.copies.length; g++) {
     var Dc = map["i" + args.copies[g].id], rows = [Dc.name];
@@ -532,7 +528,7 @@ function problemLines(problems: Problem[], override: Override[]): string[] {
 }
 
 /** The plan as text: what moves, what is renamed, every rewrite, every problem. */
-export function describeUnprecompose(f: UFacts, p: UPlan, override: Override[] = []): string[] {
+export function describeUnprecompose(f: UFacts, p: UPlan, override: Override[] = [], risks = true): string[] {
   const L: string[] = [];
   const lastMoved = p.moved.length ? Math.max(...p.moved.map((m) => m.index)) : 0;
   L.push(`Un-precompose ${q(f.L.n)} (layer ${f.L.i} in "${f.P.name}", source comp "${f.C.name}", ${plural(f.cLayers.length, "layer")}).`);
@@ -553,21 +549,21 @@ export function describeUnprecompose(f: UFacts, p: UPlan, override: Override[] =
   if (p.problems.length) L.push(`Problems (${p.problems.length}):`, ...problemLines(p.problems, override));
   if (p.warnings.length) L.push(...p.warnings.map((w) => `Note: ${w}`));
   if (p.notes.length) L.push(...p.notes.map((n) => `Note: ${n}`));
-  if (p.risks.length) L.push("Could make the proof differ:", ...p.risks.map((r) => `  - ${r}`));
+  if (risks && p.risks.length) L.push("Could make the proof differ:", ...p.risks.map((r) => `  - ${r}`));
   return L;
 }
 
-export function describeDeepDuplicate(f: DFacts, p: DPlan, override: Override[] = []): string[] {
+export function describeDeepDuplicate(f: DFacts, p: DPlan, override: Override[] = [], risks = true): string[] {
   const L: string[] = [];
   const root = f.tree[0];
-  L.push(`Deep duplicate "${root.name}": ${plural(p.copies.length, "comp")} copied, each once${p.folder ? `, into a new folder ${q(p.folder)}` : " (next to their originals)"}:`);
+  L.push(`Deep duplicate "${root.name}": ${plural(p.copies.length, "comp")} copied, each once (next to their originals):`);
   for (const c of p.copies) L.push(`  - "${c.from}" → "${c.to}"${c.swaps.length ? `; ${plural(c.swaps.length, "precomp layer")} pointed at the copies (${c.swaps.map((s) => q(s.n)).join(", ")})` : ""}`);
   L.push(p.rewrites.length ? `Expressions rewritten in the copies (${p.rewrites.length}); references to comps outside the tree are kept:` : "Expressions rewritten: none needed (no expression in the tree names a comp of the tree).");
   L.push(...rewriteLines(p.rewrites));
   if (p.problems.length) L.push(`Problems (${p.problems.length}):`, ...problemLines(p.problems, override));
   if (p.warnings.length) L.push(...p.warnings.map((w) => `Note: ${w}`));
   if (p.notes.length) L.push(...p.notes.map((n) => `Note: ${n}`));
-  if (p.risks.length) L.push("Could make the proof differ:", ...p.risks.map((r) => `  - ${r}`));
+  if (risks && p.risks.length) L.push("Could make the proof differ:", ...p.risks.map((r) => `  - ${r}`));
   return L;
 }
 
@@ -591,7 +587,8 @@ const RESAMPLING = /resampl/;
  * (max channel difference up to 48/255 on at most 1% of a frame's pixels). A larger one means the layers are not
  * placed or shown as they were, whatever the plan's risks say.
  */
-export function likelyCause(risks: string[], diff: { maxDiff: number; share: number }): string {
+export function likelyCause(all: string[], diff: { maxDiff: number; share: number }): string {
+  const risks = [...new Set(all)];
   const small = diff.maxDiff <= 48 && diff.share <= 0.01;
   const resampling = risks.filter((r) => RESAMPLING.test(r)), other = risks.filter((r) => !RESAMPLING.test(r));
   const size = `up to ${Math.round(diff.maxDiff * 100) / 100}/255 on ${Math.round(diff.share * 10000) / 100}% of a frame`;
@@ -610,11 +607,17 @@ export function likelyCause(risks: string[], diff: { maxDiff: number; share: num
 export async function runSurgery(a: SurgeryInput, perm: { mode: string; allowShell: boolean }): Promise<CallToolResult> {
   const override = a.override ?? [];
   const dup = a.action === "deep_duplicate";
+  // seen live (AE 26.5): moving an item into a folder is an undo step of its own even inside an undo group, so a
+  // folder would break the one-undo-step promise
+  if (a.folder !== undefined)
+    return errorResult(
+      "folder isn't supported: After Effects records every move into a folder as an undo step of its own (even inside one undo group), so the copies couldn't be undone in one step. Nothing was changed. Run it without folder (the copies are made next to their originals), then move them with ae_move_items if wanted (separate undo steps).",
+    );
   const read = await runJsx(dup ? DFACTS_JSX : UFACTS_JSX, { comp: a.comp, layer: a.layer }, { undoGroup: false, timeoutMs: 300_000, depth: 10 });
   if (!read.ok) return errorResult(read.error?.message ?? "After Effects could not read the project.");
   const uf = dup ? null : parse<UFacts>(read.result);
   const df = dup ? parse<DFacts>(read.result) : null;
-  const plan: UPlan | DPlan = dup ? planDeepDuplicate(df!, { suffix: a.suffix, folder: a.folder, override }) : planUnprecompose(uf!, { removeSource: a.removeSource, bakeNull: a.bakeNull, override });
+  const plan: UPlan | DPlan = dup ? planDeepDuplicate(df!, { suffix: a.suffix, override }) : planUnprecompose(uf!, { removeSource: a.removeSource, bakeNull: a.bakeNull, override });
   const lines = dup ? describeDeepDuplicate(df!, plan as DPlan, override) : describeUnprecompose(uf!, plan as UPlan, override);
   const stop = blocking(plan, override);
   const what = dup ? "deep duplicate" : "un-precompose";
@@ -646,7 +649,7 @@ export async function runSurgery(a: SurgeryInput, perm: { mode: string; allowShe
   const jsxArgs = (rehearsal: boolean, expect?: string) => {
     if (dup) {
       const d = plan as DPlan;
-      return { rehearsal, expect, copies: d.copies, folder: d.folder ?? null, edits: d.rewrites.map((r) => ({ c: r.c, l: r.l, p: r.p, old: r.old, text: r.new })) };
+      return { rehearsal, expect, copies: d.copies, edits: d.rewrites.map((r) => ({ c: r.c, l: r.l, p: r.p, old: r.old, text: r.new })) };
     }
     const u = plan as UPlan, f = uf!;
     const pick = (r: Rewrite) => (rehearsal ? r.rehearse : r.new);
@@ -714,7 +717,7 @@ export async function runSurgery(a: SurgeryInput, perm: { mode: string; allowShe
       differs && typeof cmp !== "string" ? likelyCause(plan.risks, { maxDiff: cmp.view?.maxDiff ?? 255, share: cmp.share ?? 1 }) : "",
       "",
       "The plan that was rehearsed:",
-      ...lines,
+      ...(dup ? describeDeepDuplicate(df!, plan as DPlan, override, false) : describeUnprecompose(uf!, plan as UPlan, override, false)),
     );
     const content: CallToolResult["content"] = [{ type: "text", text: out.filter((x, i, arr) => !(x === "" && arr[i - 1] === "")).join("\n") + leftNote }];
     if (typeof cmp !== "string" && cmp.image) content.push({ type: "image", data: cmp.image.data, mimeType: "image/png" }, { type: "text", text: cmp.image.label });
@@ -773,7 +776,7 @@ export function registerSurgeryTools(server: McpServer) {
         removeSource: z.boolean().optional().describe("unprecompose: also remove the source comp, only if nothing else uses it (refused otherwise). Default: keep it."),
         bakeNull: z.boolean().optional().describe("unprecompose: leave out the null when the precomp layer's transform is the identity (exact); otherwise a null is kept and the result says why."),
         suffix: z.string().min(1).max(60).optional().describe('deep_duplicate: added to each copy\'s name (default " copy"; a number is added when the name is taken).'),
-        folder: z.string().min(1).max(200).optional().describe("deep_duplicate: put the copies in a new folder with this name (default: next to their originals)."),
+        folder: z.string().optional().describe("Not supported: After Effects records every move into a folder as an undo step of its own, so the copies stay next to their originals (one undo step). Move them afterwards with ae_move_items."),
         override: z
           .array(z.enum(["expressions", "bounds"]))
           .optional()
