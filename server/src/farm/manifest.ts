@@ -373,7 +373,7 @@ export function formatManifest(m: Manifest, savedAt?: string): string {
     const rs = [r.resolution && `resolution ${r.resolution}`, r.quality && `quality ${r.quality}`, r.proxyUse && `proxies: ${r.proxyUse}`, r.fpsOverride && `frame rate ${r.fpsOverride} (render settings)`, r.timeSpan && `time span ${r.timeSpan}`].filter(Boolean);
     if (rs.length) out.push(`  Render settings: ${rs.join(", ")}.`);
     for (const o of it.outputs)
-      out.push(`  Output ${o.index}: ${o.format ?? "?"}${o.codec ? ` / ${o.codec}` : ""}${o.sequence ? " sequence" : ""} -> ${o.path ?? "(none)"}${whereTag(o.location)}${o.folder && !o.folderExists ? " (folder doesn't exist here)" : o.folder && !o.folderWritable ? " (folder NOT WRITABLE here)" : ""}${o.audio ? `; audio ${o.audio}` : ""}`);
+      out.push(`  Output ${o.index}: ${o.format ?? "?"}${o.codec ? ` / ${o.codec}` : ""}${o.sequence && !/sequence/i.test(o.format ?? "") ? " sequence" : ""} -> ${o.path ?? "(none)"}${whereTag(o.location)}${o.folder && !o.folderExists ? " (folder doesn't exist here)" : o.folder && !o.folderWritable ? " (folder NOT WRITABLE here)" : ""}${o.audio ? `; audio ${o.audio}` : ""}`);
     out.push(`  Comps rendered: ${list(it.comps, 8)}.`);
   }
   out.push("", `Plug-ins (${m.plugins.length}, by match name; versions as After Effects reports them):`);
@@ -382,9 +382,11 @@ export function formatManifest(m: Manifest, savedAt?: string): string {
   out.push("", `Fonts (${m.fonts.length}; from ${m.fontsSource.split(" (")[0]}):`);
   for (const f of m.fonts) out.push(`  ${f.postScriptName}${f.family ? ` (${f.family}${f.style ? ` ${f.style}` : ""})` : ""}${f.adobeFonts ? ", Adobe Fonts" : ""}${f.here === "installed" ? ", installed here" : `, ${f.here.toUpperCase()} HERE`}: ${list(f.usedBy, 3)}`);
   if (!m.fonts.length) out.push("  none");
-  out.push("", `Footage the render pulls in (${m.footage.length}):`);
-  for (const f of m.footage) {
-    if (f.kind === "solid") continue;
+  // solids are made inside the project: nothing for a node to have
+  const files = m.footage.filter((f) => f.kind !== "solid");
+  out.push("", `Footage the render pulls in (${files.length}):`);
+  if (!files.length) out.push(m.footage.length ? "  none (only solids, which are part of the project)" : "  none");
+  for (const f of files) {
     const seq = f.sequence ? `, frames ${f.sequence.first}-${f.sequence.last} (${f.sequence.count}${f.sequence.gaps.length ? `, GAPS ${runsText(f.sequence.gaps, 4)}` : ""})` : "";
     out.push(`  "${f.name}" (${f.kind}${seq}, ${fmtBytes(f.bytes)}): ${f.path ?? "(no file)"}${f.exists ? "" : " MISSING HERE"}${whereTag(f.location)}${f.rendered ? "" : " (only on layers that are off)"}`);
     if (f.proxy) out.push(`    proxy${f.proxy.needed ? " (used by the render)" : " (not used by the render)"}: ${f.proxy.path}${f.proxy.exists ? "" : " MISSING HERE"}${whereTag(f.proxy.location)}`);
