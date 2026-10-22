@@ -592,17 +592,18 @@ const RESAMPLING = /resampl/;
 
 /**
  * What likely made the proof differ. Resampling (the precomp rendered, then transformed as a whole, against each layer
- * transformed once) only shows as small differences along edges: it is named only when the difference is small
- * (max channel difference up to 48/255 on at most 1% of a frame's pixels). A larger one means the layers are not
- * placed or shown as they were, whatever the plan's risks say.
+ * transformed once) shows along edges only: it is named when the plan has a resampling risk and the difference covers
+ * at most 1% of a frame's pixels, however strong (text edges at 90% scale differ by up to ~80/255, seen live). Without
+ * that risk, a difference beyond 48/255 or over 1% of a frame means the layers are not placed or shown as they were.
  */
 export function likelyCause(all: string[], diff: { maxDiff: number; share: number }): string {
   const risks = [...new Set(all)];
-  const small = diff.maxDiff <= 48 && diff.share <= 0.01;
+  const edges = diff.share <= 0.01;
+  const small = diff.maxDiff <= 48 && edges;
   const resampling = risks.filter((r) => RESAMPLING.test(r)), other = risks.filter((r) => !RESAMPLING.test(r));
   const size = `up to ${Math.round(diff.maxDiff * 100) / 100}/255 on ${Math.round(diff.share * 10000) / 100}% of a frame`;
-  if (small && resampling.length)
-    return `Likely cause (a small difference, ${size}, as resampling makes along edges):\n${[...resampling, ...other].map((r) => `  - ${r}`).join("\n")}`;
+  if (edges && resampling.length)
+    return `Likely cause (${size}, the kind of difference resampling makes along edges; the difference image shows where):\n${[...resampling, ...other].map((r) => `  - ${r}`).join("\n")}`;
   if (!small)
     return (
       `Likely cause: the difference is too large for resampling (${size}): the moved layers are not placed, timed or shown as they were in the precomp. ` +

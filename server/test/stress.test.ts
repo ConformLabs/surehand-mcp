@@ -320,6 +320,22 @@ describe("a whole run", () => {
     expect(run.args.variants.map((x: any) => x.id)).toEqual(["baseline", "de-long@Title", "one-char@Title"]);
   });
 
+  it("the read-back doesn't depend on where the playhead is: a keyframed value read at another time is not a change", async () => {
+    fake = fakeProject(project());
+    const run = fake.run;
+    const box = () => original().layer("Controls").property("Effects").property("Show logo").property("Checkbox");
+    // like a keyframed property: .value follows the playhead, valueAtTime(0, true) doesn't
+    box().valueAtTime = () => 1;
+    fake.run = (body: string, args: any) => {
+      const r = run(body, args);
+      if (body === RUN_JSX) box().value = 0;
+      return r;
+    };
+    const v = viewOf(await runStress({ contactSheets: false, sets: ["one-char"] }, { mode: "full" }));
+    expect(v.restore).toMatchObject({ verified: true, differences: [] });
+    fake.run = run;
+  });
+
   it("the read-back catches a comp that is not exactly as it was: the run is never a PASS then", async () => {
     fake = fakeProject(project());
     const run = fake.run;
