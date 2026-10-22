@@ -631,8 +631,16 @@ describe("un-precompose: the tool", () => {
 
 describe("the likely cause of a DIFFERS", () => {
   const risks = ['"L" is scaled (50%, 50%): the precomp was rendered first and then resampled once as a whole', 'Main > 1 "A" > Opacity: reads the comp\'s name'];
-  it("resampling only for a small difference along edges", () => {
-    expect(likelyCause(risks, { maxDiff: 20, share: 0.004 })).toMatch(/^Likely cause \(a small difference, up to 20\/255 on 0.4% of a frame, as resampling makes along edges\):\n {2}- "L" is scaled/);
+  it("resampling for a difference along edges", () => {
+    expect(likelyCause(risks, { maxDiff: 20, share: 0.004 })).toMatch(/^Likely cause \(up to 20\/255 on 0.4% of a frame, the kind of difference resampling makes along edges; the difference image shows where\):\n {2}- "L" is scaled/);
+  });
+  it("resampling also when text edges differ strongly on few pixels (a 90% precomp layer, seen live)", () => {
+    const t = likelyCause(risks, { maxDiff: 79.47, share: 0.0059 });
+    expect(t).toMatch(/^Likely cause \(up to 79.47\/255 on 0.59% of a frame, the kind of difference resampling makes along edges/);
+    expect(t).not.toMatch(/too large|a bug/);
+  });
+  it("without a resampling risk, a strong difference is still the placement", () => {
+    expect(likelyCause([risks[1]], { maxDiff: 79.47, share: 0.0059 })).toMatch(/^Likely cause: the difference is too large for resampling/);
   });
   it("a large difference is the placement, whatever the plan's risks say", () => {
     const t = likelyCause(risks, { maxDiff: 229, share: 0.07 });

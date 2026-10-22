@@ -39,7 +39,7 @@ vi.mock("../src/tools/prove.js", async (original) => {
 const { farm, farmRuns, existingOutputs, farmTiming } = await import("../src/tools/farm.js");
 const { FARM_SCAN_JSX, FARM_CHECK_JSX } = await import("../src/farm/jsx.js");
 const { splitFrames, buildPlan, planScripts, joinSafety, commandLine, aerenderArgs, maxLocalProcesses, frameCost, PlanRefusal, formatPlan } = await import("../src/farm/plan.js");
-const { itemFrames, outputInfo, buildManifest, reachOf } = await import("../src/farm/manifest.js");
+const { itemFrames, outputInfo, buildManifest, reachOf, formatManifest } = await import("../src/farm/manifest.js");
 const { classifyPath, parseMountOutput, parseNetUse, mapPath, shQuote, batQuote, plistVersion, exeVersion, readAeInstall, defaultAerender, compareAeVersions } = await import("../src/farm/paths.js");
 const { postScriptNames, indexFonts } = await import("../src/farm/fonts.js");
 const { findMatchNames } = await import("../src/farm/plugins.js");
@@ -1097,5 +1097,18 @@ describe("manifest building (pure)", () => {
     expect(m.color).toMatchObject({ management: "OCIO", ocioConfig: { path: "/Users/ron/ocio/aces.ocio", exists: false, insideProjectFolder: false } });
     expect(m.notShared.join("\n")).toMatch(/OCIO config/);
     expect(m.multiFrameRendering.on).toBeNull();
+  });
+
+  it("the text: solids aren't footage a node needs, and a sequence format isn't called a sequence twice", () => {
+    const m: any = buildManifest(
+      { file: "/p/a.aep", dirty: false, color: {}, mfr: null, rqCount: 0, items: [], comps: [], footage: [], effects: [], layers: 0, fonts: null } as any,
+      { platform: "mac", classify: { platform: "mac", home: "/Users/ron" } },
+    );
+    m.footage = [{ id: 1, name: "BG", kind: "solid", path: null, exists: false, bytes: null, location: null, rendered: true, usedBy: ["C > BG"], rqItems: [1] }];
+    m.items = [{ rqIndex: 1, status: "QUEUED", comp: { id: 1, name: "C", width: 1920, height: 1080, fps: 25, duration: 1, displayStartFrame: 0 }, frames: { first: 0, last: 24, count: 25, shownFirst: 0, shownLast: 24 }, render: {}, comps: ["C"],
+      outputs: [{ index: 1, format: "TIFF Sequence", codec: null, sequence: true, path: "/o/a_[#####].tif", pad: 5, useCompFrameNumber: true, startingNumber: 0, audio: "Off", folder: "/o", folderExists: true, folderWritable: true, location: null }] }];
+    const t = formatManifest(m);
+    expect(t).toMatch(/Footage the render pulls in \(0\):\n {2}none \(only solids, which are part of the project\)/);
+    expect(t).toMatch(/Output 1: TIFF Sequence -> \/o\/a_\[#####\]\.tif/);
   });
 });

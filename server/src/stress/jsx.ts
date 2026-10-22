@@ -431,7 +431,9 @@ function walk(G, path, li) {
     if (p.propertyType === PropertyType.PROPERTY) {
       n++;
       var s = li + pp + "=";
-      try { if (p.propertyValueType !== PropertyValueType.NO_VALUE) s += enc(p.value); } catch (e) {}
+      // the value at time 0 before expressions: the same wherever the playhead is (the test moves it to measure);
+      // keyframes and the expression text are compared below
+      try { if (p.propertyValueType !== PropertyValueType.NO_VALUE) { var v; try { v = p.valueAtTime(0, true); } catch (e) { v = p.value; } s += enc(v); } } catch (e) {}
       try { if (p.canSetExpression && p.expression !== "") s += "|x" + (p.expressionEnabled ? 1 : 0) + ":" + p.expression; } catch (e) {}
       try { for (var j = 1; j <= p.numKeys; j++) s += "|k" + p.keyTime(j) + ":" + enc(p.keyValue(j)); } catch (e) {}
       out.push(s);
