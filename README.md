@@ -19,6 +19,8 @@ Every edit is one undo step and comes back with an exact list of what changed. S
 proof that the picture didn't change. Deliveries are checked against your own spec, templates are pushed through
 worst-case inputs, and every version built from data is checked row by row. Verified, not trusted.
 
+[![Claude un-precomposes a comp in After Effects and Surehand proves the picture is identical](media/demo-proven-identical.gif)](https://youtu.be/WjrCNMhCpxs)
+
 - **AI apps:** Claude (Desktop and Code), ChatGPT (desktop app and web), Codex, Cursor, VS Code (GitHub Copilot),
   Windsurf / Devin Desktop, LM Studio, or any MCP client. Inside After Effects, the Surehand panel can also chat
   through Codex, Claude Code or Antigravity on your own sign-in.
@@ -34,6 +36,20 @@ measures the result.
 ```
 AI app ──MCP──> surehand-ae server (Node, on your computer) ──localhost──> Surehand panel (CEP, inside After Effects) ──> ExtendScript
 ```
+
+## See it work
+
+Four short demos, recorded on Surehand 1.4.1 and After Effects 2026. Long waits are cut and marked on screen; nothing
+is sped up. [All four as a playlist](https://www.youtube.com/playlist?list=PLXM55bZwkADk).
+
+- [Precomp surgery](https://youtu.be/WjrCNMhCpxs): Claude un-precomposes a comp, keeps every expression working and
+  proves the picture didn't change (16 frames, zero difference).
+- [Preflight](https://youtu.be/zQAjYXbE2Os): a comp checked against the client's delivery spec finds 5 problems, each
+  with a timecode, then one is fixed and checked again.
+- [Stress test](https://youtu.be/jV-YHCpfMfc): a lower-third template with long German names, Arabic, Hebrew and huge
+  numbers; 28 of 33 variants break, and the original comp is confirmed unchanged.
+- [Farm render](https://youtu.be/ZZxSKqX3NCY): a render split across 4 aerender processes, and every one of the 250
+  frames verified.
 
 <a name="example-prompts"></a>
 
