@@ -21,7 +21,8 @@ export function registerOnDemandTools(server: McpServer, catalog: Map<string, Ca
       title: "More tools",
       description:
         "Discover every After Effects tool, including ones not loaded in this chat: list them by category (one line each), or describe " +
-        "chosen tools (full parameters). Then run any of them with ae_call. Categories: " + Object.keys(CATEGORIES).join(", ") + ".",
+        "chosen tools (full parameters, up to 10). Then run any of them with ae_call. Tools already loaded here need no lookup: call them directly. " +
+        "Categories: " + Object.keys(CATEGORIES).join(", ") + ".",
       inputSchema: {
         describe: z.array(z.string()).max(10).optional().describe("Tool names to get full parameter details for."),
         category: z.string().optional().describe("Only list this category."),
@@ -64,7 +65,8 @@ export function registerOnDemandTools(server: McpServer, catalog: Map<string, Ca
       title: "Run any tool",
       description:
         "Run any After Effects tool by name with its arguments, e.g. tools listed by ae_tools that aren't loaded in this chat. " +
-        "Same validation, permissions, change report and activity log as calling the tool directly. Get the parameters with ae_tools {describe: [name]}.",
+        "Same validation, permissions, change report and activity log as calling the tool directly. Get the parameters with ae_tools {describe: [name]}. " +
+        "Invalid arguments come back as an error listing them. Tools loaded in this chat don't need it: call them directly.",
       inputSchema: {
         tool: z.string().describe('Tool name, e.g. "ae_set_camera".'),
         args: z.record(z.string(), z.any()).optional().describe("The tool's arguments."),

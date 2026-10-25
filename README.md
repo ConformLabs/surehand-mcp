@@ -486,7 +486,7 @@ unknown effect name gets suggestions.
 ### Tool profiles
 
 Every tool description is sent to the AI in every chat, so by default only a **core set of 29 tools** is loaded
-(about 9k tokens instead of 47k for all 114), and **every other tool stays available on demand**: `ae_tools` lists
+(about 12k tokens instead of 50k for all 114), and **every other tool stays available on demand**: `ae_tools` lists
 all tools by category (or gives full parameter details of chosen ones), and `ae_call` runs any tool by name with the
 same validation, permissions, change report and activity log. In AI apps that show in-chat views, the four tools with
 a view (`ae_preflight`, `ae_project_xray`, `ae_project_history`, `ae_stress_test`) join the core set, because a view

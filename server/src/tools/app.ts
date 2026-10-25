@@ -18,8 +18,11 @@ app.executeCommand(id); return { executed: args.command, id: id };`,
   {
     name: "ae_undo",
     title: "Undo",
-    description: "Undo the last action(s) in After Effects (Edit > Undo).",
-    input: { steps: z.number().int().min(1).max(50).optional() },
+    description:
+      "Undo the last action(s) in After Effects, like Edit > Undo; each Surehand MCP edit call (an ae_batch included) is one undo step. " +
+      "Returns how many steps were undone and a change report across all comps. If After Effects undoes nothing (nothing left to undo, " +
+      "or a dialog open in After Effects) it fails and says so. Reverse it with ae_redo (via ae_call); to go back further, restore an ae_checkpoint.",
+    input: { steps: z.number().int().min(1).max(50).optional().describe("Number of undo steps, 1-50 (default 1). Stops early, with a note, when nothing more can be undone.") },
     noUndo: true,
     report: true,
     // the step undone can be in any comp: compare them all (a rename and a value in another comp read "Changes: none")

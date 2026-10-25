@@ -570,7 +570,7 @@ export function registerProveTools(server: McpServer) {
         "Prove a structural change (un-precompose, bake expressions, reorder effects, simplify a rig) left the render unchanged, or show which " +
         "frames and areas differ. capture: render reference frames (default: active comp, 5 frames over the work area), returns a proof id. " +
         "compare: render them again and compare pixel by pixel (verdict, per-frame max difference, changed pixels, ΔE, area, difference image). " +
-        "run: capture, ae_batch steps, compare, in one call. For un-precompose, prove the parent comp. " +
+        "run: capture, ae_batch steps, compare, in one call. For un-precompose, prove the parent comp. Not for edits meant to change the picture (look at those with ae_render_frame). " +
         "Only the sampled video frames are compared (alpha included; not audio, the comp background color or times between samples; 32 bpc values above 1.0 are clamped).",
       inputSchema: {
         action: z.enum(["capture", "compare", "run"]),

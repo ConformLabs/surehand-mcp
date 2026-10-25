@@ -17,11 +17,12 @@ return out;`,
     name: "ae_get_comp_info",
     title: "Get composition info",
     description:
-      "Composition settings plus a summary of its layers (index, id, name, type, timing, parent, switches). " +
-      "Large comps are paged: use layerOffset/layerLimit (see totalLayers / nextLayerOffset in the result).",
+      "Composition settings and markers plus a summary of its layers (index, id, name, type, timing, parent, switches). " +
+      "Large comps are paged: use layerOffset/layerLimit (see totalLayers / nextLayerOffset in the result). Read-only. Use it to see what a comp " +
+      "contains; for one layer in full use ae_get_layer_info, for nested precomps, parenting and expression links ae_get_comp_map.",
     input: {
       comp: compRef,
-      includeLayers: z.boolean().optional().describe("Default true."),
+      includeLayers: z.boolean().optional().describe("Include the layer summary (default true); false returns only the comp's settings and markers."),
       layerOffset: z.number().int().min(0).optional().describe("Skip this many layers (default 0)."),
       layerLimit: z.number().int().min(1).max(1000).optional().describe("Max layers to return (default 150)."),
     },
@@ -41,16 +42,19 @@ return o;`,
   {
     name: "ae_create_comp",
     title: "Create composition",
-    description: "Create a new composition and (by default) open it in the viewer.",
+    description:
+      "Create a new, empty composition in the open project and (by default) open it in the viewer. Returns the new comp's id, name and " +
+      "settings: pass the id as comp to later calls (names need not be unique). Then add layers with ae_add_layer / ae_add_shape. " +
+      "To copy an existing comp use ae_duplicate_comp, to move existing layers into a new comp ae_precompose (both via ae_call).",
     input: {
-      name: z.string(),
-      width: z.number().int().min(4).max(30000).optional().describe("Default 1920."),
-      height: z.number().int().min(4).max(30000).optional().describe("Default 1080."),
-      duration: z.number().min(0.01).optional().describe("Seconds, default 10."),
-      frameRate: z.number().min(1).max(999).optional().describe("Default 30."),
-      pixelAspect: z.number().optional().describe("Default 1."),
-      bgColor: colorSchema.optional(),
-      folder: itemRef.optional(),
+      name: z.string().describe("Name of the new comp (After Effects allows duplicate names)."),
+      width: z.number().int().min(4).max(30000).optional().describe("Pixels, 4-30000 (default 1920)."),
+      height: z.number().int().min(4).max(30000).optional().describe("Pixels, 4-30000 (default 1080)."),
+      duration: z.number().min(0.01).optional().describe("Seconds (default 10)."),
+      frameRate: z.number().min(1).max(999).optional().describe("Frames per second, 1-999 (default 30)."),
+      pixelAspect: z.number().optional().describe("Pixel aspect ratio (default 1, square pixels)."),
+      bgColor: colorSchema.optional().describe('Background color, "#rrggbb" or [r,g,b].'),
+      folder: itemRef.optional().describe("Project folder to put the comp in: id or exact name (default: the project root)."),
       open: z.boolean().optional().describe("Open in viewer (default true)."),
     },
     jsx: `

@@ -42,8 +42,10 @@ return { total: all.length, returned: out.length, effects: out };`,
     name: "ae_get_effect_params",
     title: "Inspect effect parameters",
     description:
-      "List an effect's parameters (names, match names, value types, defaults, min/max) WITHOUT changing your layers, so you know the exact " +
-      "parameter names for ae_apply_effect / ae_set_effect_params. Pass comp+layer to inspect an effect already applied (current values).",
+      "List an effect's parameters (names, match names, value types, defaults, min/max) so you know the exact parameter names for " +
+      "ae_apply_effect / ae_set_effect_params (via ae_call). By default it reads a fresh instance: it applies the effect on a temporary comp " +
+      "and removes that comp again in the same undo step, so your comps and layers are left as they were. Pass comp+layer to read an effect " +
+      "already applied to that layer instead (current values). Unknown effect names fail with suggestions.",
     input: {
       effect: z.union([z.string(), z.number().int()]).describe('Match name (e.g. "ADBE Glo2") or display name ("Glow"); with comp+layer, also an index in the stack.'),
       comp: compRef,
@@ -92,8 +94,17 @@ return res;`,
     name: "ae_apply_effect",
     title: "Apply effect",
     description:
-      'Apply an effect to a layer by match name (preferred, e.g. "ADBE Gaussian Blur 2", "ADBE Fill", "ADBE Glo2", "ADBE Drop Shadow") or display name, optionally setting parameters. Returns the effect\'s parameters.',
-    input: { comp: compRef, layer: layerRef, effect: z.string(), name: z.string().optional().describe("Rename the effect instance."), params },
+      'Apply an effect to a layer by match name (preferred, e.g. "ADBE Gaussian Blur 2", "ADBE Fill", "ADBE Glo2", "ADBE Drop Shadow") or display name, optionally setting parameters. ' +
+      "Each call adds a new instance at the bottom of the layer's effect stack. Returns its index in the stack, its parameters and the values set; " +
+      "an unknown effect name fails with suggestions. Check parameter names first with ae_get_effect_params; change an applied effect with " +
+      "ae_set_effect_params, search installed effects with ae_list_available_effects (both via ae_call).",
+    input: {
+      comp: compRef,
+      layer: layerRef,
+      effect: z.string().describe('Match name (e.g. "ADBE Gaussian Blur 2", works in every AE language) or display name ("Gaussian Blur").'),
+      name: z.string().optional().describe("Name for the new effect instance (default: After Effects' name for it)."),
+      params,
+    },
     jsx: `${setParams}
 var c = aemcp.findComp(args.comp), l = aemcp.findLayer(c, args.layer), parade = l.property("ADBE Effect Parade");
 var mn = parade.canAddProperty(args.effect) ? args.effect : aemcp.effectMatchName(args.effect).matchName;
@@ -136,25 +147,27 @@ l.applyPreset(f); return aemcp.layerInfo(l, true);`,
     name: "ae_add_shape",
     title: "Add shape",
     description:
-      "Draw a shape (rectangle, ellipse, polygon, star, or custom path) with fill and/or stroke, on a new shape layer or an existing one. Positions are relative to the layer (new layers are centered in the comp).",
+      "Draw a shape (rectangle, ellipse, polygon, star, or custom path) with fill and/or stroke, as a new shape group on a new shape layer or " +
+      "added to an existing shape layer (its other groups are kept). Positions are relative to the layer (new layers are centered in the comp, " +
+      "so [0,0] is the comp center). Returns the layer and the new group. To cut out part of a layer use ae_add_mask (via ae_call).",
     input: {
       comp: compRef,
-      layer: layerRef.optional().describe("Existing shape layer; omit to create a new one."),
-      name: z.string().optional(),
+      layer: layerRef.optional().describe("Existing shape layer to add to (other layer types fail); omit to create a new one."),
+      name: z.string().optional().describe('Name of the new shape group, and of a new layer (default "Shape Layer").'),
       shape: z.enum(["rectangle", "ellipse", "polygon", "star", "path"]),
-      size: z.array(z.number()).length(2).optional().describe("[w,h] for rectangle/ellipse (default 400x400)."),
-      position: z.array(z.number()).length(2).optional().describe("Shape position within the layer (default [0,0])."),
-      roundness: z.number().optional().describe("Rectangle corner roundness."),
-      points: z.number().optional().describe("Polygon/star points."),
-      outerRadius: z.number().optional(),
-      innerRadius: z.number().optional(),
-      vertices: z.array(z.array(z.number()).length(2)).optional().describe("For 'path': [[x,y],...]."),
-      inTangents: z.array(z.array(z.number()).length(2)).optional(),
-      outTangents: z.array(z.array(z.number()).length(2)).optional(),
-      closed: z.boolean().optional(),
+      size: z.array(z.number()).length(2).optional().describe("[w,h] in pixels for rectangle/ellipse (default [400,400]); polygon/star radii default from its width."),
+      position: z.array(z.number()).length(2).optional().describe("Shape center within the layer (default [0,0]); not used for 'path'."),
+      roundness: z.number().optional().describe("Rectangle corner roundness in pixels (default 0)."),
+      points: z.number().optional().describe("Polygon/star: number of points (default 5)."),
+      outerRadius: z.number().optional().describe("Polygon/star: outer radius in pixels (default size[0]/2)."),
+      innerRadius: z.number().optional().describe("Star: inner radius in pixels (default size[0]/4)."),
+      vertices: z.array(z.array(z.number()).length(2)).optional().describe("For 'path' (required): points [[x,y],...] in layer coordinates."),
+      inTangents: z.array(z.array(z.number()).length(2)).optional().describe("For 'path': incoming Bezier handle per vertex, [[x,y],...] relative to the vertex (default: straight segments)."),
+      outTangents: z.array(z.array(z.number()).length(2)).optional().describe("For 'path': outgoing Bezier handle per vertex, relative to the vertex."),
+      closed: z.boolean().optional().describe("For 'path': close the path (default true)."),
       fill: colorSchema.optional().describe("Fill color; omit for no fill (unless no stroke either: defaults to white)."),
-      stroke: colorSchema.optional(),
-      strokeWidth: z.number().optional(),
+      stroke: colorSchema.optional().describe("Stroke color; omit for no stroke."),
+      strokeWidth: z.number().optional().describe("Stroke width in pixels (default 4); only with stroke."),
     },
     jsx: `
 var c = aemcp.findComp(args.comp), l;
