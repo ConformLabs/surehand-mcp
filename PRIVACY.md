@@ -1,6 +1,7 @@
 # Privacy
 
-*Surehand MCP for Adobe® After Effects®, by Conform Labs. Last updated 2026-10-25.*
+*Surehand MCP for Adobe® After Effects®, by Conform Labs. Last updated 2026-10-25. Also at
+[conformlabs.co/privacy](https://conformlabs.co/privacy/).*
 
 Surehand MCP runs entirely on your computer. Conform Labs collects no data: there are no accounts, no analytics and no
 telemetry, and nothing is sent to Conform Labs.

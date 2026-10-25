@@ -22,6 +22,6 @@
   "icon": "./brand/png/icon-512.png",
   "documentationUrl": "https://github.com/ConformLabs/surehand-mcp/wiki",
   "supportUrl": "https://github.com/ConformLabs/surehand-mcp/issues",
-  "privacyPolicyUrl": "https://github.com/ConformLabs/surehand-mcp/blob/main/PRIVACY.md",
+  "privacyPolicyUrl": "https://conformlabs.co/privacy/",
   "mcpServers": "https://github.com/ConformLabs/surehand-mcp/releases/download/v1.4.1/Surehand-MCP.mcpb"
 }
