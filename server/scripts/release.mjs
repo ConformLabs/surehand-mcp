@@ -139,6 +139,22 @@ if (installers) {
 }
 for (const f of assets) if (!existsSync(f)) die(`missing ${f}`);
 
+// the listings point at this release's .mcpb: the MCP Registry's server.json (published by the "Publish to MCP Registry"
+// workflow when the release is published) and the Claude Code plugin manifest. Betas leave them on the last stable release.
+if (!prerelease) {
+  const mcpbSha = createHash("sha256").update(readFileSync(mcpb)).digest("hex");
+  const mcpbUrl = `https://github.com/${repo}/releases/download/${tag}/Surehand-MCP.mcpb`;
+  const edit = (file, fn) => {
+    const path = join(ROOT, file);
+    const json = JSON.parse(readFileSync(path, "utf8"));
+    fn(json);
+    writeFileSync(path, JSON.stringify(json, null, 2) + "\n");
+  };
+  edit("server.json", (j) => Object.assign(j, { version }) && Object.assign(j.packages[0], { identifier: mcpbUrl, fileSha256: mcpbSha }));
+  edit(".claude-plugin/plugin.json", (j) => Object.assign(j, { version, mcpServers: mcpbUrl }));
+  console.log(`listings: server.json and .claude-plugin/plugin.json -> ${tag} (.mcpb ${mcpbSha.slice(0, 12)})`);
+}
+
 step(`release pull request (${branch})`);
 sh("git", ["checkout", "-q", "-b", branch]);
 sh("git", ["add", "-A"]);
