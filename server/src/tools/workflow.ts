@@ -267,9 +267,14 @@ export function registerWorkflowTools(server: McpServer) {
         "Run many steps in ONE call: each step is a tool with its arguments (any project/comp/layer/property/keyframe/effect/text/footage tool) " +
         "or {tool: \"ae_run_script\", args: {code}}. All steps form a single undo step and return one change report. " +
         "Atomic by default: if any step fails, everything is undone and you get the error of the failing step. " +
-        "Use it for repetitive or multi-part edits (e.g. style 30 layers, build a scene) to save round trips.",
+        "Use it for repetitive or multi-part edits (e.g. style 30 layers, build a scene) to save round trips; for a single edit call the tool directly. " +
+        "Not usable as steps: tools that can't be part of an undo step (open/save project, undo/redo), renders and ae_checkpoint.",
       inputSchema: {
-        steps: z.array(z.object({ tool: z.string(), args: z.record(z.string(), z.any()).optional() })).min(1).max(200),
+        steps: z
+          .array(z.object({ tool: z.string(), args: z.record(z.string(), z.any()).optional() }))
+          .min(1)
+          .max(200)
+          .describe("1-200 steps run in order, each {tool, args} with the same args as calling that tool."),
         atomic: z.boolean().optional().describe("Undo everything if a step fails (default true). false = keep successful steps and continue."),
         name: z.string().optional().describe('Undo step name shown in After Effects (default "Surehand MCP Batch").'),
         checkpoint: z.boolean().optional().describe("Save a project checkpoint before running (see ae_checkpoint)."),
@@ -294,9 +299,11 @@ export function registerWorkflowTools(server: McpServer) {
       title: "Project checkpoints",
       description:
         "Safety copies of the project: save (saves the open project, then keeps a timestamped copy), list the checkpoints of this project, " +
-        "or restore one (opens it as a NEW file next to the original; neither the original nor an earlier restore is ever overwritten). Use before large or risky changes.",
+        "or restore one (opens it as a NEW file next to the original; neither the original nor an earlier restore is ever overwritten). Use before large or risky changes. " +
+        "The project must have been saved once. save returns the checkpoint id and file; list the ids, times and labels; restore without id takes the latest " +
+        "and refuses while the open project has unsaved changes unless discardChanges. Keeps the 50 latest. To revert just the last edits use ae_undo.",
       inputSchema: {
-        action: z.enum(["save", "list", "restore"]),
+        action: z.enum(["save", "list", "restore"]).describe("save a new checkpoint, list this project's checkpoints, or restore one."),
         label: z.string().optional().describe("Short label for a new checkpoint."),
         id: z.string().optional().describe("Checkpoint id to restore (from list)."),
         discardChanges: z.boolean().optional().describe("Restore even if the open project has unsaved changes (they are discarded)."),
@@ -337,8 +344,9 @@ export function registerWorkflowTools(server: McpServer) {
       title: "List scripts",
       description:
         "List the user's own After Effects scripts: AE's Scripts folder (and ScriptUI Panels) plus folders configured as \"scriptFolders\" " +
-        "in ~/.surehand/ae/config.json, with each script's description from its header comment. Run one with ae_run_script_file.",
-      inputSchema: { nameContains: z.string().optional() },
+        "in ~/.surehand/ae/config.json, with each script's name, path, kind (script or panel) and description from its header comment. " +
+        "Needs After Effects running (to find its Scripts folder). Run one with ae_run_script_file; for code you write yourself use ae_run_script.",
+      inputSchema: { nameContains: z.string().optional().describe("Only scripts whose file name (without extension) contains this text, case-insensitive.") },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ nameContains }) => {

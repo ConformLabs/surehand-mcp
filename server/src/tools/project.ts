@@ -5,7 +5,10 @@ export const projectTools: JsxTool[] = [
   {
     name: "ae_get_project_info",
     title: "Get project info",
-    description: "Summary of the open project: file path, dirty state, item counts, bit depth, render queue size, active item.",
+    description:
+      "Summary of the open project: file path (null if never saved), unsaved-changes (dirty) state, item counts by type, bit depth, render " +
+      "queue size, active item. Read-only and quick: call it first to orient. For the connection and permission mode use ae_status; to list " +
+      "comps or items ae_list_comps / ae_list_items, for problems ae_project_health, for how a project works ae_project_xray (all via ae_call).",
     input: {},
     readOnly: true,
     jsx: "return aemcp.projectInfo();",

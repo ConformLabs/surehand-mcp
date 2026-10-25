@@ -53,7 +53,8 @@ export const inspectTools: JsxTool[] = [
     description:
       "Exact on-screen bounding boxes of layers in composition pixels at a time, after all transforms, parenting, 3D and the active camera " +
       "(via AE's own toComp()). Also reports whether each layer is visible at that time, fully/partly/not in frame, and inside action-safe (5% margin) " +
-      "and title-safe (10% margin). Use it to check alignment, spacing, overlaps and safe areas with numbers.",
+      "and title-safe (10% margin). Use it to check alignment, spacing, overlaps and safe areas with numbers; to move layers by these bounds " +
+      "use ae_align_layers (via ae_call). It measures through a temporary probe layer removed in the same undo step; your layers are left as they were.",
     input: {
       comp: compRef,
       layers: z.array(layerRef).optional().describe("Layers to measure (default: all layers, up to 300)."),
@@ -128,7 +129,8 @@ return { comp: c.name, time: t, radius: rad, samples: out };`,
     title: "Composition structure map",
     description:
       "Overview of how a composition is built: the tree of nested precomps (with how many times each is used), parenting chains, " +
-      "track mattes, and which layers/comps each expression references. Use it to understand an unfamiliar project before editing.",
+      "track mattes, and which layers/comps each expression references. Read-only. Use it to understand an unfamiliar comp before editing; " +
+      "for one comp's settings and layer list use ae_get_comp_info, for the whole project (render queue, missing items, fragile links) ae_project_xray (via ae_call).",
     input: {
       comp: compRef,
       depth: z.number().int().min(1).max(10).optional().describe("How deep to follow nested precomps (default 4)."),

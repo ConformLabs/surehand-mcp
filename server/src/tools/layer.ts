@@ -3,16 +3,16 @@ import { colorSchema, compRef, itemRef, layerRef, type JsxTool } from "./registr
 
 const textStyle = {
   font: z.string().optional().describe('PostScript font name, e.g. "Arial-BoldMT", "Helvetica", "Montserrat-Bold".'),
-  fontSize: z.number().optional(),
-  fillColor: colorSchema.optional(),
-  strokeColor: colorSchema.optional(),
-  strokeWidth: z.number().optional(),
-  tracking: z.number().optional(),
-  leading: z.number().optional(),
-  justification: z.enum(["LEFT_JUSTIFY", "CENTER_JUSTIFY", "RIGHT_JUSTIFY", "FULL_JUSTIFY_LASTLINE_LEFT", "FULL_JUSTIFY_LASTLINE_CENTER", "FULL_JUSTIFY_LASTLINE_RIGHT", "FULL_JUSTIFY_LASTLINE_FULL"]).optional(),
-  fauxBold: z.boolean().optional(),
-  fauxItalic: z.boolean().optional(),
-  allCaps: z.boolean().optional(),
+  fontSize: z.number().optional().describe("Text: font size in pixels."),
+  fillColor: colorSchema.optional().describe('Text: fill color, "#rrggbb" or [r,g,b].'),
+  strokeColor: colorSchema.optional().describe('Text: stroke color, "#rrggbb" or [r,g,b].'),
+  strokeWidth: z.number().optional().describe("Text: stroke width in pixels."),
+  tracking: z.number().optional().describe("Text: tracking (After Effects units, 1/1000 em)."),
+  leading: z.number().optional().describe("Text: line spacing in pixels (turns auto leading off)."),
+  justification: z.enum(["LEFT_JUSTIFY", "CENTER_JUSTIFY", "RIGHT_JUSTIFY", "FULL_JUSTIFY_LASTLINE_LEFT", "FULL_JUSTIFY_LASTLINE_CENTER", "FULL_JUSTIFY_LASTLINE_RIGHT", "FULL_JUSTIFY_LASTLINE_FULL"]).optional().describe("Text: paragraph alignment."),
+  fauxBold: z.boolean().optional().describe("Text: faux bold."),
+  fauxItalic: z.boolean().optional().describe("Text: faux italic."),
+  allCaps: z.boolean().optional().describe("Text: all caps."),
   direction: z
     .enum(["LEFT_TO_RIGHT", "RIGHT_TO_LEFT"])
     .optional()
@@ -23,7 +23,10 @@ export const layerTools: JsxTool[] = [
   {
     name: "ae_get_layer_info",
     title: "Get layer info",
-    description: "Full info for one layer: switches, timing, parent, source, transform values, effects, masks count, markers, text, and every animated/expression property.",
+    description:
+      "Full info for one layer: switches, timing, parent, source, transform values, effects, mask count, markers, text, and every " +
+      "animated/expression property. Read-only; fails if the comp or layer isn't found. For all layers in brief use ae_get_comp_info, for the " +
+      "full property tree (paths to set) ae_get_properties, for the on-screen box ae_get_layer_bounds.",
     input: { comp: compRef, layer: layerRef },
     readOnly: true,
     jsx: `var c = aemcp.findComp(args.comp); return aemcp.layerInfo(aemcp.findLayer(c, args.layer), true);`,
@@ -32,23 +35,25 @@ export const layerTools: JsxTool[] = [
     name: "ae_add_layer",
     title: "Add layer",
     description:
-      "Add a layer to a composition: solid, text, shape (empty, use ae_add_shape to draw), null, adjustment, camera, light, or an existing project item (footage/comp).",
+      "Add one new layer to a composition: solid, text, shape (empty, use ae_add_shape to draw), null, adjustment, camera, light, or an existing " +
+      "project item (footage/comp). Each call adds another layer, on top unless moveToIndex is given. Returns the new layer's index, id and name. " +
+      "Text options apply to text layers only. To edit existing text use ae_set_text, for switches, timing or parent ae_set_layer_attributes (both via ae_call).",
     input: {
       comp: compRef,
-      type: z.enum(["solid", "text", "shape", "null", "adjustment", "camera", "light", "item"]),
-      name: z.string().optional(),
-      text: z.string().optional().describe("For text layers."),
+      type: z.enum(["solid", "text", "shape", "null", "adjustment", "camera", "light", "item"]).describe("Layer kind; 'item' adds the project item given in item."),
+      name: z.string().optional().describe('Layer name (default: After Effects\' name, e.g. "Solid", "Camera").'),
+      text: z.string().optional().describe("For type 'text': the text (default empty)."),
       boxSize: z.array(z.number()).length(2).optional().describe("Paragraph (box) text size [w,h]; omit for point text."),
       ...textStyle,
       color: colorSchema.optional().describe("Solid/adjustment color, or light color."),
-      width: z.number().int().optional().describe("Solid size (default comp size)."),
-      height: z.number().int().optional(),
-      item: itemRef.optional().describe("For type 'item': project item to add."),
-      lightType: z.enum(["PARALLEL", "SPOT", "POINT", "AMBIENT"]).optional(),
-      position: z.array(z.number()).min(2).max(3).optional(),
-      startTime: z.number().optional(),
+      width: z.number().int().optional().describe("Solid/adjustment width in pixels (default: comp width)."),
+      height: z.number().int().optional().describe("Solid/adjustment height in pixels (default: comp height)."),
+      item: itemRef.optional().describe("For type 'item' (required there): project item to add."),
+      lightType: z.enum(["PARALLEL", "SPOT", "POINT", "AMBIENT"]).optional().describe("For type 'light' (default: After Effects' default)."),
+      position: z.array(z.number()).min(2).max(3).optional().describe("Layer position [x,y] or [x,y,z] in comp pixels (cameras and lights default to the comp center)."),
+      startTime: z.number().optional().describe("Layer start time in seconds (comp time)."),
       duration: z.number().optional().describe("Layer duration in seconds (default comp duration)."),
-      threeD: z.boolean().optional(),
+      threeD: z.boolean().optional().describe("Make the layer 3D."),
       moveToIndex: z.number().int().optional().describe("Move the new layer to this 1-based index (new layers are added on top)."),
     },
     jsx: `
@@ -167,7 +172,10 @@ return { removed: names };`,
   {
     name: "ae_get_selection",
     title: "Get selection",
-    description: "What the user has selected: project items, and in the active comp the selected layers and selected properties (with paths).",
+    description:
+      "What the user has selected right now: project items, and in the active comp the selected layers and selected properties (with paths " +
+      "usable by ae_set_property). Read-only. Use it when the user says \"this layer\" or \"the selected ones\". Lists are empty when nothing is " +
+      "selected, and comp is null when no comp is active. To change the selection use ae_select_layers (via ae_call).",
     input: {},
     readOnly: true,
     jsx: `

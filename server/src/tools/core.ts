@@ -463,7 +463,8 @@ export function registerCoreTools(server: McpServer) {
         "- The `aemcp` helper library is available: aemcp.findComp(idOrName), aemcp.findLayer(comp, indexOrName), aemcp.findItem(ref), " +
         "aemcp.resolveProp(layer, 'Transform/Position'), aemcp.color('#ff0000'), aemcp.compInfo(comp, true), aemcp.layerInfo(layer, true), aemcp.propInfo(prop, {depth:2}), aemcp.projectInfo().\n" +
         "- Collections are 1-based: app.project.item(1), comp.layer(1), prop.property(1).\n" +
-        "- The whole script is one undo step. Errors come back with the failing line and code around it. ae_get_scripting_guide has an API cheat sheet.",
+        "- The whole script is one undo step. Errors come back with the failing line and code around it. ae_get_scripting_guide has an API cheat sheet.\n" +
+        "- Prefer the dedicated tools for common edits (clearer validation and results); use this for anything they don't cover. For a script file on disk use ae_run_script_file.",
       inputSchema: {
         code: z.string().describe("JavaScript source; a function body, use `return` to return data."),
         args: z.record(z.string(), z.any()).optional().describe("JSON object exposed to the script as `args`."),
@@ -525,12 +526,13 @@ export function registerCoreTools(server: McpServer) {
     {
       title: "Run JSX file",
       description:
-        "Run an existing .jsx/.jsxbin script file from disk inside After Effects (like File > Scripts > Run Script File). " +
-        "`args` is exposed to the script as the global AEMCP_ARGS. Returns the value of the script's last expression.",
+        "Run an existing .jsx/.jsxbin script file from disk inside After Effects (like File > Scripts > Run Script File), e.g. one found with " +
+        "ae_list_scripts. `args` is exposed to the script as the global AEMCP_ARGS. Returns the value of the script's last expression and a change " +
+        "report; the run is one undo step. A missing file is an error; refused in Read-only mode. For code you write yourself use ae_run_script.",
       inputSchema: {
         path: z.string().describe("Absolute path to the .jsx / .jsxbin file."),
-        args: z.record(z.string(), z.any()).optional(),
-        timeoutSeconds: z.number().min(1).max(3600).optional(),
+        args: z.record(z.string(), z.any()).optional().describe("JSON object exposed to the script as the global AEMCP_ARGS (default {})."),
+        timeoutSeconds: z.number().min(1).max(3600).optional().describe("Max seconds to wait for the script, 1-3600 (default 300)."),
       },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },
@@ -568,7 +570,8 @@ export function registerCoreTools(server: McpServer) {
       description:
         "Check the connection to After Effects: app version, OS, open project, active item, permission mode, and whether AE is busy. " +
         "Lists every running After Effects instance when several are open; pass `instance` (e.g. \"2025\", \"2026\" or a port) to choose which one " +
-        "this session controls. Call this first if unsure AE is reachable.",
+        "this session controls. Call this first if unsure AE is reachable; if it isn't, the error says why (e.g. not running, or not taking scripts). " +
+        "For the project's contents use ae_get_project_info.",
       inputSchema: {
         instance: z.string().optional().describe('Switch to another running After Effects: "2026", "26.5", or a bridge port. Omit to keep the current one.'),
       },
@@ -667,7 +670,9 @@ export function registerCoreTools(server: McpServer) {
       description:
         "Render a frame of a composition and return it as an image, so you can SEE the result. Inspection options: zoom into a region, " +
         "render only some layers, show transparency on a checkerboard or a color, and compare against another time or comp as a difference image " +
-        "(black = identical). Large frames are downscaled to maxSize.",
+        "(black = identical). Large frames are downscaled to maxSize. Use it after visual edits; for motion use ae_render_contact_sheet, for exact " +
+        "colors ae_sample_pixels (via ae_call). Renders through a temporary comp, removed afterwards (hidden layers put back); writes a file only " +
+        "with outputPath, never replacing one unless overwrite.",
       inputSchema: {
         comp: compRef,
         time: z.number().optional().describe("Time in seconds (default: the comp's current time)."),
@@ -712,7 +717,8 @@ export function registerCoreTools(server: McpServer) {
       title: "Preview animation (contact sheet)",
       description:
         "Render several frames of a composition into ONE image (a grid, each cell labelled with its time and frame number), " +
-        "so you can judge motion, timing and easing, not just a single frame. Defaults to 9 frames spread over the work area.",
+        "so you can judge motion, timing and easing, not just a single frame. Defaults to 9 frames spread over the work area. For one frame in " +
+        "detail use ae_render_frame. Writes a file only with outputPath, never replacing one unless overwrite.",
       inputSchema: {
         comp: compRef,
         frames: z.number().int().min(2).max(36).optional().describe("Number of evenly spaced frames (default 9)."),
