@@ -1,0 +1,27 @@
+{
+  "name": "surehand-ae",
+  "displayName": "Surehand MCP for Adobe After Effects",
+  "version": "1.4.1",
+  "description": "Your AI works in Adobe After Effects and proves what it did: an exact change report for every edit, pixel proof for restructures, delivery checks against your spec, template stress tests and verified farm renders. Runs locally; After Effects 2025 and 2026 on macOS and Windows.",
+  "author": {
+    "name": "Conform Labs",
+    "url": "https://conformlabs.co"
+  },
+  "homepage": "https://conformlabs.co/surehand/",
+  "repository": "https://github.com/ConformLabs/surehand-mcp",
+  "license": "MIT",
+  "keywords": [
+    "after-effects",
+    "adobe",
+    "motion-design",
+    "mcp",
+    "extendscript",
+    "qc",
+    "rendering"
+  ],
+  "icon": "./brand/png/icon-512.png",
+  "documentationUrl": "https://github.com/ConformLabs/surehand-mcp/wiki",
+  "supportUrl": "https://github.com/ConformLabs/surehand-mcp/issues",
+  "privacyPolicyUrl": "https://github.com/ConformLabs/surehand-mcp/blob/main/PRIVACY.md",
+  "mcpServers": "https://github.com/ConformLabs/surehand-mcp/releases/download/v1.4.1/Surehand-MCP.mcpb"
+}

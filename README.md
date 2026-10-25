@@ -173,6 +173,17 @@ The source is `skills/` in this repo.
 - `surehand-ae skills [--json]` shows where they are installed; `surehand-ae skills install` / `uninstall` writes or
   removes them.
 
+### Claude Code plugin
+
+In Claude Code you can also install Surehand as a plugin (the server and the four skills, from the latest release;
+needs Node.js on your PATH):
+
+```
+/plugin install surehand-ae --marketplace ConformLabs/surehand-mcp
+```
+
+The server installs the After Effects extension the first time it starts; restart After Effects afterwards.
+
 ### Other MCP clients
 
 Point them at the installed server (stdio):

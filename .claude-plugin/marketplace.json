@@ -1,0 +1,15 @@
+{
+  "name": "conformlabs",
+  "owner": {
+    "name": "Conform Labs",
+    "url": "https://conformlabs.co"
+  },
+  "description": "Surehand MCP: AI in Adobe After Effects that proves what it did.",
+  "plugins": [
+    {
+      "name": "surehand-ae",
+      "source": "./",
+      "description": "Your AI works in Adobe After Effects and proves what it did."
+    }
+  ]
+}
