@@ -2,12 +2,16 @@ name: Publish to MCP Registry
 
 # Publishes server.json to the official MCP Registry as io.github.ConformLabs/surehand-mcp.
 # GitHub's OIDC token proves the repo belongs to ConformLabs, so no secret is needed.
-# Run it by hand after a release, once server.json points at the new .mcpb (version, URL, fileSha256).
+# Runs when a stable release is published (the release script has already pointed server.json at its .mcpb:
+# version, URL, fileSha256), or by hand. Pre-releases are skipped.
 on:
+  release:
+    types: [published]
   workflow_dispatch:
 
 jobs:
   publish:
+    if: github.event_name != 'release' || !github.event.release.prerelease
     runs-on: ubuntu-latest
     permissions:
       id-token: write
