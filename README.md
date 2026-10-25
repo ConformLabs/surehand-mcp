@@ -40,7 +40,8 @@ AI app ──MCP──> surehand-ae server (Node, on your computer) ──localh
 ## See it work
 
 Four short demos, recorded on Surehand 1.4.1 and After Effects 2026. Long waits are cut and marked on screen; nothing
-is sped up. [All four as a playlist](https://www.youtube.com/playlist?list=PLXM55bZwkADk).
+is sped up. [All four as a playlist](https://www.youtube.com/playlist?list=PLXM55bZwkADk), or on
+[conformlabs.co/get](https://conformlabs.co/get/#demos).
 
 - [Precomp surgery](https://youtu.be/WjrCNMhCpxs): Claude un-precomposes a comp, keeps every expression working and
   proves the picture didn't change (16 frames, zero difference).
