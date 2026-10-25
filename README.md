@@ -198,6 +198,9 @@ Point them at the installed server (stdio):
 
 The panel's **☰ › Connect an AI app** shows which apps are connected and connects the others.
 
+For AI agents that install MCP servers themselves (Cline, for example), [llms-install.md](llms-install.md) has
+the steps: download, checksum, install, MCP settings.
+
 ## ChatGPT
 
 **ChatGPT desktop app (Mac and Windows): no tunnel needed.** It runs local MCP servers itself and reads the same
