@@ -4,3 +4,4 @@ node_modules/
 dist-zip/
 server/scripts/smoke-frame.png
 server/scripts/smoke-sheet.png
+.mcpb-cache/

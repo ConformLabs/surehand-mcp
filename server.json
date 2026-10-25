@@ -1,0 +1,22 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.ConformLabs/surehand-mcp",
+  "title": "Surehand MCP for Adobe After Effects",
+  "description": "Your AI works in Adobe After Effects and proves what it did: change reports, pixel proofs, QC.",
+  "version": "1.4.1",
+  "websiteUrl": "https://conformlabs.co/surehand/",
+  "repository": {
+    "url": "https://github.com/ConformLabs/surehand-mcp",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "mcpb",
+      "identifier": "https://github.com/ConformLabs/surehand-mcp/releases/download/v1.4.1/Surehand-MCP.mcpb",
+      "fileSha256": "ee7482e810f3c8dcda25a1862315f1575d652842c9ce999618cb7bfc6153bd71",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}
