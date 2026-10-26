@@ -12,6 +12,7 @@
 </p>
 
 [![CI](https://github.com/ConformLabs/surehand-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/ConformLabs/surehand-mcp/actions/workflows/ci.yml)
+[![Glama score](https://glama.ai/mcp/servers/ConformLabs/surehand-mcp/badges/score.svg)](https://glama.ai/mcp/servers/ConformLabs/surehand-mcp)
 
 **Surehand MCP lets the AI app you already use work inside Adobe® After Effects®, and shows you what it did.**
 It is for motion designers, finishing artists and technical directors who can't deliver on "the AI says it's done".
