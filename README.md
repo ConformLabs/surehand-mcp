@@ -29,7 +29,7 @@ worst-case inputs, and every version built from data is checked row by row. Veri
   extension loads in CC 2019 (16.0) and newer; versions before 2025 are best effort.
 - **Install:** signed and notarized `.pkg` for Mac, signed `Setup.exe` for Windows. No administrator rights, no
   account. Free and open source (MIT).
-- **Website and downloads:** [conformlabs.co/get](https://conformlabs.co/get).
+- **Website and downloads:** [conformlabs.co/surehand](https://conformlabs.co/surehand/).
 
 It doesn't generate images and ships no presets or canned looks. It works on your project, by your rules, and
 measures the result.
@@ -42,7 +42,7 @@ AI app ──MCP──> surehand-ae server (Node, on your computer) ──localh
 
 Four short demos, recorded on Surehand 1.4.1 and After Effects 2026. Long waits are cut and marked on screen; nothing
 is sped up. [All four as a playlist](https://www.youtube.com/playlist?list=PLXM55bZwkADk), or on
-[conformlabs.co/get](https://conformlabs.co/get/#demos).
+[conformlabs.co/surehand](https://conformlabs.co/surehand/#demos).
 
 - [Precomp surgery](https://youtu.be/WjrCNMhCpxs): Claude un-precomposes a comp, keeps every expression working and
   proves the picture didn't change (16 frames, zero difference).
